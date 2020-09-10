@@ -21,7 +21,7 @@ pub fn readit() {
         let m = MappedRecord::new(&record);
         line_count += 1;
         match m {
-            Err(_) => println!("{:?}", (m, record)),
+            Err(_) => println!("{:?}", (m, &record)),
             _ => ()
         };
     }
