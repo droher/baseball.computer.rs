@@ -9,21 +9,34 @@ use strum_macros::{EnumDiscriminants, EnumString};
 pub type LineupPosition = u8;
 pub type FieldingPosition = u8;
 pub type Inning = u8;
-pub type PitchSequence<'a> = &'a str;
-pub type Play<'a> = &'a str;
-pub type Comment<'a> = &'a str;
+pub type PitchSequence = String;
+pub type Play = String;
+pub type Comment = String;
 
 pub type RetrosheetEventRecord = StringRecord;
 
 
-type Person<'a> = &'a str;
-type Player<'a> = Person<'a>;
-type Umpire<'a> = Person<'a>;
-type RetrosheetVolunteer<'a> = Person<'a>;
-type Scorer<'a> = Person<'a>;
+type Person = String;
+type Player = Person;
+type Umpire = Person;
+type RetrosheetVolunteer = Person;
+type Scorer = Person;
 
-type Batter<'a> = Player<'a>;
-type Fielder<'a> = Player<'a>;
+type Batter = Player;
+type Fielder = Player;
+
+type Pitcher = Player;
+type Catcher = Player;
+type FirstBaseman = Player;
+type SecondBaseman = Player;
+type ThirdBaseman = Player;
+type Shortstop = Player;
+type LeftFielder = Player;
+type CenterFielder = Player;
+type RightFielder = Player;
+type DesignatedHitter = Player;
+type PinchHitter = Player;
+type PinchRunner = Player;
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
 #[strum(serialize_all = "lowercase")]
@@ -57,34 +70,34 @@ enum TeamKind {
     Home
 }
 
-pub trait FromRetrosheetRecord<'a> {
-    fn new(record: &'a RetrosheetEventRecord) -> Result<Self> where Self: Sized;
+pub trait FromRetrosheetRecord {
+    fn new(record: &RetrosheetEventRecord) -> Result<Self> where Self: Sized;
 
-    fn error(msg: &str, record: &'a RetrosheetEventRecord) -> Error {
+    fn error(msg: &str, record: &RetrosheetEventRecord) -> Error {
         anyhow!("{}\nRecord: {:?}", msg, record)
     }
 }
 
 #[derive(Debug)]
-pub struct GameId<'a> {pub id: &'a str}
-impl<'a> FromRetrosheetRecord<'a> for GameId<'a> {
-    fn new(record: &'a RetrosheetEventRecord) -> Result<GameId<'a>> {
+pub struct GameId {pub id: String}
+impl FromRetrosheetRecord for GameId {
+    fn new(record: &RetrosheetEventRecord) -> Result<GameId> {
         Ok(GameId {
-            id: record.get(1).ok_or(Self::error("No game ID string found", record))?
+            id: String::from(record.get(1).ok_or(Self::error("No game ID string found", record))?)
         })
     }
 }
 
 #[derive(Debug)]
-pub struct HandAdjustment<'a> {player_id: &'a str, hand: Hand}
-pub type BatHandAdjustment<'a> = HandAdjustment<'a>;
-pub type PitchHandAdjustment<'a> = HandAdjustment<'a>;
+pub struct HandAdjustment {player_id: String, hand: Hand}
+pub type BatHandAdjustment = HandAdjustment;
+pub type PitchHandAdjustment = HandAdjustment;
 
-impl<'a> FromRetrosheetRecord<'a> for HandAdjustment<'a> {
-    fn new(record: &'a RetrosheetEventRecord) -> Result<HandAdjustment<'a>> {
+impl FromRetrosheetRecord for HandAdjustment {
+    fn new(record: &RetrosheetEventRecord) -> Result<HandAdjustment> {
         let (player_id, hand) = (record.get(1), record.get(2));
         Ok(HandAdjustment {
-            player_id: player_id.ok_or(Self::error("Missing player ID", record))?,
+            player_id: String::from(player_id.ok_or(Self::error("Missing player ID", record))?),
             hand: Hand::from_str(hand.unwrap_or(""))?
         })
     }
@@ -93,7 +106,7 @@ impl<'a> FromRetrosheetRecord<'a> for HandAdjustment<'a> {
 #[derive(Debug)]
 pub struct LineupAdjustment {team_kind: TeamKind, lineup_position: LineupPosition}
 
-impl FromRetrosheetRecord<'_> for LineupAdjustment {
+impl FromRetrosheetRecord for LineupAdjustment {
     fn new(record: &RetrosheetEventRecord) -> Result<LineupAdjustment> {
         let (hv, pos) = (record.get(1), record.get(2));
         Ok(LineupAdjustment {
@@ -105,18 +118,18 @@ impl FromRetrosheetRecord<'_> for LineupAdjustment {
 
 #[derive(Debug)]
 enum Position {
-    Pitcher,
-    Catcher,
-    FirstBaseman,
-    SecondBaseman,
-    ThirdBaseman,
-    Shortstop,
-    LeftFielder,
-    CenterFielder,
-    RightFielder,
-    DesignatedHitter,
-    PinchHitter,
-    PinchRunner
+    Pitcher(Pitcher),
+    Catcher(Catcher),
+    FirstBaseman(FirstBaseman),
+    SecondBaseman(SecondBaseman),
+    ThirdBaseman(ThirdBaseman),
+    Shortstop(Shortstop),
+    LeftFielder(LeftFielder),
+    CenterFielder(CenterFielder),
+    RightFielder(RightFielder),
+    DesignatedHitter(DesignatedHitter),
+    PinchHitter(PinchHitter),
+    PinchRunner(PinchRunner)
 }
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
@@ -176,8 +189,8 @@ enum WindDirection {
     Unknown
 }
 
-type Team<'a> = &'a str;
-type Park<'a> = &'a str;
+type Team = String;
+type Park = String;
 
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
@@ -211,9 +224,9 @@ enum PitchDetail {
 }
 
 #[derive(Debug)]
-pub enum InfoRecord<'a> {
-    VisitingTeam(Team<'a>),
-    HomeTeam(Team<'a>),
+pub enum InfoRecord {
+    VisitingTeam(Team),
+    HomeTeam(Team),
     GameDate(NaiveDate),
     GameType(GameType),
     StartTime(Option<NaiveTime>),
@@ -221,12 +234,12 @@ pub enum InfoRecord<'a> {
     UseDH(bool),
     HomeTeamBatsFirst(bool),
     PitchDetail(PitchDetail),
-    UmpHome(Umpire<'a>),
-    Ump1B(Umpire<'a>),
-    Ump2B(Umpire<'a>),
-    Ump3B(Umpire<'a>),
-    UmpLF(Umpire<'a>),
-    UmpRF(Umpire<'a>),
+    UmpHome(Umpire),
+    Ump1B(Umpire),
+    Ump2B(Umpire),
+    Ump3B(Umpire),
+    UmpLF(Umpire),
+    UmpRF(Umpire),
     FieldCondition(FieldCondition),
     Precipitation(Precipitation),
     Sky(Sky),
@@ -235,22 +248,22 @@ pub enum InfoRecord<'a> {
     WindSpeed(Option<u8>),
     TimeOfGameMinutes(Option<u16>),
     Attendance(Option<u32>),
-    Park(Park<'a>),
-    WinningPitcher(Option<Player<'a>>),
-    LosingPitcher(Option<Player<'a>>),
-    SavePitcher(Option<Player<'a>>),
-    GameWinningRBI(Option<Player<'a>>),
-    EditTime(Option<&'a str>),
+    Park(Park),
+    WinningPitcher(Option<Player>),
+    LosingPitcher(Option<Player>),
+    SavePitcher(Option<Player>),
+    GameWinningRBI(Option<Player>),
+    EditTime(Option<String>),
     HowScored(HowScored),
-    InputProgramVersion(Option<&'a str>),
-    Inputter(Option<RetrosheetVolunteer<'a>>),
-    InputTime(Option<&'a str>),
-    Scorer(Option<Scorer<'a>>),
-    OriginalScorer(Scorer<'a>),
-    Translator(Option<RetrosheetVolunteer<'a>>),
+    InputProgramVersion(Option<String>),
+    Inputter(Option<RetrosheetVolunteer>),
+    InputTime(Option<String>),
+    Scorer(Option<Scorer>),
+    OriginalScorer(Scorer),
+    Translator(Option<RetrosheetVolunteer>),
     Unrecognized
 }
-impl InfoRecord<'_> {
+impl InfoRecord {
     fn parse_time(time_str: &str) -> InfoRecord {
         let padded_time = format!("{:0>4}", time_str);
         let time = NaiveTime::parse_from_str(&padded_time, "%I%M");
@@ -270,54 +283,56 @@ impl InfoRecord<'_> {
     }
 }
 
-impl<'a> FromRetrosheetRecord<'a> for InfoRecord<'a> {
-    fn new(record: &'a RetrosheetEventRecord) -> Result<InfoRecord<'a>> {
+impl FromRetrosheetRecord for InfoRecord {
+    fn new(record: &RetrosheetEventRecord) -> Result<InfoRecord> {
         let info_type = record.get(1).ok_or(Self::error("Missing Info Type", record))?;
         let value = record.get(2);
 
-        let as_ref = value.ok_or(Self::error("Unexpected missing value", record))?;
-        type I<'a> = InfoRecord<'a>;
+        let opt_string = {|| value.map(|s| String::from(s))};
+        let as_ref = value.ok_or(Self::error("Unexpected missing value", record));
+        let as_string = {|| opt_string().ok_or(Self::error("Unexpected missing value", record))};
+        type I = InfoRecord;
         let info = match info_type {
-            "visteam" => I::VisitingTeam(as_ref),
-            "hometeam" => I::HomeTeam(as_ref),
-            "umphome" => I::UmpHome(as_ref),
-            "ump1b" => I::Ump1B(as_ref),
-            "ump2b" => I::Ump2B(as_ref),
-            "ump3b" => I::Ump3B(as_ref),
-            "umplf" => I::UmpLF(as_ref),
-            "umprf" => I::UmpRF(as_ref),
-            "site" => I::Park(as_ref),
-            "oscorer" => I::OriginalScorer(as_ref),
+            "visteam" => I::VisitingTeam(as_string()?),
+            "hometeam" => I::HomeTeam(as_string()?),
+            "umphome" => I::UmpHome(as_string()?),
+            "ump1b" => I::Ump1B(as_string()?),
+            "ump2b" => I::Ump2B(as_string()?),
+            "ump3b" => I::Ump3B(as_string()?),
+            "umplf" => I::UmpLF(as_string()?),
+            "umprf" => I::UmpRF(as_string()?),
+            "site" => I::Park(as_string()?),
+            "oscorer" => I::OriginalScorer(as_string()?),
 
-            "number" => I::GameType(GameType::from_str(as_ref)?),
-            "daynight" => I::DayNight(DayNight::from_str(as_ref)?),
-            "pitches" => I::PitchDetail(PitchDetail::from_str(as_ref)?),
-            "fieldcond" => I::FieldCondition(FieldCondition::from_str(as_ref)?),
-            "precip" => I::Precipitation(Precipitation::from_str(as_ref)?),
-            "sky" => I::Sky(Sky::from_str(as_ref)?),
-            "winddir" => I::WindDirection(WindDirection::from_str(as_ref)?),
-            "howscored" => I::HowScored(HowScored::from_str(as_ref)?),
+            "number" => I::GameType(GameType::from_str(as_ref?)?),
+            "daynight" => I::DayNight(DayNight::from_str(as_ref?)?),
+            "pitches" => I::PitchDetail(PitchDetail::from_str(as_ref?)?),
+            "fieldcond" => I::FieldCondition(FieldCondition::from_str(as_ref?)?),
+            "precip" => I::Precipitation(Precipitation::from_str(as_ref?)?),
+            "sky" => I::Sky(Sky::from_str(as_ref?)?),
+            "winddir" => I::WindDirection(WindDirection::from_str(as_ref?)?),
+            "howscored" => I::HowScored(HowScored::from_str(as_ref?)?),
 
             "windspeed" => I::WindSpeed(I::parse_positive_int::<u8>(value)),
             "timeofgame" => I::TimeOfGameMinutes(I::parse_positive_int::<u16>(value)),
             "attendance" => I::Attendance(I::parse_positive_int::<u32>(value)),
             "temp" => I::Temp(I::parse_positive_int::<u8>(value)),
 
-            "usedh" => I::UseDH(bool::from_str(as_ref)?),
-            "htbf" => I::HomeTeamBatsFirst(bool::from_str(as_ref)?),
-            "date" => I::GameDate(NaiveDate::parse_from_str(as_ref, "%Y/%m/%d")?),
-            "starttime" => I::parse_time(as_ref),
+            "usedh" => I::UseDH(bool::from_str(as_ref?)?),
+            "htbf" => I::HomeTeamBatsFirst(bool::from_str(as_ref?)?),
+            "date" => I::GameDate(NaiveDate::parse_from_str(as_ref?, "%Y/%m/%d")?),
+            "starttime" => I::parse_time(as_ref?),
 
-            "wp" => I::WinningPitcher(value),
-            "lp" => I::LosingPitcher(value),
-            "save" => I::SavePitcher(value),
-            "gwrbi" => I::GameWinningRBI(value),
-            "edittime" => I::EditTime(value),
-            "inputtime" => I::InputTime(value),
-            "scorer" => I::Scorer(value),
-            "inputter" => I::Inputter(value),
-            "inputprogvers" => I::InputProgramVersion(value),
-            "translator" => I::Translator(value),
+            "wp" => I::WinningPitcher(opt_string()),
+            "lp" => I::LosingPitcher(opt_string()),
+            "save" => I::SavePitcher(opt_string()),
+            "gwrbi" => I::GameWinningRBI(opt_string()),
+            "edittime" => I::EditTime(opt_string()),
+            "inputtime" => I::InputTime(opt_string()),
+            "scorer" => I::Scorer(opt_string()),
+            "inputter" => I::Inputter(opt_string()),
+            "inputprogvers" => I::InputProgramVersion(opt_string()),
+            "translator" => I::Translator(opt_string()),
             _ => I::Unrecognized
         };
         match info {
@@ -328,16 +343,16 @@ impl<'a> FromRetrosheetRecord<'a> for InfoRecord<'a> {
 }
 
 #[derive(Debug)]
-pub struct AppearanceRecord<'a> {
-    player: Player<'a>,
+pub struct AppearanceRecord {
+    player: Player,
     team_kind: TeamKind,
     lineup_position: LineupPosition,
     fielding_position: FieldingPosition
 }
-impl<'a> FromRetrosheetRecord<'a> for AppearanceRecord<'a> {
-    fn new(record: &'a RetrosheetEventRecord) -> Result<AppearanceRecord<'a>> {
+impl FromRetrosheetRecord for AppearanceRecord {
+    fn new(record: &RetrosheetEventRecord) -> Result<AppearanceRecord> {
         Ok(AppearanceRecord {
-            player: record.get(1).ok_or(Self::error("Missing player ID", record))?,
+            player: String::from(record.get(1).ok_or(Self::error("Missing player ID", record))?),
             team_kind: TeamKind::from_str(record.get(3).unwrap_or(""))?,
             lineup_position: record.get(4).unwrap_or("").parse::<LineupPosition>()?,
             fielding_position:  record.get(5).unwrap_or("").trim().parse::<FieldingPosition>()?
@@ -345,8 +360,8 @@ impl<'a> FromRetrosheetRecord<'a> for AppearanceRecord<'a> {
     }
 }
 
-pub type StartRecord<'a> = AppearanceRecord<'a>;
-pub type SubstitutionRecord<'a>= AppearanceRecord<'a>;
+pub type StartRecord = AppearanceRecord;
+pub type SubstitutionRecord = AppearanceRecord;
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
 #[strum(serialize_all = "lowercase")]
@@ -412,147 +427,147 @@ struct Pitch {
     blocked_by_catcher: bool
 }
 
-// #[derive(Debug, EnumDiscriminants)]
-// #[strum_discriminants(derive(EnumString))]
-// enum BatterPlay {
-//     FlyOut(Fielder),
-//     GroundOut(Vec<Fielder>),
-//     DoublePlay(Fielder),
-//     CatcherInterference,
-//     OtherFielderInterference(Fielder),
-//     Single(Fielder),
-//     Double(Fielder),
-//     Triple(Fielder),
-//     GroundRuleDouble,
-//     ReachedOnError(Fielder),
-//     FieldersChoice(Fielder),
-//     ErrorOnFlyBall(Fielder),
-//     HomeRun,
-//     InsideTheParkHomeRun(Fielder),
-//     HitByPitch,
-//     StrikeOut(Option<RunnerPlay>),
-//     NoPlay,
-//     IntentionalWalk(Option<RunnerPlay>),
-//     Walk(Option<RunnerPlay>)
-// }
-//
-// #[derive(Debug, EnumDiscriminants)]
-// #[strum_discriminants(derive(EnumString))]
-// enum RunnerPlay {
-//     Balk,
-//     CaughtStealing(Base, Vec<Fielder>),
-//     DefensiveIndifference,
-//     OtherAdvance,
-//     PassedBall,
-//     WildPitch,
-//     PickedOff(Base, Vec<Fielder>),
-//     PickedOffCaughtStealing(Base, Vec<Fielder>),
-//     StolenBase(Base)
-// }
-//
-// struct RunnerAdvance {
-//     from: Base,
-//     to: Base,
-//
-// }
-// type SuccessfulRunnerAdvance = RunnerAdvance;
-// struct UnsuccessfulRunnerAdvance {
-//     attempt: RunnerAdvance,
-//     fielders: Vec<Fielder>
-// }
-//
-//
-// type HitLocation = String;
-//
-// #[derive(Debug, EnumDiscriminants)]
-// #[strum_discriminants(derive(EnumString))]
-// enum PlayModifier {
-//     AppealPlay,
-//     PopUpBunt(Option<HitLocation>),
-//     GroundBallBunt(Option<HitLocation>),
-//     BuntGroundIntoDoublePlay(Option<HitLocation>),
-//     BatterInterference(Option<HitLocation>),
-//     LineDriveBunt(Option<HitLocation>),
-//     BatingOutOfTurn,
-//     BuntPopUp(Option<HitLocation>),
-//     BuntPoppedIntoDoublePlay(Option<HitLocation>),
-//     RunnerHitByBattedBall(Option<HitLocation>),
-//     CalledThirdStrike,
-//     CourtesyBatter,
-//     CourtesyFielder,
-//     CourtesyRunner,
-//     UnspecifiedDoublePlay(Option<HitLocation>),
-//     ErrorOn(Position),
-//     Fly(Option<HitLocation>),
-//     FlyBallDoublePlay(Option<HitLocation>),
-//     FanInterference,
-//     Foul(Option<HitLocation>),
-//     ForceOut(Option<HitLocation>),
-//     GroundBall(Option<HitLocation>),
-//     GroundBallDoublePlay(Option<HitLocation>),
-//     GroundBallTriplePlay(Option<HitLocation>),
-//     InfieldFlyRule(Option<HitLocation>),
-//     Interference(Option<HitLocation>),
-//     InsideTheParkHomeRun(Option<HitLocation>),
-//     LineDrive(Option<HitLocation>),
-//     LinedIntoDoublePlay(Option<HitLocation>),
-//     LinedIntoTriplePlay(Option<HitLocation>),
-//     ManageChallengeOfCallOnField,
-//     NoDoublePlayCredited,
-//     Obstruction,
-//     PopFly(Option<HitLocation>),
-//     RunnerOutPassingAnotherRunner,
-//     RelayToFielderWithNoOutMade(Position),
-//     RunnerInterference,
-//     SacrificeFly(Option<HitLocation>),
-//     SacrificeHit(Option<HitLocation>),
-//     Throw,
-//     ThrowToBase(Base),
-//     UnspecifiedTriplePlay(Option<HitLocation>),
-//     UmpireInterference(Option<HitLocation>),
-//     UmpireReviewOfCallOnField
-// }
-
-#[derive(Debug)]
-pub struct PlayRecord<'a> {
-    inning: Inning,
-    team_kind: TeamKind,
-    batter: Batter<'a>,
-    count: Count,
-    pitch_sequence: PitchSequence<'a>,
-    play: Play<'a>
+#[derive(Debug, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumString))]
+enum BatterPlay {
+    FlyOut(Fielder),
+    GroundOut(Vec<Fielder>),
+    DoublePlay(Fielder),
+    CatcherInterference,
+    OtherFielderInterference(Fielder),
+    Single(Fielder),
+    Double(Fielder),
+    Triple(Fielder),
+    GroundRuleDouble,
+    ReachedOnError(Fielder),
+    FieldersChoice(Fielder),
+    ErrorOnFlyBall(Fielder),
+    HomeRun,
+    InsideTheParkHomeRun(Fielder),
+    HitByPitch,
+    StrikeOut(Option<RunnerPlay>),
+    NoPlay,
+    IntentionalWalk(Option<RunnerPlay>),
+    Walk(Option<RunnerPlay>)
 }
 
-impl<'a> FromRetrosheetRecord<'a> for PlayRecord<'a> {
-    fn new(record: &'a RetrosheetEventRecord) -> Result<PlayRecord<'a>> {
+#[derive(Debug, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumString))]
+enum RunnerPlay {
+    Balk,
+    CaughtStealing(Base, Vec<Fielder>),
+    DefensiveIndifference,
+    OtherAdvance,
+    PassedBall,
+    WildPitch,
+    PickedOff(Base, Vec<Fielder>),
+    PickedOffCaughtStealing(Base, Vec<Fielder>),
+    StolenBase(Base)
+}
+
+struct RunnerAdvance {
+    from: Base,
+    to: Base,
+
+}
+type SuccessfulRunnerAdvance = RunnerAdvance;
+struct UnsuccessfulRunnerAdvance {
+    attempt: RunnerAdvance,
+    fielders: Vec<Fielder>
+}
+
+
+type HitLocation = String;
+
+#[derive(Debug, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumString))]
+enum PlayModifier {
+    AppealPlay,
+    PopUpBunt(Option<HitLocation>),
+    GroundBallBunt(Option<HitLocation>),
+    BuntGroundIntoDoublePlay(Option<HitLocation>),
+    BatterInterference(Option<HitLocation>),
+    LineDriveBunt(Option<HitLocation>),
+    BatingOutOfTurn,
+    BuntPopUp(Option<HitLocation>),
+    BuntPoppedIntoDoublePlay(Option<HitLocation>),
+    RunnerHitByBattedBall(Option<HitLocation>),
+    CalledThirdStrike,
+    CourtesyBatter,
+    CourtesyFielder,
+    CourtesyRunner,
+    UnspecifiedDoublePlay(Option<HitLocation>),
+    ErrorOn(Position),
+    Fly(Option<HitLocation>),
+    FlyBallDoublePlay(Option<HitLocation>),
+    FanInterference,
+    Foul(Option<HitLocation>),
+    ForceOut(Option<HitLocation>),
+    GroundBall(Option<HitLocation>),
+    GroundBallDoublePlay(Option<HitLocation>),
+    GroundBallTriplePlay(Option<HitLocation>),
+    InfieldFlyRule(Option<HitLocation>),
+    Interference(Option<HitLocation>),
+    InsideTheParkHomeRun(Option<HitLocation>),
+    LineDrive(Option<HitLocation>),
+    LinedIntoDoublePlay(Option<HitLocation>),
+    LinedIntoTriplePlay(Option<HitLocation>),
+    ManageChallengeOfCallOnField,
+    NoDoublePlayCredited,
+    Obstruction,
+    PopFly(Option<HitLocation>),
+    RunnerOutPassingAnotherRunner,
+    RelayToFielderWithNoOutMade(Position),
+    RunnerInterference,
+    SacrificeFly(Option<HitLocation>),
+    SacrificeHit(Option<HitLocation>),
+    Throw,
+    ThrowToBase(Base),
+    UnspecifiedTriplePlay(Option<HitLocation>),
+    UmpireInterference(Option<HitLocation>),
+    UmpireReviewOfCallOnField
+}
+
+#[derive(Debug)]
+pub struct PlayRecord {
+    inning: Inning,
+    team_kind: TeamKind,
+    batter: Batter,
+    count: Count,
+    pitch_sequence: PitchSequence,
+    play: Play
+}
+
+impl FromRetrosheetRecord for PlayRecord {
+    fn new(record: &RetrosheetEventRecord) -> Result<PlayRecord> {
 
         Ok(PlayRecord {
             inning: record.get(1).unwrap_or("").parse::<Inning>()?,
             team_kind: TeamKind::from_str(record.get(2).unwrap_or(""))?,
-            batter: record.get(3).ok_or(Self::error("Missing batter", record))?,
+            batter: String::from(record.get(3).unwrap_or("")),
             count: Count::new(record.get(4))?,
-            pitch_sequence: record.get(5).unwrap_or(""),
-            play: record.get(6).unwrap_or("")
+            pitch_sequence: String::from(record.get(5).unwrap_or("")),
+            play: String::from(record.get(6).unwrap_or(""))
         })
     }
 }
 
 #[derive(Debug)]
-pub enum MappedRecord<'a> {
-    GameId(GameId<'a>),
-    Info(InfoRecord<'a>),
-    Start(StartRecord<'a>),
-    Substitution(SubstitutionRecord<'a>),
-    Play(PlayRecord<'a>),
-    BatHandAdjustment(BatHandAdjustment<'a>),
-    PitchHandAdjustment(PitchHandAdjustment<'a>),
+pub enum MappedRecord {
+    GameId(GameId),
+    Info(InfoRecord),
+    Start(StartRecord),
+    Substitution(SubstitutionRecord),
+    Play(PlayRecord),
+    BatHandAdjustment(BatHandAdjustment),
+    PitchHandAdjustment(PitchHandAdjustment),
     LineupAdjustment(LineupAdjustment),
     Data,
-    Comment(Comment<'a>)
+    Comment(Comment)
 }
 
-impl<'a> FromRetrosheetRecord<'a> for MappedRecord<'a> {
-    fn new(record: &'a RetrosheetEventRecord) -> Result<MappedRecord<'a>>{
+impl FromRetrosheetRecord for MappedRecord {
+    fn new(record: &RetrosheetEventRecord) -> Result<MappedRecord>{
         let line_type = record.get(0).ok_or(anyhow!("No record"))?;
         type E = EventLineType;
         let mapped= match E::from_str(line_type)? {
@@ -564,7 +579,7 @@ impl<'a> FromRetrosheetRecord<'a> for MappedRecord<'a> {
             E::BatHandAdjustment => MappedRecord::BatHandAdjustment(BatHandAdjustment::new(record)?),
             E::PitchHandAdjustment => MappedRecord::PitchHandAdjustment(PitchHandAdjustment::new(record)?),
             E::BatOutOfOrder => MappedRecord::LineupAdjustment(LineupAdjustment::new(record)?),
-            E::Comment => MappedRecord::Comment(record.get(1).unwrap()),
+            E::Comment => MappedRecord::Comment(String::from(record.get(1).unwrap())),
             _ => MappedRecord::Data
         };
         Ok(mapped)
