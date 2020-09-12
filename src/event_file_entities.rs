@@ -1,14 +1,21 @@
 use std::str::FromStr;
+use std::convert::{TryFrom};
 
-use anyhow::{anyhow, Error, Result};
+
+use anyhow::{Context, Error, Result, anyhow};
 use chrono::{NaiveDate, NaiveTime};
 use csv::StringRecord;
-use num::Integer;
+use num_traits::{PrimInt};
 use strum_macros::{EnumDiscriminants, EnumString};
+use smallvec::SmallVec;
+use arrayref::array_ref;
+
+use crate::util::parse_positive_int;
 
 pub type LineupPosition = u8;
 pub type FieldingPosition = u8;
 pub type Inning = u8;
+
 pub type PitchSequence = String;
 pub type Play = String;
 pub type Comment = String;
@@ -17,53 +24,21 @@ pub type RetrosheetEventRecord = StringRecord;
 
 
 type Person = String;
-type Player = Person;
+pub type Player = Person;
 type Umpire = Person;
 type RetrosheetVolunteer = Person;
 type Scorer = Person;
 
 type Batter = Player;
-type Fielder = Player;
-
-type Pitcher = Player;
-type Catcher = Player;
-type FirstBaseman = Player;
-type SecondBaseman = Player;
-type ThirdBaseman = Player;
-type Shortstop = Player;
-type LeftFielder = Player;
-type CenterFielder = Player;
-type RightFielder = Player;
-type DesignatedHitter = Player;
-type PinchHitter = Player;
-type PinchRunner = Player;
-
-#[derive(Debug, Eq, PartialEq, EnumString)]
-#[strum(serialize_all = "lowercase")]
-pub enum EventLineType {
-    Id,
-    Version,
-    Info,
-    Start,
-    #[strum(serialize = "sub")]
-    Substitution,
-    Play,
-    #[strum(serialize = "badj")]
-    BatHandAdjustment,
-    #[strum(serialize = "padj")]
-    PitchHandAdjustment,
-    #[strum(serialize = "ladj")]
-    BatOutOfOrder,
-    Data,
-    #[strum(serialize = "com")]
-    Comment
-}
+type Baserunner = Player;
+pub type Pitcher = Player;
+pub type Fielder = Player;
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
 enum Hand {L, R, S, B}
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
-enum TeamKind {
+enum Side {
     #[strum(serialize = "0")]
     Away,
     #[strum(serialize = "1")]
@@ -81,10 +56,10 @@ pub trait FromRetrosheetRecord {
 #[derive(Debug)]
 pub struct GameId {pub id: String}
 impl FromRetrosheetRecord for GameId {
+
     fn new(record: &RetrosheetEventRecord) -> Result<GameId> {
-        Ok(GameId {
-            id: String::from(record.get(1).ok_or(Self::error("No game ID string found", record))?)
-        })
+        let record = record.deserialize::<[&str; 2]>(None)?;
+        Ok(GameId { id: String::from(record[1]) })
     }
 }
 
@@ -95,46 +70,32 @@ pub type PitchHandAdjustment = HandAdjustment;
 
 impl FromRetrosheetRecord for HandAdjustment {
     fn new(record: &RetrosheetEventRecord) -> Result<HandAdjustment> {
-        let (player_id, hand) = (record.get(1), record.get(2));
+        let record = record.deserialize::<[&str; 3]>(None)?;
+
         Ok(HandAdjustment {
-            player_id: String::from(player_id.ok_or(Self::error("Missing player ID", record))?),
-            hand: Hand::from_str(hand.unwrap_or(""))?
+            player_id: String::from(record[1]),
+            hand: Hand::from_str(record[2])?
         })
     }
 }
 
 #[derive(Debug)]
-pub struct LineupAdjustment {team_kind: TeamKind, lineup_position: LineupPosition}
+pub struct LineupAdjustment { side: Side, lineup_position: LineupPosition}
 
 impl FromRetrosheetRecord for LineupAdjustment {
     fn new(record: &RetrosheetEventRecord) -> Result<LineupAdjustment> {
-        let (hv, pos) = (record.get(1), record.get(2));
+        let record = record.deserialize::<[&str; 3]>(None)?;
+
         Ok(LineupAdjustment {
-            team_kind: TeamKind::from_str(hv.unwrap_or(""))?,
-            lineup_position: pos.unwrap_or("").parse::<LineupPosition>()?,
+            side: Side::from_str(record[1])?,
+            lineup_position: record[2].parse::<LineupPosition>()?,
         })
     }
-}
-
-#[derive(Debug)]
-enum Position {
-    Pitcher(Pitcher),
-    Catcher(Catcher),
-    FirstBaseman(FirstBaseman),
-    SecondBaseman(SecondBaseman),
-    ThirdBaseman(ThirdBaseman),
-    Shortstop(Shortstop),
-    LeftFielder(LeftFielder),
-    CenterFielder(CenterFielder),
-    RightFielder(RightFielder),
-    DesignatedHitter(DesignatedHitter),
-    PinchHitter(PinchHitter),
-    PinchRunner(PinchRunner)
 }
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
 #[strum(serialize_all = "lowercase")]
-enum HowScored {
+pub enum HowScored {
     Park,
     Tv,
     Radio,
@@ -143,7 +104,7 @@ enum HowScored {
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
 #[strum(serialize_all = "lowercase")]
-enum FieldCondition {
+pub enum FieldCondition {
     Dry,
     Soaked,
     Wet,
@@ -153,7 +114,7 @@ enum FieldCondition {
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
 #[strum(serialize_all = "lowercase")]
-enum Precipitation {
+pub enum Precipitation {
     Rain,
     Drizzle,
     Showers,
@@ -164,7 +125,7 @@ enum Precipitation {
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
 #[strum(serialize_all = "lowercase")]
-enum Sky {
+pub enum Sky {
     Cloudy,
     Dome,
     Night,
@@ -175,7 +136,7 @@ enum Sky {
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
 #[strum(serialize_all = "lowercase")]
-enum WindDirection {
+pub enum WindDirection {
     FromCF,
     FromLF,
     FromRF,
@@ -195,13 +156,14 @@ type Park = String;
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
 #[strum(serialize_all = "lowercase")]
-enum DayNight {
+pub enum DayNight {
     Day,
-    Night
+    Night,
+    Unknown
 }
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
-enum GameType {
+pub enum GameType {
     #[strum(serialize = "0")]
     SingleGame,
     #[strum(serialize = "1")]
@@ -216,7 +178,7 @@ enum GameType {
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
 #[strum(serialize_all = "lowercase")]
-enum PitchDetail {
+pub enum PitchDetail {
     Pitches,
     Count,
     None,
@@ -261,6 +223,9 @@ pub enum InfoRecord {
     Scorer(Option<Scorer>),
     OriginalScorer(Scorer),
     Translator(Option<RetrosheetVolunteer>),
+    // We currently don't parse umpire changes as they only occur in box scores
+    // and are irregularly shaped
+    UmpireChange,
     Unrecognized
 }
 impl InfoRecord {
@@ -272,67 +237,61 @@ impl InfoRecord {
             Err(_) => InfoRecord::StartTime(None)
         }
     }
-
-    fn parse_positive_int<T: Integer + FromStr>(temp_str: Option<&str>) -> Option<T> {
-        let unwrapped = temp_str.unwrap_or("");
-        let int = unwrapped.parse::<T>();
-        match int {
-            Ok(i) if !i.is_zero() => Some(i),
-            _ => None
-        }
-    }
 }
 
 impl FromRetrosheetRecord for InfoRecord {
     fn new(record: &RetrosheetEventRecord) -> Result<InfoRecord> {
-        let info_type = record.get(1).ok_or(Self::error("Missing Info Type", record))?;
-        let value = record.get(2);
+        let record = record.deserialize::<[&str; 3]>(None)?;
 
-        let opt_string = {|| value.map(|s| String::from(s))};
-        let as_ref = value.ok_or(Self::error("Unexpected missing value", record));
-        let as_string = {|| opt_string().ok_or(Self::error("Unexpected missing value", record))};
+        let info_type = record[1];
+        let value = record[2];
+
+        let as_string = String::from(value);
+        let to_option = {|s: String| if s.is_empty() {Some(s)} else {None}};
+        
         type I = InfoRecord;
         let info = match info_type {
-            "visteam" => I::VisitingTeam(as_string()?),
-            "hometeam" => I::HomeTeam(as_string()?),
-            "umphome" => I::UmpHome(as_string()?),
-            "ump1b" => I::Ump1B(as_string()?),
-            "ump2b" => I::Ump2B(as_string()?),
-            "ump3b" => I::Ump3B(as_string()?),
-            "umplf" => I::UmpLF(as_string()?),
-            "umprf" => I::UmpRF(as_string()?),
-            "site" => I::Park(as_string()?),
-            "oscorer" => I::OriginalScorer(as_string()?),
+            "visteam" => I::VisitingTeam(as_string),
+            "hometeam" => I::HomeTeam(as_string),
+            "umphome" => I::UmpHome(as_string),
+            "ump1b" => I::Ump1B(as_string),
+            "ump2b" => I::Ump2B(as_string),
+            "ump3b" => I::Ump3B(as_string),
+            "umplf" => I::UmpLF(as_string),
+            "umprf" => I::UmpRF(as_string),
+            "site" => I::Park(as_string),
+            "oscorer" => I::OriginalScorer(as_string),
 
-            "number" => I::GameType(GameType::from_str(as_ref?)?),
-            "daynight" => I::DayNight(DayNight::from_str(as_ref?)?),
-            "pitches" => I::PitchDetail(PitchDetail::from_str(as_ref?)?),
-            "fieldcond" => I::FieldCondition(FieldCondition::from_str(as_ref?)?),
-            "precip" => I::Precipitation(Precipitation::from_str(as_ref?)?),
-            "sky" => I::Sky(Sky::from_str(as_ref?)?),
-            "winddir" => I::WindDirection(WindDirection::from_str(as_ref?)?),
-            "howscored" => I::HowScored(HowScored::from_str(as_ref?)?),
+            "number" => I::GameType(GameType::from_str(value)?),
+            "daynight" => I::DayNight(DayNight::from_str(value)?),
+            "pitches" => I::PitchDetail(PitchDetail::from_str(value)?),
+            "fieldcond" | "fieldcon" => I::FieldCondition(FieldCondition::from_str(value)?),
+            "precip" => I::Precipitation(Precipitation::from_str(value)?),
+            "sky" => I::Sky(Sky::from_str(value)?),
+            "winddir" => I::WindDirection(WindDirection::from_str(value)?),
+            "howscored" => I::HowScored(HowScored::from_str(value)?),
 
-            "windspeed" => I::WindSpeed(I::parse_positive_int::<u8>(value)),
-            "timeofgame" => I::TimeOfGameMinutes(I::parse_positive_int::<u16>(value)),
-            "attendance" => I::Attendance(I::parse_positive_int::<u32>(value)),
-            "temp" => I::Temp(I::parse_positive_int::<u8>(value)),
+            "windspeed" => I::WindSpeed(parse_positive_int::<u8>(value)),
+            "timeofgame" => I::TimeOfGameMinutes(parse_positive_int::<u16>(value)),
+            "attendance" => I::Attendance(parse_positive_int::<u32>(value)),
+            "temp" => I::Temp(parse_positive_int::<u8>(value)),
 
-            "usedh" => I::UseDH(bool::from_str(as_ref?)?),
-            "htbf" => I::HomeTeamBatsFirst(bool::from_str(as_ref?)?),
-            "date" => I::GameDate(NaiveDate::parse_from_str(as_ref?, "%Y/%m/%d")?),
-            "starttime" => I::parse_time(as_ref?),
+            "usedh" => I::UseDH(bool::from_str(value)?),
+            "htbf" => I::HomeTeamBatsFirst(bool::from_str(value)?),
+            "date" => I::GameDate(NaiveDate::parse_from_str(value, "%Y/%m/%d")?),
+            "starttime" => I::parse_time(value),
 
-            "wp" => I::WinningPitcher(opt_string()),
-            "lp" => I::LosingPitcher(opt_string()),
-            "save" => I::SavePitcher(opt_string()),
-            "gwrbi" => I::GameWinningRBI(opt_string()),
-            "edittime" => I::EditTime(opt_string()),
-            "inputtime" => I::InputTime(opt_string()),
-            "scorer" => I::Scorer(opt_string()),
-            "inputter" => I::Inputter(opt_string()),
-            "inputprogvers" => I::InputProgramVersion(opt_string()),
-            "translator" => I::Translator(opt_string()),
+            "wp" => I::WinningPitcher(to_option(as_string)),
+            "lp" => I::LosingPitcher(to_option(as_string)),
+            "save" => I::SavePitcher(to_option(as_string)),
+            "gwrbi" => I::GameWinningRBI(to_option(as_string)),
+            "edittime" => I::EditTime(to_option(as_string)),
+            "inputtime" => I::InputTime(to_option(as_string)),
+            "scorer" => I::Scorer(to_option(as_string)),
+            "inputter" => I::Inputter(to_option(as_string)),
+            "inputprogvers" => I::InputProgramVersion(to_option(as_string)),
+            "translator" => I::Translator(to_option(as_string)),
+            "umpchange" => I::UmpireChange,
             _ => I::Unrecognized
         };
         match info {
@@ -345,17 +304,18 @@ impl FromRetrosheetRecord for InfoRecord {
 #[derive(Debug)]
 pub struct AppearanceRecord {
     player: Player,
-    team_kind: TeamKind,
+    side: Side,
     lineup_position: LineupPosition,
     fielding_position: FieldingPosition
 }
 impl FromRetrosheetRecord for AppearanceRecord {
     fn new(record: &RetrosheetEventRecord) -> Result<AppearanceRecord> {
+        let record = record.deserialize::<[&str; 6]>(None)?;
         Ok(AppearanceRecord {
-            player: String::from(record.get(1).ok_or(Self::error("Missing player ID", record))?),
-            team_kind: TeamKind::from_str(record.get(3).unwrap_or(""))?,
-            lineup_position: record.get(4).unwrap_or("").parse::<LineupPosition>()?,
-            fielding_position:  record.get(5).unwrap_or("").trim().parse::<FieldingPosition>()?
+            player: String::from(record[1]),
+            side: Side::from_str(record[3])?,
+            lineup_position: record[4].parse::<LineupPosition>()?,
+            fielding_position:  record[5].trim_end().parse::<FieldingPosition>()?
         })
     }
 }
@@ -363,175 +323,23 @@ impl FromRetrosheetRecord for AppearanceRecord {
 pub type StartRecord = AppearanceRecord;
 pub type SubstitutionRecord = AppearanceRecord;
 
-#[derive(Debug, Eq, PartialEq, EnumString)]
-#[strum(serialize_all = "lowercase")]
-enum InningFrame {
-    Top,
-    Bottom,
-}
-
-#[derive(Debug, Eq, PartialEq, EnumString)]
-#[strum(serialize_all = "lowercase")]
-enum Base {
-    Home,
-    First,
-    Second,
-    Third
-}
-
 #[derive(Debug)]
 struct Count { balls: Option<u8>, strikes: Option<u8> }
 impl Count {
-    fn new(count_str: Option<&str>) -> Result<Count> {
-        let mut count_iter = count_str.unwrap_or("").chars();
-        let count_arr = [count_iter.next(), count_iter.next()];
-        let mut as_ints = count_arr.iter().map(
-            |c| c.unwrap_or('a').to_string().parse::<u8>().ok()
-        ).flatten();
-        Ok(Count {balls: as_ints.next(), strikes: as_ints.next()})
+    fn new(count_str: &str) -> Result<Count> {
+        let mut ints = count_str.chars().map(|c| c.to_digit(10).map(|i| i as u8));
+
+        Ok(Count {
+            balls: ints.next().flatten(),
+            strikes: ints.next().flatten()
+        })
     }
-}
-
-#[derive(Debug, Eq, PartialEq, EnumString)]
-#[strum(serialize_all = "camel_case")]
-enum PitchType {
-    PickoffFirst,
-    PickoffSecond,
-    PickoffThird,
-    PlayNotInvolvingBatter,
-    Ball,
-    CalledStrike,
-    Foul,
-    HitBatter,
-    IntentionalBall,
-    StrikeUnknownType,
-    FoulBunt,
-    MissedBunt,
-    NoPitch,
-    FoulTipBunt,
-    Pitchout,
-    SwingingOnPitchout,
-    FoulOnPitchout,
-    SwingingStrike,
-    FoulTip,
-    Unknown,
-    BallOnPitcherGoingToMouth,
-    InPlay,
-    InPlayOnPitchout
-}
-
-struct Pitch {
-    pitch_type: PitchType,
-    runners_going: bool,
-    catcher_pickoff_attempt: bool,
-    blocked_by_catcher: bool
-}
-
-#[derive(Debug, EnumDiscriminants)]
-#[strum_discriminants(derive(EnumString))]
-enum BatterPlay {
-    FlyOut(Fielder),
-    GroundOut(Vec<Fielder>),
-    DoublePlay(Fielder),
-    CatcherInterference,
-    OtherFielderInterference(Fielder),
-    Single(Fielder),
-    Double(Fielder),
-    Triple(Fielder),
-    GroundRuleDouble,
-    ReachedOnError(Fielder),
-    FieldersChoice(Fielder),
-    ErrorOnFlyBall(Fielder),
-    HomeRun,
-    InsideTheParkHomeRun(Fielder),
-    HitByPitch,
-    StrikeOut(Option<RunnerPlay>),
-    NoPlay,
-    IntentionalWalk(Option<RunnerPlay>),
-    Walk(Option<RunnerPlay>)
-}
-
-#[derive(Debug, EnumDiscriminants)]
-#[strum_discriminants(derive(EnumString))]
-enum RunnerPlay {
-    Balk,
-    CaughtStealing(Base, Vec<Fielder>),
-    DefensiveIndifference,
-    OtherAdvance,
-    PassedBall,
-    WildPitch,
-    PickedOff(Base, Vec<Fielder>),
-    PickedOffCaughtStealing(Base, Vec<Fielder>),
-    StolenBase(Base)
-}
-
-struct RunnerAdvance {
-    from: Base,
-    to: Base,
-
-}
-type SuccessfulRunnerAdvance = RunnerAdvance;
-struct UnsuccessfulRunnerAdvance {
-    attempt: RunnerAdvance,
-    fielders: Vec<Fielder>
-}
-
-
-type HitLocation = String;
-
-#[derive(Debug, EnumDiscriminants)]
-#[strum_discriminants(derive(EnumString))]
-enum PlayModifier {
-    AppealPlay,
-    PopUpBunt(Option<HitLocation>),
-    GroundBallBunt(Option<HitLocation>),
-    BuntGroundIntoDoublePlay(Option<HitLocation>),
-    BatterInterference(Option<HitLocation>),
-    LineDriveBunt(Option<HitLocation>),
-    BatingOutOfTurn,
-    BuntPopUp(Option<HitLocation>),
-    BuntPoppedIntoDoublePlay(Option<HitLocation>),
-    RunnerHitByBattedBall(Option<HitLocation>),
-    CalledThirdStrike,
-    CourtesyBatter,
-    CourtesyFielder,
-    CourtesyRunner,
-    UnspecifiedDoublePlay(Option<HitLocation>),
-    ErrorOn(Position),
-    Fly(Option<HitLocation>),
-    FlyBallDoublePlay(Option<HitLocation>),
-    FanInterference,
-    Foul(Option<HitLocation>),
-    ForceOut(Option<HitLocation>),
-    GroundBall(Option<HitLocation>),
-    GroundBallDoublePlay(Option<HitLocation>),
-    GroundBallTriplePlay(Option<HitLocation>),
-    InfieldFlyRule(Option<HitLocation>),
-    Interference(Option<HitLocation>),
-    InsideTheParkHomeRun(Option<HitLocation>),
-    LineDrive(Option<HitLocation>),
-    LinedIntoDoublePlay(Option<HitLocation>),
-    LinedIntoTriplePlay(Option<HitLocation>),
-    ManageChallengeOfCallOnField,
-    NoDoublePlayCredited,
-    Obstruction,
-    PopFly(Option<HitLocation>),
-    RunnerOutPassingAnotherRunner,
-    RelayToFielderWithNoOutMade(Position),
-    RunnerInterference,
-    SacrificeFly(Option<HitLocation>),
-    SacrificeHit(Option<HitLocation>),
-    Throw,
-    ThrowToBase(Base),
-    UnspecifiedTriplePlay(Option<HitLocation>),
-    UmpireInterference(Option<HitLocation>),
-    UmpireReviewOfCallOnField
 }
 
 #[derive(Debug)]
 pub struct PlayRecord {
     inning: Inning,
-    team_kind: TeamKind,
+    side: Side,
     batter: Batter,
     count: Count,
     pitch_sequence: PitchSequence,
@@ -540,21 +348,516 @@ pub struct PlayRecord {
 
 impl FromRetrosheetRecord for PlayRecord {
     fn new(record: &RetrosheetEventRecord) -> Result<PlayRecord> {
-
+        let record = record.deserialize::<[&str; 7]>(None)?;
         Ok(PlayRecord {
-            inning: record.get(1).unwrap_or("").parse::<Inning>()?,
-            team_kind: TeamKind::from_str(record.get(2).unwrap_or(""))?,
-            batter: String::from(record.get(3).unwrap_or("")),
-            count: Count::new(record.get(4))?,
-            pitch_sequence: String::from(record.get(5).unwrap_or("")),
-            play: String::from(record.get(6).unwrap_or(""))
+            inning: record[1].parse::<Inning>()?,
+            side: Side::from_str(record[2])?,
+            batter: String::from(record[3]),
+            count: Count::new(record[4])?,
+            pitch_sequence: String::from(record[5]),
+            play: String::from(record[6])
         })
     }
 }
 
 #[derive(Debug)]
+pub struct EarnedRunRecord {
+    pitcher_id: Pitcher,
+    earned_runs: u8
+}
+
+impl FromRetrosheetRecord for EarnedRunRecord {
+    fn new(record: &RetrosheetEventRecord) -> Result<EarnedRunRecord> {
+        let arr = record.deserialize::<[&str; 4]>(None)?;
+        match arr[1] {
+            "er" => Ok(EarnedRunRecord {
+                pitcher_id: String::from(arr[2]),
+                earned_runs: arr[3].trim_end().parse::<u8>()?
+            }),
+            _ => Err(Self::error("Unexpected `data` type value", record))
+        }
+    }
+}
+
+#[derive(Debug)]
+struct BattingLineStats {
+    at_bats: u8,
+    runs: u8,
+    hits: u8,
+    doubles: Option<u8>,
+    triples: Option<u8>,
+    home_runs: Option<u8>,
+    rbi: Option<u8>,
+    sacrifice_hits: Option<u8>,
+    sacrifice_flies: Option<u8>,
+    hit_by_pitch: Option<u8>,
+    walks: Option<u8>,
+    intentional_walks: Option<u8>,
+    strikeouts: Option<u8>,
+    stolen_bases: Option<u8>,
+    caught_stealing: Option<u8>,
+    grounded_into_double_plays: Option<u8>,
+    reached_on_interference: Option<u8>
+}
+
+impl TryFrom<&[&str; 17]> for BattingLineStats {
+    type Error = Error;
+
+    fn try_from(value: &[&str; 17]) -> Result<BattingLineStats> {
+        let o = {|i: usize| value[i].parse::<u8>().ok()};
+        let u = {|i: usize|
+            value[i].parse::<u8>().context("Bad value for batting line stat")
+        };
+        Ok(BattingLineStats {
+            at_bats: u(0)?,
+            runs: u(1)?,
+            hits: u(2)?,
+            doubles: o(3),
+            triples: o(4),
+            home_runs: o(5),
+            rbi: o(6),
+            sacrifice_hits: o(7),
+            sacrifice_flies: o(8),
+            hit_by_pitch: o(9),
+            walks: o(10),
+            intentional_walks: o(11),
+            strikeouts: o(12),
+            stolen_bases: o(13),
+            caught_stealing: o(14),
+            grounded_into_double_plays: o(15),
+            reached_on_interference: o(16)
+        })
+    }
+}
+
+
+#[derive(Debug)]
+pub struct BattingLine {
+    batter_id: Batter,
+    side: Side,
+    lineup_position: LineupPosition,
+    nth_player_at_position: u8,
+    batting_stats: BattingLineStats,
+}
+
+impl FromRetrosheetRecord for BattingLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<BattingLine> {
+        let arr = record.deserialize::<[&str; 23]>(None)?;
+        let p = parse_positive_int::<u8>;
+        Ok(BattingLine{
+            batter_id: arr[2].to_string(),
+            side: Side::from_str(arr[3])?,
+            lineup_position: p(arr[4]).context("Invalid lineup position")?,
+            nth_player_at_position: p(arr[5]).context("Invalid batting sequence position")?,
+            batting_stats: BattingLineStats::try_from(array_ref![arr,6,17])?
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct PinchHittingLine {
+    pinch_hitter_id: Batter,
+    inning: Option<Inning>,
+    side: Side,
+    batting_stats: Option<BattingLineStats>,
+}
+impl FromRetrosheetRecord for PinchHittingLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<PinchHittingLine> {
+        let arr = record.deserialize::<[&str; 22]>(None)?;
+        let p = parse_positive_int::<u8>;
+        Ok(PinchHittingLine{
+            pinch_hitter_id: arr[2].to_string(),
+            inning: p(arr[3]),
+            side: Side::from_str(arr[4])?,
+            batting_stats: BattingLineStats::try_from(array_ref![arr,5,17]).ok()
+        })
+    }
+}
+
+
+#[derive(Debug)]
+pub struct PinchRunningLine {
+    pinch_runner_id: Batter,
+    inning: Option<Inning>,
+    side: Side,
+    runs: Option<u8>,
+    stolen_bases: Option<u8>,
+    caught_stealing: Option<u8>
+}
+
+impl FromRetrosheetRecord for PinchRunningLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<PinchRunningLine>{
+        let arr = record.deserialize::<[&str; 8]>(None)?;
+        let p = {|i: usize| arr[i].parse::<u8>().ok()};
+        Ok(PinchRunningLine{
+            pinch_runner_id: arr[2].to_string(),
+            inning: p(3),
+            side: Side::from_str(arr[4])?,
+            runs: p(5),
+            stolen_bases: p(6),
+            caught_stealing: p(7)
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct DefenseLineStats {
+    outs_played: Option<u8>,
+    putouts: Option<u8>,
+    assists: Option<u8>,
+    errors: Option<u8>,
+    double_plays: Option<u8>,
+    triple_plays: Option<u8>,
+    passed_balls: Option<u8>
+}
+
+impl TryFrom<&[&str; 7]> for DefenseLineStats {
+    type Error = Error;
+
+    fn try_from(value: &[&str; 7]) -> Result<DefenseLineStats> {
+        let o = {|i: usize| value[i].parse::<u8>().ok()};
+        Ok(DefenseLineStats {
+            outs_played: o(0),
+            putouts: o(1),
+            assists: o(2),
+            errors: o(3),
+            double_plays: o(4),
+            triple_plays: o(5),
+            passed_balls: o(6)
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct DefenseLine {
+    fielder_id: Fielder,
+    side: Side,
+    fielding_position: FieldingPosition,
+    nth_player_at_position: u8,
+    defensive_stats: Option<DefenseLineStats>
+}
+
+impl FromRetrosheetRecord for DefenseLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<DefenseLine>{
+        let arr = record.deserialize::<[&str; 13]>(None)?;
+        let p = parse_positive_int::<u8>;
+        Ok(DefenseLine{
+            fielder_id: arr[2].to_string(),
+            side: Side::from_str(arr[3])?,
+            fielding_position: p(arr[4]).context("Invalid fielding position")?,
+            nth_player_at_position: p(arr[5]).context("Invalid fielding sequence position")?,
+            defensive_stats: DefenseLineStats::try_from(array_ref![arr,6,7]).ok(),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct PitchingLineStats {
+    outs_recorded: u8,
+    no_out_batters: Option<u8>,
+    batters_faced: Option<u8>,
+    hits: u8,
+    doubles: Option<u8>,
+    triples: Option<u8>,
+    home_runs: Option<u8>,
+    runs: u8,
+    earned_runs: Option<u8>,
+    walks: Option<u8>,
+    intentional_walks: Option<u8>,
+    strikeouts: Option<u8>,
+    hit_batsmen: Option<u8>,
+    wild_pitches: Option<u8>,
+    balks: Option<u8>,
+    sacrifice_hits: Option<u8>,
+    sacrifice_files: Option<u8>
+}
+
+impl TryFrom<&[&str; 17]> for PitchingLineStats {
+    type Error = Error;
+
+    fn try_from(value: &[&str; 17]) -> Result<PitchingLineStats> {
+        let o = {|i: usize| value[i].parse::<u8>().ok()};
+        let u = {|i: usize|
+            value[i].parse::<u8>().context("Bad value for pitching line stat")
+        };
+        Ok(PitchingLineStats {
+            outs_recorded: u(0)?,
+            no_out_batters: o(1),
+            batters_faced: o(2),
+            hits: u(3)?,
+            doubles:o(4),
+            triples: o(5),
+            home_runs: o(6),
+            runs: u(7)?,
+            earned_runs: o(8),
+            walks: o(9),
+            intentional_walks: o(10),
+            strikeouts: o(11),
+            hit_batsmen: o(12),
+            wild_pitches: o(13),
+            balks: o(14),
+            sacrifice_hits: o(15),
+            sacrifice_files: o(16)
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct PitchingLine {
+    pitcher_id: Pitcher,
+    side: Side,
+    nth_pitcher: u8,
+    pitching_stats: PitchingLineStats
+}
+
+impl FromRetrosheetRecord for PitchingLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<PitchingLine>{
+        let arr = record.deserialize::<[&str; 22]>(None)?;
+        let p = parse_positive_int::<u8>;
+        Ok(PitchingLine{
+            pitcher_id: arr[2].to_string(),
+            side: Side::from_str(arr[3])?,
+            nth_pitcher: p(arr[4]).context("Invalid fielding sequence position")?,
+            pitching_stats: PitchingLineStats::try_from(array_ref![arr,5,17])?,
+        })
+    }
+}
+#[derive(Debug)]
+pub struct TeamMiscellaneousLine {
+    side: Side,
+    left_on_base: u8,
+    team_earned_runs: Option<u8>,
+    double_plays_turned: Option<u8>,
+    triple_plays_turned: u8
+}
+
+#[derive(Debug)]
+pub struct TeamBattingLine {
+    side: Side,
+    batting_stats: BattingLineStats
+}
+
+impl FromRetrosheetRecord for TeamBattingLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<TeamBattingLine> {
+        let arr = record.deserialize::<[&str; 20]>(None)?;
+        Ok(TeamBattingLine {
+            side: Side::from_str(arr[2])?,
+            batting_stats: BattingLineStats::try_from(array_ref![arr,3,17])?
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct TeamDefenseLine {
+    side: Side,
+    defensive_stats: DefenseLineStats
+}
+
+impl FromRetrosheetRecord for TeamDefenseLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<TeamDefenseLine> {
+        let mut arr = record.deserialize::<[&str; 10]>(None)?;
+        Ok(TeamDefenseLine {
+            side: Side::from_str(arr[2])?,
+            defensive_stats: DefenseLineStats::try_from(array_ref![arr,3, 7])?
+        })
+    }
+}
+
+
+impl FromRetrosheetRecord for TeamMiscellaneousLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<TeamMiscellaneousLine>{
+        let arr = record.deserialize::<[&str; 7]>(None)?;
+        let o = {|i: usize| arr[i].parse::<u8>().ok()};
+        let u = {|i: usize|
+            arr[i].parse::<u8>().context("Bad value for team line stat")
+        };
+        Ok(TeamMiscellaneousLine {
+            side: Side::from_str(arr[2])?,
+            left_on_base: u(3)?,
+            team_earned_runs: o(4),
+            double_plays_turned: o(5),
+            triple_plays_turned: u(6)?
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum BoxScoreLine {
+    BattingLine(BattingLine),
+    PinchHittingLine(PinchHittingLine),
+    PinchRunningLine(PinchRunningLine),
+    PitchingLine(PitchingLine),
+    DefenseLine(DefenseLine),
+    TeamMiscellaneousLine(Option<TeamMiscellaneousLine>),
+    TeamBattingLine(TeamBattingLine),
+    TeamDefenseLine(TeamDefenseLine),
+    Unrecognized
+}
+impl FromRetrosheetRecord for BoxScoreLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<BoxScoreLine>{
+        let stat_line_type = record.get(1).context("No stat line type")?;
+        let mapped= match stat_line_type {
+            "bline" => BoxScoreLine::BattingLine(BattingLine::new(&record)?),
+            "phline" => BoxScoreLine::PinchHittingLine(PinchHittingLine::new(&record)?),
+            "prline" => BoxScoreLine::PinchRunningLine(PinchRunningLine::new(&record)?),
+            "pline" => BoxScoreLine::PitchingLine(PitchingLine::new(&record)?),
+            "dline" => BoxScoreLine::DefenseLine(DefenseLine::new(&record)?),
+            "tline" => BoxScoreLine::TeamMiscellaneousLine(TeamMiscellaneousLine::new(&record).ok()),
+            "btline" => BoxScoreLine::TeamBattingLine(TeamBattingLine::new(&record)?),
+            "dtline" => BoxScoreLine::TeamDefenseLine(TeamDefenseLine::new(&record)?),
+            _ => BoxScoreLine::Unrecognized
+        };
+        match mapped {
+            BoxScoreLine::Unrecognized => Err(Self::error("Unrecognized box score line type", record)),
+            _ => Ok(mapped)
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct LineScore {
+    side: Side,
+    line_score: SmallVec<[u8; 9]>
+}
+
+impl FromRetrosheetRecord for LineScore {
+    fn new(record: &RetrosheetEventRecord) -> Result<LineScore>{
+        let mut iter = record.iter();
+        Ok(LineScore{
+            side: Side::from_str(iter.nth(1).context("Missing team side")?)?,
+            line_score: {
+                let mut vec = SmallVec::with_capacity(9);
+                for s in iter {vec.push(s.parse::<u8>()?)}
+            vec
+            }
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct FieldingPlayLine {
+    defense_side: Side,
+    fielders: SmallVec<[Fielder; 3]>
+}
+pub type DoublePlayLine = FieldingPlayLine;
+pub type TriplePlayLine = FieldingPlayLine;
+
+impl FromRetrosheetRecord for FieldingPlayLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<FieldingPlayLine>{
+        let mut iter = record.iter();
+        Ok(FieldingPlayLine{
+            defense_side: Side::from_str(iter.nth(2).context("Missing team side")?)?,
+            fielders: iter.map(String::from).collect()
+        })
+    }
+}
+
+
+#[derive(Debug)]
+pub struct HitByPitchLine {
+    pitching_side: Side,
+    pitcher_id: Pitcher,
+    batter_id: Batter
+}
+
+impl FromRetrosheetRecord for HitByPitchLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<HitByPitchLine>{
+        let arr = record.deserialize::<[&str; 5]>(None)?;
+        Ok(HitByPitchLine{
+            pitching_side: Side::from_str(arr[2])?,
+            pitcher_id: arr[3].to_string(),
+            batter_id: arr[4].to_string()
+        })
+    }
+}
+
+
+#[derive(Debug)]
+pub struct HomeRunLine {
+    batting_side: Side,
+    batter_id: Batter,
+    pitcher_id: Pitcher,
+    inning: Option<Inning>,
+    runners_on: Option<u8>,
+    outs: Option<u8>
+}
+
+impl FromRetrosheetRecord for HomeRunLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<HomeRunLine>{
+        let arr = record.deserialize::<[&str; 8]>(None)?;
+        let p = {|i: usize| arr[i].parse::<u8>().ok()};
+        Ok(HomeRunLine{
+            batting_side: Side::from_str(arr[2])?,
+            batter_id: arr[3].to_string(),
+            pitcher_id: arr[4].to_string(),
+            inning: p(5),
+            runners_on: p(6),
+            outs: p(7)
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct StolenBaseAttemptLine {
+    running_side: Side,
+    runner_id: Baserunner,
+    pitcher_id: Pitcher,
+    catcher_id: Fielder,
+    inning: Option<Inning>
+}
+pub type StolenBaseLine = StolenBaseAttemptLine;
+pub type CaughtStealingLine = StolenBaseAttemptLine;
+
+impl FromRetrosheetRecord for StolenBaseAttemptLine {
+    fn new(record: &RetrosheetEventRecord) -> Result<StolenBaseAttemptLine>{
+        let arr = record.deserialize::<[&str; 7]>(None)?;
+        Ok(StolenBaseAttemptLine{
+            running_side: Side::from_str(arr[2])?,
+            runner_id: arr[3].to_string(),
+            pitcher_id: arr[4].to_string(),
+            catcher_id: arr[5].to_string(),
+            inning: arr[6].parse::<u8>().ok()
+
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum BoxScoreEvent {
+    DoublePlay(DoublePlayLine),
+    TriplePlay(TriplePlayLine),
+    HitByPitch(HitByPitchLine),
+    HomeRun(HomeRunLine),
+    StolenBase(StolenBaseLine),
+    CaughtStealing(CaughtStealingLine),
+    Unrecognized
+}
+impl FromRetrosheetRecord for BoxScoreEvent {
+    fn new(record: &RetrosheetEventRecord) -> Result<BoxScoreEvent>{
+        let event_line_type = record.get(1).context("No event type")?;
+        let mapped = match event_line_type {
+            "dpline" => BoxScoreEvent::DoublePlay(DoublePlayLine::new(&record)?),
+            "tpline" => BoxScoreEvent::TriplePlay(TriplePlayLine::new(&record)?),
+            "hpline" => BoxScoreEvent::HitByPitch(HitByPitchLine::new(&record)?),
+            "hrline" => BoxScoreEvent::HomeRun(HomeRunLine::new(&record)?),
+            "sbline" => BoxScoreEvent::StolenBase(StolenBaseLine::new(&record)?),
+            "csline" => BoxScoreEvent::CaughtStealing(CaughtStealingLine::new(&record)?),
+            _ => BoxScoreEvent::Unrecognized,
+
+        };
+        match mapped {
+            BoxScoreEvent::Unrecognized => Err(anyhow!("Unrecognized box score event type {}", event_line_type)),
+            _ => Ok(mapped)
+        }
+    }
+}
+
+
+
+#[derive(Debug)]
 pub enum MappedRecord {
     GameId(GameId),
+    Version,
     Info(InfoRecord),
     Start(StartRecord),
     Substitution(SubstitutionRecord),
@@ -562,26 +865,37 @@ pub enum MappedRecord {
     BatHandAdjustment(BatHandAdjustment),
     PitchHandAdjustment(PitchHandAdjustment),
     LineupAdjustment(LineupAdjustment),
-    Data,
-    Comment(Comment)
+    EarnedRun(EarnedRunRecord),
+    Comment(Comment),
+    BoxScoreLine(BoxScoreLine),
+    LineScore(LineScore),
+    BoxScoreEvent(BoxScoreEvent),
+    Unrecognized
 }
 
 impl FromRetrosheetRecord for MappedRecord {
     fn new(record: &RetrosheetEventRecord) -> Result<MappedRecord>{
-        let line_type = record.get(0).ok_or(anyhow!("No record"))?;
-        type E = EventLineType;
-        let mapped= match E::from_str(line_type)? {
-            E::Id => MappedRecord::GameId(GameId::new(record)?),
-            E::Info => MappedRecord::Info(InfoRecord::new(record)?),
-            E::Start => MappedRecord::Start(StartRecord::new(record)?),
-            E::Substitution => MappedRecord::Substitution(SubstitutionRecord::new(record)?),
-            E::Play => MappedRecord::Play(PlayRecord::new(record)?),
-            E::BatHandAdjustment => MappedRecord::BatHandAdjustment(BatHandAdjustment::new(record)?),
-            E::PitchHandAdjustment => MappedRecord::PitchHandAdjustment(PitchHandAdjustment::new(record)?),
-            E::BatOutOfOrder => MappedRecord::LineupAdjustment(LineupAdjustment::new(record)?),
-            E::Comment => MappedRecord::Comment(String::from(record.get(1).unwrap())),
-            _ => MappedRecord::Data
+        let line_type = record.get(0).context("No record")?;
+        let mapped= match line_type {
+            "id" | "7d" => MappedRecord::GameId(GameId::new(record)?),
+            "version" => MappedRecord::Version,
+            "info" => MappedRecord::Info(InfoRecord::new(record)?),
+            "start" => MappedRecord::Start(StartRecord::new(record)?),
+            "sub" => MappedRecord::Substitution(SubstitutionRecord::new(record)?),
+            "play" => MappedRecord::Play(PlayRecord::new(record)?),
+            "badj" => MappedRecord::BatHandAdjustment(BatHandAdjustment::new(record)?),
+            "padj" => MappedRecord::PitchHandAdjustment(PitchHandAdjustment::new(record)?),
+            "ladj" => MappedRecord::LineupAdjustment(LineupAdjustment::new(record)?),
+            "com" => MappedRecord::Comment(String::from(record.get(1).unwrap())),
+            "data" => MappedRecord::EarnedRun(EarnedRunRecord::new(record)?),
+            "stat" => MappedRecord::BoxScoreLine(BoxScoreLine::new(record)?),
+            "line" => MappedRecord::LineScore(LineScore::new(record)?),
+            "event" => MappedRecord::BoxScoreEvent(BoxScoreEvent::new(record)?),
+            _ => MappedRecord::Unrecognized
         };
-        Ok(mapped)
+        match mapped {
+            MappedRecord::Unrecognized => Err(Self::error("Unrecognized record type", record)),
+            _ => Ok(mapped)
+        }
     }
 }

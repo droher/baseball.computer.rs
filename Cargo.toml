@@ -14,5 +14,6 @@ serde = { version = "1.0.115", features = ["derive"] }
 csv = "1.1.3"
 anyhow = "1.0.32"
 regex = "1.3.9"
-bounded-integer = "0.2.1"
-num = "0.3.0"
+num-traits = "0.2.12"
+smallvec = "1.4.2"
+arrayref = "0.3.6"
