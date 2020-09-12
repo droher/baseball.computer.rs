@@ -342,7 +342,7 @@ pub struct PlayRecord {
     side: Side,
     batter: Batter,
     count: Count,
-    pitch_sequence: PitchSequence,
+    pub pitch_sequence: PitchSequence,
     play: Play
 }
 

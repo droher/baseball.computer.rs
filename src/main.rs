@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 mod event_file_entities;
 mod event_file_parser;
-mod game;
+mod play;
 mod util;
 
 fn main() {
