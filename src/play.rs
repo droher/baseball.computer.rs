@@ -367,6 +367,7 @@ const POP_FLY: &str = r"^P\+?([0-9].*)?$";
 const RUNNER_PASSES_ANOTHER_RUNNER: &str = r"^PASS$";
 const RELAY_NO_OUT: &str = r"^R([1-9].*)?$";
 const RUNNER_INTERFERENCE: &str = r"^RINT([0-9].*)?$";
+const SWINGING_THIRD_STRIKE: &str = r"^S$";
 const SACRIFICE_FLY: &str = r"^SF([0-9].*)?$";
 const SACRIFICE_HIT: &str = r"^SH([0-9].*)?$";
 const THROW: &str = r"^TH\)?$";
@@ -376,20 +377,20 @@ const UMPIRE_INTERFERENCE: &str = r"^UINT([0-9].*)?$";
 const UMPIRE_REVIEW_OF_CALL: &str = r"^UREV([0-9].*)?$";
 const UNSPECIFIED_REVIEW: &str = r"^REV$";
 const UNKNOWN_MODIFIER: &str = r"^U.*$?";
-const MODIFIER_REGEXES: [&str; 49] = [HIT_LOCATION, APPEAL_PLAY, UNSPECIFIED_BUNT, FOUL_BUNT, POP_UP_BUNT, GROUND_BALL_BUNT,
+const MODIFIER_REGEXES: [&str; 50] = [HIT_LOCATION, APPEAL_PLAY, UNSPECIFIED_BUNT, FOUL_BUNT, POP_UP_BUNT, GROUND_BALL_BUNT,
     BUNT_GIDP, BATTER_INTERFERENCE, LINE_DRIVE_BUNT, BATTING_OUT_OF_TURN, BUNT_POP_UP,
     BUNT_POP_INTO_DP, RUNNER_HIT_BY_BALL, CALLED_THIRD_STRIKE, COURTESY_BATTER, COURTESY_FIELDER,
     COURTESY_RUNNER, UNSPECIFIED_DP, ERROR_ON, FLY, FLY_BALL_DP, FAN_INTERFERENCE, FOUL, FORCE_OUT,
     GROUND_BALL, GROUND_BALL_DP, GROUND_BALL_TP, INFIELD_FLY, INTERFERENCE_MOD, INSIDE_PARK_HR,
     LINE_DRIVE, LINE_DRIVE_DP, LINE_DRIVE_TP, MANAGER_CHALLENGE_CALL, NO_DP_CREDITED,
     FIELDER_OBSTRUCTING_RUNNER, POP_FLY, RUNNER_PASSES_ANOTHER_RUNNER, RELAY_NO_OUT,
-    RUNNER_INTERFERENCE, SACRIFICE_FLY, SACRIFICE_HIT, THROW, THROW_TO_BASE, TP_UNSPECIFIED,
+    RUNNER_INTERFERENCE, SWINGING_THIRD_STRIKE, SACRIFICE_FLY, SACRIFICE_HIT, THROW, THROW_TO_BASE, TP_UNSPECIFIED,
     UMPIRE_INTERFERENCE, UMPIRE_REVIEW_OF_CALL, UNSPECIFIED_REVIEW, UNKNOWN_MODIFIER];
 
 
 lazy_static!{
     static ref PLAY_REGEX_SET: RegexSet = RegexSet::new(&PLAY_REGEXES).unwrap();
-    static ref MODIFIER_REGEX_SET: RegexSet = RegexSet::new(&MODIFIER_REGEXES).unwrap();
+    static ref MODIFIER_REGEX_SET: RegexSet = RegexSet::new(MODIFIER_REGEXES.iter()).unwrap();
     static ref STRIP_CHARS_REGEX: Regex = Regex::new(STRIP_CHARS).unwrap();
 }
 
@@ -410,6 +411,7 @@ impl Play {
     }
     fn parse_modifiers(value: &str) -> Result<Vec<PlayModifier>> {
         let x: Vec<SetMatches> = value.split("/").filter(|s| s.len() > 0).map({|m| MODIFIER_REGEX_SET.matches(m)}).collect();
+        let y: Vec<()> = x.iter().zip(value.split("/")).map({|t| if !t.0.matched_any() {println!("{} {:?} ,", value, t.1)}}).collect();
         Ok(vec![PlayModifier::AppealPlay])
     }
     fn parse_advances(value: &str) -> Result<Vec<RunnerAdvance>> {
@@ -421,8 +423,7 @@ impl TryFrom<&str> for Play {
 
     fn try_from(value: &str) -> Result<Self> {
         let (uncertain, exceptional) = (value.contains("#"), value.contains("!"));
-        let cleaned_value: String = STRIP_CHARS_REGEX.replace_all(value, "").to_string();
-        let value = cleaned_value.deref();
+        let value: &str = &STRIP_CHARS_REGEX.replace_all(value, "").to_string();
         let modifiers_boundary = value.find("/").unwrap_or(value.len());
         let advances_boundary = value.find(".").unwrap_or(value.len());
         let first_boundary = min(modifiers_boundary, advances_boundary);
