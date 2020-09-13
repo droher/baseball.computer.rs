@@ -5,8 +5,9 @@ use std::str::FromStr;
 use anyhow::{anyhow, Result};
 use csv::{ReaderBuilder, StringRecord};
 use crate::event_file_entities::{RetrosheetEventRecord, MappedRecord, FromRetrosheetRecord};
-use crate::play::{pitch_sequence};
+use crate::play::{pitch_sequence, Play};
 use std::ops::Deref;
+use std::convert::TryFrom;
 
 
 pub fn readit() {
@@ -21,7 +22,7 @@ pub fn readit() {
             let m = MappedRecord::new(&record);
             match m {
                 Ok(MappedRecord::Play(p)) => {
-                    let ps = pitch_sequence(p.pitch_sequence.deref());
+                    let ps = Play::try_from(p.play.deref());
                     match ps {
                         Err(e) => {println!("{:?}", (e.to_string(), &record))},
                         _ => {}

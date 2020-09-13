@@ -1,3 +1,4 @@
+#![recursion_limit="256"]
 use std::time::Instant;
 use event_file_parser::readit;
 use std::str::FromStr;

@@ -343,7 +343,7 @@ pub struct PlayRecord {
     batter: Batter,
     count: Count,
     pub pitch_sequence: PitchSequence,
-    play: Play
+    pub play: Play
 }
 
 impl FromRetrosheetRecord for PlayRecord {
