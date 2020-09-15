@@ -2,8 +2,9 @@ use std::fs::File;
 use std::io::BufReader;
 
 use csv::{ReaderBuilder, StringRecord};
-use crate::event_file::entities::{RetrosheetEventRecord, MappedRecord, FromRetrosheetRecord};
 
+use crate::event_file::entities::MappedRecord;
+use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord};
 
 pub fn readit() {
     let file = File::open("/home/davidroher/Downloads/retrosheet/event/all.txt");

@@ -1,16 +1,16 @@
+use std::cmp::min;
 use std::ops::Deref;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Error, Result};
+use const_format::{concatcp as concat, formatcp as format};
 use lazy_static::lazy_static;
-use regex::{Regex, Match, Captures};
+use regex::{Captures, Match, Regex};
 use serde::export::TryFrom;
-use strum_macros::{EnumDiscriminants, EnumString};
-use const_format::{formatcp as format, concatcp as concat};
-
-use std::cmp::min;
-use crate::util::digit_vec;
 use strum::ParseError;
+use strum_macros::{EnumDiscriminants, EnumString};
+
+use crate::util::digit_vec;
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[1-9]?)+)";
