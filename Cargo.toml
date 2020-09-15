@@ -25,4 +25,4 @@ default-features = false
 features = ["std", "perf"]
 
 [profile.release]
-lto = "fat"
+lto = true

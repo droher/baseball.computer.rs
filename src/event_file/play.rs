@@ -11,6 +11,8 @@ use strum::ParseError;
 use strum_macros::{EnumDiscriminants, EnumString};
 
 use crate::util::digit_vec;
+use crate::event_file::traits::{Inning, Side, Batter, FromRetrosheetRecord, RetrosheetEventRecord};
+
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[1-9]?)+)";
@@ -649,3 +651,42 @@ impl TryFrom<&str> for Play {
         })
     }
 }
+
+#[derive(Debug)]
+struct Count { balls: Option<u8>, strikes: Option<u8> }
+
+impl Count {
+    fn new(count_str: &str) -> Result<Count> {
+        let mut ints = count_str.chars().map(|c| c.to_digit(10).map(|i| i as u8));
+
+        Ok(Count {
+            balls: ints.next().flatten(),
+            strikes: ints.next().flatten()
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct PlayRecord {
+    inning: Inning,
+    side: Side,
+    batter: Batter,
+    count: Count,
+    pub pitch_sequence: Option<PitchSequence>,
+    pub play: Play
+}
+
+impl FromRetrosheetRecord for PlayRecord {
+    fn new(record: &RetrosheetEventRecord) -> Result<PlayRecord> {
+        let record = record.deserialize::<[&str; 7]>(None)?;
+        Ok(PlayRecord {
+            inning: record[1].parse::<Inning>()?,
+            side: Side::from_str(record[2])?,
+            batter: String::from(record[3]),
+            count: Count::new(record[4])?,
+            pitch_sequence: {match record[5] {"" => None, s => Some(PitchSequence::try_from(s)?)}},
+            play: Play::try_from(record[6])?
+        })
+    }
+}
+

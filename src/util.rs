@@ -2,11 +2,10 @@ use num_traits::PrimInt;
 use std::str::FromStr;
 
 pub(crate) fn parse_positive_int<T: PrimInt + FromStr>(int_str: &str) -> Option<T> {
-    let int = int_str.parse::<T>();
-    match int {
-        Ok(i) if !i.is_zero() => Some(i),
-        _ => None
-    }
+    int_str
+        .parse::<T>()
+        .ok()
+        .filter(|i| !i.is_zero())
 }
 
 pub(crate) fn digit_vec(int_str: &str) -> Vec<u8> {
