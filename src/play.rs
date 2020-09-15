@@ -10,6 +10,7 @@ use const_format::{formatcp as format, concatcp as concat};
 
 use std::cmp::min;
 use crate::util::digit_vec;
+use strum::ParseError;
 
 #[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 enum Base {
@@ -116,7 +117,7 @@ pub fn pitch_sequence(str_sequence: &str) -> Result<Vec<Pitch>> {
     let mut pitch = Pitch::default();
 
     let get_catcher_pickoff_base = { |c: Option<char>|
-        Base::from_str(c.unwrap_or('.').to_string().deref()).ok()
+        Base::from_str(&c.unwrap_or('.').to_string()).ok()
     };
 
     // TODO: Maybe try implementing in nom? Not a priority tho
@@ -295,7 +296,7 @@ const GROUP_PUTOUT1: &str = concat!(NAMING_PREFIX, "po1", GROUP_PUTOUT);
 const GROUP_PUTOUT2: &str = concat!(NAMING_PREFIX, "po2", GROUP_PUTOUT);
 const GROUP_PUTOUT3: &str = concat!(NAMING_PREFIX, "po3", GROUP_PUTOUT);
 const GROUP_OUT_AT_BASE_PREFIX: &str = r"(?:\((?P<runner";
-const GROUP_OUT_AT_BASE_SUFFIX: &str = r">[B123]\)))?";
+const GROUP_OUT_AT_BASE_SUFFIX: &str = r">[B123])\))?";
 const GROUP_OUT_AT_BASE1: &str = concat!(GROUP_OUT_AT_BASE_PREFIX, "1", GROUP_OUT_AT_BASE_SUFFIX);
 const GROUP_OUT_AT_BASE2: &str = concat!(GROUP_OUT_AT_BASE_PREFIX, "2", GROUP_OUT_AT_BASE_SUFFIX);
 const GROUP_OUT_AT_BASE3: &str = concat!(GROUP_OUT_AT_BASE_PREFIX, "3", GROUP_OUT_AT_BASE_SUFFIX);
@@ -360,7 +361,7 @@ impl Play {
             let putout_matches = vec![captures.name("po1"), captures.name("po2"), captures.name("po3")];
             let runner_matches = vec![captures.name("runner1"), captures.name("runner2"), captures.name("runner3")];
             let (assists, putouts) = (digit_vec(&to_str_vec(assist_matches).join("")), digit_vec(&to_str_vec(putout_matches).join("")));
-            let runners_out = to_str_vec(runner_matches).into_iter().filter_map(|s| BaseRunner::from_str(s).ok()).collect();
+            let runners_out = to_str_vec(runner_matches).into_iter().map(|s| BaseRunner::from_str(s)).collect::<Result<Vec<BaseRunner>, ParseError>>()?;
             return Ok(PlayType::Out {assists, putouts, runners_out})
         }
         else {
@@ -449,12 +450,11 @@ impl Play {
     }
 
     fn parse_modifiers(value: &str) -> Result<Vec<PlayModifier>> {
-        Ok(value
+        value
             .split("/")
             .filter(|s| s.len() > 0)
-            .filter_map(|s|Self::parse_single_modifier(s).ok())
-            .collect()
-        )
+            .map(|s| Self::parse_single_modifier(s))
+            .collect::<Result<Vec<PlayModifier>>>()
     }
 
     fn parse_single_modifier(value: &str) -> Result<PlayModifier> {
@@ -515,11 +515,11 @@ impl Play {
     }
 
     fn parse_advances(value: &str) -> Result<Vec<RunnerAdvance>> {
-        Ok(value
+        value
             .split(";")
             .filter_map(|s|ADVANCE_REGEX.captures(s))
-            .filter_map(|c| Self::parse_single_advance(c).ok())
-            .collect::<Vec<RunnerAdvance>>())
+            .map(|c| Self::parse_single_advance(c))
+            .collect::<Result<Vec<RunnerAdvance>>>()
     }
 
     fn parse_single_advance(captures: Captures) -> Result<RunnerAdvance> {
@@ -533,27 +533,30 @@ impl Play {
             .map(|s| s.as_str())
             .context("Missing destination base in advance")?)?;
         let out_or_error = out_at_match.is_some();
-        let modifiers = mods.map_or(Vec::new(), |m| Self::parse_advance_modifiers(m.as_str()));
+        let modifiers = mods.map_or(Ok(Vec::new()), |m| Self::parse_advance_modifiers(m.as_str()))?;
         return Ok(RunnerAdvance {baserunner, to, out_or_error, modifiers})
 
     }
 
-    fn parse_advance_modifiers(value: &str) -> Vec<RunnerAdvanceModifier> {
+    fn parse_advance_modifiers(value: &str) -> Result<Vec<RunnerAdvanceModifier>> {
         value
             .split(")")
-            .filter_map(|s| Self::parse_single_advance_modifier(s).ok())
-            .collect()
+            .filter(|s| !s.is_empty())
+            .map(|s| Self::parse_single_advance_modifier(s))
+            .collect::<Result<Vec<RunnerAdvanceModifier>>>()
     }
 
     fn parse_single_advance_modifier(value: &str) -> Result<RunnerAdvanceModifier> {
         let simple_match = match value {
             "(UR" => RunnerAdvanceModifier::UnearnedRun,
             "(TUR" => RunnerAdvanceModifier::TeamUnearnedRun,
-            "(NR" => RunnerAdvanceModifier::NoRBI,
+            "(NR" | "(NORBI" => RunnerAdvanceModifier::NoRBI,
             "(RBI" => RunnerAdvanceModifier::RBI,
             "(PB" => RunnerAdvanceModifier::PassedBall,
             "(WP" => RunnerAdvanceModifier::WildPitch,
             "(THH" => RunnerAdvanceModifier::AdvancedOnThrowTo(Some(Base::Home)),
+            "(TH" => RunnerAdvanceModifier::AdvancedOnThrowTo(None),
+            "(" => RunnerAdvanceModifier::Putout { assists: vec![], putout: None },
             _ => RunnerAdvanceModifier::Unrecognized(value.into())
         };
         match simple_match {RunnerAdvanceModifier::Unrecognized(_) => (), _ => {return Ok(simple_match)}};
