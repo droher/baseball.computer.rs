@@ -10,13 +10,12 @@ use smallvec::SmallVec;
 use arrayref::array_ref;
 
 use crate::util::parse_positive_int;
+use crate::event_file::play::{PitchSequence, Play};
 
 pub type LineupPosition = u8;
 pub type FieldingPosition = u8;
 pub type Inning = u8;
 
-pub type PitchSequence = String;
-pub type Play = String;
 pub type Comment = String;
 
 pub type RetrosheetEventRecord = StringRecord;
@@ -341,7 +340,7 @@ pub struct PlayRecord {
     side: Side,
     batter: Batter,
     count: Count,
-    pub pitch_sequence: PitchSequence,
+    pub pitch_sequence: Option<PitchSequence>,
     pub play: Play
 }
 
@@ -353,8 +352,8 @@ impl FromRetrosheetRecord for PlayRecord {
             side: Side::from_str(record[2])?,
             batter: String::from(record[3]),
             count: Count::new(record[4])?,
-            pitch_sequence: String::from(record[5]),
-            play: String::from(record[6])
+            pitch_sequence: {match record[5] {"" => None, s => Some(PitchSequence::try_from(s)?)}},
+            play: Play::try_from(record[6])?
         })
     }
 }

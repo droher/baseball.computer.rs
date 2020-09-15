@@ -2,10 +2,7 @@ use std::fs::File;
 use std::io::BufReader;
 
 use csv::{ReaderBuilder, StringRecord};
-use crate::event_file_entities::{RetrosheetEventRecord, MappedRecord, FromRetrosheetRecord};
-use crate::play::{Play};
-use std::ops::Deref;
-use std::convert::TryFrom;
+use crate::event_file::entities::{RetrosheetEventRecord, MappedRecord, FromRetrosheetRecord};
 
 
 pub fn readit() {
@@ -19,13 +16,7 @@ pub fn readit() {
         if rdr.read_record(&mut record).unwrap() {
             let m = MappedRecord::new(&record);
             match m {
-                Ok(MappedRecord::Play(p)) => {
-                    let ps = Play::try_from(p.play.deref());
-                    match ps {
-                        Err(e) => {println!("{:?}", (e.to_string(), &record))},
-                        _ => ()
-                    }
-                }
+                Ok(MappedRecord::Play(_)) => {}
                 Err(e) => println!("{:?}", (e.to_string(), &record)),
                 _ => ()
             }
