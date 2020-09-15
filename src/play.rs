@@ -282,6 +282,7 @@ enum PlayModifier {
     UnspecifiedTriplePlay,
     UmpireInterference,
     UmpireReviewOfCallOnField,
+    Unknown(Option<HitLocation>),
     Unrecognized(String)
 }
 
@@ -348,6 +349,14 @@ impl Play {
     }
 
     fn parse_fielding_play(value: &str) -> Result<PlayType> {
+        let simple_case = match value.parse::<u32>() {
+            Ok(_) => {
+                let mut digits = digit_vec(value);
+                let (putouts, assists) = (vec![digits.pop().unwrap()], digits);
+                return Ok(PlayType::Out { assists, putouts, runners_out: vec![]})
+            }
+            _ => ()
+        };
         let to_str_vec: fn(Vec<Option<Match>>) -> Vec<&str> = { |v| v
             .into_iter()
             .filter_map(|o| o
@@ -505,10 +514,12 @@ impl Play {
             "S" => PlayModifier::SwingingThirdStrike,
             "SF" => PlayModifier::SacrificeFly,
             "SH" => PlayModifier::SacrificeHit,
-            "TH" | "TH)" | "THH" => PlayModifier::ThrowToBase(Base::from_str(&last.unwrap_or_default()).ok()),
+            "TH" | "TH)" => PlayModifier::ThrowToBase(Base::from_str(&last.unwrap_or_default()).ok()),
+            "THH" => PlayModifier::ThrowToBase(Some(Base::Home)),
             "TP" => PlayModifier::UnspecifiedTriplePlay,
             "UINT" => PlayModifier::UmpireInterference,
             "UREV" => PlayModifier::UmpireReviewOfCallOnField,
+            "U" => PlayModifier::Unknown(last),
             _ => PlayModifier::Unrecognized(value.into())
         };
         Ok(final_match)
