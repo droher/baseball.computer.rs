@@ -5,8 +5,7 @@ use std::convert::{TryFrom};
 use anyhow::{Context, Error, Result, anyhow};
 use chrono::{NaiveDate, NaiveTime};
 use csv::StringRecord;
-use num_traits::{PrimInt};
-use strum_macros::{EnumDiscriminants, EnumString};
+use strum_macros::{EnumString};
 use smallvec::SmallVec;
 use arrayref::array_ref;
 
@@ -655,7 +654,7 @@ pub struct TeamDefenseLine {
 
 impl FromRetrosheetRecord for TeamDefenseLine {
     fn new(record: &RetrosheetEventRecord) -> Result<TeamDefenseLine> {
-        let mut arr = record.deserialize::<[&str; 10]>(None)?;
+        let arr = record.deserialize::<[&str; 10]>(None)?;
         Ok(TeamDefenseLine {
             side: Side::from_str(arr[2])?,
             defensive_stats: DefenseLineStats::try_from(array_ref![arr,3, 7])?

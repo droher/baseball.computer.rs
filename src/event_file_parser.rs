@@ -1,11 +1,9 @@
 use std::fs::File;
 use std::io::BufReader;
-use std::str::FromStr;
 
-use anyhow::{anyhow, Result};
 use csv::{ReaderBuilder, StringRecord};
 use crate::event_file_entities::{RetrosheetEventRecord, MappedRecord, FromRetrosheetRecord};
-use crate::play::{pitch_sequence, Play};
+use crate::play::{Play};
 use std::ops::Deref;
 use std::convert::TryFrom;
 
@@ -25,7 +23,7 @@ pub fn readit() {
                     let ps = Play::try_from(p.play.deref());
                     match ps {
                         Err(e) => {println!("{:?}", (e.to_string(), &record))},
-                        _ => {}
+                        _ => ()
                     }
                 }
                 Err(e) => println!("{:?}", (e.to_string(), &record)),

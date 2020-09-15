@@ -34,8 +34,8 @@ dependencies = [
  "anyhow",
  "arrayref",
  "chrono",
+ "const_format",
  "csv",
- "either",
  "lazy_static",
  "num-traits",
  "regex",
@@ -75,6 +75,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "const_format"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37e5726a263f7bfc69974be97662089e092ac8150fa42ef71222e0b95d485e00"
+dependencies = [
+ "const_format_proc_macros",
+]
+
+[[package]]
+name = "const_format_proc_macros"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49898d8292c9812495e48ee18ad27dd72080ca3ce13de448ddfe155e75aefb1e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-xid",
+]
+
+[[package]]
 name = "csv"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -95,12 +115,6 @@ checksum = "2b2466559f260f48ad25fe6317b3c8dac77b5bdb5763ac7d9d6103530663bc90"
 dependencies = [
  "memchr",
 ]
-
-[[package]]
-name = "either"
-version = "1.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd56b59865bce947ac5958779cfa508f6c3b9497cc762b7e24a12d11ccde2c4f"
 
 [[package]]
 name = "heck"

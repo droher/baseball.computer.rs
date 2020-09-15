@@ -1,7 +1,7 @@
-#![recursion_limit="256"]
+#![forbid(unsafe_code)]
+
 use std::time::Instant;
 use event_file_parser::readit;
-use std::str::FromStr;
 
 
 mod event_file_entities;

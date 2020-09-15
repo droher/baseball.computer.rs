@@ -2,17 +2,14 @@ use std::ops::Deref;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Error, Result};
-use either::{Either, Left};
 use lazy_static::lazy_static;
-use num_traits::cast::FromPrimitive;
-use regex::{Regex, RegexSet, SetMatches};
+use regex::{Regex, Match, Captures};
 use serde::export::TryFrom;
-use smallvec::SmallVec;
 use strum_macros::{EnumDiscriminants, EnumString};
+use const_format::{formatcp as format, concatcp as concat};
 
-use crate::event_file_entities::{Fielder, Pitcher, Player, PlayRecord};
-use std::collections::hash_map::VacantEntry;
 use std::cmp::min;
+use crate::util::digit_vec;
 
 #[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 enum Base {
@@ -24,6 +21,18 @@ enum Base {
     Third,
     #[strum(serialize = "H")]
     Home
+}
+
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+enum BaseRunner {
+    #[strum(serialize = "B")]
+    Batter,
+    #[strum(serialize = "1")]
+    First,
+    #[strum(serialize = "2")]
+    Second,
+    #[strum(serialize = "3")]
+    Third
 }
 
 #[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
@@ -159,275 +168,433 @@ enum InningFrame {
     Bottom,
 }
 
-
-#[derive(Debug, EnumDiscriminants)]
-#[strum_discriminants(derive(EnumString))]
-enum BatterPlay {
-    FlyOut(Fielder),
-    GroundOut(Vec<Fielder>),
-    DoublePlay(Fielder),
-    CatcherInterference,
-    OtherFielderInterference(Fielder),
-    Single(Fielder),
-    Double(Fielder),
-    Triple(Fielder),
-    GroundRuleDouble,
-    ReachedOnError(Fielder),
-    FieldersChoice(Fielder),
-    ErrorOnFlyBall(Fielder),
-    HomeRun,
-    InsideTheParkHomeRun(Fielder),
-    HitByPitch,
-    StrikeOut(Option<RunnerPlay>),
-    NoPlay,
-    IntentionalWalk(Option<RunnerPlay>),
-    Walk(Option<RunnerPlay>),
-    Unknown
+#[derive(Debug, EnumString)]
+enum UnearnedRun {
+    #[strum(serialize = "UR")]
+    Unearned,
+    #[strum(serialize = "TUR")]
+    TeamUnearned
 }
 
-#[derive(Debug, EnumDiscriminants)]
-#[strum_discriminants(derive(EnumString))]
-enum RunnerPlay {
+type Position = u8;
+
+#[derive(Debug)]
+enum PlayType {
+    Out { assists: Vec<Position>, putouts: Vec<Position>, runners_out: Vec<BaseRunner> },
+    Interference,
+    Single(Option<HitLocation>),
+    Double(Option<HitLocation>),
+    Triple(Option<HitLocation>),
+    GroundRuleDouble(Option<HitLocation>),
+    ErrorOnFoul(Position),
+    ReachedOnError {assists: Vec<Position>, error: Position},
+    FieldersChoice(Vec<u8>),
+    HomeRun(Option<HitLocation>),
+    HitByPitch,
+    StrikeOut,
+    StrikeOutPutOut(Vec<Position>),
+    NoPlay,
+    IntentionalWalk,
+    Walk,
+    Unknown,
     Balk,
-    CaughtStealing(Base, Vec<Fielder>),
+    CaughtStealing {base: Base, fielders: Vec<Position>, error:Option<Position>, unearned_run: Option<UnearnedRun>},
     DefensiveIndifference,
     OtherAdvance,
     PassedBall,
     WildPitch,
-    PickedOff(Base, Vec<Fielder>),
-    PickedOffCaughtStealing(Base, Vec<Fielder>),
-    StolenBase(Base)
+    PickedOff {base: Base, fielders: Vec<Position>, error:Option<Position>, unearned_run: Option<UnearnedRun>},
+    PickedOffCaughtStealing {base: Base, fielders: Vec<Position>, error:Option<Position>, unearned_run: Option<UnearnedRun>},
+    StolenBase {base: Base, unearned_run: Option<UnearnedRun>},
+    Unrecognized(String)
 }
-
+#[derive(Debug)]
 struct RunnerAdvance {
-    from: Base,
+    baserunner: BaseRunner,
     to: Base,
-
+    out_or_error: bool,
+    modifiers: Vec<RunnerAdvanceModifier>
 }
-
-type SuccessfulRunnerAdvance = RunnerAdvance;
-
-struct UnsuccessfulRunnerAdvance {
-    attempt: RunnerAdvance,
-    fielders: Vec<Fielder>
+#[derive(Debug)]
+enum RunnerAdvanceModifier {
+    UnearnedRun,
+    TeamUnearnedRun,
+    NoRBI,
+    Interference(Option<Position>),
+    RBI,
+    PassedBall,
+    WildPitch,
+    AdvancedOnThrowTo(Option<Base>),
+    AdvancedOnError {assists: Vec<Position>, error: Option<Position>},
+    Putout{assists: Vec<Position>, putout: Option<Position>},
+    Unrecognized(String)
 }
-
 
 type HitLocation = String;
 
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumString))]
 enum PlayModifier {
+    HitLocation(HitLocation),
     AppealPlay,
+    UnspecifiedBunt(Option<HitLocation>),
     PopUpBunt(Option<HitLocation>),
     GroundBallBunt(Option<HitLocation>),
-    BuntGroundIntoDoublePlay(Option<HitLocation>),
-    BatterInterference(Option<HitLocation>),
+    FoulBunt(Option<HitLocation>),
+    BuntGroundIntoDoublePlay,
+    BatterInterference,
     LineDriveBunt(Option<HitLocation>),
     BatingOutOfTurn,
-    BuntPopUp(Option<HitLocation>),
-    BuntPoppedIntoDoublePlay(Option<HitLocation>),
-    RunnerHitByBattedBall(Option<HitLocation>),
+    BuntPoppedIntoDoublePlay,
+    RunnerHitByBattedBall,
     CalledThirdStrike,
     CourtesyBatter,
     CourtesyFielder,
     CourtesyRunner,
-    UnspecifiedDoublePlay(Option<HitLocation>),
+    UnspecifiedDoublePlay,
     ErrorOn(Position),
     Fly(Option<HitLocation>),
-    FlyBallDoublePlay(Option<HitLocation>),
+    FlyBallDoublePlay,
     FanInterference,
-    Foul(Option<HitLocation>),
-    ForceOut(Option<HitLocation>),
+    Foul,
+    ForceOut,
     GroundBall(Option<HitLocation>),
-    GroundBallDoublePlay(Option<HitLocation>),
-    GroundBallTriplePlay(Option<HitLocation>),
-    InfieldFlyRule(Option<HitLocation>),
-    Interference(Option<HitLocation>),
-    InsideTheParkHomeRun(Option<HitLocation>),
+    GroundBallDoublePlay,
+    GroundBallTriplePlay,
+    InfieldFlyRule,
+    Interference,
+    InsideTheParkHomeRun,
     LineDrive(Option<HitLocation>),
-    LinedIntoDoublePlay(Option<HitLocation>),
-    LinedIntoTriplePlay(Option<HitLocation>),
+    LinedIntoDoublePlay,
+    LinedIntoTriplePlay,
     ManageChallengeOfCallOnField,
     NoDoublePlayCredited,
     Obstruction,
     PopFly(Option<HitLocation>),
     RunnerOutPassingAnotherRunner,
-    RelayToFielderWithNoOutMade(Position),
+    RelayToFielderWithNoOutMade(Vec<Position>),
     RunnerInterference,
-    SacrificeFly(Option<HitLocation>),
-    SacrificeHit(Option<HitLocation>),
-    Throw,
-    ThrowToBase(Base),
-    UnspecifiedTriplePlay(Option<HitLocation>),
-    UmpireInterference(Option<HitLocation>),
-    UmpireReviewOfCallOnField
+    SwingingThirdStrike,
+    SacrificeFly,
+    SacrificeHit,
+    ThrowToBase(Option<Base>),
+    UnspecifiedTriplePlay,
+    UmpireInterference,
+    UmpireReviewOfCallOnField,
+    Unrecognized(String)
 }
 
-type Catcher = Player;
-type FirstBaseman = Player;
-type SecondBaseman = Player;
-type ThirdBaseman = Player;
-type Shortstop = Player;
-type LeftFielder = Player;
-type CenterFielder = Player;
-type RightFielder = Player;
-type DesignatedHitter = Player;
-type PinchHitter = Player;
-type PinchRunner = Player;
 
-#[derive(Debug)]
-pub enum Position {
-    Pitcher(Pitcher),
-    Catcher(Catcher),
-    FirstBaseman(FirstBaseman),
-    SecondBaseman(SecondBaseman),
-    ThirdBaseman(ThirdBaseman),
-    Shortstop(Shortstop),
-    LeftFielder(LeftFielder),
-    CenterFielder(CenterFielder),
-    RightFielder(RightFielder),
-    DesignatedHitter(DesignatedHitter),
-    PinchHitter(PinchHitter),
-    PinchRunner(PinchRunner)
-}
+const NAMING_PREFIX: &str = r"(?P<";
+const GROUP_ASSISTS: &str = r">(?:[1-9]?)+)";
+const GROUP_ASSISTS1: &str = concat!(NAMING_PREFIX, "a1", GROUP_ASSISTS);
+const GROUP_ASSISTS2: &str = concat!(NAMING_PREFIX, "a2", GROUP_ASSISTS);
+const GROUP_ASSISTS3: &str = concat!(NAMING_PREFIX, "a3", GROUP_ASSISTS);
+const GROUP_PUTOUT: &str = r">[1-9])";
+const GROUP_PUTOUT1: &str = concat!(NAMING_PREFIX, "po1", GROUP_PUTOUT);
+const GROUP_PUTOUT2: &str = concat!(NAMING_PREFIX, "po2", GROUP_PUTOUT);
+const GROUP_PUTOUT3: &str = concat!(NAMING_PREFIX, "po3", GROUP_PUTOUT);
+const GROUP_OUT_AT_BASE_PREFIX: &str = r"(?:\((?P<runner";
+const GROUP_OUT_AT_BASE_SUFFIX: &str = r">[B123]\)))?";
+const GROUP_OUT_AT_BASE1: &str = concat!(GROUP_OUT_AT_BASE_PREFIX, "1", GROUP_OUT_AT_BASE_SUFFIX);
+const GROUP_OUT_AT_BASE2: &str = concat!(GROUP_OUT_AT_BASE_PREFIX, "2", GROUP_OUT_AT_BASE_SUFFIX);
+const GROUP_OUT_AT_BASE3: &str = concat!(GROUP_OUT_AT_BASE_PREFIX, "3", GROUP_OUT_AT_BASE_SUFFIX);
 
-const STRIP_CHARS: &str = r"[#!0?\- ]";
-const UNKNOWN: &str = r"^99$";
-// I'm sorry
-const OUT: &str = r"^([1-9]+?)(E?[1-9])?(\([B123]\))?(?:([1-9]+?)([1-9])?(\([B123]\))?)?(?:([1-9]+?)([1-9])?(\([B123]\))?)?$";
-const INTERFERENCE: &str = r"^C$";
-const SINGLE: &str = r"^S([1-9])*$";
-const DOUBLE: &str = r"^D([1-9])*$";
-const TRIPLE: &str = r"^T([1-9])*$";
-const HOME_RUN: &str = r"^(H|HR)([1-9])?";
-const GROUND_RULE_DOUBLE: &str = r"^DGR([1-9])*$";
-const REACH_ON_ERROR: &str = r"^E([1-9])$";
-const FIELDERS_CHOICE: &str = r"^FC([1-9])?$";
-const ERROR_ON_FOUL: &str = r"^FLE([1-9])$";
-const HIT_BY_PITCH: &str = r"^HP$";
-const STRIKEOUT: &str = r"^K$";
-const STRIKEOUT_PUTOUT: &str = r"^K[1-9]+$";
-const NO_PLAY: &str = r"^NP$";
-const INTENTIONAL_WALK: &str = r"^(I|IW)$";
-const WALK: &str = r"^W$";
-const MULTI_PLAY: &str = r"^(.+)\+(.+)$";
-const BALK: &str = r"^BK$";
-const DEFENSIVE_INDIFFERENCE: &str = r"^DI$";
-const OTHER_ADVANCE: &str = r"^OA$";
-const PASSED_BALL: &str = r"^PB$";
-const WILD_PITCH: &str = r"^WP$";
-const CAUGHT_STEALING: &str = r"^CS([23H])(?:\(([0-9]*)(E[0-9])?\)?)?(\(T?UR\))?$";
-const PICKED_OFF: &str = r"^PO([123])(?:\(([0-9]*)(E[0-9])?\)?)?$";
-const PICKED_OFF_CAUGHT_STEALING: &str = r"^POCS([23H])(?:\(([0-9]*)(E[0-9])?\)?)?(\(T?UR\))?$";
-const STOLEN_BASE: &str = r"^SB([23H])(\(T?UR\))?$";
-const MULTI_BASE_PLAY: &str = r";";
-const PLAY_REGEXES: [&str; 28] = [UNKNOWN, OUT, INTERFERENCE, SINGLE, DOUBLE, TRIPLE, HOME_RUN, GROUND_RULE_DOUBLE,
-    REACH_ON_ERROR, FIELDERS_CHOICE, ERROR_ON_FOUL, HIT_BY_PITCH, STRIKEOUT, STRIKEOUT_PUTOUT, NO_PLAY, INTENTIONAL_WALK,
-    WALK, MULTI_PLAY, BALK, DEFENSIVE_INDIFFERENCE, OTHER_ADVANCE, PASSED_BALL, WILD_PITCH, CAUGHT_STEALING,
-    PICKED_OFF, PICKED_OFF_CAUGHT_STEALING, STOLEN_BASE, MULTI_BASE_PLAY];
+const OUT: &str = &format!(r"^{}{}{}({}{}{})?({}{}{})?$",
+    GROUP_ASSISTS1, GROUP_PUTOUT1, GROUP_OUT_AT_BASE1,
+    GROUP_ASSISTS2, GROUP_PUTOUT2, GROUP_OUT_AT_BASE2,
+    GROUP_ASSISTS3, GROUP_PUTOUT3, GROUP_OUT_AT_BASE3
+);
 
-const HIT_LOCATION: &str = r"^[0-9].*$";
-const APPEAL_PLAY: &str = r"^AP$";
-const UNSPECIFIED_BUNT: &str = r"^B([0-9].*)?";
-const FOUL_BUNT: &str = r"^BF$";
-const POP_UP_BUNT: &str = r"^BP([0-9].*)?$";
-const GROUND_BALL_BUNT: &str = r"^BG([0-9].*)?$";
-const BUNT_GIDP: &str = r"^BGDP([0-9].*)?$";
-const BATTER_INTERFERENCE: &str = r"^BINT([0-9].*)?$";
-const LINE_DRIVE_BUNT: &str = r"^BL([0-9].*)?$";
-const BATTING_OUT_OF_TURN: &str = r"^BOOT$";
-const BUNT_POP_UP: &str = r"^BP([0-9].*)?$";
-const BUNT_POP_INTO_DP: &str = r"^BPDP([0-9].*)?$";
-const RUNNER_HIT_BY_BALL: &str = r"^BR([0-9].*)?$";
-const CALLED_THIRD_STRIKE: &str = r"^C$";
-const COURTESY_BATTER: &str = r"^COUB$";
-const COURTESY_FIELDER: &str = r"^COUF$";
-const COURTESY_RUNNER: &str = r"^COUR$";
-const UNSPECIFIED_DP: &str = r"^DP$";
-const ERROR_ON: &str = r"^E([1-9])$";
-const FLY: &str = r"^F\+?([0-9].*)?$";
-const FLY_BALL_DP: &str = r"^FDP([0-9].*)?$";
-const FAN_INTERFERENCE: &str = r"^FINT([0-9].*)?$";
-const FOUL: &str = r"^FL([0-9].*)?$";
-const FORCE_OUT: &str = r"^FO([0-9].*)?$";
-const GROUND_BALL: &str = r"^G\+?([0-9].*)?$";
-const GROUND_BALL_DP: &str = r"^GDP([0-9].*)?$";
-const GROUND_BALL_TP: &str = r"^GTP([0-9].*)?$";
-const INFIELD_FLY: &str = r"^IF([0-9].*)?$";
-const INTERFERENCE_MOD: &str = r"^INT([0-9].*)?$";
-const INSIDE_PARK_HR: &str = r"^IPHR([0-9].*)?$";
-const LINE_DRIVE: &str = r"^L\+?([0-9].*)?$";
-const LINE_DRIVE_DP: &str = r"^LDP([0-9].*)?$";
-const LINE_DRIVE_TP: &str = r"^LTP([0-9].*)?$";
-const MANAGER_CHALLENGE_CALL: &str = r"^MREV([0-9].*)?$";
-const NO_DP_CREDITED: &str = r"^NDP([0-9].*)?$";
-const FIELDER_OBSTRUCTING_RUNNER: &str = r"^OBS([0-9].*)?$";
-const POP_FLY: &str = r"^P\+?([0-9].*)?$";
-const RUNNER_PASSES_ANOTHER_RUNNER: &str = r"^PASS$";
-const RELAY_NO_OUT: &str = r"^R([1-9].*)?$";
-const RUNNER_INTERFERENCE: &str = r"^RINT([0-9].*)?$";
-const SWINGING_THIRD_STRIKE: &str = r"^S$";
-const SACRIFICE_FLY: &str = r"^SF([0-9].*)?$";
-const SACRIFICE_HIT: &str = r"^SH([0-9].*)?$";
-const THROW: &str = r"^TH\)?$";
-const THROW_TO_BASE: &str = r"^TH([123H])$";
-const TP_UNSPECIFIED: &str = r"^TP([0-9].*)?$";
-const UMPIRE_INTERFERENCE: &str = r"^UINT([0-9].*)?$";
-const UMPIRE_REVIEW_OF_CALL: &str = r"^UREV([0-9].*)?$";
-const UNSPECIFIED_REVIEW: &str = r"^REV$";
-const UNKNOWN_MODIFIER: &str = r"^U.*$?";
-const MODIFIER_REGEXES: [&str; 50] = [HIT_LOCATION, APPEAL_PLAY, UNSPECIFIED_BUNT, FOUL_BUNT, POP_UP_BUNT, GROUND_BALL_BUNT,
-    BUNT_GIDP, BATTER_INTERFERENCE, LINE_DRIVE_BUNT, BATTING_OUT_OF_TURN, BUNT_POP_UP,
-    BUNT_POP_INTO_DP, RUNNER_HIT_BY_BALL, CALLED_THIRD_STRIKE, COURTESY_BATTER, COURTESY_FIELDER,
-    COURTESY_RUNNER, UNSPECIFIED_DP, ERROR_ON, FLY, FLY_BALL_DP, FAN_INTERFERENCE, FOUL, FORCE_OUT,
-    GROUND_BALL, GROUND_BALL_DP, GROUND_BALL_TP, INFIELD_FLY, INTERFERENCE_MOD, INSIDE_PARK_HR,
-    LINE_DRIVE, LINE_DRIVE_DP, LINE_DRIVE_TP, MANAGER_CHALLENGE_CALL, NO_DP_CREDITED,
-    FIELDER_OBSTRUCTING_RUNNER, POP_FLY, RUNNER_PASSES_ANOTHER_RUNNER, RELAY_NO_OUT,
-    RUNNER_INTERFERENCE, SWINGING_THIRD_STRIKE, SACRIFICE_FLY, SACRIFICE_HIT, THROW, THROW_TO_BASE, TP_UNSPECIFIED,
-    UMPIRE_INTERFERENCE, UMPIRE_REVIEW_OF_CALL, UNSPECIFIED_REVIEW, UNKNOWN_MODIFIER];
+const REACH_ON_ERROR: &str = &format!(r"{}E(?P<e>[1-9])$", GROUP_ASSISTS1);
+const BASERUNNING_PLAY: &str = r"^(?P<play_type>SB|CS|PO|POCS)(?P<base>[123H])(?:\((?P<fielders>[0-9]*)(?P<error>E[0-9])?\)?)?(?P<unearned_run>\(T?UR\))?$";
 
+
+const ADVANCE: &str = r"^(?P<from>[B123])(?:(-(?P<to>[123H])|X(?P<out_at>[123H])))(?P<mods>.*)?";
 
 lazy_static!{
-    static ref PLAY_REGEX_SET: RegexSet = RegexSet::new(&PLAY_REGEXES).unwrap();
-    static ref MODIFIER_REGEX_SET: RegexSet = RegexSet::new(MODIFIER_REGEXES.iter()).unwrap();
-    static ref STRIP_CHARS_REGEX: Regex = Regex::new(STRIP_CHARS).unwrap();
+    static ref OUT_REGEX: Regex = Regex::new(OUT).unwrap();
+    static ref REACHED_ON_ERROR_REGEX: Regex = Regex::new(REACH_ON_ERROR).unwrap();
+    static ref BASERUNNING_PLAY_REGEX: Regex = Regex::new(BASERUNNING_PLAY).unwrap();
+
+    static ref ADVANCE_REGEX: Regex = Regex::new(ADVANCE).unwrap();
+    static ref STRIP_CHARS_REGEX: Regex = Regex::new(r"([#!0? ]|99)").unwrap();
+    static ref MULTI_PLAY_REGEX: Regex = Regex::new(r"[+;]").unwrap();
+    static ref NUMERIC_REGEX: Regex = Regex::new(r"[0-9]").unwrap();
+    static ref MODIFIER_DIVIDER_REGEX: Regex = Regex::new(r"[+\-0-9]").unwrap();
 }
 
-
+#[derive(Debug, Default)]
 pub struct Play {
-    main_plays: Vec<u8>,
+    main_plays: Vec<PlayType>,
     modifiers: Vec<PlayModifier>,
     advances: Vec<RunnerAdvance>,
     uncertain_flag: bool,
     exceptional_flag: bool
 }
 
+
+
 impl Play {
-    fn parse_main_play(value: &str) -> Result<u8> {
-        let m = PLAY_REGEX_SET.matches(value);
-        Ok(0)
+    fn unknown_play() -> Play {
+        Play {
+            main_plays: vec![PlayType::Unknown],
+            modifiers: vec![],
+            advances: vec![],
+            uncertain_flag: false,
+            exceptional_flag: false
+        }
+    }
+
+    fn parse_fielding_play(value: &str) -> Result<PlayType> {
+        let to_str_vec: fn(Vec<Option<Match>>) -> Vec<&str> = { |v| v
+            .into_iter()
+            .filter_map(|o| o
+                .map(|m| m.as_str()))
+            .collect()
+        };
+        let out_captures = OUT_REGEX.captures(value);
+        if out_captures.is_some() {
+            let captures = out_captures.unwrap();
+            let assist_matches = vec![captures.name("a1"), captures.name("a2"), captures.name("a3")];
+            let putout_matches = vec![captures.name("po1"), captures.name("po2"), captures.name("po3")];
+            let runner_matches = vec![captures.name("runner1"), captures.name("runner2"), captures.name("runner3")];
+            let (assists, putouts) = (digit_vec(&to_str_vec(assist_matches).join("")), digit_vec(&to_str_vec(putout_matches).join("")));
+            let runners_out = to_str_vec(runner_matches).into_iter().filter_map(|s| BaseRunner::from_str(s).ok()).collect();
+            return Ok(PlayType::Out {assists, putouts, runners_out})
+        }
+        else {
+            let error_captures = REACHED_ON_ERROR_REGEX.captures(value);
+            if error_captures.is_some() {
+                let captures = error_captures.unwrap();
+                let assists = digit_vec(captures.name("a1").map(|s| s.as_str()).unwrap_or_default());
+                let error = captures.name("e").map(|s| s.as_str().parse::<u8>()).context("No fielder specified on error play")??;
+                return Ok(PlayType::ReachedOnError {assists, error})
+            }
+            return Err(anyhow!("Unable to parse fielding play"))
+        }
+    }
+    fn parse_baserunning_play(value: &str) -> Result<PlayType> {
+        let captures = BASERUNNING_PLAY_REGEX
+            .captures(value)
+            .context("No matching info in baserunning detail")?;
+        let (play_type, base, fielders, error, unearned_run) = (
+            captures.name("play_type").map(|m| m.as_str()).context("No baserunning play type found")?,
+            Base::from_str(captures.name("base").map(|m| m.as_str()).unwrap_or_default())?,
+            captures.name("fielders").map(|m| digit_vec(m.as_str())).unwrap_or_default(),
+            captures.name("error").map(|m| digit_vec(m.as_str()).first().copied()).unwrap_or_default(),
+            captures.name("unearned_run").map(|s|
+                if s.as_str().contains("T") {UnearnedRun::TeamUnearned} else {UnearnedRun::Unearned})
+        );
+        match play_type.into() {
+            "CS" => Ok(PlayType::CaughtStealing { base, fielders, error, unearned_run }),
+            "PO" => Ok(PlayType::PickedOff { base, fielders, error, unearned_run }),
+            "POCS" => Ok(PlayType::PickedOffCaughtStealing { base, fielders, error, unearned_run }),
+            "SB" => Ok(PlayType::StolenBase { base, unearned_run }),
+            "POCSH" => Ok(PlayType::PickedOffCaughtStealing { base: Base::Home, fielders, error, unearned_run }),
+            "CSH" => Ok(PlayType::CaughtStealing { base: Base::Home, fielders, error, unearned_run }),
+            _ => Err(anyhow!("Unrecognized baserunning play type"))
+        }
 
     }
-    fn parse_modifiers(value: &str) -> Result<Vec<PlayModifier>> {
-        let x: Vec<SetMatches> = value.split("/").filter(|s| s.len() > 0).map({|m| MODIFIER_REGEX_SET.matches(m)}).collect();
-        let y: Vec<()> = x.iter().zip(value.split("/")).map({|t| if !t.0.matched_any() {println!("{} {:?} ,", value, t.1)}}).collect();
-        Ok(vec![PlayModifier::AppealPlay])
+    fn parse_main_play(value: &str) -> Result<Vec<PlayType>> {
+        if value == "" {return Ok(vec![])}
+        let multi_split = MULTI_PLAY_REGEX.find(value);
+        if multi_split != None {
+            let (first, last) = value.split_at(multi_split.unwrap().start());
+            return Ok(Play::parse_main_play(first)?
+                .into_iter()
+                .chain(Play::parse_main_play(&last[1..])?.into_iter())
+                .collect())
+        }
+        let play_type = match value {
+            "99" => PlayType::Unknown,
+            "C" => PlayType::Interference,
+            "HP" => PlayType::HitByPitch,
+            "K" => PlayType::StrikeOut,
+            "I" | "IW" => PlayType::IntentionalWalk,
+            "NP" => PlayType::NoPlay,
+            "W" => PlayType::Walk,
+            "BK" => PlayType::Balk,
+            "DI" => PlayType::DefensiveIndifference,
+            "OA" => PlayType::OtherAdvance,
+            "PB" => PlayType::PassedBall,
+            "WP" => PlayType::WildPitch,
+            _ => PlayType::Unrecognized(value.to_string())
+        };
+        match play_type {PlayType::Unrecognized(_) => (), _ => {return Ok(vec![play_type])}}
+
+        if BASERUNNING_PLAY_REGEX.is_match(value) {return Ok(vec![Self::parse_baserunning_play(value)?])}
+
+        let num_split = if NUMERIC_REGEX.is_match(value) {NUMERIC_REGEX.find(value).unwrap().start()} else {value.len()};
+        let (first, last) = value.split_at(num_split);
+        let last = match last {"" => None, _ => Some(last.to_string())};
+        let last_as_int_vec: Vec<u8> = (&last).as_ref().map(|c| digit_vec(&c)).unwrap_or_default();
+        let final_match = match first {
+            "E" => PlayType::ReachedOnError {assists: vec![], error: last_as_int_vec.first().map(|u| *u).context("No fielder specified")?},
+            "" => Play::parse_fielding_play(&last.clone().unwrap())?,
+            "S" => PlayType::Single(last),
+            "D" => PlayType::Double(last),
+            "T" => PlayType::Triple(last),
+            "H" | "HR" => PlayType::HomeRun(last),
+            "DGR" => PlayType::GroundRuleDouble(last),
+            "FC" => PlayType::FieldersChoice(last_as_int_vec),
+            "FLE" => PlayType::ErrorOnFoul(last_as_int_vec.first().map(|u| *u).context("No fielder specified")?),
+            "K" => PlayType::StrikeOutPutOut(last_as_int_vec),
+            // Special case where fielders are unknown but base of forceout is
+            "(" => PlayType::Out { assists: vec![], putouts: vec![], runners_out: vec![BaseRunner::from_str(last.unwrap_or_default().get(0..1).unwrap_or_default())?]},
+            _ => PlayType::Unrecognized(value.to_string())
+        };
+        Ok(vec![final_match])
     }
+
+    fn parse_modifiers(value: &str) -> Result<Vec<PlayModifier>> {
+        Ok(value
+            .split("/")
+            .filter(|s| s.len() > 0)
+            .filter_map(|s|Self::parse_single_modifier(s).ok())
+            .collect()
+        )
+    }
+
+    fn parse_single_modifier(value: &str) -> Result<PlayModifier> {
+        let num_split = if MODIFIER_DIVIDER_REGEX.is_match(value) {MODIFIER_DIVIDER_REGEX.find(value).unwrap().start()} else {value.len()};
+        let (first, last) = value.split_at(num_split);
+        let last = match last {"" => None, _ => Some(last.to_string())};
+        let last_as_int_vec: Vec<u8> = digit_vec(&last.clone().unwrap_or_default());
+        let final_match = match first {
+            "" => PlayModifier::HitLocation(last.context("No play modifier info")?),
+            "AP" => PlayModifier::AppealPlay,
+            "B" => PlayModifier::UnspecifiedBunt(last),
+            "BF" => PlayModifier::FoulBunt(last),
+            "BP" => PlayModifier::PopUpBunt(last),
+            "BG" => PlayModifier::GroundBallBunt(last),
+            "BGDP" => PlayModifier::BuntGroundIntoDoublePlay,
+            "BINT" => PlayModifier::BatterInterference,
+            "BL" => PlayModifier::LineDriveBunt(last),
+            "BOOT" => PlayModifier::BatingOutOfTurn,
+            "BPDP" => PlayModifier::BuntPoppedIntoDoublePlay,
+            "BR" => PlayModifier::RunnerHitByBattedBall,
+            "C" => PlayModifier::CalledThirdStrike,
+            "COUB" => PlayModifier::CourtesyBatter,
+            "COUF" => PlayModifier::CourtesyFielder,
+            "COUR" => PlayModifier::CourtesyRunner,
+            "DP" => PlayModifier::UnspecifiedDoublePlay,
+            "E" => PlayModifier::ErrorOn(*last_as_int_vec.first().context("Missing error position info")?),
+            "F" => PlayModifier::Fly(last),
+            "FDP" => PlayModifier::FlyBallDoublePlay,
+            "FINT" => PlayModifier::FanInterference,
+            "FL" => PlayModifier::Foul,
+            "FO" => PlayModifier::ForceOut,
+            "G" => PlayModifier::GroundBall(last),
+            "GDP" => PlayModifier::GroundBallDoublePlay,
+            "GTP" => PlayModifier::GroundBallTriplePlay,
+            "IF" => PlayModifier::InfieldFlyRule,
+            "INT" => PlayModifier::Interference,
+            "IPHR" => PlayModifier::InsideTheParkHomeRun,
+            "L" => PlayModifier::LineDrive(last),
+            "LDP" => PlayModifier::LinedIntoDoublePlay,
+            "LTP" => PlayModifier::LinedIntoTriplePlay,
+            "MREV" => PlayModifier::ManageChallengeOfCallOnField,
+            "NDP" => PlayModifier::NoDoublePlayCredited,
+            "OBS" => PlayModifier::Obstruction,
+            "P" => PlayModifier::PopFly(last),
+            "PASS" => PlayModifier::RunnerOutPassingAnotherRunner,
+            "R" => PlayModifier::RelayToFielderWithNoOutMade(last_as_int_vec),
+            "RINT" => PlayModifier::RunnerInterference,
+            "S" => PlayModifier::SwingingThirdStrike,
+            "SF" => PlayModifier::SacrificeFly,
+            "SH" => PlayModifier::SacrificeHit,
+            "TH" | "TH)" | "THH" => PlayModifier::ThrowToBase(Base::from_str(&last.unwrap_or_default()).ok()),
+            "TP" => PlayModifier::UnspecifiedTriplePlay,
+            "UINT" => PlayModifier::UmpireInterference,
+            "UREV" => PlayModifier::UmpireReviewOfCallOnField,
+            _ => PlayModifier::Unrecognized(value.into())
+        };
+        Ok(final_match)
+    }
+
     fn parse_advances(value: &str) -> Result<Vec<RunnerAdvance>> {
-        Ok(vec![RunnerAdvance { from: Base::First, to: Base::First }])
+        Ok(value
+            .split(";")
+            .filter_map(|s|ADVANCE_REGEX.captures(s))
+            .filter_map(|c| Self::parse_single_advance(c).ok())
+            .collect::<Vec<RunnerAdvance>>())
+    }
+
+    fn parse_single_advance(captures: Captures) -> Result<RunnerAdvance> {
+        let (from_match, to_match, out_at_match, mods) = (
+            captures.name("from"), captures.name("to"), captures.name("out_at"), captures.name("mods")
+        );
+        let baserunner = BaseRunner::from_str(from_match
+            .map(|s| s.as_str())
+            .context("Missing baserunner in advance")?)?;
+        let to = Base::from_str(to_match.or(out_at_match)
+            .map(|s| s.as_str())
+            .context("Missing destination base in advance")?)?;
+        let out_or_error = out_at_match.is_some();
+        let modifiers = mods.map_or(Vec::new(), |m| Self::parse_advance_modifiers(m.as_str()));
+        return Ok(RunnerAdvance {baserunner, to, out_or_error, modifiers})
+
+    }
+
+    fn parse_advance_modifiers(value: &str) -> Vec<RunnerAdvanceModifier> {
+        value
+            .split(")")
+            .filter_map(|s| Self::parse_single_advance_modifier(s).ok())
+            .collect()
+    }
+
+    fn parse_single_advance_modifier(value: &str) -> Result<RunnerAdvanceModifier> {
+        let simple_match = match value {
+            "(UR" => RunnerAdvanceModifier::UnearnedRun,
+            "(TUR" => RunnerAdvanceModifier::TeamUnearnedRun,
+            "(NR" => RunnerAdvanceModifier::NoRBI,
+            "(RBI" => RunnerAdvanceModifier::RBI,
+            "(PB" => RunnerAdvanceModifier::PassedBall,
+            "(WP" => RunnerAdvanceModifier::WildPitch,
+            "(THH" => RunnerAdvanceModifier::AdvancedOnThrowTo(Some(Base::Home)),
+            _ => RunnerAdvanceModifier::Unrecognized(value.into())
+        };
+        match simple_match {RunnerAdvanceModifier::Unrecognized(_) => (), _ => {return Ok(simple_match)}};
+        let num_split = if NUMERIC_REGEX.is_match(value) {
+            NUMERIC_REGEX.find(value).unwrap().start()
+        } else {
+            return Err(anyhow!("Malformed baserunner advance modifier"))
+        };
+        let (first, last) = value.split_at(num_split);
+        let last_as_int_vec: Vec<u8> = digit_vec(last.into());
+        let final_match = match first {
+            "(INT" => RunnerAdvanceModifier::Interference(last_as_int_vec.first().copied()),
+            "(TH" => RunnerAdvanceModifier::AdvancedOnThrowTo(Base::from_str(last).ok()),
+            "(E" => RunnerAdvanceModifier::AdvancedOnError {assists: Vec::new(), error: last.get(0..1).map_or(None, |s| s.parse::<u8>().ok())},
+            "(" if last.contains("E") => {
+                let (assist_str, error_str) = last.split_at(last.find("E").unwrap());
+                let (assists, error) = (digit_vec(assist_str), digit_vec(error_str).first().copied());
+                RunnerAdvanceModifier::AdvancedOnError {assists, error}
+            },
+            "(" => {
+                let mut digits = digit_vec(last);
+                let (putout, assists) = (digits.pop(), digits);
+                RunnerAdvanceModifier::Putout {assists, putout}
+            }
+            _ => RunnerAdvanceModifier::Unrecognized(value.to_string())
+        };
+        Ok(final_match)
+
     }
 }
 impl TryFrom<&str> for Play {
     type Error = Error;
 
     fn try_from(value: &str) -> Result<Self> {
-        let (uncertain, exceptional) = (value.contains("#"), value.contains("!"));
+        let (uncertain_flag, exceptional_flag) = (value.contains("#"), value.contains("!"));
         let value: &str = &STRIP_CHARS_REGEX.replace_all(value, "").to_string();
+        if value == "" {return Ok(Play::unknown_play())}
         let modifiers_boundary = value.find("/").unwrap_or(value.len());
         let advances_boundary = value.find(".").unwrap_or(value.len());
         let first_boundary = min(modifiers_boundary, advances_boundary);
-        let main_play = Self::parse_main_play(&value[..first_boundary])?;
+        let main_plays = Self::parse_main_play(&value[..first_boundary])?;
         let modifiers = if modifiers_boundary < advances_boundary {
             Self::parse_modifiers(&value[modifiers_boundary+1..advances_boundary])?
         } else {Vec::new()};
@@ -435,11 +602,11 @@ impl TryFrom<&str> for Play {
             Self::parse_advances(&value[advances_boundary+1..])?
         } else {Vec::new()};
         Ok(Play {
-            main_plays: vec![],
-            modifiers: vec![],
-            advances: vec![],
-            uncertain_flag: false,
-            exceptional_flag: false
+            main_plays,
+            modifiers,
+            advances,
+            uncertain_flag,
+            exceptional_flag
         })
     }
 }
