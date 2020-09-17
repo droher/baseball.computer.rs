@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::BufReader;
 
-use anyhow::{Result, Context, Error};
+use anyhow::{Result, Context, Error, anyhow};
 use csv::{ReaderBuilder, StringRecord, Reader};
 
 use crate::event_file::misc::{GameId, StartRecord, SubstitutionRecord, BatHandAdjustment, PitchHandAdjustment, LineupAdjustment, EarnedRunRecord, Comment};
@@ -12,6 +12,8 @@ use crate::event_file::play::PlayRecord;
 use std::convert::TryFrom;
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Deserializer};
+use std::iter::TakeWhile;
+use serde::de::Unexpected::Map;
 
 
 pub struct Matchup<T> { pub(crate) away: T, pub(crate) home: T }
@@ -81,8 +83,20 @@ pub struct GameResults {
     time_of_game_minutes: Option<u16>,
 }
 
+pub struct RetrosheetReader(Reader<BufReader<File>>);
 
-pub struct RetrosheetReader(Reader<BufReader<File>>, StringRecord);
+impl RetrosheetReader {
+    pub fn next_game(&mut self) -> Result<Vec<MappedRecord>>{
+        let mut v = Vec::with_capacity(200);
+        if self.0.is_done() {return Ok(Vec::new())}
+        for r in self.0.records() {
+            let mapped = MappedRecord::new(&r?)?;
+            if let MappedRecord::GameId(g) = &mapped {v.push(mapped); break}
+            v.push(mapped)
+        }
+        Ok(v)
+    }
+}
 
 impl TryFrom<&str> for RetrosheetReader {
     type Error = Error;
@@ -94,21 +108,8 @@ impl TryFrom<&str> for RetrosheetReader {
                     .has_headers(false)
                     .flexible(true)
                     .from_reader(BufReader::new(File::open(path)?)),
-                StringRecord::new()
             )
         )
-    }
-}
-
-impl Iterator for RetrosheetReader {
-    type Item = Result<MappedRecord>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.0.read_record(&mut self.1) {
-            Ok(true) => Some(MappedRecord::new(&self.1)),
-            Ok(false) => None,
-            Err(e) => Some(Err(e.into()))
-        }
     }
 }
 

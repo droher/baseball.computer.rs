@@ -65,7 +65,7 @@ pub trait FieldingData {
 }
 
 #[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
-enum Base {
+pub enum Base {
     #[strum(serialize = "1")]
     First = 1,
     #[strum(serialize = "2")]
@@ -164,7 +164,7 @@ impl Pitch {
 }
 
 #[derive(Debug, Default)]
-pub struct PitchSequence(SmallVec<[Pitch; 10]>);
+pub struct PitchSequence(pub SmallVec<[Pitch; 10]>);
 
 impl TryFrom<&str> for PitchSequence {
     type Error = Error;
@@ -230,7 +230,7 @@ pub(crate) enum InningFrame {
 }
 
 #[derive(Debug, EnumString, Copy, Clone)]
-enum UnearnedRunStatus {
+pub enum UnearnedRunStatus {
     #[strum(serialize = "UR")]
     Unearned,
     #[strum(serialize = "TUR")]
@@ -238,7 +238,7 @@ enum UnearnedRunStatus {
 }
 
 #[derive(Debug, Copy, Clone)]
-enum RbiStatus {
+pub enum RbiStatus {
     RBI,
     NoRBI
 }
@@ -247,7 +247,7 @@ type Position = u8;
 type PositionVec = SmallVec<[Position; 3]>;
 
 #[derive(Debug, Clone)]
-struct CaughtStealingInfo {
+pub struct CaughtStealingInfo {
     base: Base,
     assists: PositionVec,
     putout: Option<Position>,
@@ -256,7 +256,7 @@ struct CaughtStealingInfo {
 }
 
 #[derive(Debug)]
-enum PlayType {
+pub enum PlayType {
     Out { assists: PositionVec, putouts: PositionVec, runners_out: SmallVec<[BaseRunner; 3]> },
     Interference,
     Single(Option<HitLocation>),
@@ -456,11 +456,11 @@ struct ScoringInfo {unearned: Option<UnearnedRunStatus>, rbi: bool}
 
 
 #[derive(Debug)]
-struct RunnerAdvance {
+pub struct RunnerAdvance {
     pub baserunner: BaseRunner,
     pub to: Base,
     out_or_error: bool,
-    modifiers: SmallVec<[RunnerAdvanceModifier; 3]>
+    pub modifiers: SmallVec<[RunnerAdvanceModifier; 3]>
 }
 
 impl FieldingData for RunnerAdvance {
@@ -526,7 +526,7 @@ impl RunnerAdvance {
 }
 
 #[derive(Debug, PartialEq, EnumDiscriminants)]
-enum RunnerAdvanceModifier {
+pub enum RunnerAdvanceModifier {
     UnearnedRun,
     TeamUnearnedRun,
     NoRBI,
@@ -636,11 +636,11 @@ impl RunnerAdvanceModifier {
     }
 }
 
-type HitLocation = String;
+pub type HitLocation = String;
 
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumString))]
-enum PlayModifier {
+pub enum PlayModifier {
     HitLocation(HitLocation),
     AppealPlay,
     UnspecifiedBunt(Option<HitLocation>),
@@ -784,11 +784,11 @@ impl PlayModifier {
 
 #[derive(Debug)]
 pub struct Play {
-    main_plays: SmallVec<[PlayType; 2]>,
-    modifiers: SmallVec<[PlayModifier; 4]>,
-    advances: SmallVec<[RunnerAdvance; 3]>,
-    uncertain_flag: bool,
-    exceptional_flag: bool
+    pub main_plays: SmallVec<[PlayType; 2]>,
+    pub modifiers: SmallVec<[PlayModifier; 4]>,
+    pub advances: SmallVec<[RunnerAdvance; 3]>,
+    pub uncertain_flag: bool,
+    pub exceptional_flag: bool
 }
 impl Play {
     pub fn out_advancing(&self) -> SmallVec<[BaseRunner; 3]> {
