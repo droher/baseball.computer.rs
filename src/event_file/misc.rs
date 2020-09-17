@@ -10,7 +10,7 @@ pub type Comment = String;
 #[derive(Debug, Eq, PartialEq, EnumString)]
 enum Hand {L, R, S, B}
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct GameId {pub id: String}
 impl FromRetrosheetRecord for GameId {
 

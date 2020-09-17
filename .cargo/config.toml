@@ -1,2 +1,2 @@
 [build]
-rustflags = ["-C", "profile-use=/tmp/pgo-data/merged.profdata"]
+rustflags = []

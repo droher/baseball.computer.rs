@@ -63,8 +63,8 @@ pub enum WindDirection {
     Unknown
 }
 
-type Team = String;
-type Park = String;
+pub type Team = String;
+pub type Park = String;
 
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
