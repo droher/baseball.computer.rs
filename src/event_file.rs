@@ -1,6 +1,6 @@
 pub mod misc;
 pub mod parser;
-mod play;
+pub mod play;
 mod traits;
 mod box_score;
 pub mod info;

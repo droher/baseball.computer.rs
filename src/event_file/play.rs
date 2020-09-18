@@ -638,6 +638,19 @@ impl RunnerAdvanceModifier {
 
 pub type HitLocation = String;
 
+pub enum HitLocationType {
+    UnspecifiedBunt,
+    PopUpBunt,
+    GroundBallBunt,
+    FoulBunt,
+    LineDriveBunt,
+    Fly,
+    GroundBall,
+    LineDrive,
+    PopFly,
+    Unknown
+}
+
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumString))]
 pub enum PlayModifier {
@@ -707,10 +720,6 @@ impl FieldingData for PlayModifier {
 }
 
 impl PlayModifier {
-    pub fn hit_location(&self) -> () {
-
-    }
-
     fn parse_modifiers(value: &str) -> Result<SmallVec<[PlayModifier; 4]>> {
         value
             .split("/")
