@@ -18,7 +18,7 @@ fn main() {
         .flatten()
         .filter_map(|m| if let MappedRecord::Play(pr) = m {Some(pr.play.modifiers)} else {None})
         .flatten()
-        .map(|pm| if let PlayModifier::HitLocation(hl) = pm {println!("{}", hl)})
+        .map(|pm| if let PlayModifier::HitLocation(hl) = pm {})
         .collect::<()>();
     let end = start.elapsed();
     println!("Elapsed: {:?}", end);

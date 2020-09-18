@@ -90,7 +90,7 @@ pub struct RetrosheetReader {
     current_game_id: GameId
 }
 
-pub type RecordVec = SmallVec<[MappedRecord; 128]>;
+pub type RecordVec = Vec<MappedRecord>;
 
 impl Iterator for RetrosheetReader {
     type Item = Result<RecordVec>;
@@ -105,7 +105,7 @@ impl Iterator for RetrosheetReader {
 
 impl RetrosheetReader {
     fn next_game(&mut self) -> Result<RecordVec> {
-        let mut v = RecordVec::new();
+        let mut v = RecordVec::with_capacity(128);
         if self.reader.is_done() {return Ok(v)}
         v.push(MappedRecord::GameId(self.current_game_id.to_owned()));
         loop {
