@@ -14,6 +14,7 @@ use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Deserializer};
 use std::iter::TakeWhile;
 use serde::de::Unexpected::Map;
+use smallvec::SmallVec;
 
 
 pub struct Matchup<T> { pub(crate) away: T, pub(crate) home: T }
@@ -83,35 +84,61 @@ pub struct GameResults {
     time_of_game_minutes: Option<u16>,
 }
 
-pub struct RetrosheetReader(Reader<BufReader<File>>);
+pub struct RetrosheetReader {
+    reader: Reader<BufReader<File>>,
+    current_record: StringRecord,
+    current_game_id: GameId
+}
+
+pub type RecordVec = SmallVec<[MappedRecord; 128]>;
+
+impl Iterator for RetrosheetReader {
+    type Item = Result<RecordVec>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.next_game() {
+            Ok(v) if v.is_empty() => None,
+            r => Some(r)
+        }
+    }
+}
 
 impl RetrosheetReader {
-    pub fn next_game(&mut self) -> Result<Vec<MappedRecord>>{
-        let mut v = Vec::with_capacity(200);
-        if self.0.is_done() {return Ok(Vec::new())}
-        for r in self.0.records() {
-            let mapped = MappedRecord::new(&r?)?;
-            if let MappedRecord::GameId(g) = &mapped {v.push(mapped); break}
-            v.push(mapped)
+    fn next_game(&mut self) -> Result<RecordVec> {
+        let mut v = RecordVec::new();
+        if self.reader.is_done() {return Ok(v)}
+        v.push(MappedRecord::GameId(self.current_game_id.to_owned()));
+        loop {
+            self.reader.read_record(&mut self.current_record)?;
+            let mapped_record = MappedRecord::new(&self.current_record)?;
+            if let MappedRecord::GameId(g) = mapped_record {
+                self.current_game_id = g;
+                break
+            } else { v.push(mapped_record) }
         }
         Ok(v)
     }
+
 }
 
 impl TryFrom<&str> for RetrosheetReader {
     type Error = Error;
 
     fn try_from(path: &str) -> Result<Self> {
-        Ok(
-            RetrosheetReader(
-                ReaderBuilder::new()
+        let mut reader = ReaderBuilder::new()
                     .has_headers(false)
                     .flexible(true)
-                    .from_reader(BufReader::new(File::open(path)?)),
-            )
-        )
+                    .from_reader(BufReader::new(File::open(path)?));
+        let mut current_record = StringRecord::new();
+        reader.read_record(&mut current_record)?;
+        let current_game_id = match MappedRecord::new(&current_record)? {
+            MappedRecord::GameId(g) => Ok(g),
+            _ => Err(anyhow!("First record was not a game ID, cannot read file"))
+        }?;
+        Ok(Self {reader, current_record, current_game_id})
     }
 }
+
 
 #[derive(Debug)]
 pub enum MappedRecord {
