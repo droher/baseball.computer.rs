@@ -5,7 +5,7 @@ use anyhow::{Result, Context, Error, anyhow};
 use csv::{ReaderBuilder, StringRecord, Reader};
 
 use crate::event_file::misc::{GameId, StartRecord, SubstitutionRecord, BatHandAdjustment, PitchHandAdjustment, LineupAdjustment, EarnedRunRecord, Comment};
-use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, Umpire, Batter, Pitcher, RetrosheetVolunteer, Scorer, Player, LineupPosition, FieldingPosition, Fielder};
+use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, Umpire, Batter, Pitcher, RetrosheetVolunteer, Scorer, Player, LineupPosition, FieldingPosition, Fielder, Side};
 use crate::event_file::info::{InfoRecord, Team, GameType, DayNight, WindDirection, Sky, Park, PitchDetail, HowScored};
 use crate::event_file::box_score::{BoxScoreLine, LineScore, BoxScoreEvent};
 use crate::event_file::play::PlayRecord;
@@ -18,9 +18,17 @@ use smallvec::SmallVec;
 use smallvec::alloc::collections::BTreeMap;
 use std::collections::HashMap;
 use num_traits::PrimInt;
+use std::ops::Deref;
+use crate::event_file::play::PlayType::DefensiveIndifference;
 
 
 pub struct Matchup<T> { away: T, home: T }
+
+impl<T> Matchup<T> {
+    pub fn new(away: T, home: T) -> Self {
+        Self {away, home}
+    }
+}
 
 impl<T: Default> Default for Matchup<T> {
     fn default() -> Self {
@@ -98,6 +106,27 @@ pub struct RetrosheetReader {
 }
 
 pub type RecordVec = Vec<MappedRecord>;
+
+fn assemble_lineups_and_defense(v: Vec<MappedRecord>) -> (Matchup<Lineup>, Matchup<Defense>)  {
+    // TODO: DRY
+    let (mut away_lineup, mut home_lineup) = (Lineup::with_capacity(10), Lineup::with_capacity(10));
+    let (mut away_defense, mut home_defense) = (Defense::with_capacity(10), Defense::with_capacity(10));
+    let (away_records, home_records): (Vec<StartRecord>, Vec<StartRecord>) = v.into_iter()
+        .filter_map(|m| if let MappedRecord::Start(sr) = m { Some(sr) } else { None })
+        .partition(|sr| sr.side == Side::Away);
+
+    away_records.iter().map(|sr| {
+        away_lineup.insert(sr.lineup_position, sr.player.clone());
+        away_defense.insert(sr.fielding_position, sr.player.clone());
+    }).last();
+    home_records.iter().map(|sr| {
+        home_lineup.insert(sr.lineup_position, sr.player.clone());
+        home_defense.insert(sr.fielding_position, sr.player.clone());
+    }).last();
+
+    (Matchup::new(away_lineup, home_lineup),
+     Matchup::new(away_defense, home_defense))
+}
 
 impl Iterator for RetrosheetReader {
     type Item = Result<RecordVec>;

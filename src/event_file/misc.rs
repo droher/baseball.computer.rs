@@ -53,10 +53,10 @@ impl FromRetrosheetRecord for LineupAdjustment {
 
 #[derive(Debug)]
 pub struct AppearanceRecord {
-    player: Player,
-    side: Side,
-    lineup_position: LineupPosition,
-    fielding_position: FieldingPosition
+    pub player: Player,
+    pub side: Side,
+    pub lineup_position: LineupPosition,
+    pub fielding_position: FieldingPosition
 }
 impl FromRetrosheetRecord for AppearanceRecord {
     fn new(record: &RetrosheetEventRecord) -> Result<AppearanceRecord> {

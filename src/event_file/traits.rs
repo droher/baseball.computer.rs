@@ -17,7 +17,7 @@ pub trait FromRetrosheetRecord {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
+#[derive(Debug, Eq, PartialEq, TryFromPrimitive, Copy, Clone, Hash)]
 #[repr(u8)]
 pub enum LineupPosition {
     PitcherWithDH = 0,
@@ -40,7 +40,7 @@ impl TryFrom<&str> for LineupPosition {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
+#[derive(Debug, Eq, PartialEq, TryFromPrimitive, Copy, Clone, Hash)]
 #[repr(u8)]
 pub enum FieldingPosition {
     Unknown = 0,
@@ -79,7 +79,7 @@ pub type Batter = Player;
 pub type Pitcher = Player;
 pub type Fielder = Player;
 
-#[derive(Debug, Eq, PartialEq, EnumString)]
+#[derive(Debug, Eq, PartialEq, EnumString, Hash, Copy, Clone)]
 pub enum Side {
     #[strum(serialize = "0")]
     Away,
