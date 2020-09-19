@@ -13,7 +13,7 @@ mod event_file;
 fn main() {
     let start = Instant::now();
     let mut reader= RetrosheetReader::try_from("/home/davidroher/Downloads/retrosheet/event/all.txt").unwrap();
-    reader.flatten().flat_map(|x| x).map(|m| println!("{:?}", m)).collect::<()>();
+    reader.for_each(drop);
     let end = start.elapsed();
     println!("Elapsed: {:?}", end);
 }

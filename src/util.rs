@@ -1,6 +1,7 @@
 use num_traits::PrimInt;
 use std::str::FromStr;
 use smallvec::SmallVec;
+use std::ops::Deref;
 
 pub(crate) fn parse_positive_int<T: PrimInt + FromStr>(int_str: &str) -> Option<T> {
     int_str

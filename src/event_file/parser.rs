@@ -107,22 +107,20 @@ pub struct RetrosheetReader {
 
 pub type RecordVec = Vec<MappedRecord>;
 
-fn assemble_lineups_and_defense(v: Vec<MappedRecord>) -> (Matchup<Lineup>, Matchup<Defense>)  {
+fn assemble_lineups_and_defense(start_records: Vec<StartRecord>) -> (Matchup<Lineup>, Matchup<Defense>)  {
     // TODO: DRY
     let (mut away_lineup, mut home_lineup) = (Lineup::with_capacity(10), Lineup::with_capacity(10));
     let (mut away_defense, mut home_defense) = (Defense::with_capacity(10), Defense::with_capacity(10));
-    let (away_records, home_records): (Vec<StartRecord>, Vec<StartRecord>) = v.into_iter()
-        .filter_map(|m| if let MappedRecord::Start(sr) = m { Some(sr) } else { None })
+    let (away_records, home_records): (Vec<StartRecord>, Vec<StartRecord>) = start_records.into_iter()
+        // TODO: Partition in place once method stabilized
         .partition(|sr| sr.side == Side::Away);
 
-    away_records.iter().map(|sr| {
-        away_lineup.insert(sr.lineup_position, sr.player.clone());
-        away_defense.insert(sr.fielding_position, sr.player.clone());
-    }).last();
-    home_records.iter().map(|sr| {
-        home_lineup.insert(sr.lineup_position, sr.player.clone());
-        home_defense.insert(sr.fielding_position, sr.player.clone());
-    }).last();
+    away_records.into_iter().zip(home_records).map(|(away, home)| {
+        away_lineup.insert(away.lineup_position, away.player.clone());
+        away_defense.insert(away.fielding_position, away.player);
+        home_lineup.insert(home.lineup_position, home.player.clone());
+        home_defense.insert(home.fielding_position, home.player);
+    }).for_each(drop);
 
     (Matchup::new(away_lineup, home_lineup),
      Matchup::new(away_defense, home_defense))

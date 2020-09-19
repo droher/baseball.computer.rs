@@ -51,7 +51,7 @@ impl FromRetrosheetRecord for LineupAdjustment {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AppearanceRecord {
     pub player: Player,
     pub side: Side,
