@@ -7,6 +7,7 @@ use arrayref::array_ref;
 use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, Batter, LineupPosition, Inning, Fielder, FieldingPosition, Pitcher, Side};
 use crate::util::parse_positive_int;
 use smallvec::SmallVec;
+use std::num::NonZeroU8;
 
 #[derive(Debug)]
 struct BattingLineStats {
@@ -76,7 +77,7 @@ impl FromRetrosheetRecord for BattingLine {
         Ok(BattingLine{
             batter_id: arr[2].to_string(),
             side: Side::from_str(arr[3])?,
-            lineup_position: p(arr[4]).context("Invalid lineup position")?,
+            lineup_position: LineupPosition::try_from(arr[4])?,
             nth_player_at_position: p(arr[5]).context("Invalid batting sequence position")?,
             batting_stats: BattingLineStats::try_from(array_ref![arr,6,17])?
         })
@@ -163,7 +164,7 @@ pub struct DefenseLine {
     fielder_id: Fielder,
     side: Side,
     fielding_position: FieldingPosition,
-    nth_player_at_position: u8,
+    nth_position_played_by_player: u8,
     defensive_stats: Option<DefenseLineStats>
 }
 
@@ -174,8 +175,8 @@ impl FromRetrosheetRecord for DefenseLine {
         Ok(DefenseLine{
             fielder_id: arr[2].to_string(),
             side: Side::from_str(arr[3])?,
-            fielding_position: p(arr[4]).context("Invalid fielding position")?,
-            nth_player_at_position: p(arr[5]).context("Invalid fielding sequence position")?,
+            nth_position_played_by_player: p(arr[4]).context("Invalid fielding sequence position")?,
+            fielding_position: FieldingPosition::try_from(arr[5])?,
             defensive_stats: DefenseLineStats::try_from(array_ref![arr,6,7]).ok(),
         })
     }

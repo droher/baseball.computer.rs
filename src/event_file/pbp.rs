@@ -1,17 +1,19 @@
 use either::Either;
-use crate::event_file::play::{PlayRecord, Count, InningFrame};
+use crate::event_file::play::{PlayRecord, Count, InningFrame, Base};
 use crate::event_file::misc::SubstitutionRecord;
-use crate::event_file::traits::{Inning, Side, LineupPosition};
+use crate::event_file::traits::{Inning, Side, LineupPosition, Pitcher};
 use crate::event_file::parser::{Matchup, Defense, Lineup, GameSetting, GameInfo};
 
 pub type EventRecord = Either<PlayRecord, SubstitutionRecord>;
 pub type Outs = u8;
 
+pub struct Runner {lineup_position: LineupPosition, charged_to: Pitcher}
+
 #[derive(Default)]
 pub struct BaseState {
-    first: Option<LineupPosition>,
-    second: Option<LineupPosition>,
-    third: Option<LineupPosition>
+    first: Option<Runner>,
+    second: Option<Runner>,
+    third: Option<Runner>
 }
 
 pub struct GameState {
@@ -32,10 +34,10 @@ impl GameState {
             frame: InningFrame::Top,
             outs: 0,
             bases: BaseState::default(),
-            score: Matchup { away: 0, home: 0 },
+            score: Matchup::default(),
             lineups: game_info.starting_lineups,
             defenses: game_info.starting_defense,
-            at_bat: 1,
+            at_bat: LineupPosition::First,
             count: Count::default()
         }
     }

@@ -13,13 +13,7 @@ mod event_file;
 fn main() {
     let start = Instant::now();
     let mut reader= RetrosheetReader::try_from("/home/davidroher/Downloads/retrosheet/event/all.txt").unwrap();
-    reader
-        .filter_map(|r| r.ok())
-        .flatten()
-        .filter_map(|m| if let MappedRecord::Play(pr) = m {Some(pr.play.modifiers)} else {None})
-        .flatten()
-        .map(|pm| if let PlayModifier::HitLocation(hl) = pm {})
-        .collect::<()>();
+    reader.flatten().flat_map(|x| x).map(|m| println!("{:?}", m)).collect::<()>();
     let end = start.elapsed();
     println!("Elapsed: {:?}", end);
 }

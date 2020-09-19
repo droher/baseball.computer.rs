@@ -4,6 +4,7 @@ use anyhow::{Result};
 use strum_macros::EnumString;
 
 use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, LineupPosition, Player, FieldingPosition, Pitcher, Side};
+use std::convert::TryFrom;
 
 pub type Comment = String;
 
@@ -45,7 +46,7 @@ impl FromRetrosheetRecord for LineupAdjustment {
 
         Ok(LineupAdjustment {
             side: Side::from_str(record[1])?,
-            lineup_position: record[2].parse::<LineupPosition>()?,
+            lineup_position: LineupPosition::try_from(record[2])?,
         })
     }
 }
@@ -63,8 +64,8 @@ impl FromRetrosheetRecord for AppearanceRecord {
         Ok(AppearanceRecord {
             player: String::from(record[1]),
             side: Side::from_str(record[3])?,
-            lineup_position: record[4].parse::<LineupPosition>()?,
-            fielding_position:  record[5].trim_end().parse::<FieldingPosition>()?
+            lineup_position: LineupPosition::try_from(record[4])?,
+            fielding_position:  FieldingPosition::try_from(record[5])?
         })
     }
 }

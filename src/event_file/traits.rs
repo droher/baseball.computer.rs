@@ -1,6 +1,9 @@
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Error, Result, Context};
 use csv::StringRecord;
 use strum_macros::EnumString;
+use num_enum::{TryFromPrimitive, TryFromPrimitiveError};
+use std::convert::TryFrom;
+use crate::event_file::play::PlayType::FieldersChoice;
 
 
 pub type RetrosheetEventRecord = StringRecord;
@@ -14,8 +17,56 @@ pub trait FromRetrosheetRecord {
     }
 }
 
-pub type LineupPosition = u8;
-pub type FieldingPosition = u8;
+#[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
+#[repr(u8)]
+pub enum LineupPosition {
+    PitcherWithDH = 0,
+    First,
+    Second,
+    Third,
+    Fourth,
+    Fifth,
+    Sixth,
+    Seventh,
+    Eighth,
+    Ninth
+}
+impl TryFrom<&str> for LineupPosition {
+    type Error = Error;
+
+    //noinspection RsTypeCheck
+    fn try_from(value: &str) -> Result<Self> {
+        LineupPosition::try_from(value.parse::<u8>()?).context("Unable to convert to lineup position")
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
+#[repr(u8)]
+pub enum FieldingPosition {
+    Unknown = 0,
+    Pitcher,
+    Catcher,
+    FirstBaseman,
+    SecondBaseman,
+    ThirdBaseman,
+    Shortstop,
+    LeftFielder,
+    CenterFielder,
+    RightFielder,
+    DesignatedHitter,
+    PinchHitter,
+    PinchRunner
+}
+impl TryFrom<&str> for FieldingPosition {
+    type Error = Error;
+
+    //noinspection RsTypeCheck
+    fn try_from(value: &str) -> Result<Self> {
+        FieldingPosition::try_from(value.parse::<u8>()?).context("Unable to convert to fielding position")
+    }
+}
+
+
 pub type Inning = u8;
 
 type Person = String;

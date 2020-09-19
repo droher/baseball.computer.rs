@@ -5,7 +5,7 @@ use anyhow::{Result, Context, Error, anyhow};
 use csv::{ReaderBuilder, StringRecord, Reader};
 
 use crate::event_file::misc::{GameId, StartRecord, SubstitutionRecord, BatHandAdjustment, PitchHandAdjustment, LineupAdjustment, EarnedRunRecord, Comment};
-use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, Umpire, Batter, Pitcher, RetrosheetVolunteer, Scorer, Player, LineupPosition, FieldingPosition};
+use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, Umpire, Batter, Pitcher, RetrosheetVolunteer, Scorer, Player, LineupPosition, FieldingPosition, Fielder};
 use crate::event_file::info::{InfoRecord, Team, GameType, DayNight, WindDirection, Sky, Park, PitchDetail, HowScored};
 use crate::event_file::box_score::{BoxScoreLine, LineScore, BoxScoreEvent};
 use crate::event_file::play::PlayRecord;
@@ -15,17 +15,24 @@ use serde::{Deserialize, Deserializer};
 use std::iter::TakeWhile;
 use serde::de::Unexpected::Map;
 use smallvec::SmallVec;
+use smallvec::alloc::collections::BTreeMap;
+use std::collections::HashMap;
+use num_traits::PrimInt;
 
 
-pub struct Matchup<T> { pub(crate) away: T, pub(crate) home: T }
+pub struct Matchup<T> { away: T, home: T }
+
+impl<T: Default> Default for Matchup<T> {
+    fn default() -> Self {
+        Self {away: T::default(), home: T::default() }
+    }
+}
 
 pub type Teams = Matchup<Team>;
 pub type StartingLineups = Matchup<Lineup>;
 
-/// Zero is the pitcher if there's a DH
-pub struct Lineup([LineupPosition; 10]);
-/// Zero is the DH if applicable
-pub struct Defense([FieldingPosition; 10]);
+pub type Lineup = HashMap<LineupPosition, Batter>;
+pub type Defense = HashMap<FieldingPosition, Fielder>;
 
 /// Contains the information provided in the Retrosheet info and start fields.
 pub struct GameInfo {
