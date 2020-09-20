@@ -1,23 +1,20 @@
+use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::fs::File;
 use std::io::BufReader;
-
-use anyhow::{Result, Context, Error, anyhow};
-use csv::{ReaderBuilder, StringRecord, Reader};
-
-use crate::event_file::misc::{GameId, StartRecord, SubstitutionRecord, BatHandAdjustment, PitchHandAdjustment, LineupAdjustment, EarnedRunRecord, Comment};
-use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, Umpire, Batter, Pitcher, RetrosheetVolunteer, Scorer, Player, LineupPosition, FieldingPosition, Fielder, Side, MiscInfoString};
-use crate::event_file::info::{InfoRecord, Team, GameType, DayNight, WindDirection, Sky, Park, PitchDetail, HowScored, UmpirePosition, FieldCondition, Precipitation};
-use crate::event_file::box_score::{BoxScoreLine, LineScore, BoxScoreEvent};
-use crate::event_file::play::PlayRecord;
-use std::convert::TryFrom;
-use chrono::{NaiveDate, NaiveTime};use std::iter::TakeWhile;
-use std::collections::HashMap;
-use num_traits::PrimInt;
-use std::ops::Deref;
 use std::str::FromStr;
-use crate::event_file::play::PlayType::DefensiveIndifference;
-use tinystr::{TinyStr8};
+
+use anyhow::{anyhow, Context, Error, Result};
+use chrono::{NaiveDate, NaiveTime};
+use csv::{Reader, ReaderBuilder, StringRecord};
+use tinystr::TinyStr8;
+
+use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
+use crate::event_file::info::{DayNight, FieldCondition, GameType, HowScored, InfoRecord, Park, PitchDetail, Precipitation, Sky, Team, UmpirePosition, WindDirection};
+use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord};
 use crate::event_file::pbp::PlayByPlay;
+use crate::event_file::play::PlayRecord;
+use crate::event_file::traits::{Batter, Fielder, FieldingPosition, FromRetrosheetRecord, LineupPosition, Pitcher, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Side, Umpire};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Matchup<T> { away: T, home: T }
@@ -125,7 +122,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameUmpires {
             .iter()
             .filter_map(|i|
                 match i {
-                    InfoRecord::UmpireAssignment(ass) if ass.umpire.is_some() => Some((ass.position.into(), ass.umpire.unwrap())),
+                    InfoRecord::UmpireAssignment(ass) if ass.umpire.is_some() => Some((ass.position, ass.umpire.unwrap())),
                     _ => None
                 })
             .collect();
@@ -205,7 +202,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameSetting {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct GameInfo {
-    matchup: Matchup<Team>,
+    matchup: Teams,
     date: NaiveDate,
     setting: GameSetting,
     umpires: GameUmpires,
@@ -216,10 +213,10 @@ impl TryFrom<&Vec<InfoRecord>> for GameInfo {
     type Error = Error;
 
     fn try_from(infos: &Vec<InfoRecord>) -> Result<Self> {
-        let mut matchup = Matchup::try_from(infos)?;
+        let matchup = Matchup::try_from(infos)?;
         let date = *infos.iter()
             .find_map(|i| if let InfoRecord::GameDate(d) = i {Some(d)} else {None})
-            .ok_or(anyhow!("Game info did not include date. Full info list: {:?}", infos))?;
+            .ok_or_else(|| anyhow!("Game info did not include date. Full info list: {:?}", infos))?;
         let setting = GameSetting::try_from(infos)?;
         let umpires = GameUmpires::try_from(infos)?;
         let results = GameResults::try_from(infos)?;

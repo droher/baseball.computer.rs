@@ -9,12 +9,9 @@ use regex::{Captures, Match, Regex};
 use strum::ParseError;
 use strum_macros::{EnumDiscriminants, EnumString};
 
-use crate::util::{digit_vec, pop_plus_vec, str_to_tinystr, regex_split};
+use crate::util::{str_to_tinystr, regex_split};
 use crate::event_file::traits::{Inning, Side, Batter, FromRetrosheetRecord, RetrosheetEventRecord, FieldingPosition};
-use std::collections::HashSet;
-use crate::event_file::play::UnearnedRunStatus::TeamUnearned;
 use std::convert::TryFrom;
-use tinystr::TinyStr8;
 
 
 const NAMING_PREFIX: &str = r"(?P<";
@@ -209,11 +206,8 @@ impl TryFrom<&str> for PitchSequence {
                     // not apply the advance attempt info to the pitch.
                     // TODO: Figure out what's going on here and fix if needed or delete the todo
                     let mut speculative_iter = char_iter.clone();
-                    match speculative_iter.nth(1) {
-                        Some('+') => {
-                            pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(2)))
-                        },
-                        _ => {}
+                    if let Some('+') = speculative_iter.nth(1) {
+                        pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(2)))
                     }
                 }
                 Some('+') => {pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(1)))}
@@ -319,7 +313,7 @@ impl FieldingData for PlayType {
             PlayType::FieldersChoice(putout) | PlayType::StrikeOutPutOut {putout, ..}  => vec![*putout],
             _ => PositionVec::with_capacity(1)
         };
-        if cs_putout.is_some() { out_putouts.push(cs_putout.unwrap()) }
+        if let Some(p) = cs_putout { out_putouts.push(p )}
         out_putouts
     }
 
@@ -330,7 +324,7 @@ impl FieldingData for PlayType {
             PlayType::ReachedOnError {assists, ..} | PlayType::StrikeOutPutOut {assists, ..}=> PositionVec::from(assists.deref()),
             _ => PositionVec::with_capacity(1)
         };
-        if cs_assists.is_some() {out_assists.extend(cs_assists.unwrap())}
+        if let Some(a) = cs_assists {out_assists.extend(a)}
         out_assists
     }
 
@@ -340,7 +334,7 @@ impl FieldingData for PlayType {
             PlayType::ReachedOnError {error, ..} => vec![*error],
             _ => PositionVec::with_capacity(1)
         };
-        if cs_error.is_some() { errors.push(cs_error.unwrap()) }
+        if let Some(e) = cs_error { errors.push(e) }
         errors
     }
 }
@@ -348,7 +342,7 @@ impl FieldingData for PlayType {
 impl PlayType {
     fn is_plate_appearance(&self) -> bool {
         match self {
-            Self::StolenBase { base, .. } => false,
+            Self::StolenBase {.. } => false,
             Self::NoPlay | Self::Balk | Self::PassedBall | Self::WildPitch | Self::OtherAdvance
             | Self::CaughtStealing(_) | Self::PickedOff(_) | Self::PickedOffCaughtStealing(_)
             | Self::DefensiveIndifference | Self::ErrorOnFoul(_) => false,
@@ -366,13 +360,10 @@ impl PlayType {
     }
 
     fn parse_fielding_play(value: &str) -> Result<PlayType> {
-        match value.parse::<u32>() {
-            Ok(_) => {
+        if value.parse::<u32>().is_ok() {
                 let mut digits = FieldingPosition::fielding_vec(value);
                 let (putouts, assists) = (vec![digits.pop().unwrap()], digits);
                 return Ok(PlayType::Out { assists, putouts, runners_out: vec![]})
-            }
-            _ => ()
         };
         let to_str_vec: fn(Vec<Option<Match>>) -> Vec<&str> = { |v| v
             .into_iter()
@@ -380,9 +371,7 @@ impl PlayType {
                 .map(|m| m.as_str()))
             .collect()
         };
-        let out_captures = OUT_REGEX.captures(value);
-        if out_captures.is_some() {
-            let captures = out_captures.unwrap();
+        if let Some(captures) = OUT_REGEX.captures(value) {
             let assist_matches = vec![captures.name("a1"), captures.name("a2"), captures.name("a3")];
             let putout_matches = vec![captures.name("po1"), captures.name("po2"), captures.name("po3")];
             let runner_matches = vec![captures.name("runner1"), captures.name("runner2"), captures.name("runner3")];
@@ -394,9 +383,7 @@ impl PlayType {
             Ok(PlayType::Out {assists, putouts, runners_out})
         }
         else {
-            let error_captures = REACHED_ON_ERROR_REGEX.captures(value);
-            if error_captures.is_some() {
-                let captures = error_captures.unwrap();
+            if let Some(captures) = REACHED_ON_ERROR_REGEX.captures(value) {
                 let assists = FieldingPosition::fielding_vec(captures.name("a1").map(|s| s.as_str()).unwrap_or_default());
                 let error = FieldingPosition::try_from(captures.name("e").map_or("", |s| s.as_str()))?;
                 return Ok(PlayType::ReachedOnError {assists, error})
@@ -414,11 +401,11 @@ impl PlayType {
             captures.name("fielders").map(|m| FieldingPosition::fielding_vec(m.as_str())).unwrap_or_default(),
             captures.name("error").map_or(FieldingPosition::Unknown, |m| *FieldingPosition::fielding_vec(m.as_str()).first().unwrap_or(&FieldingPosition::Unknown)),
             captures.name("unearned_run").map(|s|
-                if s.as_str().contains("T") { UnearnedRunStatus::TeamUnearned} else { UnearnedRunStatus::Unearned})
+                if s.as_str().contains('T') { UnearnedRunStatus::TeamUnearned} else { UnearnedRunStatus::Unearned})
         );
         let (putout, assists ) = (fielders.pop().unwrap_or(FieldingPosition::Unknown), fielders);
         let cs_info = CaughtStealingInfo{base, putout, assists, error, unearned_run };
-        match play_type.into() {
+        match play_type {
             "CS" => Ok(PlayType::CaughtStealing(cs_info)),
             "PO" => Ok(PlayType::PickedOff(cs_info)),
             "POCS" => Ok(PlayType::PickedOffCaughtStealing(cs_info)),
@@ -431,9 +418,8 @@ impl PlayType {
     }
     fn parse_main_play(value: &str) -> Result<Vec<PlayType>> {
         if value == "" {return Ok(vec![])}
-        let multi_split = MULTI_PLAY_REGEX.find(value);
-        if multi_split.is_some() {
-            let (first, last) = value.split_at(multi_split.unwrap().start());
+        if let Some(multi_split) = MULTI_PLAY_REGEX.find(value) {
+            let (first, last) = value.split_at(multi_split.start());
             return Ok(Self::parse_main_play(first)?
                 .into_iter()
                 .chain(Self::parse_main_play(&last[1..])?.into_iter())
@@ -461,7 +447,7 @@ impl PlayType {
         let (first, last) = regex_split(value, &NUMERIC_REGEX);
         let mut last_as_int_vec: PositionVec = (&last).as_ref().map(|c| FieldingPosition::fielding_vec(&c)).unwrap_or_default();
         let final_match = match first {
-            "E" => PlayType::ReachedOnError {assists: vec![], error: last_as_int_vec.first().map(|u| *u).context("No fielder specified")?},
+            "E" => PlayType::ReachedOnError {assists: vec![], error: last_as_int_vec.first().copied().context("No fielder specified")?},
             "" => Self::parse_fielding_play(&last.unwrap_or_default())?,
             "S" => PlayType::Single(last_as_int_vec),
             "D" => PlayType::Double(last_as_int_vec),
@@ -469,7 +455,7 @@ impl PlayType {
             "H" | "HR" => PlayType::HomeRun(last_as_int_vec),
             "DGR" => PlayType::GroundRuleDouble(last_as_int_vec),
             "FC" => PlayType::FieldersChoice(last_as_int_vec.get(0).copied().unwrap_or(FieldingPosition::Unknown)),
-            "FLE" => PlayType::ErrorOnFoul(last_as_int_vec.first().map(|u| *u).context("No fielder specified")?),
+            "FLE" => PlayType::ErrorOnFoul(last_as_int_vec.first().copied().context("No fielder specified")?),
             "K" => {
                 let (putout, assists) = (last_as_int_vec.pop().unwrap_or(FieldingPosition::Unknown), last_as_int_vec);
                 PlayType::StrikeOutPutOut {putout, assists}
@@ -535,9 +521,9 @@ impl RunnerAdvance {
 
     fn parse_advances(value: &str) -> Result<Vec<RunnerAdvance>> {
         value
-            .split(";")
+            .split(';')
             .filter_map(|s|ADVANCE_REGEX.captures(s))
-            .map(|c| Self::parse_single_advance(c))
+            .map(Self::parse_single_advance)
             .collect::<Result<Vec<RunnerAdvance>>>()
     }
 
@@ -553,7 +539,7 @@ impl RunnerAdvance {
             .context("Missing destination base in advance")?)?;
         let out_or_error = out_at_match.is_some();
         let modifiers = mods.map_or(Ok(Vec::new()), |m| RunnerAdvanceModifier::parse_advance_modifiers(m.as_str()))?;
-        return Ok(RunnerAdvance {baserunner, to, out_or_error, modifiers})
+        Ok(RunnerAdvance {baserunner, to, out_or_error, modifiers})
 
     }
 }
@@ -619,7 +605,7 @@ impl RunnerAdvanceModifier {
 
     fn parse_advance_modifiers(value: &str) -> Result<Vec<RunnerAdvanceModifier>> {
         value
-            .split(")")
+            .split(')')
             .filter(|s| !s.is_empty())
             .map(|s| Self::parse_single_advance_modifier(s))
             .collect::<Result<Vec<RunnerAdvanceModifier>>>()
@@ -642,11 +628,6 @@ impl RunnerAdvanceModifier {
             RunnerAdvanceModifier::Unrecognized(_) => (),
             _ => { return Ok(simple_match) }
         };
-        let num_split = if NUMERIC_REGEX.is_match(value) {
-            NUMERIC_REGEX.find(value).unwrap().start()
-        } else {
-            return Err(anyhow!("Malformed baserunner advance modifier: {}", value))
-        };
         let (first, last) = regex_split(value, &NUMERIC_REGEX);
         let last = last.unwrap_or_default();
         let last_as_int_vec: PositionVec = FieldingPosition::fielding_vec(last);
@@ -654,8 +635,8 @@ impl RunnerAdvanceModifier {
             "(INT" => RunnerAdvanceModifier::Interference(last_as_int_vec.first().copied().unwrap_or(FieldingPosition::Unknown)),
             "(TH" => RunnerAdvanceModifier::AdvancedOnThrowTo(Base::from_str(last).ok()),
             "(E" => RunnerAdvanceModifier::AdvancedOnError { assists: Vec::new(), error: FieldingPosition::try_from(last.get(0..1).unwrap_or_default()).unwrap_or(FieldingPosition::Unknown) },
-            "(" if last.contains("E") => {
-                let (assist_str, error_str) = last.split_at(last.find("E").unwrap());
+            "(" if last.contains('E') => {
+                let (assist_str, error_str) = last.split_at(last.find('E').unwrap());
                 let (assists, error) = (FieldingPosition::fielding_vec(assist_str), FieldingPosition::fielding_vec(error_str).first().copied().unwrap_or(FieldingPosition::Unknown));
                 RunnerAdvanceModifier::AdvancedOnError { assists, error }
             },
@@ -884,8 +865,8 @@ impl FieldingData for PlayModifier {
 impl PlayModifier {
     fn parse_modifiers(value: &str) -> Result<Vec<PlayModifier>> {
         value
-            .split("/")
-            .filter(|s| s.len() > 0)
+            .split('/')
+            .filter(|s| !s.is_empty())
             .map(|s| Self::parse_single_modifier(s))
             .collect::<Result<Vec<PlayModifier>>>()
     }
@@ -964,11 +945,11 @@ impl TryFrom<&str> for Play {
     type Error = Error;
 
     fn try_from(value: &str) -> Result<Self> {
-        let (uncertain_flag, exceptional_flag) = (value.contains("#"), value.contains("!"));
+        let (uncertain_flag, exceptional_flag) = (value.contains('#'), value.contains('!'));
         let value: &str = &STRIP_CHARS_REGEX.replace_all(value, "").to_string();
         if value == "" {return Ok(Play::default())}
-        let modifiers_boundary = value.find("/").unwrap_or(value.len());
-        let advances_boundary = value.find(".").unwrap_or(value.len());
+        let modifiers_boundary = value.find('/').unwrap_or_else(|| value.len());
+        let advances_boundary = value.find('.').unwrap_or_else(|| value.len());
         let first_boundary = min(modifiers_boundary, advances_boundary);
 
         let main_plays = PlayType::parse_main_play(&value[..first_boundary])?;

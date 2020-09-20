@@ -1,6 +1,5 @@
 use num_traits::PrimInt;
 use std::str::FromStr;
-use std::ops::Deref;
 use anyhow::{anyhow, Result};
 use regex::Regex;
 
@@ -28,7 +27,7 @@ pub(crate) fn pop_plus_vec(mut vec: Vec<u8>) -> (Option<u8>, Vec<u8>) {
 
 #[inline]
 pub(crate) fn str_to_tinystr<T: FromStr>(s: &str) -> Result<T> {
-    T::from_str(s).map_err({|_| anyhow!("Tinystr not formatted properly")})
+    T::from_str(s).map_err(|_| anyhow!("Tinystr not formatted properly"))
 }
 
 #[inline]

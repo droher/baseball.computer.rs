@@ -1,11 +1,11 @@
 use std::str::FromStr;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result};
 use strum_macros::EnumString;
 
 use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, LineupPosition, Player, FieldingPosition, Pitcher, Side};
 use std::convert::TryFrom;
-use tinystr::{TinyStr8, TinyStr16};
+use tinystr::{TinyStr16};
 use crate::util::str_to_tinystr;
 
 pub type Comment = String;

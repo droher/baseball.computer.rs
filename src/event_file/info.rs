@@ -2,11 +2,10 @@ use anyhow::{anyhow, Result};
 use chrono::{NaiveDate, NaiveTime};
 use strum_macros::EnumString;
 
-use crate::event_file::traits::{FromRetrosheetRecord, Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire, Person, MiscInfoString};
+use crate::event_file::traits::{FromRetrosheetRecord, Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire};
 use crate::util::{parse_positive_int, str_to_tinystr};
 use std::str::FromStr;
 use tinystr::{TinyStr4, TinyStr8, TinyStr16};
-use either::Either;
 
 #[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 #[strum(serialize_all = "lowercase")]

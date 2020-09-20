@@ -3,9 +3,6 @@
 use std::time::Instant;
 use event_file::parser::RetrosheetReader;
 use std::convert::TryFrom;
-use crate::event_file::play::{PlayModifier};
-use crate::event_file::parser::{MappedRecord};
-use crate::event_file::info::InfoRecord;
 
 mod util;
 mod event_file;

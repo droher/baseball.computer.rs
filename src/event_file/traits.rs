@@ -2,8 +2,7 @@ use anyhow::{anyhow, Error, Result, Context};
 use csv::StringRecord;
 use strum_macros::EnumString;
 use num_enum::{TryFromPrimitive, IntoPrimitive};
-use std::convert::{TryFrom, TryInto};
-use crate::event_file::play::PlayType::FieldersChoice;
+use std::convert::{TryFrom};
 use tinystr::{TinyStr8, TinyStr16};
 
 use crate::util::digit_vec;

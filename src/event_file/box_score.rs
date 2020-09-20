@@ -5,9 +5,7 @@ use anyhow::{anyhow, Context, Error, Result};
 use arrayref::array_ref;
 
 use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, Batter, LineupPosition, Inning, Fielder, FieldingPosition, Pitcher, Side};
-use crate::util::{parse_positive_int, str_to_tinystr, digit_vec};
-use std::num::NonZeroU8;
-use tinystr::TinyStr8;
+use crate::util::{parse_positive_int, str_to_tinystr};
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 struct BattingLineStats {

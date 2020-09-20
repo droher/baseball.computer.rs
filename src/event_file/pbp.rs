@@ -1,8 +1,8 @@
 use either::Either;
-use crate::event_file::play::{PlayRecord, Count, InningFrame, Base};
+use crate::event_file::play::{PlayRecord, Count, InningFrame};
 use crate::event_file::misc::SubstitutionRecord;
-use crate::event_file::traits::{Inning, Side, LineupPosition, Pitcher};
-use crate::event_file::parser::{Matchup, Defense, Lineup, GameSetting, GameInfo};
+use crate::event_file::traits::{Inning, LineupPosition, Pitcher};
+use crate::event_file::parser::{Matchup, Defense, Lineup, GameInfo};
 
 pub type EventRecord = Either<PlayRecord, SubstitutionRecord>;
 
