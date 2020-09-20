@@ -54,6 +54,11 @@ lazy_static!{
     static ref MULTI_PLAY_REGEX: Regex = Regex::new(r"[+;]").unwrap();
     static ref NUMERIC_REGEX: Regex = Regex::new(r"[0-9]").unwrap();
     static ref MODIFIER_DIVIDER_REGEX: Regex = Regex::new(r"[+\-0-9]").unwrap();
+
+    static ref HIT_LOCATION_GENERAL_REGEX: Regex = Regex::new(r"[0-9]+").unwrap();
+    static ref HIT_LOCATION_STRENGTH_REGEX: Regex = Regex::new(r"[+\-]").unwrap();
+    static ref HIT_LOCATION_ANGLE_REGEX: Regex = Regex::new(r"[FML]").unwrap();
+    static ref HIT_LOCATION_DEPTH_REGEX: Regex = Regex::new(r"(D|S|XD)").unwrap();
 }
 
 pub trait FieldingData {
@@ -308,6 +313,7 @@ impl FieldingData for PlayType {
         let cs_putout = self.caught_stealing_info().map(|cs| cs.putout);
         let mut out_putouts = match self {
             PlayType::Out { putouts, .. } => PositionVec::from(putouts.deref()),
+            PlayType::FieldersChoice(putout) | PlayType::StrikeOutPutOut {putout, ..}  => vec![*putout],
             _ => PositionVec::with_capacity(1)
         };
         if cs_putout.is_some() { out_putouts.push(cs_putout.unwrap()) }
@@ -318,7 +324,7 @@ impl FieldingData for PlayType {
         let cs_assists = self.caught_stealing_info().map(|cs| cs.assists);
         let mut out_assists = match self {
             PlayType::Out{assists, ..} |
-            PlayType::ReachedOnError {assists, ..} => PositionVec::from(assists.deref()),
+            PlayType::ReachedOnError {assists, ..} | PlayType::StrikeOutPutOut {assists, ..}=> PositionVec::from(assists.deref()),
             _ => PositionVec::with_capacity(1)
         };
         if cs_assists.is_some() {out_assists.extend(cs_assists.unwrap())}
@@ -661,33 +667,165 @@ impl RunnerAdvanceModifier {
     }
 }
 
-pub type HitLocation = String;
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+pub enum HitStrength {
+    #[strum(serialize = "+")]
+    Hard,
+    #[strum(serialize = "-")]
+    Soft,
+    Default
+}
+impl Default for HitStrength {
+    fn default() -> Self {Self::Default}
+}
 
-pub enum HitLocationType {
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+pub enum HitDepth {
+    #[strum(serialize = "S")]
+    Shallow,
+    #[strum(serialize = "D")]
+    Deep,
+    #[strum(serialize = "XD")]
+    ExtraDeep,
+    Default
+}
+impl Default for HitDepth {
+    fn default() -> Self {Self::Default}
+}
+
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+pub enum HitAngle {
+    #[strum(serialize = "F")]
+    Foul,
+    #[strum(serialize = "M")]
+    Middle,
+    #[strum(serialize = "L")]
+    FoulLine,
+    Default
+}
+impl Default for HitAngle {
+    fn default() -> Self {Self::Default}
+}
+
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+pub enum HitLocationGeneral {
+    #[strum(serialize = "1")]
+    Pitcher,
+    #[strum(serialize = "13")]
+    PitcherFirst,
+    #[strum(serialize = "15")]
+    PitcherThird,
+    #[strum(serialize = "2")]
+    Catcher,
+    #[strum(serialize = "23")]
+    CatcherFirst,
+    #[strum(serialize = "25")]
+    CatcherThird,
+    #[strum(serialize = "3")]
+    First,
+    #[strum(serialize = "34")]
+    FirstSecond,
+    #[strum(serialize = "4")]
+    Second,
+    #[strum(serialize = "46")]
+    SecondShortstop,
+    #[strum(serialize = "5")]
+    Third,
+    #[strum(serialize = "56")]
+    ThirdShortstop,
+    #[strum(serialize = "6")]
+    Shortstop,
+    #[strum(serialize = "7")]
+    Left,
+    #[strum(serialize = "78")]
+    LeftCenter,
+    #[strum(serialize = "8")]
+    Center,
+    #[strum(serialize = "89")]
+    RightCenter,
+    #[strum(serialize = "9")]
+    Right,
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct HitLocation {
+    general_location: HitLocationGeneral,
+    depth: HitDepth,
+    angle: HitAngle,
+    strength: HitStrength
+}
+impl TryFrom<&str> for HitLocation {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        let as_str = {|re: &Regex| re.find(value).map_or("",  |m| m.as_str())};
+        // If there's no general location found, that's unexpected behavior and we should short-circuit, but other missing info is expected
+        let general_location = HitLocationGeneral::from_str(as_str(&HIT_LOCATION_GENERAL_REGEX))?;
+        let depth = HitDepth::from_str(as_str(&HIT_LOCATION_DEPTH_REGEX)).unwrap_or_default();
+        let angle = HitAngle::from_str(as_str(&HIT_LOCATION_ANGLE_REGEX)).unwrap_or_default();
+        let strength = HitStrength::from_str(as_str(&HIT_LOCATION_STRENGTH_REGEX)).unwrap_or_default();
+        Ok(Self {
+            general_location,
+            depth,
+            angle,
+            strength
+        })
+    }
+}
+
+
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct ContactDescription {
+    contact_type: ContactType,
+    location: Option<HitLocation>
+}
+impl TryFrom<(&str, &str)> for ContactDescription {
+    type Error = Error;
+
+    fn try_from(tup: (&str, &str)) -> Result<Self> {
+        let (contact, loc) = tup;
+        let contact_type = ContactType::from_str(contact)?;
+        let location = HitLocation::try_from(loc).ok();
+        Ok(Self{
+            contact_type,
+            location
+        })
+
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone, EnumString)]
+pub enum ContactType {
+    #[strum(serialize = "B")]
     UnspecifiedBunt,
+    #[strum(serialize = "BP")]
     PopUpBunt,
+    #[strum(serialize = "BG")]
     GroundBallBunt,
+    #[strum(serialize = "BF")]
     FoulBunt,
+    #[strum(serialize = "BL")]
     LineDriveBunt,
+    #[strum(serialize = "F")]
     Fly,
+    #[strum(serialize = "G")]
     GroundBall,
+    #[strum(serialize = "L")]
     LineDrive,
+    #[strum(serialize = "P")]
     PopFly,
+    #[strum(serialize = "")]
     Unknown
 }
 
 #[derive(Debug, EnumDiscriminants, Eq, PartialEq, Clone)]
 #[strum_discriminants(derive(EnumString))]
 pub enum PlayModifier {
-    HitLocation(HitLocation),
+    ContactDescription(ContactDescription),
     AppealPlay,
-    UnspecifiedBunt(Option<HitLocation>),
-    PopUpBunt(Option<HitLocation>),
-    GroundBallBunt(Option<HitLocation>),
-    FoulBunt(Option<HitLocation>),
     BuntGroundIntoDoublePlay,
     BatterInterference,
-    LineDriveBunt(Option<HitLocation>),
     BatingOutOfTurn,
     BuntPoppedIntoDoublePlay,
     RunnerHitByBattedBall,
@@ -697,24 +835,20 @@ pub enum PlayModifier {
     CourtesyRunner,
     UnspecifiedDoublePlay,
     ErrorOn(FieldingPosition),
-    Fly(Option<HitLocation>),
     FlyBallDoublePlay,
     FanInterference,
     Foul,
     ForceOut,
-    GroundBall(Option<HitLocation>),
     GroundBallDoublePlay,
     GroundBallTriplePlay,
     InfieldFlyRule,
     Interference,
     InsideTheParkHomeRun,
-    LineDrive(Option<HitLocation>),
     LinedIntoDoublePlay,
     LinedIntoTriplePlay,
     ManageChallengeOfCallOnField,
     NoDoublePlayCredited,
     Obstruction,
-    PopFly(Option<HitLocation>),
     RunnerOutPassingAnotherRunner,
     RelayToFielderWithNoOutMade(PositionVec),
     RunnerInterference,
@@ -725,7 +859,7 @@ pub enum PlayModifier {
     UnspecifiedTriplePlay,
     UmpireInterference,
     UmpireReviewOfCallOnField,
-    Unknown(Option<HitLocation>),
+    Unknown,
     Unrecognized(String)
 }
 
@@ -755,18 +889,14 @@ impl PlayModifier {
 
     fn parse_single_modifier(value: &str) -> Result<PlayModifier> {
         let (first, last) = regex_split(value, &MODIFIER_DIVIDER_REGEX);
-        let as_str = last.map(String::from);
-        let last_as_int_vec: PositionVec = FieldingPosition::fielding_vec(&last.unwrap_or_default());
+        let last_as_int_vec = {|| FieldingPosition::fielding_vec(&last.unwrap_or_default()) };
+        if let Ok(cd) = ContactDescription::try_from((first, last.unwrap_or_default())) {
+            return Ok(PlayModifier::ContactDescription(cd))
+        }
         let final_match = match first {
-            "" => PlayModifier::HitLocation(as_str.context("No play modifier info")?),
             "AP" => PlayModifier::AppealPlay,
-            "B" => PlayModifier::UnspecifiedBunt(as_str),
-            "BF" => PlayModifier::FoulBunt(as_str),
-            "BP" => PlayModifier::PopUpBunt(as_str),
-            "BG" => PlayModifier::GroundBallBunt(as_str),
             "BGDP" => PlayModifier::BuntGroundIntoDoublePlay,
             "BINT" => PlayModifier::BatterInterference,
-            "BL" => PlayModifier::LineDriveBunt(as_str),
             "BOOT" => PlayModifier::BatingOutOfTurn,
             "BPDP" => PlayModifier::BuntPoppedIntoDoublePlay,
             "BR" => PlayModifier::RunnerHitByBattedBall,
@@ -775,27 +905,23 @@ impl PlayModifier {
             "COUF" => PlayModifier::CourtesyFielder,
             "COUR" => PlayModifier::CourtesyRunner,
             "DP" => PlayModifier::UnspecifiedDoublePlay,
-            "E" => PlayModifier::ErrorOn(*last_as_int_vec.first().context("Missing error position info")?),
-            "F" => PlayModifier::Fly(as_str),
+            "E" => PlayModifier::ErrorOn(*last_as_int_vec().first().context("Missing error position info")?),
             "FDP" => PlayModifier::FlyBallDoublePlay,
             "FINT" => PlayModifier::FanInterference,
             "FL" => PlayModifier::Foul,
             "FO" => PlayModifier::ForceOut,
-            "G" => PlayModifier::GroundBall(as_str),
             "GDP" => PlayModifier::GroundBallDoublePlay,
             "GTP" => PlayModifier::GroundBallTriplePlay,
             "IF" => PlayModifier::InfieldFlyRule,
             "INT" => PlayModifier::Interference,
             "IPHR" => PlayModifier::InsideTheParkHomeRun,
-            "L" => PlayModifier::LineDrive(as_str),
             "LDP" => PlayModifier::LinedIntoDoublePlay,
             "LTP" => PlayModifier::LinedIntoTriplePlay,
             "MREV" => PlayModifier::ManageChallengeOfCallOnField,
             "NDP" => PlayModifier::NoDoublePlayCredited,
             "OBS" => PlayModifier::Obstruction,
-            "P" => PlayModifier::PopFly(as_str),
             "PASS" => PlayModifier::RunnerOutPassingAnotherRunner,
-            "R" => PlayModifier::RelayToFielderWithNoOutMade(last_as_int_vec),
+            "R" => PlayModifier::RelayToFielderWithNoOutMade(last_as_int_vec()),
             "RINT" => PlayModifier::RunnerInterference,
             "S" => PlayModifier::SwingingThirdStrike,
             "SF" => PlayModifier::SacrificeFly,
@@ -805,7 +931,8 @@ impl PlayModifier {
             "TP" => PlayModifier::UnspecifiedTriplePlay,
             "UINT" => PlayModifier::UmpireInterference,
             "UREV" => PlayModifier::UmpireReviewOfCallOnField,
-            "U" => PlayModifier::Unknown(as_str),
+            // TODO: Unassisted?
+            "U" => PlayModifier::Unknown,
             _ => PlayModifier::Unrecognized(value.into())
         };
         Ok(final_match)
