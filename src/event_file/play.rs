@@ -9,7 +9,7 @@ use regex::{Captures, Match, Regex};
 use strum::ParseError;
 use strum_macros::{EnumDiscriminants, EnumString};
 
-use crate::util::{digit_vec, pop_plus_vec, str_to_tinystr};
+use crate::util::{digit_vec, pop_plus_vec, str_to_tinystr, regex_split};
 use crate::event_file::traits::{Inning, Side, Batter, FromRetrosheetRecord, RetrosheetEventRecord, FieldingPosition};
 use std::collections::HashSet;
 use crate::event_file::play::UnearnedRunStatus::TeamUnearned;
@@ -271,15 +271,15 @@ impl Default for CaughtStealingInfo {
 pub enum PlayType {
     Out { assists: PositionVec, putouts: PositionVec, runners_out: Vec<BaseRunner> },
     Interference,
-    Single(Option<HitLocation>),
-    Double(Option<HitLocation>),
-    Triple(Option<HitLocation>),
-    GroundRuleDouble(Option<HitLocation>),
+    Single(PositionVec),
+    Double(PositionVec),
+    Triple(PositionVec),
+    GroundRuleDouble(PositionVec),
     ErrorOnFoul(FieldingPosition),
     ReachedOnError {assists: PositionVec, error: FieldingPosition},
     // TODO: Add to fielding
     FieldersChoice(FieldingPosition),
-    HomeRun(Option<HitLocation>),
+    HomeRun(PositionVec),
     HitByPitch,
     StrikeOut,
     // TODO: Add to fielding
@@ -423,7 +423,7 @@ impl PlayType {
     fn parse_main_play(value: &str) -> Result<Vec<PlayType>> {
         if value == "" {return Ok(vec![])}
         let multi_split = MULTI_PLAY_REGEX.find(value);
-        if multi_split != None {
+        if multi_split.is_some() {
             let (first, last) = value.split_at(multi_split.unwrap().start());
             return Ok(Self::parse_main_play(first)?
                 .into_iter()
@@ -449,18 +449,16 @@ impl PlayType {
 
         if BASERUNNING_PLAY_REGEX.is_match(value) {return Ok(vec![Self::parse_baserunning_play(value)?])}
 
-        let num_split = if NUMERIC_REGEX.is_match(value) {NUMERIC_REGEX.find(value).unwrap().start()} else {value.len()};
-        let (first, last) = value.split_at(num_split);
-        let last = match last {"" => None, _ => Some(last.to_string())};
+        let (first, last) = regex_split(value, &NUMERIC_REGEX);
         let mut last_as_int_vec: PositionVec = (&last).as_ref().map(|c| FieldingPosition::fielding_vec(&c)).unwrap_or_default();
         let final_match = match first {
             "E" => PlayType::ReachedOnError {assists: vec![], error: last_as_int_vec.first().map(|u| *u).context("No fielder specified")?},
-            "" => Self::parse_fielding_play(&last.clone().unwrap())?,
-            "S" => PlayType::Single(last),
-            "D" => PlayType::Double(last),
-            "T" => PlayType::Triple(last),
-            "H" | "HR" => PlayType::HomeRun(last),
-            "DGR" => PlayType::GroundRuleDouble(last),
+            "" => Self::parse_fielding_play(&last.unwrap_or_default())?,
+            "S" => PlayType::Single(last_as_int_vec),
+            "D" => PlayType::Double(last_as_int_vec),
+            "T" => PlayType::Triple(last_as_int_vec),
+            "H" | "HR" => PlayType::HomeRun(last_as_int_vec),
+            "DGR" => PlayType::GroundRuleDouble(last_as_int_vec),
             "FC" => PlayType::FieldersChoice(last_as_int_vec.get(0).copied().unwrap_or(FieldingPosition::Unknown)),
             "FLE" => PlayType::ErrorOnFoul(last_as_int_vec.first().map(|u| *u).context("No fielder specified")?),
             "K" => {
@@ -640,8 +638,9 @@ impl RunnerAdvanceModifier {
         } else {
             return Err(anyhow!("Malformed baserunner advance modifier: {}", value))
         };
-        let (first, last) = value.split_at(num_split);
-        let last_as_int_vec: PositionVec = FieldingPosition::fielding_vec(last.into());
+        let (first, last) = regex_split(value, &NUMERIC_REGEX);
+        let last = last.unwrap_or_default();
+        let last_as_int_vec: PositionVec = FieldingPosition::fielding_vec(last);
         let final_match = match first {
             "(INT" => RunnerAdvanceModifier::Interference(last_as_int_vec.first().copied().unwrap_or(FieldingPosition::Unknown)),
             "(TH" => RunnerAdvanceModifier::AdvancedOnThrowTo(Base::from_str(last).ok()),
@@ -755,23 +754,19 @@ impl PlayModifier {
     }
 
     fn parse_single_modifier(value: &str) -> Result<PlayModifier> {
-        let num_split = if MODIFIER_DIVIDER_REGEX.is_match(value) { MODIFIER_DIVIDER_REGEX.find(value).unwrap().start() } else { value.len() };
-        let (first, last) = value.split_at(num_split);
-        let opt_last = match last {
-            "" => None,
-            _ => Some(last.to_string())
-        };
-        let last_as_int_vec: PositionVec = FieldingPosition::fielding_vec(&last);
+        let (first, last) = regex_split(value, &MODIFIER_DIVIDER_REGEX);
+        let as_str = last.map(String::from);
+        let last_as_int_vec: PositionVec = FieldingPosition::fielding_vec(&last.unwrap_or_default());
         let final_match = match first {
-            "" => PlayModifier::HitLocation(opt_last.context("No play modifier info")?),
+            "" => PlayModifier::HitLocation(as_str.context("No play modifier info")?),
             "AP" => PlayModifier::AppealPlay,
-            "B" => PlayModifier::UnspecifiedBunt(opt_last),
-            "BF" => PlayModifier::FoulBunt(opt_last),
-            "BP" => PlayModifier::PopUpBunt(opt_last),
-            "BG" => PlayModifier::GroundBallBunt(opt_last),
+            "B" => PlayModifier::UnspecifiedBunt(as_str),
+            "BF" => PlayModifier::FoulBunt(as_str),
+            "BP" => PlayModifier::PopUpBunt(as_str),
+            "BG" => PlayModifier::GroundBallBunt(as_str),
             "BGDP" => PlayModifier::BuntGroundIntoDoublePlay,
             "BINT" => PlayModifier::BatterInterference,
-            "BL" => PlayModifier::LineDriveBunt(opt_last),
+            "BL" => PlayModifier::LineDriveBunt(as_str),
             "BOOT" => PlayModifier::BatingOutOfTurn,
             "BPDP" => PlayModifier::BuntPoppedIntoDoublePlay,
             "BR" => PlayModifier::RunnerHitByBattedBall,
@@ -781,36 +776,36 @@ impl PlayModifier {
             "COUR" => PlayModifier::CourtesyRunner,
             "DP" => PlayModifier::UnspecifiedDoublePlay,
             "E" => PlayModifier::ErrorOn(*last_as_int_vec.first().context("Missing error position info")?),
-            "F" => PlayModifier::Fly(opt_last),
+            "F" => PlayModifier::Fly(as_str),
             "FDP" => PlayModifier::FlyBallDoublePlay,
             "FINT" => PlayModifier::FanInterference,
             "FL" => PlayModifier::Foul,
             "FO" => PlayModifier::ForceOut,
-            "G" => PlayModifier::GroundBall(opt_last),
+            "G" => PlayModifier::GroundBall(as_str),
             "GDP" => PlayModifier::GroundBallDoublePlay,
             "GTP" => PlayModifier::GroundBallTriplePlay,
             "IF" => PlayModifier::InfieldFlyRule,
             "INT" => PlayModifier::Interference,
             "IPHR" => PlayModifier::InsideTheParkHomeRun,
-            "L" => PlayModifier::LineDrive(opt_last),
+            "L" => PlayModifier::LineDrive(as_str),
             "LDP" => PlayModifier::LinedIntoDoublePlay,
             "LTP" => PlayModifier::LinedIntoTriplePlay,
             "MREV" => PlayModifier::ManageChallengeOfCallOnField,
             "NDP" => PlayModifier::NoDoublePlayCredited,
             "OBS" => PlayModifier::Obstruction,
-            "P" => PlayModifier::PopFly(opt_last),
+            "P" => PlayModifier::PopFly(as_str),
             "PASS" => PlayModifier::RunnerOutPassingAnotherRunner,
             "R" => PlayModifier::RelayToFielderWithNoOutMade(last_as_int_vec),
             "RINT" => PlayModifier::RunnerInterference,
             "S" => PlayModifier::SwingingThirdStrike,
             "SF" => PlayModifier::SacrificeFly,
             "SH" => PlayModifier::SacrificeHit,
-            "TH" | "TH)" => PlayModifier::ThrowToBase(Base::from_str(&opt_last.unwrap_or_default()).ok()),
+            "TH" | "TH)" => PlayModifier::ThrowToBase(Base::from_str(&last.unwrap_or_default()).ok()),
             "THH" => PlayModifier::ThrowToBase(Some(Base::Home)),
             "TP" => PlayModifier::UnspecifiedTriplePlay,
             "UINT" => PlayModifier::UmpireInterference,
             "UREV" => PlayModifier::UmpireReviewOfCallOnField,
-            "U" => PlayModifier::Unknown(opt_last),
+            "U" => PlayModifier::Unknown(as_str),
             _ => PlayModifier::Unrecognized(value.into())
         };
         Ok(final_match)
