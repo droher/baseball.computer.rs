@@ -5,9 +5,10 @@ use anyhow::{anyhow, Context, Error, Result};
 use arrayref::array_ref;
 
 use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, Batter, LineupPosition, Inning, Fielder, FieldingPosition, Pitcher, Side};
-use crate::util::parse_positive_int;
+use crate::util::{parse_positive_int, str_to_tinystr};
 use smallvec::SmallVec;
 use std::num::NonZeroU8;
+use tinystr::TinyStr8;
 
 #[derive(Debug)]
 struct BattingLineStats {
@@ -75,7 +76,7 @@ impl FromRetrosheetRecord for BattingLine {
         let arr = record.deserialize::<[&str; 23]>(None)?;
         let p = parse_positive_int::<u8>;
         Ok(BattingLine{
-            batter_id: arr[2].to_string(),
+            batter_id: str_to_tinystr(arr[2])?,
             side: Side::from_str(arr[3])?,
             lineup_position: LineupPosition::try_from(arr[4])?,
             nth_player_at_position: p(arr[5]).context("Invalid batting sequence position")?,
@@ -97,7 +98,7 @@ impl FromRetrosheetRecord for PinchHittingLine {
         let arr = record.deserialize::<[&str; 22]>(None)?;
         let p = parse_positive_int::<u8>;
         Ok(PinchHittingLine{
-            pinch_hitter_id: arr[2].to_string(),
+            pinch_hitter_id: str_to_tinystr(arr[2])?,
             inning: p(arr[3]),
             side: Side::from_str(arr[4])?,
             batting_stats: BattingLineStats::try_from(array_ref![arr,5,17]).ok()
@@ -121,7 +122,7 @@ impl FromRetrosheetRecord for PinchRunningLine {
         let arr = record.deserialize::<[&str; 8]>(None)?;
         let p = {|i: usize| arr[i].parse::<u8>().ok()};
         Ok(PinchRunningLine{
-            pinch_runner_id: arr[2].to_string(),
+            pinch_runner_id: str_to_tinystr(arr[2])?,
             inning: p(3),
             side: Side::from_str(arr[4])?,
             runs: p(5),
@@ -173,7 +174,7 @@ impl FromRetrosheetRecord for DefenseLine {
         let arr = record.deserialize::<[&str; 13]>(None)?;
         let p = parse_positive_int::<u8>;
         Ok(DefenseLine{
-            fielder_id: arr[2].to_string(),
+            fielder_id: str_to_tinystr(arr[2])?,
             side: Side::from_str(arr[3])?,
             nth_position_played_by_player: p(arr[4]).context("Invalid fielding sequence position")?,
             fielding_position: FieldingPosition::try_from(arr[5])?,
@@ -246,7 +247,7 @@ impl FromRetrosheetRecord for PitchingLine {
         let arr = record.deserialize::<[&str; 22]>(None)?;
         let p = parse_positive_int::<u8>;
         Ok(PitchingLine{
-            pitcher_id: arr[2].to_string(),
+            pitcher_id: str_to_tinystr(arr[2])?,
             side: Side::from_str(arr[3])?,
             nth_pitcher: p(arr[4]).context("Invalid fielding sequence position")?,
             pitching_stats: PitchingLineStats::try_from(array_ref![arr,5,17])?,
@@ -381,7 +382,7 @@ impl FromRetrosheetRecord for FieldingPlayLine {
         let mut iter = record.iter();
         Ok(FieldingPlayLine{
             defense_side: Side::from_str(iter.nth(2).context("Missing team side")?)?,
-            fielders: iter.map(String::from).collect()
+            fielders: iter.map(|f| str_to_tinystr(f)).collect::<Result<SmallVec<[Fielder; 3]>>>()?
         })
     }
 }
@@ -399,8 +400,8 @@ impl FromRetrosheetRecord for HitByPitchLine {
         let arr = record.deserialize::<[&str; 5]>(None)?;
         Ok(HitByPitchLine{
             pitching_side: Side::from_str(arr[2])?,
-            pitcher_id: arr[3].to_string(),
-            batter_id: arr[4].to_string()
+            pitcher_id: str_to_tinystr(arr[3])?,
+            batter_id: str_to_tinystr(arr[4])?
         })
     }
 }
@@ -422,8 +423,8 @@ impl FromRetrosheetRecord for HomeRunLine {
         let p = {|i: usize| arr[i].parse::<u8>().ok()};
         Ok(HomeRunLine{
             batting_side: Side::from_str(arr[2])?,
-            batter_id: arr[3].to_string(),
-            pitcher_id: arr[4].to_string(),
+            batter_id: str_to_tinystr(arr[3])?,
+            pitcher_id: str_to_tinystr(arr[4])?,
             inning: p(5),
             runners_on: p(6),
             outs: p(7)
@@ -448,9 +449,9 @@ impl FromRetrosheetRecord for StolenBaseAttemptLine {
         let arr = record.deserialize::<[&str; 7]>(None)?;
         Ok(StolenBaseAttemptLine{
             running_side: Side::from_str(arr[2])?,
-            runner_id: arr[3].to_string(),
-            pitcher_id: arr[4].to_string(),
-            catcher_id: arr[5].to_string(),
+            runner_id: str_to_tinystr(arr[3])?,
+            pitcher_id: str_to_tinystr(arr[4])?,
+            catcher_id: str_to_tinystr(arr[5])?,
             inning: arr[6].parse::<u8>().ok()
 
         })

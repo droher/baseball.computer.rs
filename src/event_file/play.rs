@@ -9,12 +9,13 @@ use regex::{Captures, Match, Regex};
 use strum::ParseError;
 use strum_macros::{EnumDiscriminants, EnumString};
 
-use crate::util::{digit_vec, pop_plus_vec};
+use crate::util::{digit_vec, pop_plus_vec, str_to_tinystr};
 use crate::event_file::traits::{Inning, Side, Batter, FromRetrosheetRecord, RetrosheetEventRecord, FieldingPosition};
 use std::collections::HashSet;
 use smallvec::{SmallVec, smallvec};
 use crate::event_file::play::UnearnedRunStatus::TeamUnearned;
 use std::convert::TryFrom;
+use tinystr::TinyStr8;
 
 
 const NAMING_PREFIX: &str = r"(?P<";
@@ -229,7 +230,7 @@ pub(crate) enum InningFrame {
     Bottom,
 }
 
-#[derive(Debug, EnumString, Copy, Clone)]
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
 pub enum UnearnedRunStatus {
     #[strum(serialize = "UR")]
     Unearned,
@@ -245,7 +246,7 @@ pub enum RbiStatus {
 
 type PositionVec = SmallVec<[FieldingPosition; 3]>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CaughtStealingInfo {
     base: Base,
     assists: PositionVec,
@@ -893,7 +894,7 @@ impl FromRetrosheetRecord for PlayRecord {
         Ok(PlayRecord {
             inning: record[1].parse::<Inning>()?,
             side: Side::from_str(record[2])?,
-            batter: String::from(record[3]),
+            batter: str_to_tinystr(record[3])?,
             count: Count::new(record[4])?,
             pitch_sequence: {match record[5] {"" => None, s => Some(PitchSequence::try_from(s)?)}},
             play: Play::try_from(record[6])?

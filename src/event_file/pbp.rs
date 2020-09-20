@@ -35,8 +35,8 @@ impl GameState {
             outs: 0,
             bases: BaseState::default(),
             score: Matchup::default(),
-            lineups: game_info.starting_lineups,
-            defenses: game_info.starting_defense,
+            lineups: Matchup::default(),
+            defenses: Matchup::default(),
             at_bat: LineupPosition::First,
             count: Count::default()
         }

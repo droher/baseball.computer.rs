@@ -2,11 +2,13 @@ use anyhow::{anyhow, Result};
 use chrono::{NaiveDate, NaiveTime};
 use strum_macros::EnumString;
 
-use crate::event_file::traits::{FromRetrosheetRecord, Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire};
-use crate::util::parse_positive_int;
+use crate::event_file::traits::{FromRetrosheetRecord, Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire, Person, MiscInfoString};
+use crate::util::{parse_positive_int, str_to_tinystr};
 use std::str::FromStr;
+use tinystr::{TinyStr4, TinyStr8, TinyStr16};
+use either::Either;
 
-#[derive(Debug, Eq, PartialEq, EnumString)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 #[strum(serialize_all = "lowercase")]
 pub enum HowScored {
     Park,
@@ -14,8 +16,11 @@ pub enum HowScored {
     Radio,
     Unknown
 }
+impl Default for HowScored {
+    fn default() -> Self { Self::Unknown }
+}
 
-#[derive(Debug, Eq, PartialEq, EnumString)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 #[strum(serialize_all = "lowercase")]
 pub enum FieldCondition {
     Dry,
@@ -24,8 +29,11 @@ pub enum FieldCondition {
     Damp,
     Unknown
 }
+impl Default for FieldCondition {
+    fn default() -> Self { Self::Unknown }
+}
 
-#[derive(Debug, Eq, PartialEq, EnumString)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 #[strum(serialize_all = "lowercase")]
 pub enum Precipitation {
     Rain,
@@ -35,8 +43,11 @@ pub enum Precipitation {
     None,
     Unknown
 }
+impl Default for Precipitation {
+    fn default() -> Self { Self::Unknown }
+}
 
-#[derive(Debug, Eq, PartialEq, EnumString)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 #[strum(serialize_all = "lowercase")]
 pub enum Sky {
     Cloudy,
@@ -46,8 +57,11 @@ pub enum Sky {
     Sunny,
     Unknown
 }
+impl Default for Sky {
+    fn default() -> Self { Self::Unknown }
+}
 
-#[derive(Debug, Eq, PartialEq, EnumString)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 #[strum(serialize_all = "lowercase")]
 pub enum WindDirection {
     FromCF,
@@ -62,20 +76,26 @@ pub enum WindDirection {
     ToRF,
     Unknown
 }
+impl Default for WindDirection {
+    fn default() -> Self { Self::Unknown }
+}
 
-pub type Team = String;
-pub type Park = String;
+pub type Team = TinyStr4;
+pub type Park = TinyStr8;
 
 
-#[derive(Debug, Eq, PartialEq, EnumString)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 #[strum(serialize_all = "lowercase")]
 pub enum DayNight {
     Day,
     Night,
     Unknown
 }
+impl Default for DayNight {
+    fn default() -> Self { Self::Unknown }
+}
 
-#[derive(Debug, Eq, PartialEq, EnumString)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 pub enum GameType {
     #[strum(serialize = "0")]
     SingleGame,
@@ -88,8 +108,12 @@ pub enum GameType {
     #[strum(serialize = "4")]
     DoubleHeaderGame4
 }
+impl Default for GameType {
+    fn default() -> Self { Self::SingleGame }
+}
 
-#[derive(Debug, Eq, PartialEq, EnumString)]
+
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash)]
 #[strum(serialize_all = "lowercase")]
 pub enum PitchDetail {
     Pitches,
@@ -97,8 +121,31 @@ pub enum PitchDetail {
     None,
     Unknown
 }
+impl Default for PitchDetail {
+    fn default() -> Self { Self::Unknown }
+}
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString)]
+pub enum UmpirePosition {
+    #[strum(serialize = "umphome")]
+    Home,
+    #[strum(serialize = "ump1b")]
+    First,
+    #[strum(serialize = "ump2b")]
+    Second,
+    #[strum(serialize = "ump3b")]
+    Third,
+    #[strum(serialize = "umplf")]
+    LeftField,
+    #[strum(serialize = "umprf")]
+    RightField
+}
+
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+pub struct UmpireAssignment {pub position: UmpirePosition, pub umpire: Umpire}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum InfoRecord {
     VisitingTeam(Team),
     HomeTeam(Team),
@@ -109,12 +156,7 @@ pub enum InfoRecord {
     UseDH(bool),
     HomeTeamBatsFirst(bool),
     PitchDetail(PitchDetail),
-    UmpHome(Umpire),
-    Ump1B(Umpire),
-    Ump2B(Umpire),
-    Ump3B(Umpire),
-    UmpLF(Umpire),
-    UmpRF(Umpire),
+    UmpireAssignment(UmpireAssignment),
     FieldCondition(FieldCondition),
     Precipitation(Precipitation),
     Sky(Sky),
@@ -128,11 +170,11 @@ pub enum InfoRecord {
     LosingPitcher(Option<Player>),
     SavePitcher(Option<Player>),
     GameWinningRBI(Option<Player>),
-    EditTime(Option<String>),
+    EditTime(Option<MiscInfoString>),
     HowScored(HowScored),
-    InputProgramVersion(Option<String>),
+    InputProgramVersion(Option<MiscInfoString>),
     Inputter(Option<RetrosheetVolunteer>),
-    InputTime(Option<String>),
+    InputTime(Option<MiscInfoString>),
     Scorer(Option<Scorer>),
     OriginalScorer(Scorer),
     Translator(Option<RetrosheetVolunteer>),
@@ -160,21 +202,22 @@ impl FromRetrosheetRecord for InfoRecord {
         let info_type = record[1];
         let value = record[2];
 
-        let as_string = String::from(value);
-        let to_option = {|s: String| if s.is_empty() {Some(s)} else {None}};
+        let t8 = {|| str_to_tinystr::<TinyStr8>(value)};
+        let t16 = {|| str_to_tinystr::<TinyStr16>(value)};
+
+        let to_option8 = {|s: TinyStr8| if !value.is_empty() {Some(s)} else {None}};
+        let to_option16 = {|s: TinyStr16| if !value.is_empty() {Some(s)} else {None}};
 
         type I = InfoRecord;
         let info = match info_type {
-            "visteam" => I::VisitingTeam(as_string),
-            "hometeam" => I::HomeTeam(as_string),
-            "umphome" => I::UmpHome(as_string),
-            "ump1b" => I::Ump1B(as_string),
-            "ump2b" => I::Ump2B(as_string),
-            "ump3b" => I::Ump3B(as_string),
-            "umplf" => I::UmpLF(as_string),
-            "umprf" => I::UmpRF(as_string),
-            "site" => I::Park(as_string),
-            "oscorer" => I::OriginalScorer(as_string),
+            "visteam" => I::VisitingTeam(str_to_tinystr(value)?),
+            "hometeam" => I::HomeTeam(str_to_tinystr(value)?),
+            "site" => I::Park(str_to_tinystr(value)?),
+            "oscorer" => I::OriginalScorer(str_to_tinystr(value)?),
+
+            "umphome" | "ump1b" | "ump2b" | "ump3b" | "umplf" | "umprf" => {
+                I::UmpireAssignment(UmpireAssignment {position: UmpirePosition::from_str(info_type)?, umpire: t8()?})
+            },
 
             "number" => I::GameType(GameType::from_str(value)?),
             "daynight" => I::DayNight(DayNight::from_str(value)?),
@@ -195,16 +238,16 @@ impl FromRetrosheetRecord for InfoRecord {
             "date" => I::GameDate(NaiveDate::parse_from_str(value, "%Y/%m/%d")?),
             "starttime" => I::parse_time(value),
 
-            "wp" => I::WinningPitcher(to_option(as_string)),
-            "lp" => I::LosingPitcher(to_option(as_string)),
-            "save" => I::SavePitcher(to_option(as_string)),
-            "gwrbi" => I::GameWinningRBI(to_option(as_string)),
-            "edittime" => I::EditTime(to_option(as_string)),
-            "inputtime" => I::InputTime(to_option(as_string)),
-            "scorer" => I::Scorer(to_option(as_string)),
-            "inputter" => I::Inputter(to_option(as_string)),
-            "inputprogvers" => I::InputProgramVersion(to_option(as_string)),
-            "translator" => I::Translator(to_option(as_string)),
+            "wp" => I::WinningPitcher(to_option8(t8()?)),
+            "lp" => I::LosingPitcher(to_option8(t8()?)),
+            "save" => I::SavePitcher(to_option8(t8()?)),
+            "gwrbi" => I::GameWinningRBI(to_option8(t8()?)),
+            "edittime" => I::EditTime(to_option16(t16()?)),
+            "inputtime" => I::InputTime(to_option16(t16()?)),
+            "scorer" => I::Scorer(to_option16(t16()?)),
+            "inputter" => I::Inputter(to_option16(t16()?)),
+            "inputprogvers" => I::InputProgramVersion(to_option16(t16()?)),
+            "translator" => I::Translator(to_option16(t16()?)),
             "umpchange" => I::UmpireChange,
             _ => I::Unrecognized
         };

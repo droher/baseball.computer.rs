@@ -5,8 +5,8 @@ use num_enum::{TryFromPrimitive, IntoPrimitive};
 use std::convert::{TryFrom, TryInto};
 use crate::event_file::play::PlayType::FieldersChoice;
 use smallvec::SmallVec;
-use smallvec::alloc::str::FromStr;
-use std::num::NonZeroU8;
+use tinystr::{TinyStr8, TinyStr16};
+
 use crate::util::digit_vec;
 
 
@@ -91,16 +91,19 @@ impl TryFrom<&str> for FieldingPosition {
 
 pub type Inning = u8;
 
-type Person = String;
+pub(crate) type Person = TinyStr8;
+pub type MiscInfoString = TinyStr16;
+
 
 pub type Player = Person;
 pub type Umpire = Person;
-pub type RetrosheetVolunteer = String;
-pub type Scorer = String;
 
 pub type Batter = Player;
 pub type Pitcher = Player;
 pub type Fielder = Player;
+
+pub type RetrosheetVolunteer = MiscInfoString;
+pub type Scorer = MiscInfoString;
 
 #[derive(Debug, Eq, PartialEq, EnumString, Hash, Copy, Clone)]
 pub enum Side {

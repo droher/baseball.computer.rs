@@ -2,6 +2,7 @@ use num_traits::PrimInt;
 use std::str::FromStr;
 use smallvec::SmallVec;
 use std::ops::Deref;
+use anyhow::{anyhow, Result};
 
 pub(crate) fn parse_positive_int<T: PrimInt + FromStr>(int_str: &str) -> Option<T> {
     int_str
@@ -21,3 +22,8 @@ pub(crate) fn digit_vec(int_str: &str) -> SmallVec<[u8; 3]> {
 pub(crate) fn pop_plus_vec(mut vec: SmallVec<[u8; 3]>) -> (Option<u8>, SmallVec<[u8; 3]>) {
     (vec.pop(), vec)
 }
+
+pub(crate) fn str_to_tinystr<T: FromStr>(s: &str) -> Result<T> {
+    T::from_str(s).map_err({|_| anyhow!("Tinystr not formatted properly")})
+}
+

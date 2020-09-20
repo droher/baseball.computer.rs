@@ -1,28 +1,30 @@
 use std::str::FromStr;
 
-use anyhow::{Result};
+use anyhow::{Result, anyhow};
 use strum_macros::EnumString;
 
 use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, LineupPosition, Player, FieldingPosition, Pitcher, Side};
 use std::convert::TryFrom;
+use tinystr::{TinyStr8, TinyStr16};
+use crate::util::str_to_tinystr;
 
 pub type Comment = String;
 
 #[derive(Debug, Eq, PartialEq, EnumString)]
 enum Hand {L, R, S, B}
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct GameId {pub id: String}
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct GameId {pub id: TinyStr16}
 impl FromRetrosheetRecord for GameId {
 
     fn new(record: &RetrosheetEventRecord) -> Result<GameId> {
         let record = record.deserialize::<[&str; 2]>(None)?;
-        Ok(GameId { id: String::from(record[1]) })
+        Ok(GameId { id: str_to_tinystr(record[1])? })
     }
 }
 
 #[derive(Debug)]
-pub struct HandAdjustment {player_id: String, hand: Hand}
+pub struct HandAdjustment {player_id: Player, hand: Hand}
 pub type BatHandAdjustment = HandAdjustment;
 pub type PitchHandAdjustment = HandAdjustment;
 
@@ -31,7 +33,7 @@ impl FromRetrosheetRecord for HandAdjustment {
         let record = record.deserialize::<[&str; 3]>(None)?;
 
         Ok(HandAdjustment {
-            player_id: String::from(record[1]),
+            player_id: str_to_tinystr(record[1])?,
             hand: Hand::from_str(record[2])?
         })
     }
@@ -51,7 +53,7 @@ impl FromRetrosheetRecord for LineupAdjustment {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub struct AppearanceRecord {
     pub player: Player,
     pub side: Side,
@@ -62,7 +64,7 @@ impl FromRetrosheetRecord for AppearanceRecord {
     fn new(record: &RetrosheetEventRecord) -> Result<AppearanceRecord> {
         let record = record.deserialize::<[&str; 6]>(None)?;
         Ok(AppearanceRecord {
-            player: String::from(record[1]),
+            player: str_to_tinystr(record[1])?,
             side: Side::from_str(record[3])?,
             lineup_position: LineupPosition::try_from(record[4])?,
             fielding_position:  FieldingPosition::try_from(record[5])?
@@ -84,7 +86,7 @@ impl FromRetrosheetRecord for EarnedRunRecord {
         let arr = record.deserialize::<[&str; 4]>(None)?;
         match arr[1] {
             "er" => Ok(EarnedRunRecord {
-                pitcher_id: String::from(arr[2]),
+                pitcher_id: str_to_tinystr(arr[2])?,
                 earned_runs: arr[3].trim_end().parse::<u8>()?
             }),
             _ => Err(Self::error("Unexpected `data` type value", record))
