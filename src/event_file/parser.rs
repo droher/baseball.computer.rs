@@ -23,7 +23,7 @@ use std::str::FromStr;
 use crate::event_file::play::PlayType::DefensiveIndifference;
 use tinystr::{TinyStr8};
 
-
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Matchup<T> { away: T, home: T }
 
 impl<T> Matchup<T> {
@@ -44,7 +44,7 @@ pub type StartingLineups = Matchup<Lineup>;
 pub type Lineup = HashMap<LineupPosition, Batter>;
 pub type Defense = HashMap<FieldingPosition, Fielder>;
 
-/// Contains the information provided in the Retrosheet info and start fields.
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Game {
     info: GameInfo,
     pub starting_lineups: Matchup<Lineup>,
@@ -107,7 +107,11 @@ impl TryFrom<&Vec<InfoRecord>> for GameUmpires {
     fn try_from(record_vec: &Vec<InfoRecord>) -> Result<Self> {
         let asses: HashMap<UmpirePosition, Umpire> = record_vec
             .iter()
-            .filter_map(|i| if let InfoRecord::UmpireAssignment(ass) = i {Some((ass.position.into(), ass.umpire))} else {None})
+            .filter_map(|i|
+                match i {
+                    InfoRecord::UmpireAssignment(ass) if ass.umpire.is_some() => Some((ass.position.into(), ass.umpire.unwrap())),
+                    _ => None
+                })
             .collect();
         Ok(Self {
             home: asses.get(&UmpirePosition::Home).copied(),
@@ -197,7 +201,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameInfo {
     fn try_from(infos: &Vec<InfoRecord>) -> Result<Self> {
         let date = *infos.iter()
             .find_map(|i| if let InfoRecord::GameDate(d) = i {Some(d)} else {None})
-            .ok_or(anyhow!("Game info did not include date"))?;
+            .ok_or(anyhow!("Game info did not include date. Full info list: {:?}", infos))?;
         let setting = GameSetting::try_from(infos)?;
         let umpires = GameUmpires::try_from(infos)?;
         let results = GameResults::try_from(infos)?;
@@ -217,11 +221,8 @@ impl TryFrom<&Vec<InfoRecord>> for GameInfo {
 #[derive(Debug, Default, Eq, PartialEq, Clone)]
 pub struct GameRetrosheetMetadata {
     pitch_detail: PitchDetail,
-    edit_time: Option<MiscInfoString>,
     scoring_method: HowScored,
-    input_program_version: Option<MiscInfoString>,
     inputter: Option<RetrosheetVolunteer>,
-    input_time: Option<MiscInfoString>,
     scorer: Option<Scorer>,
     original_scorer: Option<Scorer>,
     translator: Option<RetrosheetVolunteer>
@@ -235,11 +236,8 @@ impl TryFrom<&Vec<InfoRecord>> for GameRetrosheetMetadata {
         for info in infos {
             match info {
                 InfoRecord::PitchDetail(x) => {metadata.pitch_detail = *x},
-                InfoRecord::EditTime(x) => {metadata.edit_time = *x},
                 InfoRecord::HowScored(x) => {metadata.scoring_method = *x},
-                InfoRecord::InputProgramVersion(x) => {metadata.input_program_version = *x},
                 InfoRecord::Inputter(x) => {metadata.inputter = *x},
-                InfoRecord::InputTime(x) => {metadata.input_time = *x},
                 InfoRecord::Scorer(x) => {metadata.scorer = *x},
                 InfoRecord::OriginalScorer(x) => {metadata.original_scorer = Some(*x)},
                 InfoRecord::Translator(x) => {metadata.translator = *x}
@@ -309,14 +307,15 @@ impl RetrosheetReader {
         if self.reader.is_done() {return Ok(false)}
         self.current_record_vec.push(MappedRecord::GameId(self.current_game_id));
         loop {
-            self.reader.read_record(&mut self.current_record)?;
-            let mapped_record = MappedRecord::new(&self.current_record)?;
-            if let MappedRecord::GameId(g) = mapped_record {
-                self.current_game_id = g;
-                break
-            } else { self.current_record_vec.push(mapped_record) }
+            let did_read = self.reader.read_record(&mut self.current_record)?;
+            if !did_read {return Ok(false)}
+            let mapped_record = MappedRecord::new(&self.current_record);
+            match mapped_record {
+                Ok(MappedRecord::GameId(g)) => {self.current_game_id = g; return Ok(true)},
+                Ok(m) => {self.current_record_vec.push(m)}
+                _ => println!("Error during game {} -- Error reading record: {:?}", &self.current_game_id.id, &self.current_record)
+            }
         }
-        Ok(true)
     }
 
 }
@@ -333,7 +332,7 @@ impl TryFrom<&str> for RetrosheetReader {
         reader.read_record(&mut current_record)?;
         let current_game_id = match MappedRecord::new(&current_record)? {
             MappedRecord::GameId(g) => Ok(g),
-            _ => Err(anyhow!("First record was not a game ID, cannot read file"))
+            _ => Err(anyhow!("First record was not a game ID, cannot read file. Full record: {:?}", &current_record))
         }?;
         let current_record_vec = RecordVec::new();
         Ok(Self {reader, current_record, current_game_id, current_record_vec})
@@ -341,7 +340,7 @@ impl TryFrom<&str> for RetrosheetReader {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum MappedRecord {
     GameId(GameId),
     Version,
@@ -364,7 +363,7 @@ impl FromRetrosheetRecord for MappedRecord {
     fn new(record: &RetrosheetEventRecord) -> Result<MappedRecord>{
         let line_type = record.get(0).context("No record")?;
         let mapped= match line_type {
-            "id" | "7d" => MappedRecord::GameId(GameId::new(record)?),
+            "id" => MappedRecord::GameId(GameId::new(record)?),
             "version" => MappedRecord::Version,
             "info" => MappedRecord::Info(InfoRecord::new(record)?),
             "start" => MappedRecord::Start(StartRecord::new(record)?),

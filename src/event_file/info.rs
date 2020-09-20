@@ -143,7 +143,7 @@ pub enum UmpirePosition {
 
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct UmpireAssignment {pub position: UmpirePosition, pub umpire: Umpire}
+pub struct UmpireAssignment {pub position: UmpirePosition, pub umpire: Option<Umpire>}
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum InfoRecord {
@@ -170,17 +170,17 @@ pub enum InfoRecord {
     LosingPitcher(Option<Player>),
     SavePitcher(Option<Player>),
     GameWinningRBI(Option<Player>),
-    EditTime(Option<MiscInfoString>),
     HowScored(HowScored),
-    InputProgramVersion(Option<MiscInfoString>),
     Inputter(Option<RetrosheetVolunteer>),
-    InputTime(Option<MiscInfoString>),
     Scorer(Option<Scorer>),
     OriginalScorer(Scorer),
     Translator(Option<RetrosheetVolunteer>),
     // We currently don't parse umpire changes as they only occur in box scores
     // and are irregularly shaped
     UmpireChange,
+    InputTime,
+    EditTime,
+    InputProgramVersion,
     Unrecognized
 }
 
@@ -205,9 +205,6 @@ impl FromRetrosheetRecord for InfoRecord {
         let t8 = {|| str_to_tinystr::<TinyStr8>(value)};
         let t16 = {|| str_to_tinystr::<TinyStr16>(value)};
 
-        let to_option8 = {|s: TinyStr8| if !value.is_empty() {Some(s)} else {None}};
-        let to_option16 = {|s: TinyStr16| if !value.is_empty() {Some(s)} else {None}};
-
         type I = InfoRecord;
         let info = match info_type {
             "visteam" => I::VisitingTeam(str_to_tinystr(value)?),
@@ -216,7 +213,7 @@ impl FromRetrosheetRecord for InfoRecord {
             "oscorer" => I::OriginalScorer(str_to_tinystr(value)?),
 
             "umphome" | "ump1b" | "ump2b" | "ump3b" | "umplf" | "umprf" => {
-                I::UmpireAssignment(UmpireAssignment {position: UmpirePosition::from_str(info_type)?, umpire: t8()?})
+                I::UmpireAssignment(UmpireAssignment {position: UmpirePosition::from_str(info_type)?, umpire: t8().ok()})
             },
 
             "number" => I::GameType(GameType::from_str(value)?),
@@ -238,17 +235,18 @@ impl FromRetrosheetRecord for InfoRecord {
             "date" => I::GameDate(NaiveDate::parse_from_str(value, "%Y/%m/%d")?),
             "starttime" => I::parse_time(value),
 
-            "wp" => I::WinningPitcher(to_option8(t8()?)),
-            "lp" => I::LosingPitcher(to_option8(t8()?)),
-            "save" => I::SavePitcher(to_option8(t8()?)),
-            "gwrbi" => I::GameWinningRBI(to_option8(t8()?)),
-            "edittime" => I::EditTime(to_option16(t16()?)),
-            "inputtime" => I::InputTime(to_option16(t16()?)),
-            "scorer" => I::Scorer(to_option16(t16()?)),
-            "inputter" => I::Inputter(to_option16(t16()?)),
-            "inputprogvers" => I::InputProgramVersion(to_option16(t16()?)),
-            "translator" => I::Translator(to_option16(t16()?)),
+            // # TODO: Add error correction for optional fields rather than passing in None
+            "wp" => I::WinningPitcher(t8().ok()),
+            "lp" => I::LosingPitcher(t8().ok()),
+            "save" => I::SavePitcher(t8().ok()),
+            "gwrbi" => I::GameWinningRBI(t8().ok()),
+            "scorer" => I::Scorer(t16().ok()),
+            "inputter" => I::Inputter(t16().ok()),
+            "translator" => I::Translator(t16().ok()),
+            "inputprogvers" => I::InputProgramVersion,
             "umpchange" => I::UmpireChange,
+            "inputtime" => I::InputTime,
+            "edittime" => I::EditTime,
             _ => I::Unrecognized
         };
         match info {

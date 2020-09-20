@@ -10,7 +10,7 @@ use crate::util::str_to_tinystr;
 
 pub type Comment = String;
 
-#[derive(Debug, Eq, PartialEq, EnumString)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 enum Hand {L, R, S, B}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -23,7 +23,7 @@ impl FromRetrosheetRecord for GameId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct HandAdjustment {player_id: Player, hand: Hand}
 pub type BatHandAdjustment = HandAdjustment;
 pub type PitchHandAdjustment = HandAdjustment;
@@ -39,7 +39,7 @@ impl FromRetrosheetRecord for HandAdjustment {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct LineupAdjustment { side: Side, lineup_position: LineupPosition}
 
 impl FromRetrosheetRecord for LineupAdjustment {
@@ -67,7 +67,7 @@ impl FromRetrosheetRecord for AppearanceRecord {
             player: str_to_tinystr(record[1])?,
             side: Side::from_str(record[3])?,
             lineup_position: LineupPosition::try_from(record[4])?,
-            fielding_position:  FieldingPosition::try_from(record[5])?
+            fielding_position:  FieldingPosition::try_from(record[5].trim_end())?
         })
     }
 }
@@ -75,7 +75,7 @@ impl FromRetrosheetRecord for AppearanceRecord {
 pub type StartRecord = AppearanceRecord;
 pub type SubstitutionRecord = AppearanceRecord;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct EarnedRunRecord {
     pitcher_id: Pitcher,
     earned_runs: u8

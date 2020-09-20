@@ -3,7 +3,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Error, Result};
-use const_format::{concatcp as concat, formatcp as format};
+use const_format::{concatcp, formatcp};
 use lazy_static::lazy_static;
 use regex::{Captures, Match, Regex};
 use strum::ParseError;
@@ -20,26 +20,26 @@ use tinystr::TinyStr8;
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[1-9]?)+)";
-const GROUP_ASSISTS1: &str = concat!(NAMING_PREFIX, "a1", GROUP_ASSISTS);
-const GROUP_ASSISTS2: &str = concat!(NAMING_PREFIX, "a2", GROUP_ASSISTS);
-const GROUP_ASSISTS3: &str = concat!(NAMING_PREFIX, "a3", GROUP_ASSISTS);
+const GROUP_ASSISTS1: &str = concatcp!(NAMING_PREFIX, "a1", GROUP_ASSISTS);
+const GROUP_ASSISTS2: &str = concatcp!(NAMING_PREFIX, "a2", GROUP_ASSISTS);
+const GROUP_ASSISTS3: &str = concatcp!(NAMING_PREFIX, "a3", GROUP_ASSISTS);
 const GROUP_PUTOUT: &str = r">[1-9])";
-const GROUP_PUTOUT1: &str = concat!(NAMING_PREFIX, "po1", GROUP_PUTOUT);
-const GROUP_PUTOUT2: &str = concat!(NAMING_PREFIX, "po2", GROUP_PUTOUT);
-const GROUP_PUTOUT3: &str = concat!(NAMING_PREFIX, "po3", GROUP_PUTOUT);
+const GROUP_PUTOUT1: &str = concatcp!(NAMING_PREFIX, "po1", GROUP_PUTOUT);
+const GROUP_PUTOUT2: &str = concatcp!(NAMING_PREFIX, "po2", GROUP_PUTOUT);
+const GROUP_PUTOUT3: &str = concatcp!(NAMING_PREFIX, "po3", GROUP_PUTOUT);
 const GROUP_OUT_AT_BASE_PREFIX: &str = r"(?:\((?P<runner";
 const GROUP_OUT_AT_BASE_SUFFIX: &str = r">[B123])\))?";
-const GROUP_OUT_AT_BASE1: &str = concat!(GROUP_OUT_AT_BASE_PREFIX, "1", GROUP_OUT_AT_BASE_SUFFIX);
-const GROUP_OUT_AT_BASE2: &str = concat!(GROUP_OUT_AT_BASE_PREFIX, "2", GROUP_OUT_AT_BASE_SUFFIX);
-const GROUP_OUT_AT_BASE3: &str = concat!(GROUP_OUT_AT_BASE_PREFIX, "3", GROUP_OUT_AT_BASE_SUFFIX);
+const GROUP_OUT_AT_BASE1: &str = concatcp!(GROUP_OUT_AT_BASE_PREFIX, "1", GROUP_OUT_AT_BASE_SUFFIX);
+const GROUP_OUT_AT_BASE2: &str = concatcp!(GROUP_OUT_AT_BASE_PREFIX, "2", GROUP_OUT_AT_BASE_SUFFIX);
+const GROUP_OUT_AT_BASE3: &str = concatcp!(GROUP_OUT_AT_BASE_PREFIX, "3", GROUP_OUT_AT_BASE_SUFFIX);
 
-const OUT: &str = &format!(r"^{}{}{}({}{}{})?({}{}{})?$",
+const OUT: &str = &formatcp!(r"^{}{}{}({}{}{})?({}{}{})?$",
                            GROUP_ASSISTS1, GROUP_PUTOUT1, GROUP_OUT_AT_BASE1,
                            GROUP_ASSISTS2, GROUP_PUTOUT2, GROUP_OUT_AT_BASE2,
                            GROUP_ASSISTS3, GROUP_PUTOUT3, GROUP_OUT_AT_BASE3
 );
 
-const REACH_ON_ERROR: &str = &format!(r"{}E(?P<e>[1-9])$", GROUP_ASSISTS1);
+const REACH_ON_ERROR: &str = &formatcp!(r"{}E(?P<e>[1-9])$", GROUP_ASSISTS1);
 const BASERUNNING_PLAY: &str = r"^(?P<play_type>SB|CS|PO|POCS)(?P<base>[123H])(?:\((?P<fielders>[0-9]*)(?P<error>E[0-9])?\)?)?(?P<unearned_run>\(T?UR\))?$";
 
 
@@ -142,7 +142,7 @@ impl Default for PitchType {
     fn default() -> Self { PitchType::Unknown }
 }
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Default, Copy, Clone)]
 pub struct Pitch {
     pitch_type: PitchType,
     runners_going: bool,
@@ -164,7 +164,7 @@ impl Pitch {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Eq, PartialEq, Clone)]
 pub struct PitchSequence(pub SmallVec<[Pitch; 10]>);
 
 impl TryFrom<&str> for PitchSequence {
@@ -190,7 +190,7 @@ impl TryFrom<&str> for PitchSequence {
                 ">" => {pitch.update_runners_going(); continue}
                 _ => {}
             }
-            let pitch_type: Result<PitchType> = PitchType::from_str(c.deref()).context("hi");
+            let pitch_type: Result<PitchType> = PitchType::from_str(c.deref()).context(format!("Bad pitch type: {}", c));
             // TODO: Log this as a warning once I implement logging
             pitch_type.map(|p|{pitch.update_pitch_type(p)}).ok();
 
@@ -255,7 +255,7 @@ pub struct CaughtStealingInfo {
     unearned_run: Option<UnearnedRunStatus>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum PlayType {
     Out { assists: PositionVec, putouts: PositionVec, runners_out: SmallVec<[BaseRunner; 3]> },
     Interference,
@@ -376,15 +376,15 @@ impl PlayType {
                 let error = FieldingPosition::try_from(captures.name("e").map_or("", |s| s.as_str()))?;
                 return Ok(PlayType::ReachedOnError {assists, error})
             }
-            Err(anyhow!("Unable to parse fielding play"))
+            Err(anyhow!("Unable to parse fielding play. Full captured string: {}", value))
         }
     }
     fn parse_baserunning_play(value: &str) -> Result<PlayType> {
         let captures = BASERUNNING_PLAY_REGEX
             .captures(value)
-            .context("No matching info in baserunning detail")?;
+            .context(format!("No matching info in baserunning detail: {}", value))?;
         let (play_type, base, mut fielders, error, unearned_run) = (
-            captures.name("play_type").map(|m| m.as_str()).context("No baserunning play type found")?,
+            captures.name("play_type").map(|m| m.as_str()).context(format!("No baserunning play type found: {}", value))?,
             Base::from_str(captures.name("base").map(|m| m.as_str()).unwrap_or_default())?,
             captures.name("fielders").map(|m| FieldingPosition::fielding_vec(m.as_str())).unwrap_or_default(),
             captures.name("error").map_or(FieldingPosition::Unknown, |m| *FieldingPosition::fielding_vec(m.as_str()).first().unwrap_or(&FieldingPosition::Unknown)),
@@ -400,7 +400,7 @@ impl PlayType {
             "SB" => Ok(PlayType::StolenBase { base, unearned_run }),
             "POCSH" => Ok(PlayType::PickedOffCaughtStealing(cs_info)),
             "CSH" => Ok(PlayType::CaughtStealing(cs_info)),
-            _ => Err(anyhow!("Unrecognized baserunning play type"))
+            _ => Err(anyhow!("Unrecognized baserunning play type: {}", &play_type))
         }
 
     }
@@ -465,7 +465,7 @@ impl PlayType {
 struct ScoringInfo {unearned: Option<UnearnedRunStatus>, rbi: bool}
 
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct RunnerAdvance {
     pub baserunner: BaseRunner,
     pub to: Base,
@@ -535,7 +535,7 @@ impl RunnerAdvance {
     }
 }
 
-#[derive(Debug, PartialEq, EnumDiscriminants)]
+#[derive(Debug, PartialEq, Eq, EnumDiscriminants)]
 pub enum RunnerAdvanceModifier {
     UnearnedRun,
     TeamUnearnedRun,
@@ -622,7 +622,7 @@ impl RunnerAdvanceModifier {
         let num_split = if NUMERIC_REGEX.is_match(value) {
             NUMERIC_REGEX.find(value).unwrap().start()
         } else {
-            return Err(anyhow!("Malformed baserunner advance modifier"))
+            return Err(anyhow!("Malformed baserunner advance modifier: {}", value))
         };
         let (first, last) = value.split_at(num_split);
         let last_as_int_vec: PositionVec = FieldingPosition::fielding_vec(last.into());
@@ -661,7 +661,7 @@ pub enum HitLocationType {
     Unknown
 }
 
-#[derive(Debug, EnumDiscriminants)]
+#[derive(Debug, EnumDiscriminants, Eq, PartialEq, Clone)]
 #[strum_discriminants(derive(EnumString))]
 pub enum PlayModifier {
     HitLocation(HitLocation),
@@ -801,7 +801,7 @@ impl PlayModifier {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Play {
     pub main_plays: SmallVec<[PlayType; 2]>,
     pub modifiers: SmallVec<[PlayModifier; 4]>,
@@ -864,7 +864,7 @@ impl TryFrom<&str> for Play {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Eq, PartialEq, Copy, Clone)]
 pub struct Count { balls: Option<u8>, strikes: Option<u8> }
 
 impl Count {
@@ -878,7 +878,7 @@ impl Count {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct PlayRecord {
     inning: Inning,
     side: Side,
