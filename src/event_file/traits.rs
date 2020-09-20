@@ -79,6 +79,10 @@ impl FieldingPosition {
         digit_vec(int_str).iter().map(|d|Self::try_from(*d).unwrap_or(Self::Unknown)).collect()
     }
 }
+impl Default for FieldingPosition {
+    fn default() -> Self { Self::Unknown }
+}
+
 impl TryFrom<&str> for FieldingPosition {
     type Error = Error;
 

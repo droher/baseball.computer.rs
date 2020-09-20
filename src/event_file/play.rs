@@ -255,6 +255,18 @@ pub struct CaughtStealingInfo {
     unearned_run: Option<UnearnedRunStatus>
 }
 
+impl Default for CaughtStealingInfo {
+    fn default() -> Self {
+        Self {
+            base: Base::Second,
+            assists: vec![],
+            putout: Default::default(),
+            error: Default::default(),
+            unearned_run: None
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum PlayType {
     Out { assists: PositionVec, putouts: PositionVec, runners_out: Vec<BaseRunner> },
