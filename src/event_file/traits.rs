@@ -4,7 +4,6 @@ use strum_macros::EnumString;
 use num_enum::{TryFromPrimitive, IntoPrimitive};
 use std::convert::{TryFrom, TryInto};
 use crate::event_file::play::PlayType::FieldersChoice;
-use smallvec::SmallVec;
 use tinystr::{TinyStr8, TinyStr16};
 
 use crate::util::digit_vec;
@@ -75,7 +74,8 @@ pub enum FieldingPosition {
     PinchRunner
 }
 impl FieldingPosition {
-    pub fn fielding_vec(int_str: &str) -> SmallVec<[Self; 3]> {
+    //noinspection RsTypeCheck
+    pub fn fielding_vec(int_str: &str) -> Vec<Self> {
         digit_vec(int_str).iter().map(|d|Self::try_from(*d).unwrap_or(Self::Unknown)).collect()
     }
 }

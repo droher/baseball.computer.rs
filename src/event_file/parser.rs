@@ -10,12 +10,7 @@ use crate::event_file::info::{InfoRecord, Team, GameType, DayNight, WindDirectio
 use crate::event_file::box_score::{BoxScoreLine, LineScore, BoxScoreEvent};
 use crate::event_file::play::PlayRecord;
 use std::convert::TryFrom;
-use chrono::{NaiveDate, NaiveTime};
-use serde::{Deserialize, Deserializer};
-use std::iter::TakeWhile;
-use serde::de::Unexpected::Map;
-use smallvec::SmallVec;
-use smallvec::alloc::collections::BTreeMap;
+use chrono::{NaiveDate, NaiveTime};use std::iter::TakeWhile;
 use std::collections::HashMap;
 use num_traits::PrimInt;
 use std::ops::Deref;

@@ -6,7 +6,6 @@ use arrayref::array_ref;
 
 use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, Batter, LineupPosition, Inning, Fielder, FieldingPosition, Pitcher, Side};
 use crate::util::{parse_positive_int, str_to_tinystr, digit_vec};
-use smallvec::SmallVec;
 use std::num::NonZeroU8;
 use tinystr::TinyStr8;
 
@@ -351,7 +350,7 @@ impl FromRetrosheetRecord for BoxScoreLine {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct LineScore {
     side: Side,
-    line_score: SmallVec<[u8; 9]>
+    line_score: Vec<u8>
 }
 
 impl FromRetrosheetRecord for LineScore {
@@ -360,7 +359,7 @@ impl FromRetrosheetRecord for LineScore {
         Ok(LineScore{
             side: Side::from_str(iter.nth(1).context("Missing team side")?)?,
             line_score: {
-                let mut vec = SmallVec::with_capacity(9);
+                let mut vec = Vec::with_capacity(9);
                 for s in iter {vec.push(s.parse::<u8>()?)}
             vec
             }
@@ -371,7 +370,7 @@ impl FromRetrosheetRecord for LineScore {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct FieldingPlayLine {
     defense_side: Side,
-    fielders: SmallVec<[Fielder; 3]>
+    fielders: Vec<Fielder>
 }
 
 pub type DoublePlayLine = FieldingPlayLine;
@@ -382,7 +381,7 @@ impl FromRetrosheetRecord for FieldingPlayLine {
         let mut iter = record.iter();
         Ok(FieldingPlayLine{
             defense_side: Side::from_str(iter.nth(2).context("Missing team side")?)?,
-            fielders: iter.filter_map(|f| str_to_tinystr(f).ok()).collect::<SmallVec<[Fielder; 3]>>()
+            fielders: iter.filter_map(|f| str_to_tinystr(f).ok()).collect::<Vec<Fielder>>()
         })
     }
 }

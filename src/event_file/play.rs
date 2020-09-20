@@ -12,7 +12,6 @@ use strum_macros::{EnumDiscriminants, EnumString};
 use crate::util::{digit_vec, pop_plus_vec, str_to_tinystr};
 use crate::event_file::traits::{Inning, Side, Batter, FromRetrosheetRecord, RetrosheetEventRecord, FieldingPosition};
 use std::collections::HashSet;
-use smallvec::{SmallVec, smallvec};
 use crate::event_file::play::UnearnedRunStatus::TeamUnearned;
 use std::convert::TryFrom;
 use tinystr::TinyStr8;
@@ -149,6 +148,7 @@ pub struct Pitch {
     blocked_by_catcher: bool,
     catcher_pickoff_attempt: Option<Base>
 }
+
 impl Pitch {
     fn update_pitch_type(&mut self, pitch_type: PitchType) {
         self.pitch_type = pitch_type
@@ -165,13 +165,13 @@ impl Pitch {
 }
 
 #[derive(Debug, Default, Eq, PartialEq, Clone)]
-pub struct PitchSequence(pub SmallVec<[Pitch; 10]>);
+pub struct PitchSequence(pub Vec<Pitch>);
 
 impl TryFrom<&str> for PitchSequence {
     type Error = Error;
 
     fn try_from(str_sequence: &str) -> Result<Self> {
-        let mut pitches: SmallVec<[Pitch; 10]> = SmallVec::new();
+        let mut pitches= Vec::with_capacity(10);
         let mut char_iter = str_sequence.chars().peekable();
         let mut pitch = Pitch::default();
 
@@ -244,7 +244,7 @@ pub enum RbiStatus {
     NoRBI
 }
 
-type PositionVec = SmallVec<[FieldingPosition; 3]>;
+type PositionVec = Vec<FieldingPosition>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CaughtStealingInfo {
@@ -257,7 +257,7 @@ pub struct CaughtStealingInfo {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum PlayType {
-    Out { assists: PositionVec, putouts: PositionVec, runners_out: SmallVec<[BaseRunner; 3]> },
+    Out { assists: PositionVec, putouts: PositionVec, runners_out: Vec<BaseRunner> },
     Interference,
     Single(Option<HitLocation>),
     Double(Option<HitLocation>),
@@ -287,12 +287,16 @@ pub enum PlayType {
     StolenBase {base: Base, unearned_run: Option<UnearnedRunStatus>},
     Unrecognized(String)
 }
+impl Default for PlayType {
+    fn default() -> Self { Self::Unknown }
+}
+
 impl FieldingData for PlayType {
     fn putouts(&self) -> PositionVec {
         let cs_putout = self.caught_stealing_info().map(|cs| cs.putout);
         let mut out_putouts = match self {
             PlayType::Out { putouts, .. } => PositionVec::from(putouts.deref()),
-            _ => PositionVec::new()
+            _ => PositionVec::with_capacity(1)
         };
         if cs_putout.is_some() { out_putouts.push(cs_putout.unwrap()) }
         out_putouts
@@ -303,7 +307,7 @@ impl FieldingData for PlayType {
         let mut out_assists = match self {
             PlayType::Out{assists, ..} |
             PlayType::ReachedOnError {assists, ..} => PositionVec::from(assists.deref()),
-            _ => PositionVec::new()
+            _ => PositionVec::with_capacity(1)
         };
         if cs_assists.is_some() {out_assists.extend(cs_assists.unwrap())}
         out_assists
@@ -312,8 +316,8 @@ impl FieldingData for PlayType {
     fn errors(&self) -> PositionVec {
         let cs_error = self.caught_stealing_info().map(|cs| cs.error);
         let mut errors = match self {
-            PlayType::ReachedOnError {error, ..} => smallvec![*error],
-            _ => PositionVec::new()
+            PlayType::ReachedOnError {error, ..} => vec![*error],
+            _ => PositionVec::with_capacity(1)
         };
         if cs_error.is_some() { errors.push(cs_error.unwrap()) }
         errors
@@ -344,8 +348,8 @@ impl PlayType {
         match value.parse::<u32>() {
             Ok(_) => {
                 let mut digits = FieldingPosition::fielding_vec(value);
-                let (putouts, assists) = (smallvec![digits.pop().unwrap()], digits);
-                return Ok(PlayType::Out { assists, putouts, runners_out: smallvec![]})
+                let (putouts, assists) = (vec![digits.pop().unwrap()], digits);
+                return Ok(PlayType::Out { assists, putouts, runners_out: vec![]})
             }
             _ => ()
         };
@@ -365,7 +369,7 @@ impl PlayType {
             let runners_out = to_str_vec(runner_matches)
                 .into_iter()
                 .map(|s| BaseRunner::from_str(s))
-                .collect::<Result<SmallVec<[BaseRunner; 3]>, ParseError>>()?;
+                .collect::<Result<Vec<BaseRunner>, ParseError>>()?;
             Ok(PlayType::Out {assists, putouts, runners_out})
         }
         else {
@@ -404,8 +408,8 @@ impl PlayType {
         }
 
     }
-    fn parse_main_play(value: &str) -> Result<SmallVec<[PlayType; 2]>> {
-        if value == "" {return Ok(smallvec![])}
+    fn parse_main_play(value: &str) -> Result<Vec<PlayType>> {
+        if value == "" {return Ok(vec![])}
         let multi_split = MULTI_PLAY_REGEX.find(value);
         if multi_split != None {
             let (first, last) = value.split_at(multi_split.unwrap().start());
@@ -429,16 +433,16 @@ impl PlayType {
             "WP" => PlayType::WildPitch,
             _ => PlayType::Unrecognized(value.to_string())
         };
-        match play_type {PlayType::Unrecognized(_) => (), _ => {return Ok(smallvec![play_type])}}
+        match play_type {PlayType::Unrecognized(_) => (), _ => {return Ok(vec![play_type])}}
 
-        if BASERUNNING_PLAY_REGEX.is_match(value) {return Ok(smallvec![Self::parse_baserunning_play(value)?])}
+        if BASERUNNING_PLAY_REGEX.is_match(value) {return Ok(vec![Self::parse_baserunning_play(value)?])}
 
         let num_split = if NUMERIC_REGEX.is_match(value) {NUMERIC_REGEX.find(value).unwrap().start()} else {value.len()};
         let (first, last) = value.split_at(num_split);
         let last = match last {"" => None, _ => Some(last.to_string())};
         let mut last_as_int_vec: PositionVec = (&last).as_ref().map(|c| FieldingPosition::fielding_vec(&c)).unwrap_or_default();
         let final_match = match first {
-            "E" => PlayType::ReachedOnError {assists: smallvec![], error: last_as_int_vec.first().map(|u| *u).context("No fielder specified")?},
+            "E" => PlayType::ReachedOnError {assists: vec![], error: last_as_int_vec.first().map(|u| *u).context("No fielder specified")?},
             "" => Self::parse_fielding_play(&last.clone().unwrap())?,
             "S" => PlayType::Single(last),
             "D" => PlayType::Double(last),
@@ -453,12 +457,12 @@ impl PlayType {
             }
             // Special case where fielders are unknown but base of forceout is
             "(" => PlayType::Out {
-                assists: smallvec![],
-                putouts: smallvec![],
-                runners_out: smallvec![BaseRunner::from_str(last.unwrap_or_default().get(0..1).unwrap_or_default())?]},
+                assists: vec![],
+                putouts: vec![],
+                runners_out: vec![BaseRunner::from_str(last.unwrap_or_default().get(0..1).unwrap_or_default())?]},
             _ => PlayType::Unrecognized(value.to_string())
         };
-        Ok(smallvec![final_match])
+        Ok(vec![final_match])
     }
 }
 
@@ -470,7 +474,7 @@ pub struct RunnerAdvance {
     pub baserunner: BaseRunner,
     pub to: Base,
     out_or_error: bool,
-    pub modifiers: SmallVec<[RunnerAdvanceModifier; 3]>
+    pub modifiers: Vec<RunnerAdvanceModifier>
 }
 
 impl FieldingData for RunnerAdvance {
@@ -510,12 +514,12 @@ impl RunnerAdvance {
         self.modifiers.iter().find_map(|m| m.rbi_status())
     }
 
-    fn parse_advances(value: &str) -> Result<SmallVec<[RunnerAdvance; 3]>> {
+    fn parse_advances(value: &str) -> Result<Vec<RunnerAdvance>> {
         value
             .split(";")
             .filter_map(|s|ADVANCE_REGEX.captures(s))
             .map(|c| Self::parse_single_advance(c))
-            .collect::<Result<SmallVec<[RunnerAdvance; 3]>>>()
+            .collect::<Result<Vec<RunnerAdvance>>>()
     }
 
     fn parse_single_advance(captures: Captures) -> Result<RunnerAdvance> {
@@ -529,7 +533,7 @@ impl RunnerAdvance {
             .map(|s| s.as_str())
             .context("Missing destination base in advance")?)?;
         let out_or_error = out_at_match.is_some();
-        let modifiers = mods.map_or(Ok(SmallVec::new()), |m| RunnerAdvanceModifier::parse_advance_modifiers(m.as_str()))?;
+        let modifiers = mods.map_or(Ok(Vec::new()), |m| RunnerAdvanceModifier::parse_advance_modifiers(m.as_str()))?;
         return Ok(RunnerAdvance {baserunner, to, out_or_error, modifiers})
 
     }
@@ -570,22 +574,22 @@ impl RunnerAdvanceModifier {
 impl FieldingData for RunnerAdvanceModifier {
     fn putouts(&self) -> PositionVec {
         match self {
-            Self::Putout{putout, ..} => smallvec![*putout],
-            _ => smallvec![]
+            Self::Putout{putout, ..} => vec![*putout],
+            _ => vec![]
         }
     }
 
     fn assists(&self) -> PositionVec {
         match self {
             Self::AdvancedOnError{assists, ..} | Self::Putout{assists, ..} => PositionVec::from(assists.deref()),
-            _ => smallvec![]
+            _ => vec![]
         }
     }
 
     fn errors(&self) -> PositionVec {
         match self {
-            Self::AdvancedOnError{error, ..} => smallvec![*error],
-            _ => smallvec![]
+            Self::AdvancedOnError{error, ..} => vec![*error],
+            _ => vec![]
         }
     }
 }
@@ -594,12 +598,12 @@ impl RunnerAdvanceModifier {
         RunnerAdvanceModifierDiscriminants::AdvancedOnError == self.into()
     }
 
-    fn parse_advance_modifiers(value: &str) -> Result<SmallVec<[RunnerAdvanceModifier; 3]>> {
+    fn parse_advance_modifiers(value: &str) -> Result<Vec<RunnerAdvanceModifier>> {
         value
             .split(")")
             .filter(|s| !s.is_empty())
             .map(|s| Self::parse_single_advance_modifier(s))
-            .collect::<Result<SmallVec<[RunnerAdvanceModifier; 3]>>>()
+            .collect::<Result<Vec<RunnerAdvanceModifier>>>()
     }
 
     fn parse_single_advance_modifier(value: &str) -> Result<RunnerAdvanceModifier> {
@@ -612,7 +616,7 @@ impl RunnerAdvanceModifier {
             "(WP" => RunnerAdvanceModifier::WildPitch,
             "(THH" => RunnerAdvanceModifier::AdvancedOnThrowTo(Some(Base::Home)),
             "(TH" => RunnerAdvanceModifier::AdvancedOnThrowTo(None),
-            "(" => RunnerAdvanceModifier::Putout { assists: smallvec![], putout: FieldingPosition::Unknown },
+            "(" => RunnerAdvanceModifier::Putout { assists: vec![], putout: FieldingPosition::Unknown },
             _ => RunnerAdvanceModifier::Unrecognized(value.into())
         };
         match simple_match {
@@ -629,7 +633,7 @@ impl RunnerAdvanceModifier {
         let final_match = match first {
             "(INT" => RunnerAdvanceModifier::Interference(last_as_int_vec.first().copied().unwrap_or(FieldingPosition::Unknown)),
             "(TH" => RunnerAdvanceModifier::AdvancedOnThrowTo(Base::from_str(last).ok()),
-            "(E" => RunnerAdvanceModifier::AdvancedOnError { assists: SmallVec::new(), error: FieldingPosition::try_from(last.get(0..1).unwrap_or_default()).unwrap_or(FieldingPosition::Unknown) },
+            "(E" => RunnerAdvanceModifier::AdvancedOnError { assists: Vec::new(), error: FieldingPosition::try_from(last.get(0..1).unwrap_or_default()).unwrap_or(FieldingPosition::Unknown) },
             "(" if last.contains("E") => {
                 let (assist_str, error_str) = last.split_at(last.find("E").unwrap());
                 let (assists, error) = (FieldingPosition::fielding_vec(assist_str), FieldingPosition::fielding_vec(error_str).first().copied().unwrap_or(FieldingPosition::Unknown));
@@ -717,25 +721,25 @@ pub enum PlayModifier {
 impl FieldingData for PlayModifier {
     // No putout or assist data in modifiers
     fn putouts(&self) -> PositionVec {
-        SmallVec::new()
+        Vec::new()
     }
 
     fn assists(&self) -> PositionVec {
-        SmallVec::new()
+        Vec::new()
     }
 
     fn errors(&self) -> PositionVec {
-        if let Self::ErrorOn(p) = self {smallvec![*p]} else {smallvec![]}
+        if let Self::ErrorOn(p) = self {vec![*p]} else {vec![]}
     }
 }
 
 impl PlayModifier {
-    fn parse_modifiers(value: &str) -> Result<SmallVec<[PlayModifier; 4]>> {
+    fn parse_modifiers(value: &str) -> Result<Vec<PlayModifier>> {
         value
             .split("/")
             .filter(|s| s.len() > 0)
             .map(|s| Self::parse_single_modifier(s))
-            .collect::<Result<SmallVec<[PlayModifier; 4]>>>()
+            .collect::<Result<Vec<PlayModifier>>>()
     }
 
     fn parse_single_modifier(value: &str) -> Result<PlayModifier> {
@@ -801,37 +805,22 @@ impl PlayModifier {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Default)]
 pub struct Play {
-    pub main_plays: SmallVec<[PlayType; 2]>,
-    pub modifiers: SmallVec<[PlayModifier; 4]>,
-    pub advances: SmallVec<[RunnerAdvance; 3]>,
+    pub main_plays: Vec<PlayType>,
+    pub modifiers: Vec<PlayModifier>,
+    pub advances: Vec<RunnerAdvance>,
     pub uncertain_flag: bool,
     pub exceptional_flag: bool
 }
 impl Play {
-    pub fn out_advancing(&self) -> SmallVec<[BaseRunner; 3]> {
+    pub fn out_advancing(&self) -> Vec<BaseRunner> {
         self.advances.iter()
             .filter(|a| a.is_out())
             .map(|a| a.baserunner)
             .collect()
     }
 
-}
-
-
-
-
-impl Default for Play {
-    fn default() -> Self {
-        Play {
-            main_plays: smallvec![PlayType::Unknown],
-            modifiers: smallvec![],
-            advances: smallvec![],
-            uncertain_flag: false,
-            exceptional_flag: false
-        }
-    }
 }
 
 impl TryFrom<&str> for Play {
@@ -849,11 +838,11 @@ impl TryFrom<&str> for Play {
 
         let modifiers = if modifiers_boundary < advances_boundary {
             PlayModifier::parse_modifiers(&value[modifiers_boundary+1..advances_boundary])?
-        } else {SmallVec::new()};
+        } else {Vec::new()};
 
         let advances = if advances_boundary < value.len() - 1 {
             RunnerAdvance::parse_advances(&value[advances_boundary+1..])?
-        } else {SmallVec::new()};
+        } else {Vec::new()};
         Ok(Play {
             main_plays,
             modifiers,
