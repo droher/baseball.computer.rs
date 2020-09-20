@@ -5,17 +5,22 @@ use crate::event_file::traits::{Inning, Side, LineupPosition, Pitcher};
 use crate::event_file::parser::{Matchup, Defense, Lineup, GameSetting, GameInfo};
 
 pub type EventRecord = Either<PlayRecord, SubstitutionRecord>;
+
 pub type Outs = u8;
 
+
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct Runner {lineup_position: LineupPosition, charged_to: Pitcher}
 
-#[derive(Default)]
+#[derive(Debug, Eq, PartialEq, Default, Copy, Clone)]
 pub struct BaseState {
     first: Option<Runner>,
     second: Option<Runner>,
     third: Option<Runner>
 }
 
+#[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct GameState {
     inning: Inning,
     frame: InningFrame,
@@ -43,6 +48,7 @@ impl GameState {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Event {
     starting_state: GameState,
     current_record: EventRecord,
@@ -54,3 +60,6 @@ impl Event {
 
     }
 }
+
+#[derive(Debug, Eq, PartialEq, Default, Clone)]
+pub struct PlayByPlay(Vec<Event>);

@@ -34,6 +34,9 @@ pub enum LineupPosition {
     Eighth,
     Ninth
 }
+impl Default for LineupPosition {
+    fn default() -> Self {Self::First}
+}
 
 impl LineupPosition {
     //noinspection RsTypeCheck

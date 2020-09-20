@@ -228,11 +228,14 @@ impl TryFrom<&str> for PitchSequence {
 }
 
 
-#[derive(Debug, Eq, PartialEq, EnumString)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 #[strum(serialize_all = "lowercase")]
 pub(crate) enum InningFrame {
     Top,
     Bottom,
+}
+impl Default for InningFrame {
+    fn default() -> Self {Self::Top}
 }
 
 #[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
@@ -485,7 +488,7 @@ impl PlayType {
 struct ScoringInfo {unearned: Option<UnearnedRunStatus>, rbi: bool}
 
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RunnerAdvance {
     pub baserunner: BaseRunner,
     pub to: Base,
@@ -555,7 +558,7 @@ impl RunnerAdvance {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, EnumDiscriminants)]
+#[derive(Debug, PartialEq, Eq, EnumDiscriminants, Clone)]
 pub enum RunnerAdvanceModifier {
     UnearnedRun,
     TeamUnearnedRun,
@@ -939,7 +942,7 @@ impl PlayModifier {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Default)]
+#[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct Play {
     pub main_plays: Vec<PlayType>,
     pub modifiers: Vec<PlayModifier>,
@@ -1001,7 +1004,7 @@ impl Count {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct PlayRecord {
     inning: Inning,
     side: Side,

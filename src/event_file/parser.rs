@@ -17,6 +17,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use crate::event_file::play::PlayType::DefensiveIndifference;
 use tinystr::{TinyStr8};
+use crate::event_file::pbp::PlayByPlay;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Matchup<T> { away: T, home: T }
@@ -33,6 +34,19 @@ impl<T: Default> Default for Matchup<T> {
     }
 }
 
+impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
+    type Error = Error;
+
+    fn try_from(infos: &Vec<InfoRecord>) -> Result<Self> {
+        let home_team = infos.iter().find_map(|m| if let InfoRecord::HomeTeam(t) = m {Some(t)} else {None});
+        let away_team = infos.iter().find_map(|m| if let InfoRecord::VisitingTeam(t) = m {Some(t)} else {None});
+        Ok(Self {
+            away: *away_team.context(format!("Could not find away team info in records: {:?}", infos))?,
+            home: *home_team.context(format!("Could not find home team info in records: {:?}", infos))?
+        })
+    }
+}
+
 pub type Teams = Matchup<Team>;
 pub type StartingLineups = Matchup<Lineup>;
 
@@ -41,7 +55,9 @@ pub type Defense = HashMap<FieldingPosition, Fielder>;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Game {
+    id: GameId,
     info: GameInfo,
+    play_by_play: PlayByPlay,
     pub starting_lineups: Matchup<Lineup>,
     pub starting_defense: Matchup<Defense>,
 }
@@ -49,6 +65,9 @@ impl TryFrom<&RecordVec> for Game {
     type Error = Error;
 
     fn try_from(record_vec: &RecordVec) -> Result<Self> {
+        let id = *record_vec.iter()
+            .find_map(|m| if let MappedRecord::GameId(g) = m {Some(g)} else {None})
+            .context(format!("Did not find game ID in list of records: {:?}", &record_vec))?;
         let infos = record_vec.iter()
             .filter_map(|m| if let MappedRecord::Info(i) = m {Some(*i)} else {None})
             .collect::<Vec<InfoRecord>>();
@@ -58,7 +77,9 @@ impl TryFrom<&RecordVec> for Game {
             .collect::<Vec<StartRecord>>();
         let (starting_lineups, starting_defense) = Self::assemble_lineups_and_defense(starts);
         Ok(Self {
+            id,
             info,
+            play_by_play: PlayByPlay::default(),
             starting_lineups,
             starting_defense
         })
@@ -184,6 +205,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameSetting {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct GameInfo {
+    matchup: Matchup<Team>,
     date: NaiveDate,
     setting: GameSetting,
     umpires: GameUmpires,
@@ -194,6 +216,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameInfo {
     type Error = Error;
 
     fn try_from(infos: &Vec<InfoRecord>) -> Result<Self> {
+        let mut matchup = Matchup::try_from(infos)?;
         let date = *infos.iter()
             .find_map(|i| if let InfoRecord::GameDate(d) = i {Some(d)} else {None})
             .ok_or(anyhow!("Game info did not include date. Full info list: {:?}", infos))?;
@@ -202,6 +225,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameInfo {
         let results = GameResults::try_from(infos)?;
         let retrosheet_metadata = GameRetrosheetMetadata::try_from(infos)?;
         Ok(Self {
+            matchup,
             date,
             setting,
             umpires,
