@@ -920,6 +920,14 @@ pub struct ContactDescription {
     contact_type: ContactType,
     location: Option<HitLocation>
 }
+impl Default for ContactDescription {
+    fn default() -> Self {
+        Self {
+            contact_type: ContactType::Unknown,
+            location: None
+        }
+    }
+}
 impl TryFrom<(&str, &str)> for ContactDescription {
     type Error = Error;
 
@@ -959,46 +967,82 @@ pub enum ContactType {
     Unknown
 }
 
-#[derive(Debug, EnumDiscriminants, Eq, PartialEq, Clone)]
-#[strum_discriminants(derive(EnumString))]
+#[derive(Debug, Eq, PartialEq, EnumString, Clone)]
 pub enum PlayModifier {
     ContactDescription(ContactDescription),
+    #[strum(serialize = "AP")]
     AppealPlay,
+    #[strum(serialize = "BGDP")]
     BuntGroundIntoDoublePlay,
+    #[strum(serialize = "BINT")]
     BatterInterference,
+    #[strum(serialize = "BOOT")]
     BatingOutOfTurn,
+    #[strum(serialize = "BPDP")]
     BuntPoppedIntoDoublePlay,
+    #[strum(serialize = "BR")]
     RunnerHitByBattedBall,
+    #[strum(serialize = "C")]
     CalledThirdStrike,
+    #[strum(serialize = "COUB")]
     CourtesyBatter,
+    #[strum(serialize = "COUF")]
     CourtesyFielder,
+    #[strum(serialize = "COUR")]
     CourtesyRunner,
+    #[strum(serialize = "DP")]
     UnspecifiedDoublePlay,
+    #[strum(serialize = "E")]
     ErrorOn(FieldingPosition),
+    #[strum(serialize = "FDP")]
     FlyBallDoublePlay,
+    #[strum(serialize = "FINT")]
     FanInterference,
+    #[strum(serialize = "FL")]
     Foul,
+    #[strum(serialize = "FO")]
     ForceOut,
+    #[strum(serialize = "GDP")]
     GroundBallDoublePlay,
+    #[strum(serialize = "GTP")]
     GroundBallTriplePlay,
+    #[strum(serialize = "IF")]
     InfieldFlyRule,
+    #[strum(serialize = "INT")]
     Interference,
+    #[strum(serialize = "IPHR")]
     InsideTheParkHomeRun,
+    #[strum(serialize = "LDP")]
     LinedIntoDoublePlay,
+    #[strum(serialize = "LTP")]
     LinedIntoTriplePlay,
+    #[strum(serialize = "MREV")]
     ManageChallengeOfCallOnField,
+    #[strum(serialize = "NDP")]
     NoDoublePlayCredited,
+    #[strum(serialize = "OBS")]
     Obstruction,
+    #[strum(serialize = "PASS")]
     RunnerOutPassingAnotherRunner,
+    #[strum(serialize = "R")]
     RelayToFielderWithNoOutMade(PositionVec),
+    #[strum(serialize = "RINT")]
     RunnerInterference,
+    #[strum(serialize = "S")]
     SwingingThirdStrike,
+    #[strum(serialize = "SF")]
     SacrificeFly,
+    #[strum(serialize = "SH")]
     SacrificeHit,
+    #[strum(serialize = "TH", serialize = "TH)", serialize="THH")]
     ThrowToBase(Option<Base>),
+    #[strum(serialize = "TP")]
     UnspecifiedTriplePlay,
+    #[strum(serialize = "UINT")]
     UmpireInterference,
+    #[strum(serialize = "UREV")]
     UmpireReviewOfCallOnField,
+    #[strum(serialize = "U")]
     Unknown,
     Unrecognized(String)
 }
@@ -1030,52 +1074,17 @@ impl PlayModifier {
     fn parse_single_modifier(value: &str) -> Result<PlayModifier> {
         let (first, last) = regex_split(value, &MODIFIER_DIVIDER_REGEX);
         let last_as_int_vec = {|| FieldingPosition::fielding_vec(&last.unwrap_or_default()) };
-        if let Ok(cd) = ContactDescription::try_from((first, last.unwrap_or_default())) {
-            return Ok(PlayModifier::ContactDescription(cd))
-        }
-        let final_match = match first {
-            "AP" => PlayModifier::AppealPlay,
-            "BGDP" => PlayModifier::BuntGroundIntoDoublePlay,
-            "BINT" => PlayModifier::BatterInterference,
-            "BOOT" => PlayModifier::BatingOutOfTurn,
-            "BPDP" => PlayModifier::BuntPoppedIntoDoublePlay,
-            "BR" => PlayModifier::RunnerHitByBattedBall,
-            "C" => PlayModifier::CalledThirdStrike,
-            "COUB" => PlayModifier::CourtesyBatter,
-            "COUF" => PlayModifier::CourtesyFielder,
-            "COUR" => PlayModifier::CourtesyRunner,
-            "DP" => PlayModifier::UnspecifiedDoublePlay,
-            "E" => PlayModifier::ErrorOn(*last_as_int_vec().first().context("Missing error position info")?),
-            "FDP" => PlayModifier::FlyBallDoublePlay,
-            "FINT" => PlayModifier::FanInterference,
-            "FL" => PlayModifier::Foul,
-            "FO" => PlayModifier::ForceOut,
-            "GDP" => PlayModifier::GroundBallDoublePlay,
-            "GTP" => PlayModifier::GroundBallTriplePlay,
-            "IF" => PlayModifier::InfieldFlyRule,
-            "INT" => PlayModifier::Interference,
-            "IPHR" => PlayModifier::InsideTheParkHomeRun,
-            "LDP" => PlayModifier::LinedIntoDoublePlay,
-            "LTP" => PlayModifier::LinedIntoTriplePlay,
-            "MREV" => PlayModifier::ManageChallengeOfCallOnField,
-            "NDP" => PlayModifier::NoDoublePlayCredited,
-            "OBS" => PlayModifier::Obstruction,
-            "PASS" => PlayModifier::RunnerOutPassingAnotherRunner,
-            "R" => PlayModifier::RelayToFielderWithNoOutMade(last_as_int_vec()),
-            "RINT" => PlayModifier::RunnerInterference,
-            "S" => PlayModifier::SwingingThirdStrike,
-            "SF" => PlayModifier::SacrificeFly,
-            "SH" => PlayModifier::SacrificeHit,
-            "TH" | "TH)" => PlayModifier::ThrowToBase(Base::from_str(&last.unwrap_or_default()).ok()),
-            "THH" => PlayModifier::ThrowToBase(Some(Base::Home)),
-            "TP" => PlayModifier::UnspecifiedTriplePlay,
-            "UINT" => PlayModifier::UmpireInterference,
-            "UREV" => PlayModifier::UmpireReviewOfCallOnField,
-            // TODO: Unassisted?
-            "U" => PlayModifier::Unknown,
-            _ => PlayModifier::Unrecognized(value.into())
+        let play_modifier = match PlayModifier::from_str(first) {
+            // Fill in variants that have non-default cases
+            Err(_) => PlayModifier::Unrecognized(value.into()),
+            Ok(PlayModifier::ContactDescription(_)) => PlayModifier::ContactDescription(ContactDescription::try_from((first, last.unwrap_or_default()))?),
+            Ok(PlayModifier::ErrorOn(_)) => PlayModifier::ErrorOn(*last_as_int_vec().first().context("Missing error position info")?),
+            Ok(PlayModifier::RelayToFielderWithNoOutMade(_)) => PlayModifier::RelayToFielderWithNoOutMade(last_as_int_vec()),
+            Ok(PlayModifier::ThrowToBase(_)) if first == "THH" => PlayModifier::ThrowToBase(Some(Base::Home)),
+            Ok(PlayModifier::ThrowToBase(_)) => PlayModifier::ThrowToBase(Base::from_str(&last.unwrap_or_default()).ok()),
+            Ok(pm) => pm
         };
-        Ok(final_match)
+        Ok(play_modifier)
     }
 }
 
