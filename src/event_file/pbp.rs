@@ -33,15 +33,15 @@ pub struct GameState {
     count: Count
 }
 impl GameState {
-    fn new(game_info: GameInfo) -> Self {
+    fn new(lineups: Matchup<Lineup>, defenses: Matchup<Defense>) -> Self {
         Self {
             inning: 1,
             frame: InningFrame::Top,
             outs: 0,
             bases: BaseState::default(),
             score: Matchup::default(),
-            lineups: Matchup::default(),
-            defenses: Matchup::default(),
+            lineups: lineups,
+            defenses: defenses,
             at_bat: LineupPosition::First,
             count: Count::default()
         }
@@ -55,11 +55,13 @@ pub struct Event {
     next_record: Option<EventRecord>
 }
 
-impl Event {
-    pub fn ending_state(&self) -> () {
-
-    }
-}
-
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct PlayByPlay(Vec<Event>);
+
+impl Iterator for PlayByPlay {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        unimplemented!()
+    }
+}

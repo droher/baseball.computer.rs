@@ -1,2 +1,2 @@
-[build]
-rustflags = []
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-Cprofile-generate=/tmp/pgo-data"]

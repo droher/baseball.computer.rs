@@ -249,7 +249,7 @@ impl FromRetrosheetRecord for InfoRecord {
             _ => I::Unrecognized
         };
         match info {
-            I::Unrecognized => Err(anyhow!("Unrecognized info type: {:?}", info_type)),
+            I::Unrecognized => Err(anyhow!("Unrecognized info type")),
             _ => Ok(info)
         }
     }

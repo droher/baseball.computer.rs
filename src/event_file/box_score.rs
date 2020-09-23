@@ -480,7 +480,7 @@ impl FromRetrosheetRecord for BoxScoreEvent {
 
         };
         match mapped {
-            BoxScoreEvent::Unrecognized => Err(anyhow!("Unrecognized box score event type {}", event_line_type)),
+            BoxScoreEvent::Unrecognized => Err(anyhow!("Unrecognized box score event type")),
             _ => Ok(mapped)
         }
     }

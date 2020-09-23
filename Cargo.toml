@@ -23,6 +23,7 @@ tinystr = "0.3.4"
 
 [dependencies.regex]
 version = "1.3.9"
+# No need for unicode
 default-features = false
 features = ["std", "perf"]
 

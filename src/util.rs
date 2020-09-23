@@ -1,7 +1,7 @@
 use num_traits::PrimInt;
 use std::str::FromStr;
 use anyhow::{anyhow, Result};
-use regex::Regex;
+use regex::{Regex, Match};
 
 #[inline]
 pub(crate) fn parse_positive_int<T: PrimInt + FromStr>(int_str: &str) -> Option<T> {
@@ -21,13 +21,13 @@ pub(crate) fn digit_vec(int_str: &str) -> Vec<u8> {
 }
 
 #[inline]
-pub(crate) fn pop_plus_vec(mut vec: Vec<u8>) -> (Option<u8>, Vec<u8>) {
-    (vec.pop(), vec)
+pub(crate) fn str_to_tinystr<T: FromStr>(s: &str) -> Result<T> {
+    T::from_str(s).map_err(|_| anyhow!("Tinystr not formatted properly"))
 }
 
 #[inline]
-pub(crate) fn str_to_tinystr<T: FromStr>(s: &str) -> Result<T> {
-    T::from_str(s).map_err(|_| anyhow!("Tinystr not formatted properly"))
+pub(crate) fn pop_with_vec<T: Sized>(mut v: Vec<T>) -> (Option<T>, Vec<T>) {
+    (v.pop(), v)
 }
 
 #[inline]
@@ -36,4 +36,11 @@ pub(crate) fn regex_split<'a>(s: &'a str, re: &'static Regex) -> (&'a str, Optio
         None => (s, None),
         Some(m) => (&s[..m.start()], Some(&s[m.start()..]))
     }
+}
+
+#[inline]
+pub(crate) fn to_str_vec(match_vec: Vec<Option<Match>>) -> Vec<&str> {
+    match_vec.into_iter()
+        .filter_map(|o| o.map(|m| m.as_str()))
+        .collect()
 }

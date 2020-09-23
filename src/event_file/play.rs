@@ -4,22 +4,28 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Error, Result};
 use const_format::{concatcp, formatcp};
+use num_enum::{TryFromPrimitive, IntoPrimitive};
 use lazy_static::lazy_static;
-use regex::{Captures, Match, Regex};
+use regex::{Captures, Match, Regex, Replacer};
 use strum::ParseError;
 use strum_macros::{EnumDiscriminants, EnumString};
 
-use crate::util::{str_to_tinystr, regex_split};
+use crate::util::{str_to_tinystr, regex_split, to_str_vec, pop_with_vec};
 use crate::event_file::traits::{Inning, Side, Batter, FromRetrosheetRecord, RetrosheetEventRecord, FieldingPosition};
 use std::convert::TryFrom;
+use crate::event_file::pbp::BaseState;
+use either::Either;
+use crate::event_file::misc::EarnedRunRecord;
+use either::Either::Left;
+use crate::event_file::play::PlayType::PlateAppearance;
 
 
 const NAMING_PREFIX: &str = r"(?P<";
-const GROUP_ASSISTS: &str = r">(?:[1-9]?)+)";
+const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
 const GROUP_ASSISTS1: &str = concatcp!(NAMING_PREFIX, "a1", GROUP_ASSISTS);
 const GROUP_ASSISTS2: &str = concatcp!(NAMING_PREFIX, "a2", GROUP_ASSISTS);
 const GROUP_ASSISTS3: &str = concatcp!(NAMING_PREFIX, "a3", GROUP_ASSISTS);
-const GROUP_PUTOUT: &str = r">[1-9])";
+const GROUP_PUTOUT: &str = r">[0-9])";
 const GROUP_PUTOUT1: &str = concatcp!(NAMING_PREFIX, "po1", GROUP_PUTOUT);
 const GROUP_PUTOUT2: &str = concatcp!(NAMING_PREFIX, "po2", GROUP_PUTOUT);
 const GROUP_PUTOUT3: &str = concatcp!(NAMING_PREFIX, "po3", GROUP_PUTOUT);
@@ -35,8 +41,8 @@ const OUT: &str = &formatcp!(r"^{}{}{}({}{}{})?({}{}{})?$",
                            GROUP_ASSISTS3, GROUP_PUTOUT3, GROUP_OUT_AT_BASE3
 );
 
-const REACH_ON_ERROR: &str = &formatcp!(r"{}E(?P<e>[1-9])$", GROUP_ASSISTS1);
-const BASERUNNING_PLAY: &str = r"^(?P<play_type>SB|CS|PO|POCS)(?P<base>[123H])(?:\((?P<fielders>[0-9]*)(?P<error>E[0-9])?\)?)?(?P<unearned_run>\(T?UR\))?$";
+const REACH_ON_ERROR: &str = &formatcp!(r"{}E(?P<e>[0-9])$", GROUP_ASSISTS1);
+const BASERUNNING_FIELDING_INFO: &str = r"(?P<base>[123H])(?:\((?P<fielders>[0-9]*)(?P<error>E[0-9])?\)?)?(?P<unearned_run>\(T?UR\))?$";
 
 
 const ADVANCE: &str = r"^(?P<from>[B123])(?:(-(?P<to>[123H])|X(?P<out_at>[123H])))(?P<mods>.*)?";
@@ -44,12 +50,15 @@ const ADVANCE: &str = r"^(?P<from>[B123])(?:(-(?P<to>[123H])|X(?P<out_at>[123H])
 lazy_static!{
     static ref OUT_REGEX: Regex = Regex::new(OUT).unwrap();
     static ref REACHED_ON_ERROR_REGEX: Regex = Regex::new(REACH_ON_ERROR).unwrap();
-    static ref BASERUNNING_PLAY_REGEX: Regex = Regex::new(BASERUNNING_PLAY).unwrap();
+    static ref BASERUNNING_FIELDING_INFO_REGEX: Regex = Regex::new(BASERUNNING_FIELDING_INFO).unwrap();
 
     static ref ADVANCE_REGEX: Regex = Regex::new(ADVANCE).unwrap();
-    static ref STRIP_CHARS_REGEX: Regex = Regex::new(r"([#!0? ]|99)").unwrap();
+    static ref STRIP_CHARS_REGEX: Regex = Regex::new(r"[#! ]").unwrap();
+    static ref UNKNOWN_FIELDER_REGEX: Regex = Regex::new(r"999*|\?").unwrap();
     static ref MULTI_PLAY_REGEX: Regex = Regex::new(r"[+;]").unwrap();
     static ref NUMERIC_REGEX: Regex = Regex::new(r"[0-9]").unwrap();
+    static ref MAIN_PLAY_FIELDING_REGEX: Regex = Regex::new(r"[0-9]").unwrap();
+    static ref BASERUNNING_PLAY_FIELDING_REGEX: Regex = Regex::new(r"[123H]").unwrap();
     static ref MODIFIER_DIVIDER_REGEX: Regex = Regex::new(r"[+\-0-9]").unwrap();
 
     static ref HIT_LOCATION_GENERAL_REGEX: Regex = Regex::new(r"[0-9]+").unwrap();
@@ -78,7 +87,8 @@ pub enum Base {
     Home
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, TryFromPrimitive, IntoPrimitive)]
+#[repr(u8)]
 pub enum BaseRunner {
     #[strum(serialize = "B")]
     Batter,
@@ -88,6 +98,13 @@ pub enum BaseRunner {
     Second,
     #[strum(serialize = "3")]
     Third
+}
+impl BaseRunner {
+    fn from_target_base(base: Base) -> Result<Self> {
+        BaseRunner::try_from((base as u8) - 1).context("Could not find baserunner for target base")
+    }
+
+
 }
 
 #[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
@@ -192,7 +209,7 @@ impl TryFrom<&str> for PitchSequence {
                 ">" => {pitch.update_runners_going(); continue}
                 _ => {}
             }
-            let pitch_type: Result<PitchType> = PitchType::from_str(c.deref()).context(format!("Bad pitch type: {}", c));
+            let pitch_type: Result<PitchType> = PitchType::from_str(c.deref()).context("Bad pitch type");
             // TODO: Log this as a warning once I implement logging
             pitch_type.map(|p|{pitch.update_pitch_type(p)}).ok();
 
@@ -248,19 +265,9 @@ pub enum RbiStatus {
 
 type PositionVec = Vec<FieldingPosition>;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct CaughtStealingInfo {
-    base: Base,
-    assists: PositionVec,
-    putout: FieldingPosition,
-    error: FieldingPosition,
-    unearned_run: Option<UnearnedRunStatus>
-}
-
-impl Default for CaughtStealingInfo {
+impl Default for BaserunningFieldingInfo {
     fn default() -> Self {
         Self {
-            base: Base::Second,
             assists: vec![],
             putout: Default::default(),
             error: Default::default(),
@@ -269,109 +276,104 @@ impl Default for CaughtStealingInfo {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum PlayType {
-    Out { assists: PositionVec, putouts: PositionVec, runners_out: Vec<BaseRunner> },
-    Interference,
-    Single(PositionVec),
-    Double(PositionVec),
-    Triple(PositionVec),
-    GroundRuleDouble(PositionVec),
-    ErrorOnFoul(FieldingPosition),
-    ReachedOnError {assists: PositionVec, error: FieldingPosition},
-    // TODO: Add to fielding
-    FieldersChoice(FieldingPosition),
-    HomeRun(PositionVec),
-    HitByPitch,
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
+pub enum HitType {
+    #[strum(serialize = "S")]
+    Single,
+    #[strum(serialize = "D")]
+    Double,
+    #[strum(serialize = "DGR")]
+    GroundRuleDouble,
+    #[strum(serialize = "T")]
+    Triple,
+    #[strum(serialize = "HR", serialize = "H")]
+    HomeRun
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Hit {
+    hit_type: HitType,
+    positions_hit_to: PositionVec
+}
+impl TryFrom<(&str, &str)> for Hit {
+    type Error = Error;
+
+    fn try_from(value: (&str, &str)) -> Result<Self> {
+        let (first, last) = value;
+        let hit_type = HitType::from_str(first)?;
+        Ok(Self {
+            hit_type,
+            positions_hit_to: FieldingPosition::fielding_vec(last)
+        })
+    }
+}
+
+
+/// Note that a batting out is not necessarily the same thing as an actual out,
+/// just a play which never counts for a hit and usually counts for an at-bat. Exceptions
+/// include reaching on a fielder's choice, error, passed ball, or wild pitch, which count as at-bats but not outs,
+/// and sacrifices, which count as outs but not at-bats. Baseball!
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
+pub enum OutAtBatType {
+    // Note that these may not always be at bats or outs in the event of SF, SH, PB, WP, and E
+    #[strum(serialize = "")]
+    InPlayOut,
+    #[strum(serialize = "K")]
     StrikeOut,
-    // TODO: Add to fielding
-    StrikeOutPutOut {assists: PositionVec, putout: FieldingPosition},
-    NoPlay,
-    IntentionalWalk,
-    Walk,
-    Unknown,
-    Balk,
-    CaughtStealing(CaughtStealingInfo),
-    DefensiveIndifference,
-    OtherAdvance,
-    PassedBall,
-    WildPitch,
-    PickedOff(CaughtStealingInfo),
-    PickedOffCaughtStealing(CaughtStealingInfo),
-    StolenBase {base: Base, unearned_run: Option<UnearnedRunStatus>},
-    Unrecognized(String)
-}
-impl Default for PlayType {
-    fn default() -> Self { Self::Unknown }
+    #[strum(serialize = "FC")]
+    FieldersChoice,
+    #[strum(serialize = "E")]
+    ReachedOnError
 }
 
-impl FieldingData for PlayType {
-    fn putouts(&self) -> PositionVec {
-        let cs_putout = self.caught_stealing_info().map(|cs| cs.putout);
-        let mut out_putouts = match self {
-            PlayType::Out { putouts, .. } => PositionVec::from(putouts.deref()),
-            PlayType::FieldersChoice(putout) | PlayType::StrikeOutPutOut {putout, ..}  => vec![*putout],
-            _ => PositionVec::with_capacity(1)
-        };
-        if let Some(p) = cs_putout { out_putouts.push(p )}
-        out_putouts
-    }
-
-    fn assists(&self) -> PositionVec {
-        let cs_assists = self.caught_stealing_info().map(|cs| cs.assists);
-        let mut out_assists = match self {
-            PlayType::Out{assists, ..} |
-            PlayType::ReachedOnError {assists, ..} | PlayType::StrikeOutPutOut {assists, ..}=> PositionVec::from(assists.deref()),
-            _ => PositionVec::with_capacity(1)
-        };
-        if let Some(a) = cs_assists {out_assists.extend(a)}
-        out_assists
-    }
-
-    fn errors(&self) -> PositionVec {
-        let cs_error = self.caught_stealing_info().map(|cs| cs.error);
-        let mut errors = match self {
-            PlayType::ReachedOnError {error, ..} => vec![*error],
-            _ => PositionVec::with_capacity(1)
-        };
-        if let Some(e) = cs_error { errors.push(e) }
-        errors
-    }
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct FieldingPlay {
+    assists: PositionVec,
+    putouts: PositionVec,
+    runners_out: Vec<BaseRunner>,
+    error: Option<FieldingPosition>
 }
-
-impl PlayType {
-    fn is_plate_appearance(&self) -> bool {
-        match self {
-            Self::StolenBase {.. } => false,
-            Self::NoPlay | Self::Balk | Self::PassedBall | Self::WildPitch | Self::OtherAdvance
-            | Self::CaughtStealing(_) | Self::PickedOff(_) | Self::PickedOffCaughtStealing(_)
-            | Self::DefensiveIndifference | Self::ErrorOnFoul(_) => false,
-            _ => true
+impl Default for FieldingPlay {
+    fn default() -> Self {
+        Self {
+            assists: vec![],
+            putouts: vec![FieldingPosition::Unknown],
+            runners_out: vec![],
+            error: None
         }
     }
-
-    fn caught_stealing_info(&self) -> Option<CaughtStealingInfo> {
-        match self {
-            Self::PickedOff(cs) |
-            Self::PickedOffCaughtStealing(cs) |
-            Self::CaughtStealing(cs) => Some(cs.clone()),
-            _ => None
+}
+impl FieldingPlay {
+    pub fn conventional_strikeout() -> Self {
+        Self {
+            assists: vec![],
+            putouts: vec![FieldingPosition::Catcher],
+            runners_out: vec![],
+            error: None
         }
     }
+}
+impl TryFrom<PositionVec> for FieldingPlay {
+    type Error = Error;
 
-    fn parse_fielding_play(value: &str) -> Result<PlayType> {
-        if value.parse::<u32>().is_ok() {
-                let mut digits = FieldingPosition::fielding_vec(value);
-                let (putouts, assists) = (vec![digits.pop().unwrap()], digits);
-                return Ok(PlayType::Out { assists, putouts, runners_out: vec![]})
-        };
-        let to_str_vec: fn(Vec<Option<Match>>) -> Vec<&str> = { |v| v
-            .into_iter()
-            .filter_map(|o| o
-                .map(|m| m.as_str()))
-            .collect()
-        };
-        if let Some(captures) = OUT_REGEX.captures(value) {
+    fn try_from(value: PositionVec) -> Result<Self> {
+        let (putout, assists) = pop_with_vec(value);
+        Ok(Self {
+            assists,
+            putouts: vec![putout.unwrap_or_default()],
+            runners_out: vec![],
+            error: None
+        })
+    }
+}
+impl TryFrom<&str> for FieldingPlay {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        if let Ok(_) = value.parse::<u32>() {
+            return Self::try_from(FieldingPosition::fielding_vec(value))
+        }
+        else if let Some(captures) = OUT_REGEX.captures(value) {
             let assist_matches = vec![captures.name("a1"), captures.name("a2"), captures.name("a3")];
             let putout_matches = vec![captures.name("po1"), captures.name("po2"), captures.name("po3")];
             let runner_matches = vec![captures.name("runner1"), captures.name("runner2"), captures.name("runner3")];
@@ -380,94 +382,248 @@ impl PlayType {
                 .into_iter()
                 .map(|s| BaseRunner::from_str(s))
                 .collect::<Result<Vec<BaseRunner>, ParseError>>()?;
-            Ok(PlayType::Out {assists, putouts, runners_out})
+            return Ok(Self {
+                assists,
+                putouts,
+                runners_out,
+                error: None
+            })
         }
-        else {
-            if let Some(captures) = REACHED_ON_ERROR_REGEX.captures(value) {
+        else if let Some(captures) = REACHED_ON_ERROR_REGEX.captures(value) {
                 let assists = FieldingPosition::fielding_vec(captures.name("a1").map(|s| s.as_str()).unwrap_or_default());
                 let error = FieldingPosition::try_from(captures.name("e").map_or("", |s| s.as_str()))?;
-                return Ok(PlayType::ReachedOnError {assists, error})
+                return Ok(Self {
+                    assists,
+                    putouts: vec![],
+                    runners_out: vec![],
+                    error: Some(error)
+                })
             }
-            Err(anyhow!("Unable to parse fielding play. Full captured string: {}", value))
-        }
+            Err(anyhow!("Unable to parse fielding play"))
     }
-    fn parse_baserunning_play(value: &str) -> Result<PlayType> {
-        let captures = BASERUNNING_PLAY_REGEX
-            .captures(value)
-            .context(format!("No matching info in baserunning detail: {}", value))?;
-        let (play_type, base, mut fielders, error, unearned_run) = (
-            captures.name("play_type").map(|m| m.as_str()).context(format!("No baserunning play type found: {}", value))?,
-            Base::from_str(captures.name("base").map(|m| m.as_str()).unwrap_or_default())?,
-            captures.name("fielders").map(|m| FieldingPosition::fielding_vec(m.as_str())).unwrap_or_default(),
-            captures.name("error").map_or(FieldingPosition::Unknown, |m| *FieldingPosition::fielding_vec(m.as_str()).first().unwrap_or(&FieldingPosition::Unknown)),
-            captures.name("unearned_run").map(|s|
-                if s.as_str().contains('T') { UnearnedRunStatus::TeamUnearned} else { UnearnedRunStatus::Unearned})
-        );
-        let (putout, assists ) = (fielders.pop().unwrap_or(FieldingPosition::Unknown), fielders);
-        let cs_info = CaughtStealingInfo{base, putout, assists, error, unearned_run };
-        match play_type {
-            "CS" => Ok(PlayType::CaughtStealing(cs_info)),
-            "PO" => Ok(PlayType::PickedOff(cs_info)),
-            "POCS" => Ok(PlayType::PickedOffCaughtStealing(cs_info)),
-            "SB" => Ok(PlayType::StolenBase { base, unearned_run }),
-            "POCSH" => Ok(PlayType::PickedOffCaughtStealing(cs_info)),
-            "CSH" => Ok(PlayType::CaughtStealing(cs_info)),
-            _ => Err(anyhow!("Unrecognized baserunning play type: {}", &play_type))
-        }
+}
 
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct BattingOut {
+    out_type: OutAtBatType,
+    fielding_play: FieldingPlay
+
+}
+impl TryFrom<(&str, &str)> for BattingOut {
+    type Error = Error;
+
+    fn try_from(value: (&str, &str)) -> Result<Self> {
+        let (first, last) = value;
+        let mut rejoined = first.to_string();
+        rejoined.push_str(last);
+        let out_type = OutAtBatType::from_str(first)?;
+        let fielding_play = match out_type {
+            // Put the whole string in when reaching on error
+            OutAtBatType::ReachedOnError => FieldingPlay::try_from(rejoined.as_str())?,
+            OutAtBatType::StrikeOut if last.is_empty() => FieldingPlay::conventional_strikeout(),
+            OutAtBatType::FieldersChoice if last.is_empty() => FieldingPlay::default(),
+            _ => FieldingPlay::try_from(last)?
+        };
+        Ok(Self {
+            out_type,
+            fielding_play
+        })
     }
+}
+
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
+pub enum OtherPlateAppearance {
+    #[strum(serialize = "C")]
+    Interference,
+    #[strum(serialize = "HP")]
+    HitByPitch,
+    #[strum(serialize = "W")]
+    Walk,
+    #[strum(serialize = "I", serialize = "IW")]
+    IntentionalWalk
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum PlateAppearanceType {
+    Hit(Hit),
+    BattingOut(BattingOut),
+    OtherPlateAppearance(OtherPlateAppearance)
+}
+impl TryFrom<(&str, &str)> for PlateAppearanceType {
+    type Error = Error;
+
+    fn try_from(value: (&str, &str)) -> Result<Self> {
+        if let Ok(batting_out) = BattingOut::try_from(value) {
+            Ok(Self::BattingOut(batting_out))
+        }
+        else if let Ok(hit) = Hit::try_from(value) {
+            Ok(Self::Hit(hit))
+        }
+        else if let Ok(pa) = OtherPlateAppearance::from_str(value.0) {
+            Ok(Self::OtherPlateAppearance(pa))
+        }
+        else {Err(anyhow!("Unable to parse plate appearance"))}
+    }
+}
+
+
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct BaserunningFieldingInfo {
+    assists: PositionVec,
+    putout: Option<FieldingPosition>,
+    error: Option<FieldingPosition>,
+    unearned_run: Option<UnearnedRunStatus>
+}
+impl From<Captures<'_>> for BaserunningFieldingInfo {
+    fn from(captures: Captures) -> Self {
+        let get_capture = {
+            |tag: &str| captures.name(tag)
+                .map(|m| FieldingPosition::fielding_vec(m.as_str())).unwrap_or_default()};
+
+        let unearned_run = captures.name("unearned_run").map(|s| if s.as_str().contains('T') {
+            UnearnedRunStatus::TeamUnearned
+        } else { UnearnedRunStatus::Unearned });
+        if let Some(error) = get_capture("error").get(0) {
+            let assists = get_capture("fielders");
+            Self {
+                assists,
+                putout: None,
+                error: Some(*error),
+                unearned_run
+            }
+        } else {
+            let (putout, assists) = pop_with_vec(get_capture("fielders"));
+            Self {
+                assists,
+                putout,
+                error: None,
+                unearned_run
+            }
+        }
+    }
+}
+
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
+pub enum BaserunningPlayType {
+    #[strum(serialize = "PO")]
+    PickedOff,
+    #[strum(serialize = "POCS")]
+    PickedOffCaughtStealing,
+    #[strum(serialize = "SB")]
+    StolenBase,
+    #[strum(serialize = "CS")]
+    CaughtStealing,
+    #[strum(serialize = "DI")]
+    DefensiveIndifference,
+    #[strum(serialize = "BK")]
+    Balk,
+    #[strum(serialize = "OA")]
+    OtherAdvance,
+    #[strum(serialize = "WP")]
+    WildPitch,
+    #[strum(serialize = "PB")]
+    PassedBall
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct BaserunningPlay {
+    baserunning_play_type: BaserunningPlayType,
+    to_base: Option<Base>,
+    baserunning_fielding_info: Option<BaserunningFieldingInfo>
+}
+impl TryFrom<&str> for BaserunningPlay {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        let (first, last) = regex_split(value, &BASERUNNING_PLAY_FIELDING_REGEX);
+        let baserunning_play_type = BaserunningPlayType::from_str(first)?;
+        if last.is_none() {return Ok(Self {
+            baserunning_play_type,
+            to_base: None,
+            baserunning_fielding_info: None
+        })}
+        let captures = BASERUNNING_FIELDING_INFO_REGEX.captures(last.unwrap_or_default()).context("Could not capture info from baserunning play")?;
+        let to_base = Some(Base::from_str(captures.name("base").map_or("", |m| m.as_str()))?);
+        let baserunning_fielding_info = Some(BaserunningFieldingInfo::from(captures));
+        Ok(Self {
+            baserunning_play_type,
+            to_base,
+            baserunning_fielding_info
+        })
+    }
+}
+
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
+pub enum NoPlayType {
+    #[strum(serialize = "NP")]
+    NoPlay,
+    #[strum(serialize = "FLE")]
+    ErrorOnFoul
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct NoPlay {
+    no_play_type: NoPlayType,
+    error: Option<FieldingPosition>
+}
+impl TryFrom<(&str, &str)> for NoPlay {
+    type Error = Error;
+
+    fn try_from(value: (&str, &str)) -> Result<Self> {
+        let (first, last) = value;
+        let no_play_type = NoPlayType::from_str(first)?;
+        match no_play_type {
+            NoPlayType::NoPlay => Ok(Self{ no_play_type, error: None }),
+            NoPlayType::ErrorOnFoul => Ok(Self{
+                no_play_type,
+                error: FieldingPosition::fielding_vec(last).get(0).copied()
+            })
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum PlayType {
+    PlateAppearance(PlateAppearanceType),
+    BaserunningPlay(BaserunningPlay),
+    NoPlay(NoPlay)
+}
+
+impl PlayType {
+    /// Movement on the bases is not always explicitly given in the advances section.
+    /// The batter's advance is usually implied by the play type (e.g. a double means ending up
+    /// at second unless otherwise specified). This gives the implied advance for those play types,
+    /// which should be overridden by any explicit value in the advances section. Unsuccessful
+    /// advances are also often implied (e.g. caught stealing) but those do not cause issues when
+    /// determining the state of the game.
+    fn implied_advance(&self) -> Option<RunnerAdvance> {
+        unimplemented!()
+    }
+
     fn parse_main_play(value: &str) -> Result<Vec<PlayType>> {
-        if value == "" {return Ok(vec![])}
-        if let Some(multi_split) = MULTI_PLAY_REGEX.find(value) {
-            let (first, last) = value.split_at(multi_split.start());
+        if value.is_empty() {return Ok(vec![])}
+        if MULTI_PLAY_REGEX.is_match(value) {
+            let (first, last) = regex_split(value, &MULTI_PLAY_REGEX);
             return Ok(Self::parse_main_play(first)?
                 .into_iter()
-                .chain(Self::parse_main_play(&last[1..])?.into_iter())
-                .collect())
+                .chain(Self::parse_main_play(&last.unwrap().get(1..).unwrap_or_default())?.into_iter())
+                .collect::<Vec<PlayType>>())
         }
-        let play_type = match value {
-            "99" => PlayType::Unknown,
-            "C" => PlayType::Interference,
-            "HP" => PlayType::HitByPitch,
-            "K" => PlayType::StrikeOut,
-            "I" | "IW" => PlayType::IntentionalWalk,
-            "NP" => PlayType::NoPlay,
-            "W" => PlayType::Walk,
-            "BK" => PlayType::Balk,
-            "DI" => PlayType::DefensiveIndifference,
-            "OA" => PlayType::OtherAdvance,
-            "PB" => PlayType::PassedBall,
-            "WP" => PlayType::WildPitch,
-            _ => PlayType::Unrecognized(value.to_string())
-        };
-        match play_type {PlayType::Unrecognized(_) => (), _ => {return Ok(vec![play_type])}}
+        let (first, last) = regex_split(value, &MAIN_PLAY_FIELDING_REGEX);
+        let str_tuple = (first, last.unwrap_or_default());
+        if let Ok(pa) = PlateAppearanceType::try_from(str_tuple) {
+            Ok(vec![Self::PlateAppearance(pa)])
+        }
+        else if let Ok(br) = BaserunningPlay::try_from(value) {
+            Ok(vec![Self::BaserunningPlay(br)])
+        }
+        else if let Ok(np) = NoPlay::try_from(str_tuple) {
+            Ok(vec![Self::NoPlay(np)])
+        }
+        else {Err(anyhow!("Unable to parse play"))}
 
-        if BASERUNNING_PLAY_REGEX.is_match(value) {return Ok(vec![Self::parse_baserunning_play(value)?])}
-
-        let (first, last) = regex_split(value, &NUMERIC_REGEX);
-        let mut last_as_int_vec: PositionVec = (&last).as_ref().map(|c| FieldingPosition::fielding_vec(&c)).unwrap_or_default();
-        let final_match = match first {
-            "E" => PlayType::ReachedOnError {assists: vec![], error: last_as_int_vec.first().copied().context("No fielder specified")?},
-            "" => Self::parse_fielding_play(&last.unwrap_or_default())?,
-            "S" => PlayType::Single(last_as_int_vec),
-            "D" => PlayType::Double(last_as_int_vec),
-            "T" => PlayType::Triple(last_as_int_vec),
-            "H" | "HR" => PlayType::HomeRun(last_as_int_vec),
-            "DGR" => PlayType::GroundRuleDouble(last_as_int_vec),
-            "FC" => PlayType::FieldersChoice(last_as_int_vec.get(0).copied().unwrap_or(FieldingPosition::Unknown)),
-            "FLE" => PlayType::ErrorOnFoul(last_as_int_vec.first().copied().context("No fielder specified")?),
-            "K" => {
-                let (putout, assists) = (last_as_int_vec.pop().unwrap_or(FieldingPosition::Unknown), last_as_int_vec);
-                PlayType::StrikeOutPutOut {putout, assists}
-            }
-            // Special case where fielders are unknown but base of forceout is
-            "(" => PlayType::Out {
-                assists: vec![],
-                putouts: vec![],
-                runners_out: vec![BaseRunner::from_str(last.unwrap_or_default().get(0..1).unwrap_or_default())?]},
-            _ => PlayType::Unrecognized(value.to_string())
-        };
-        Ok(vec![final_match])
     }
 }
 
@@ -938,7 +1094,6 @@ impl Play {
             .map(|a| a.baserunner)
             .collect()
     }
-
 }
 
 impl TryFrom<&str> for Play {
@@ -946,8 +1101,10 @@ impl TryFrom<&str> for Play {
 
     fn try_from(value: &str) -> Result<Self> {
         let (uncertain_flag, exceptional_flag) = (value.contains('#'), value.contains('!'));
-        let value: &str = &STRIP_CHARS_REGEX.replace_all(value, "").to_string();
-        if value == "" {return Ok(Play::default())}
+        let value = &*STRIP_CHARS_REGEX.replace_all(value, "");
+        let value = &*UNKNOWN_FIELDER_REGEX.replace_all(value, "0");
+        if value.is_empty() {return Ok(Play::default())}
+
         let modifiers_boundary = value.find('/').unwrap_or_else(|| value.len());
         let advances_boundary = value.find('.').unwrap_or_else(|| value.len());
         let first_boundary = min(modifiers_boundary, advances_boundary);

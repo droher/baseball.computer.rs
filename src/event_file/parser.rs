@@ -38,8 +38,8 @@ impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
         let home_team = infos.iter().find_map(|m| if let InfoRecord::HomeTeam(t) = m {Some(t)} else {None});
         let away_team = infos.iter().find_map(|m| if let InfoRecord::VisitingTeam(t) = m {Some(t)} else {None});
         Ok(Self {
-            away: *away_team.context(format!("Could not find away team info in records: {:?}", infos))?,
-            home: *home_team.context(format!("Could not find home team info in records: {:?}", infos))?
+            away: *away_team.context("Could not find away team info in records")?,
+            home: *home_team.context("Could not find home team info in records")?
         })
     }
 }
@@ -64,7 +64,7 @@ impl TryFrom<&RecordVec> for Game {
     fn try_from(record_vec: &RecordVec) -> Result<Self> {
         let id = *record_vec.iter()
             .find_map(|m| if let MappedRecord::GameId(g) = m {Some(g)} else {None})
-            .context(format!("Did not find game ID in list of records: {:?}", &record_vec))?;
+            .context("Did not find game ID in list of records")?;
         let infos = record_vec.iter()
             .filter_map(|m| if let MappedRecord::Info(i) = m {Some(*i)} else {None})
             .collect::<Vec<InfoRecord>>();
@@ -348,7 +348,7 @@ impl TryFrom<&str> for RetrosheetReader {
         reader.read_record(&mut current_record)?;
         let current_game_id = match MappedRecord::new(&current_record)? {
             MappedRecord::GameId(g) => Ok(g),
-            _ => Err(anyhow!("First record was not a game ID, cannot read file. Full record: {:?}", &current_record))
+            _ => Err(anyhow!("First record was not a game ID, cannot read file."))
         }?;
         let current_record_vec = RecordVec::new();
         Ok(Self {reader, current_record, current_game_id, current_record_vec})
