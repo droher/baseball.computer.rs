@@ -19,7 +19,6 @@ use crate::event_file::misc::EarnedRunRecord;
 use either::Either::Left;
 use crate::event_file::play::PlayType::PlateAppearance;
 
-
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
 const GROUP_ASSISTS1: &str = concatcp!(NAMING_PREFIX, "a1", GROUP_ASSISTS);
@@ -100,8 +99,12 @@ pub enum BaseRunner {
     Third
 }
 impl BaseRunner {
-    fn from_target_base(base: Base) -> Result<Self> {
-        BaseRunner::try_from((base as u8) - 1).context("Could not find baserunner for target base")
+    fn from_target_base(base: &Base) -> Result<Self> {
+        BaseRunner::try_from((*base as u8) - 1).context("Could not find baserunner for target base")
+    }
+
+    fn from_current_base(base: &Base) -> Result<Self> {
+        BaseRunner::try_from(*base as u8).context("Could not find baserunner for current base")
     }
 
 
@@ -257,7 +260,7 @@ pub enum UnearnedRunStatus {
     TeamUnearned
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum RbiStatus {
     RBI,
     NoRBI
@@ -276,6 +279,19 @@ impl Default for BaserunningFieldingInfo {
     }
 }
 
+/// Movement on the bases is not always explicitly given in the advances section.
+/// The batter's advance is usually implied by the play type (e.g. a double means ending up
+/// at second unless otherwise specified). This gives the implied advance for those play types,
+/// which should be overridden by any explicit value in the advances section. Unsuccessful
+/// advances are also often implied (e.g. caught stealing) but those do not cause issues when
+/// determining the state of the game.
+pub trait ImplicitPlayResults {
+    fn implicit_advance(&self) -> Option<RunnerAdvance> {None}
+
+    fn implicit_out(&self) -> Vec<BaseRunner> {vec![]}
+
+}
+
 #[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
 pub enum HitType {
     #[strum(serialize = "S")]
@@ -290,11 +306,31 @@ pub enum HitType {
     HomeRun
 }
 
+impl ImplicitPlayResults for HitType {
+    fn implicit_advance(&self) -> Option<RunnerAdvance> {
+        let base = match self {
+            Self::Single => Base::First,
+            Self::Double => Base::Second,
+            Self::GroundRuleDouble => Base::Second,
+            Self::Triple => Base::Third,
+            Self::HomeRun => Base::Home
+        };
+        Some(RunnerAdvance::batter_advance(base))
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Hit {
     hit_type: HitType,
     positions_hit_to: PositionVec
 }
+
+impl ImplicitPlayResults for Hit {
+    fn implicit_advance(&self) -> Option<RunnerAdvance> {
+        self.hit_type.implicit_advance()
+    }
+}
+
 impl TryFrom<(&str, &str)> for Hit {
     type Error = Error;
 
@@ -333,6 +369,7 @@ pub struct FieldingPlay {
     runners_out: Vec<BaseRunner>,
     error: Option<FieldingPosition>
 }
+
 impl Default for FieldingPlay {
     fn default() -> Self {
         Self {
@@ -370,7 +407,7 @@ impl TryFrom<&str> for FieldingPlay {
     type Error = Error;
 
     fn try_from(value: &str) -> Result<Self> {
-        if let Ok(_) = value.parse::<u32>() {
+        if value.parse::<u32>().is_ok() {
             return Self::try_from(FieldingPosition::fielding_vec(value))
         }
         else if let Some(captures) = OUT_REGEX.captures(value) {
@@ -410,6 +447,23 @@ pub struct BattingOut {
     fielding_play: FieldingPlay
 
 }
+
+impl ImplicitPlayResults for BattingOut {
+    fn implicit_advance(&self) -> Option<RunnerAdvance> {
+        if self.fielding_play.error.is_some() {
+            Some(RunnerAdvance::batter_advance(Base::First))
+        } else {None}
+    }
+
+    fn implicit_out(&self) -> Vec<BaseRunner> {
+        let runners_out = &self.fielding_play.runners_out;
+        let mut batter_out = if self.implicit_advance().is_none() && runners_out.is_empty() {
+            vec![BaseRunner::Batter]} else {vec![]};
+        batter_out.extend_from_slice(runners_out);
+        batter_out
+    }
+}
+
 impl TryFrom<(&str, &str)> for BattingOut {
     type Error = Error;
 
@@ -444,12 +498,40 @@ pub enum OtherPlateAppearance {
     IntentionalWalk
 }
 
+impl ImplicitPlayResults for OtherPlateAppearance {
+    fn implicit_advance(&self) -> Option<RunnerAdvance> {
+        Some(RunnerAdvance::batter_advance(Base::First))
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PlateAppearanceType {
     Hit(Hit),
     BattingOut(BattingOut),
     OtherPlateAppearance(OtherPlateAppearance)
 }
+
+impl ImplicitPlayResults for PlateAppearanceType {
+    fn implicit_advance(&self) -> Option<RunnerAdvance> {
+        match self {
+            Self::Hit(i) => i.implicit_advance(),
+            Self::BattingOut(i) => i.implicit_advance(),
+            Self::OtherPlateAppearance(i) => i.implicit_advance(),
+
+        }
+    }
+
+    fn implicit_out(&self) -> Vec<BaseRunner> {
+        match self {
+            Self::Hit(i) => i.implicit_out(),
+            Self::BattingOut(i) => i.implicit_out(),
+            Self::OtherPlateAppearance(i) => i.implicit_out(),
+
+        }
+    }
+}
+
+
 impl TryFrom<(&str, &str)> for PlateAppearanceType {
     type Error = Error;
 
@@ -476,6 +558,12 @@ pub struct BaserunningFieldingInfo {
     error: Option<FieldingPosition>,
     unearned_run: Option<UnearnedRunStatus>
 }
+impl BaserunningFieldingInfo {
+    fn is_out(&self) -> bool {
+        self.putout.is_some()
+    }
+}
+
 impl From<Captures<'_>> for BaserunningFieldingInfo {
     fn from(captures: Captures) -> Self {
         let get_capture = {
@@ -530,9 +618,34 @@ pub enum BaserunningPlayType {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct BaserunningPlay {
     baserunning_play_type: BaserunningPlayType,
-    to_base: Option<Base>,
+    at_base: Option<Base>,
     baserunning_fielding_info: Option<BaserunningFieldingInfo>
 }
+
+impl BaserunningPlay {
+    fn error_on_play(&self) -> bool {
+        self.baserunning_fielding_info.as_ref().map(|i| i.error.is_some()).unwrap_or_default()
+    }
+}
+
+impl ImplicitPlayResults for BaserunningPlay {
+    fn implicit_advance(&self) -> Option<RunnerAdvance> {
+        if let (Some(b), BaserunningPlayType::StolenBase) = (self.at_base, self.baserunning_play_type) {
+            Some(RunnerAdvance::runner_advance_to(b).unwrap())
+        } else {None}
+    }
+
+    fn implicit_out(&self) -> Vec<BaseRunner> {
+        if self.error_on_play() {return vec![]}
+
+        match (self.at_base, self.baserunning_play_type) {
+            (Some(b), BaserunningPlayType::CaughtStealing) | (Some(b), BaserunningPlayType::PickedOffCaughtStealing) => vec![BaseRunner::from_target_base(&b).unwrap()],
+            (Some(b), BaserunningPlayType::PickedOff) => vec![BaseRunner::from_current_base(&b).unwrap()],
+            _ => vec![]
+        }
+    }
+}
+
 impl TryFrom<&str> for BaserunningPlay {
     type Error = Error;
 
@@ -541,15 +654,15 @@ impl TryFrom<&str> for BaserunningPlay {
         let baserunning_play_type = BaserunningPlayType::from_str(first)?;
         if last.is_none() {return Ok(Self {
             baserunning_play_type,
-            to_base: None,
+            at_base: None,
             baserunning_fielding_info: None
         })}
         let captures = BASERUNNING_FIELDING_INFO_REGEX.captures(last.unwrap_or_default()).context("Could not capture info from baserunning play")?;
-        let to_base = Some(Base::from_str(captures.name("base").map_or("", |m| m.as_str()))?);
+        let at_base = Some(Base::from_str(captures.name("base").map_or("", |m| m.as_str()))?);
         let baserunning_fielding_info = Some(BaserunningFieldingInfo::from(captures));
         Ok(Self {
             baserunning_play_type,
-            to_base,
+            at_base,
             baserunning_fielding_info
         })
     }
@@ -562,6 +675,7 @@ pub enum NoPlayType {
     #[strum(serialize = "FLE")]
     ErrorOnFoul
 }
+impl ImplicitPlayResults for NoPlayType {}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoPlay {
@@ -592,12 +706,7 @@ pub enum PlayType {
 }
 
 impl PlayType {
-    /// Movement on the bases is not always explicitly given in the advances section.
-    /// The batter's advance is usually implied by the play type (e.g. a double means ending up
-    /// at second unless otherwise specified). This gives the implied advance for those play types,
-    /// which should be overridden by any explicit value in the advances section. Unsuccessful
-    /// advances are also often implied (e.g. caught stealing) but those do not cause issues when
-    /// determining the state of the game.
+
     fn implied_advance(&self) -> Option<RunnerAdvance> {
         unimplemented!()
     }
@@ -636,6 +745,27 @@ pub struct RunnerAdvance {
     pub to: Base,
     out_or_error: bool,
     pub modifiers: Vec<RunnerAdvanceModifier>
+}
+
+impl RunnerAdvance {
+    pub fn batter_advance(to: Base) -> Self {
+        Self {
+            baserunner: BaseRunner::Batter,
+            to,
+            out_or_error: false,
+            modifiers: vec![]
+        }
+    }
+
+    pub fn runner_advance_to(target_base: Base) -> Result<Self> {
+        let baserunner = BaseRunner::from_target_base(&target_base)?;
+        Ok(Self {
+            baserunner,
+            to: target_base,
+            out_or_error: false,
+            modifiers: vec![]
+        })
+    }
 }
 
 impl FieldingData for RunnerAdvance {
@@ -801,7 +931,7 @@ impl RunnerAdvanceModifier {
                 let (putout, assists) = (digits.pop().unwrap_or(FieldingPosition::Unknown), digits);
                 RunnerAdvanceModifier::Putout { assists, putout }
             }
-            _ => RunnerAdvanceModifier::Unrecognized(value.to_string())
+            _ => RunnerAdvanceModifier::Unrecognized(value.into())
         };
         Ok(final_match)
     }
@@ -1063,6 +1193,15 @@ impl FieldingData for PlayModifier {
 }
 
 impl PlayModifier {
+     const fn double_plays() -> Vec<PlayModifier> {
+         vec![Self::BuntGroundIntoDoublePlay, Self::BuntPoppedIntoDoublePlay, Self::FlyBallDoublePlay,
+         Self::GroundBallDoublePlay, Self::LinedIntoDoublePlay, Self::UnspecifiedDoublePlay]
+     }
+
+    const fn triple_plays() -> Vec<PlayModifier> {
+        vec![Self::GroundBallTriplePlay, Self::LinedIntoTriplePlay, Self::UnspecifiedTriplePlay]
+    }
+
     fn parse_modifiers(value: &str) -> Result<Vec<PlayModifier>> {
         value
             .split('/')
@@ -1096,6 +1235,13 @@ pub struct Play {
     pub uncertain_flag: bool,
     pub exceptional_flag: bool
 }
+impl ImplicitPlayResults for Play {
+    fn implicit_advance(&self) -> Option<RunnerAdvance> {None}
+
+    fn implicit_out(&self) -> Vec<BaseRunner> {vec![]}
+
+}
+
 impl Play {
     pub fn out_advancing(&self) -> Vec<BaseRunner> {
         self.advances.iter()
