@@ -40,8 +40,8 @@ impl GameState {
             outs: 0,
             bases: BaseState::default(),
             score: Matchup::default(),
-            lineups: lineups,
-            defenses: defenses,
+            lineups,
+            defenses,
             at_bat: LineupPosition::First,
             count: Count::default()
         }
