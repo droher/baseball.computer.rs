@@ -118,4 +118,3 @@ pub enum Side {
     #[strum(serialize = "1")]
     Home
 }
-

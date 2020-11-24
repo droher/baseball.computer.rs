@@ -5,6 +5,7 @@ use std::io::BufReader;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Error, Result};
+use bimap::BiMap;
 use chrono::{NaiveDate, NaiveTime};
 use csv::{Reader, ReaderBuilder, StringRecord};
 use tinystr::TinyStr8;
@@ -12,12 +13,27 @@ use tinystr::TinyStr8;
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::{DayNight, FieldCondition, GameType, HowScored, InfoRecord, Park, PitchDetail, Precipitation, Sky, Team, UmpirePosition, WindDirection};
 use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord};
-use crate::event_file::pbp::PlayByPlay;
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{Batter, Fielder, FieldingPosition, FromRetrosheetRecord, LineupPosition, Pitcher, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Side, Umpire};
+use either::{Either, Left, Right};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Matchup<T> { away: T, home: T }
+pub struct Matchup<T> {away: T, home: T}
+
+impl<T: Clone> Matchup<T> {
+    pub fn get(&self, side: &Side) -> &T {
+        match side {
+            Side::Away => &self.away,
+            Side::Home => &self.home
+        }
+    }
+    pub fn cloned_update(&self, side: &Side, new_val: T) -> Self {
+        match side {
+            Side::Away => Self {away: new_val, home: self.home.clone()},
+            Side::Home => Self {home: new_val, away: self.away.clone()}
+        }
+    }
+}
 
 impl<T> Matchup<T> {
     pub fn new(away: T, home: T) -> Self {
@@ -29,6 +45,9 @@ impl<T: Default> Default for Matchup<T> {
     fn default() -> Self {
         Self {away: T::default(), home: T::default() }
     }
+}
+
+impl<T: Copy> Copy for Matchup<T> {
 }
 
 impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
@@ -47,17 +66,18 @@ impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
 pub type Teams = Matchup<Team>;
 pub type StartingLineups = Matchup<Lineup>;
 
-pub type Lineup = HashMap<LineupPosition, Batter>;
-pub type Defense = HashMap<FieldingPosition, Fielder>;
+pub type Lineup = BiMap<LineupPosition, Batter>;
+pub type Defense = BiMap<FieldingPosition, Fielder>;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Game {
     id: GameId,
     info: GameInfo,
-    play_by_play: PlayByPlay,
+    pub(crate) events: Vec<EventRecord>,
     pub starting_lineups: Matchup<Lineup>,
     pub starting_defense: Matchup<Defense>,
 }
+
 impl TryFrom<&RecordVec> for Game {
     type Error = Error;
 
@@ -73,10 +93,17 @@ impl TryFrom<&RecordVec> for Game {
             .filter_map(|m| if let MappedRecord::Start(i) = m {Some(*i)} else {None})
             .collect::<Vec<StartRecord>>();
         let (starting_lineups, starting_defense) = Self::assemble_lineups_and_defense(starts);
+        let events = record_vec.iter()
+            .filter_map(|m| match m {
+                MappedRecord::Play(pr) => Some(Left(pr.clone())),
+                MappedRecord::Substitution(sr) => Some(Right(sr.clone())),
+                _ => None
+            })
+            .collect();
         Ok(Self {
             id,
             info,
-            play_by_play: PlayByPlay::default(),
+            events,
             starting_lineups,
             starting_defense
         })
@@ -374,6 +401,8 @@ pub enum MappedRecord {
     BoxScoreEvent(BoxScoreEvent),
     Unrecognized
 }
+
+pub type EventRecord = Either<PlayRecord, SubstitutionRecord>;
 
 impl FromRetrosheetRecord for MappedRecord {
     fn new(record: &RetrosheetEventRecord) -> Result<MappedRecord>{

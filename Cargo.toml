@@ -19,6 +19,7 @@ const_format = "0.2.6"
 either = "1.6.0"
 num_enum = "0.5.1"
 tinystr = "0.3.4"
+bimap = "0.5.3"
 
 
 [dependencies.regex]

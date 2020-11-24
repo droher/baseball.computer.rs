@@ -115,16 +115,36 @@ pub(crate) enum InningFrame {
     Top,
     Bottom,
 }
+
+impl InningFrame {
+    pub fn flip(&self) -> Self {
+        match self {
+            Self::Top => Self::Bottom,
+            Self::Bottom => Self::Top
+        }
+    }
+}
+
 impl Default for InningFrame {
     fn default() -> Self {Self::Top}
 }
 
 #[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
 pub enum UnearnedRunStatus {
+    Earned,
     #[strum(serialize = "UR")]
     Unearned,
     #[strum(serialize = "TUR")]
     TeamUnearned
+}
+
+impl UnearnedRunStatus {
+    fn is_unearned(&self) -> bool {
+        match self {
+            Self::Unearned | Self::TeamUnearned => true,
+            _ => false
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -403,6 +423,10 @@ impl FieldingData for PlateAppearanceType {
 }
 
 impl PlateAppearanceType {
+    fn is_strikeout(&self) -> bool {
+        if let Self::BattingOut(b) = self {b.out_type == OutAtBatType::StrikeOut} else {false}
+    }
+
     fn is_at_bat(&self) -> bool {
         match self {
             Self::Hit(_) | Self::BattingOut(_) => true,
@@ -669,6 +693,10 @@ impl ImplicitPlayResults for PlayType {
 
 impl PlayType {
 
+    pub fn is_rbi_eligible(&self) -> bool {
+        if let Self::PlateAppearance(pt) = self {!pt.is_strikeout()} else {true}
+    }
+
     fn parse_main_play(value: &str) -> Result<Vec<PlayType>> {
         if value.is_empty() {return Ok(vec![])}
         if MULTI_PLAY_REGEX.is_match(value) {
@@ -753,12 +781,22 @@ impl RunnerAdvance {
         self.to == Base::Home && !self.is_out()
     }
 
-    pub fn unearned_status(&self) -> Option<UnearnedRunStatus> {
-        self.modifiers.iter().find_map(|m| m.unearned_status())
+    /// When a run scores, whether or not it counts as an RBI for the batter cannot be determined
+    /// from the RunnerAdvance data alone *unless it is explicitly given*. For instance, an non-annotated
+    /// run-scoring play on a force out is usually an RBI, but if a DP modifier is present, then
+    /// no RBI is awarded. As a result, the final RBI logic determination must occur at the Play
+    /// level.
+    pub fn explicit_rbi_status(&self) -> Option<RbiStatus> {
+        self.modifiers.iter()
+            .find_map(|m| m.rbi_status())
     }
 
-    pub fn rbi_status(&self) -> Option<RbiStatus> {
-        self.modifiers.iter().find_map(|m| m.rbi_status())
+
+    /// See the `explicit_rbi_status` doc for an explanation of why earned/unearned status cannot
+    /// be fully determined here.
+    pub fn explicit_earned_run_status(&self) -> Option<UnearnedRunStatus> {
+        self.modifiers.iter()
+            .find_map(|m| m.unearned_status())
     }
 
     fn parse_advances(value: &str) -> Result<Vec<RunnerAdvance>> {
@@ -1215,18 +1253,16 @@ impl Play {
         [self.explicit_advances.clone(), implicit_advances].concat()
     }
 
+    fn filtered_baserunners(&self, filter: fn(&RunnerAdvance) -> bool) -> Vec<BaseRunner> {
+        self.advances()
+            .iter()
+            .filter_map(|ra| if filter(ra) {Some(ra.baserunner)} else {None})
+            .collect()
+    }
+
     pub fn outs(&self) -> Result<Vec<BaseRunner>> {
-        let mut advances = self.advances();
-        let out_advancing: Vec<BaseRunner> = advances
-            .iter()
-            .filter(|ra| ra.is_out())
-            .map(|ra| ra.baserunner)
-            .collect();
-        let safe_advancing: Vec<BaseRunner> = advances
-            .iter()
-            .filter(|ra| !ra.is_out())
-            .map(|ra| ra.baserunner)
-            .collect();
+        let out_advancing: Vec<BaseRunner> = self.filtered_baserunners(|ra| ra.is_out());
+        let safe_advancing: Vec<BaseRunner> = self.filtered_baserunners(|ra|!ra.is_out());
 
         let implicit_outs = self.main_plays
             .iter()
@@ -1246,6 +1282,49 @@ impl Play {
             else {Ok(full_outs)}
         }
         else {Ok(full_outs)}
+    }
+
+    pub fn scoring_advances(&self) -> Vec<BaseRunner> {
+        self.filtered_baserunners(|ra: &RunnerAdvance| ra.scored())
+    }
+
+    fn default_rbi_status(&self) -> RbiStatus {
+        let is_gdp = self.modifiers
+            .iter()
+            .find(|m| m == &&PlayModifier::GroundBallDoublePlay)
+            .is_some();
+        let has_rbi_eligible_play = self.main_plays
+            .iter()
+            .find(|pt| pt.is_rbi_eligible())
+            .is_some();
+        match has_rbi_eligible_play && !is_gdp {
+            true => RbiStatus::RBI,
+            false => RbiStatus::NoRBI
+        }
+    }
+
+    pub fn rbi(&self) -> Vec<BaseRunner> {
+        let default_filter = {
+            |ra: &RunnerAdvance|
+                match ra.explicit_rbi_status()
+                {
+                    _ if !ra.scored() => false,
+                    Some(RbiStatus::NoRBI) => false,
+                    _ => true
+                }
+        };
+        let no_default_filter = {
+            |ra: &RunnerAdvance|
+                match ra.explicit_rbi_status() {
+                    _ if !ra.scored() => false,
+                    Some(RbiStatus::RBI) => true,
+                    _ => false
+                }
+        };
+        match self.default_rbi_status() {
+            RbiStatus::RBI => self.filtered_baserunners(default_filter),
+            RbiStatus::NoRBI => self.filtered_baserunners(no_default_filter)
+        }
     }
 
 }
@@ -1340,10 +1419,10 @@ impl Count {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct PlayRecord {
-    inning: Inning,
-    side: Side,
-    batter: Batter,
-    count: Count,
+    pub inning: Inning,
+    pub side: Side,
+    pub batter: Batter,
+    pub count: Count,
     pub pitch_sequence: Option<PitchSequence>,
     pub play: Play
 }
