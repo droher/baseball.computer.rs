@@ -12,7 +12,7 @@ pub type RetrosheetEventRecord = StringRecord;
 
 
 pub trait FromRetrosheetRecord {
-    fn new(record: &RetrosheetEventRecord) -> Result<Self> where Self: Sized;
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<Self> where Self: Sized;
 
     fn error(msg: &str, record: &RetrosheetEventRecord) -> Error {
         anyhow!("{}\nRecord: {:?}", msg, record)
@@ -47,6 +47,10 @@ impl LineupPosition {
             _ => Ok(Self::try_from(as_u8 + 1)?)
         }
     }
+
+    pub fn bats_in_lineup(&self) -> bool {
+        *self as u8 > 0
+    }
 }
 
 impl TryFrom<&str> for LineupPosition {
@@ -79,6 +83,13 @@ impl FieldingPosition {
     //noinspection RsTypeCheck
     pub fn fielding_vec(int_str: &str) -> Vec<Self> {
         digit_vec(int_str).iter().map(|d|Self::try_from(*d).unwrap_or(Self::Unknown)).collect()
+    }
+
+    /// Indicates whether the position is actually a true fielding position, as opposed
+    /// to a player who does not appear in the field but is given a mock position
+    pub fn plays_in_field(&self) -> bool {
+        let numeric_position: u8 = (*self).into();
+        (1..10).contains(&numeric_position)
     }
 }
 impl Default for FieldingPosition {

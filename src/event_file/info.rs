@@ -195,7 +195,7 @@ impl InfoRecord {
 }
 
 impl FromRetrosheetRecord for InfoRecord {
-    fn new(record: &RetrosheetEventRecord) -> Result<InfoRecord> {
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<InfoRecord> {
         let record = record.deserialize::<[&str; 3]>(None)?;
 
         let info_type = record[1];

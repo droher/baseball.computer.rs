@@ -12,7 +12,7 @@ use tinystr::TinyStr8;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::{DayNight, FieldCondition, GameType, HowScored, InfoRecord, Park, PitchDetail, Precipitation, Sky, Team, UmpirePosition, WindDirection};
-use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord};
+use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord, Lineup, Defense};
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{Batter, Fielder, FieldingPosition, FromRetrosheetRecord, LineupPosition, Pitcher, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Side, Umpire};
 use either::{Either, Left, Right};
@@ -27,6 +27,14 @@ impl<T: Clone> Matchup<T> {
             Side::Home => &self.home
         }
     }
+
+    pub fn get_move(self, side: &Side) -> T {
+        match side {
+            Side::Away => self.away,
+            Side::Home => self.home
+        }
+    }
+
     pub fn cloned_update(&self, side: &Side, new_val: T) -> Self {
         match side {
             Side::Away => Self {away: new_val, home: self.home.clone()},
@@ -47,8 +55,8 @@ impl<T: Default> Default for Matchup<T> {
     }
 }
 
-impl<T: Copy> Copy for Matchup<T> {
-}
+// TODO: Is there a rustier way to write?
+impl<T: Copy> Copy for Matchup<T> {}
 
 impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
     type Error = Error;
@@ -64,16 +72,12 @@ impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
 }
 
 pub type Teams = Matchup<Team>;
-pub type StartingLineups = Matchup<Lineup>;
-
-pub type Lineup = BiMap<LineupPosition, Batter>;
-pub type Defense = BiMap<FieldingPosition, Fielder>;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Game {
-    id: GameId,
-    info: GameInfo,
-    pub(crate) events: Vec<EventRecord>,
+    pub id: GameId,
+    pub info: GameInfo,
+    pub events: Vec<EventRecord>,
     pub starting_lineups: Matchup<Lineup>,
     pub starting_defense: Matchup<Defense>,
 }
@@ -352,7 +356,7 @@ impl RetrosheetReader {
         loop {
             let did_read = self.reader.read_record(&mut self.current_record)?;
             if !did_read {return Ok(false)}
-            let mapped_record = MappedRecord::new(&self.current_record);
+            let mapped_record = MappedRecord::from_retrosheet_record(&self.current_record);
             match mapped_record {
                 Ok(MappedRecord::GameId(g)) => {self.current_game_id = g; return Ok(true)},
                 Ok(m) => {self.current_record_vec.push(m)}
@@ -373,7 +377,7 @@ impl TryFrom<&str> for RetrosheetReader {
                     .from_reader(BufReader::new(File::open(path)?));
         let mut current_record = StringRecord::new();
         reader.read_record(&mut current_record)?;
-        let current_game_id = match MappedRecord::new(&current_record)? {
+        let current_game_id = match MappedRecord::from_retrosheet_record(&current_record)? {
             MappedRecord::GameId(g) => Ok(g),
             _ => Err(anyhow!("First record was not a game ID, cannot read file."))
         }?;
@@ -405,23 +409,23 @@ pub enum MappedRecord {
 pub type EventRecord = Either<PlayRecord, SubstitutionRecord>;
 
 impl FromRetrosheetRecord for MappedRecord {
-    fn new(record: &RetrosheetEventRecord) -> Result<MappedRecord>{
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<MappedRecord>{
         let line_type = record.get(0).context("No record")?;
         let mapped= match line_type {
-            "id" => MappedRecord::GameId(GameId::new(record)?),
+            "id" => MappedRecord::GameId(GameId::from_retrosheet_record(record)?),
             "version" => MappedRecord::Version,
-            "info" => MappedRecord::Info(InfoRecord::new(record)?),
-            "start" => MappedRecord::Start(StartRecord::new(record)?),
-            "sub" => MappedRecord::Substitution(SubstitutionRecord::new(record)?),
-            "play" => MappedRecord::Play(PlayRecord::new(record)?),
-            "badj" => MappedRecord::BatHandAdjustment(BatHandAdjustment::new(record)?),
-            "padj" => MappedRecord::PitchHandAdjustment(PitchHandAdjustment::new(record)?),
-            "ladj" => MappedRecord::LineupAdjustment(LineupAdjustment::new(record)?),
+            "info" => MappedRecord::Info(InfoRecord::from_retrosheet_record(record)?),
+            "start" => MappedRecord::Start(StartRecord::from_retrosheet_record(record)?),
+            "sub" => MappedRecord::Substitution(SubstitutionRecord::from_retrosheet_record(record)?),
+            "play" => MappedRecord::Play(PlayRecord::from_retrosheet_record(record)?),
+            "badj" => MappedRecord::BatHandAdjustment(BatHandAdjustment::from_retrosheet_record(record)?),
+            "padj" => MappedRecord::PitchHandAdjustment(PitchHandAdjustment::from_retrosheet_record(record)?),
+            "ladj" => MappedRecord::LineupAdjustment(LineupAdjustment::from_retrosheet_record(record)?),
             "com" => MappedRecord::Comment(String::from(record.get(1).unwrap())),
-            "data" => MappedRecord::EarnedRun(EarnedRunRecord::new(record)?),
-            "stat" => MappedRecord::BoxScoreLine(BoxScoreLine::new(record)?),
-            "line" => MappedRecord::LineScore(LineScore::new(record)?),
-            "event" => MappedRecord::BoxScoreEvent(BoxScoreEvent::new(record)?),
+            "data" => MappedRecord::EarnedRun(EarnedRunRecord::from_retrosheet_record(record)?),
+            "stat" => MappedRecord::BoxScoreLine(BoxScoreLine::from_retrosheet_record(record)?),
+            "line" => MappedRecord::LineScore(LineScore::from_retrosheet_record(record)?),
+            "event" => MappedRecord::BoxScoreEvent(BoxScoreEvent::from_retrosheet_record(record)?),
             _ => MappedRecord::Unrecognized
         };
         match mapped {

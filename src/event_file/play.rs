@@ -98,7 +98,7 @@ pub enum BaseRunner {
     Third
 }
 impl BaseRunner {
-    fn from_target_base(base: &Base) -> Result<Self> {
+    pub fn from_target_base(base: &Base) -> Result<Self> {
         BaseRunner::try_from((*base as u8) - 1).context("Could not find baserunner for target base")
     }
 
@@ -130,21 +130,11 @@ impl Default for InningFrame {
 }
 
 #[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
-pub enum UnearnedRunStatus {
-    Earned,
+pub enum EarnedRunStatus {
     #[strum(serialize = "UR")]
     Unearned,
     #[strum(serialize = "TUR")]
-    TeamUnearned
-}
-
-impl UnearnedRunStatus {
-    fn is_unearned(&self) -> bool {
-        match self {
-            Self::Unearned | Self::TeamUnearned => true,
-            _ => false
-        }
-    }
+    TeamUnearned // Earned to the (relief) pitcher, unearned to the team
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -480,7 +470,7 @@ pub struct BaserunningFieldingInfo {
     assists: PositionVec,
     putout: Option<FieldingPosition>,
     error: Option<FieldingPosition>,
-    unearned_run: Option<UnearnedRunStatus>
+    unearned_run: Option<EarnedRunStatus>
 }
 impl BaserunningFieldingInfo {
     fn is_out(&self) -> bool {
@@ -495,8 +485,8 @@ impl From<Captures<'_>> for BaserunningFieldingInfo {
                 .map(|m| FieldingPosition::fielding_vec(m.as_str())).unwrap_or_default()};
 
         let unearned_run = captures.name("unearned_run").map(|s| if s.as_str().contains('T') {
-            UnearnedRunStatus::TeamUnearned
-        } else { UnearnedRunStatus::Unearned });
+            EarnedRunStatus::TeamUnearned
+        } else { EarnedRunStatus::Unearned });
         if let Some(error) = get_capture("error").get(0) {
             let assists = get_capture("fielders");
             Self {
@@ -722,7 +712,7 @@ impl PlayType {
     }
 }
 
-struct ScoringInfo {unearned: Option<UnearnedRunStatus>, rbi: bool}
+struct ScoringInfo {unearned: Option<EarnedRunStatus>, rbi: bool}
 
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -749,6 +739,9 @@ impl FieldingData for RunnerAdvance {
 
 impl RunnerAdvance {
     pub fn batter_advance(to: Base) -> Self {
+        if to == Base::Home {
+
+        }
         Self {
             baserunner: BaseRunner::Batter,
             to,
@@ -781,6 +774,15 @@ impl RunnerAdvance {
         self.to == Base::Home && !self.is_out()
     }
 
+    pub fn still_on_base(&self) -> bool {
+        !(self.is_out() || self.scored())
+    }
+
+    pub fn is_this_that_one_time_jean_segura_ran_in_reverse(&self) -> Result<bool> {
+        Ok(BaseRunner::from_target_base(&self.to)? < self.baserunner)
+    }
+
+
     /// When a run scores, whether or not it counts as an RBI for the batter cannot be determined
     /// from the RunnerAdvance data alone *unless it is explicitly given*. For instance, an non-annotated
     /// run-scoring play on a force out is usually an RBI, but if a DP modifier is present, then
@@ -792,9 +794,9 @@ impl RunnerAdvance {
     }
 
 
-    /// See the `explicit_rbi_status` doc for an explanation of why earned/unearned status cannot
-    /// be fully determined here.
-    pub fn explicit_earned_run_status(&self) -> Option<UnearnedRunStatus> {
+    /// Following Chadwick's lead, I currently make no effort to determine earned/unearned run
+    /// status on a given play unless it is specified explicitly.
+    pub fn earned_run_status(&self) -> Option<EarnedRunStatus> {
         self.modifiers.iter()
             .find_map(|m| m.unearned_status())
     }
@@ -839,10 +841,10 @@ pub enum RunnerAdvanceModifier {
     Unrecognized(String)
 }
 impl RunnerAdvanceModifier {
-    fn unearned_status(&self) -> Option<UnearnedRunStatus> {
+    fn unearned_status(&self) -> Option<EarnedRunStatus> {
         match self {
-            Self::UnearnedRun => Some(UnearnedRunStatus::Unearned),
-            Self::TeamUnearnedRun => Some(UnearnedRunStatus::TeamUnearned),
+            Self::UnearnedRun => Some(EarnedRunStatus::Unearned),
+            Self::TeamUnearnedRun => Some(EarnedRunStatus::TeamUnearned),
             _ => None
         }
     }
@@ -1284,8 +1286,16 @@ impl Play {
         else {Ok(full_outs)}
     }
 
-    pub fn scoring_advances(&self) -> Vec<BaseRunner> {
+    pub fn runs(&self) -> Vec<BaseRunner> {
         self.filtered_baserunners(|ra: &RunnerAdvance| ra.scored())
+    }
+
+    pub fn unearned_runs(&self) -> Vec<BaseRunner> {
+        self.filtered_baserunners(|ra: &RunnerAdvance| ra.scored() && ra.earned_run_status() == Some(EarnedRunStatus::Unearned))
+    }
+
+    pub fn team_unearned_runs(&self) -> Vec<BaseRunner> {
+        self.filtered_baserunners(|ra: &RunnerAdvance| ra.scored() && ra.earned_run_status() == Some(EarnedRunStatus::TeamUnearned))
     }
 
     fn default_rbi_status(&self) -> RbiStatus {
@@ -1306,20 +1316,11 @@ impl Play {
     pub fn rbi(&self) -> Vec<BaseRunner> {
         let default_filter = {
             |ra: &RunnerAdvance|
-                match ra.explicit_rbi_status()
-                {
-                    _ if !ra.scored() => false,
-                    Some(RbiStatus::NoRBI) => false,
-                    _ => true
-                }
+                ra.scored() && ra.explicit_rbi_status() != Some(RbiStatus::NoRBI)
         };
         let no_default_filter = {
             |ra: &RunnerAdvance|
-                match ra.explicit_rbi_status() {
-                    _ if !ra.scored() => false,
-                    Some(RbiStatus::RBI) => true,
-                    _ => false
-                }
+                ra.scored() && ra.explicit_rbi_status() == Some(RbiStatus::RBI)
         };
         match self.default_rbi_status() {
             RbiStatus::RBI => self.filtered_baserunners(default_filter),
@@ -1428,7 +1429,7 @@ pub struct PlayRecord {
 }
 
 impl FromRetrosheetRecord for PlayRecord {
-    fn new(record: &RetrosheetEventRecord) -> Result<PlayRecord> {
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<PlayRecord> {
         let record = record.deserialize::<[&str; 7]>(None)?;
         Ok(PlayRecord {
             inning: record[1].parse::<Inning>()?,

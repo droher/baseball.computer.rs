@@ -3,10 +3,11 @@ use std::str::FromStr;
 use anyhow::{Result};
 use strum_macros::EnumString;
 
-use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, LineupPosition, Player, FieldingPosition, Pitcher, Side};
+use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, LineupPosition, Player, FieldingPosition, Pitcher, Side, Batter, Fielder};
 use std::convert::TryFrom;
 use tinystr::{TinyStr16};
 use crate::util::str_to_tinystr;
+use bimap::BiMap;
 
 pub type Comment = String;
 
@@ -17,7 +18,7 @@ enum Hand {L, R, S, B}
 pub struct GameId {pub id: TinyStr16}
 impl FromRetrosheetRecord for GameId {
 
-    fn new(record: &RetrosheetEventRecord) -> Result<GameId> {
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<GameId> {
         let record = record.deserialize::<[&str; 2]>(None)?;
         Ok(GameId { id: str_to_tinystr(record[1])? })
     }
@@ -29,7 +30,7 @@ pub type BatHandAdjustment = HandAdjustment;
 pub type PitchHandAdjustment = HandAdjustment;
 
 impl FromRetrosheetRecord for HandAdjustment {
-    fn new(record: &RetrosheetEventRecord) -> Result<HandAdjustment> {
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<HandAdjustment> {
         let record = record.deserialize::<[&str; 3]>(None)?;
 
         Ok(HandAdjustment {
@@ -43,7 +44,7 @@ impl FromRetrosheetRecord for HandAdjustment {
 pub struct LineupAdjustment { side: Side, lineup_position: LineupPosition}
 
 impl FromRetrosheetRecord for LineupAdjustment {
-    fn new(record: &RetrosheetEventRecord) -> Result<LineupAdjustment> {
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<LineupAdjustment> {
         let record = record.deserialize::<[&str; 3]>(None)?;
 
         Ok(LineupAdjustment {
@@ -61,7 +62,7 @@ pub struct AppearanceRecord {
     pub fielding_position: FieldingPosition
 }
 impl FromRetrosheetRecord for AppearanceRecord {
-    fn new(record: &RetrosheetEventRecord) -> Result<AppearanceRecord> {
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<AppearanceRecord> {
         let record = record.deserialize::<[&str; 6]>(None)?;
         Ok(AppearanceRecord {
             player: str_to_tinystr(record[1])?,
@@ -82,7 +83,7 @@ pub struct EarnedRunRecord {
 }
 
 impl FromRetrosheetRecord for EarnedRunRecord {
-    fn new(record: &RetrosheetEventRecord) -> Result<EarnedRunRecord> {
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<EarnedRunRecord> {
         let arr = record.deserialize::<[&str; 4]>(None)?;
         match arr[1] {
             "er" => Ok(EarnedRunRecord {
@@ -93,3 +94,6 @@ impl FromRetrosheetRecord for EarnedRunRecord {
         }
     }
 }
+
+pub type Lineup = BiMap<LineupPosition, Batter>;
+pub type Defense = BiMap<FieldingPosition, Fielder>;

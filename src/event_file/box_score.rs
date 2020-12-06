@@ -6,9 +6,11 @@ use arrayref::array_ref;
 
 use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, Batter, LineupPosition, Inning, Fielder, FieldingPosition, Pitcher, Side};
 use crate::util::{parse_positive_int, str_to_tinystr};
+use crate::event_file::misc::{Lineup, Defense};
+use crate::event_file::play::BaserunningPlayType::Balk;
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-struct BattingLineStats {
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
+pub struct BattingLineStats {
     at_bats: u8,
     runs: u8,
     hits: u8,
@@ -59,17 +61,40 @@ impl TryFrom<&[&str; 17]> for BattingLineStats {
 }
 
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct BattingLine {
-    batter_id: Batter,
-    side: Side,
-    lineup_position: LineupPosition,
-    nth_player_at_position: u8,
-    batting_stats: BattingLineStats,
+    pub batter_id: Batter,
+    pub side: Side,
+    pub lineup_position: LineupPosition,
+    pub nth_player_at_position: u8,
+    pub batting_stats: BattingLineStats,
+}
+
+impl BattingLine {
+    pub fn from_lineup(side: Side, lineup: &Lineup) -> Vec<Self> {
+        lineup.iter()
+            .map(|(lineup_position, batter_id)|
+                Self::new(*batter_id, side, *lineup_position, 1)
+            )
+            .collect()
+    }
+
+    pub fn new(batter_id: Batter,
+               side: Side,
+               lineup_position: LineupPosition,
+               nth_player_at_position: u8) -> Self {
+        Self {
+            batter_id,
+            side,
+            lineup_position,
+            nth_player_at_position,
+            batting_stats: BattingLineStats::default()
+        }
+    }
 }
 
 impl FromRetrosheetRecord for BattingLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<BattingLine> {
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<BattingLine> {
         let arr = record.deserialize::<[&str; 23]>(None)?;
         let p = parse_positive_int::<u8>;
         Ok(BattingLine{
@@ -90,8 +115,21 @@ pub struct PinchHittingLine {
     batting_stats: Option<BattingLineStats>,
 }
 
+impl PinchHittingLine {
+    pub fn new(pinch_hitter_id: Batter,
+               inning: Option<Inning>,
+               side: Side) -> Self {
+        Self {
+            pinch_hitter_id,
+            side,
+            inning,
+            batting_stats: Some(BattingLineStats::default())
+        }
+    }
+}
+
 impl FromRetrosheetRecord for PinchHittingLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<PinchHittingLine> {
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<PinchHittingLine> {
         let arr = record.deserialize::<[&str; 22]>(None)?;
         let p = parse_positive_int::<u8>;
         Ok(PinchHittingLine{
@@ -104,7 +142,7 @@ impl FromRetrosheetRecord for PinchHittingLine {
 }
 
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct PinchRunningLine {
     pinch_runner_id: Batter,
     inning: Option<Inning>,
@@ -114,8 +152,23 @@ pub struct PinchRunningLine {
     caught_stealing: Option<u8>
 }
 
+impl PinchRunningLine {
+    pub fn new(pinch_runner_id: Batter,
+               inning: Option<Inning>,
+               side: Side) -> Self {
+        Self {
+            pinch_runner_id,
+            inning,
+            side,
+            runs: Some(0),
+            stolen_bases: Some(0),
+            caught_stealing: Some(0)
+        }
+    }
+}
+
 impl FromRetrosheetRecord for PinchRunningLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<PinchRunningLine>{
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<PinchRunningLine>{
         let arr = record.deserialize::<[&str; 8]>(None)?;
         let p = {|i: usize| arr[i].parse::<u8>().ok()};
         Ok(PinchRunningLine{
@@ -129,7 +182,7 @@ impl FromRetrosheetRecord for PinchRunningLine {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
 pub struct DefenseLineStats {
     outs_played: Option<u8>,
     putouts: Option<u8>,
@@ -159,15 +212,38 @@ impl TryFrom<&[&str; 7]> for DefenseLineStats {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct DefenseLine {
-    fielder_id: Fielder,
-    side: Side,
-    fielding_position: FieldingPosition,
-    nth_position_played_by_player: u8,
-    defensive_stats: Option<DefenseLineStats>
+    pub fielder_id: Fielder,
+    pub side: Side,
+    pub fielding_position: FieldingPosition,
+    pub nth_position_played_by_player: u8,
+    pub defensive_stats: Option<DefenseLineStats>
+}
+
+impl DefenseLine {
+    pub fn from_defense(side: Side, defense: &Defense) -> Vec<Self> {
+        defense.iter()
+            .map(|(fielding_position, fielder_id)|
+                Self::new(*fielder_id, side, *fielding_position, 1)
+            )
+            .collect()
+    }
+
+    pub fn new(fielder_id: Fielder,
+               side: Side,
+               fielding_position: FieldingPosition,
+               nth_position_played_by_player: u8) -> Self {
+        Self {
+            fielder_id,
+            side,
+            fielding_position,
+            nth_position_played_by_player,
+            defensive_stats: Some(DefenseLineStats::default())
+        }
+    }
 }
 
 impl FromRetrosheetRecord for DefenseLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<DefenseLine>{
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<DefenseLine>{
         let arr = record.deserialize::<[&str; 13]>(None)?;
         let p = parse_positive_int::<u8>;
         Ok(DefenseLine{
@@ -180,7 +256,7 @@ impl FromRetrosheetRecord for DefenseLine {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
 pub struct PitchingLineStats {
     outs_recorded: u8,
     no_out_batters: Option<u8>,
@@ -239,8 +315,27 @@ pub struct PitchingLine {
     pitching_stats: PitchingLineStats
 }
 
+impl PitchingLine {
+
+    pub fn from_defense(side: Side, defense: &Defense) -> Result<Vec<Self>> {
+        let pitcher_id = defense.get_by_left(&FieldingPosition::Pitcher).context("No pitcher in defense provided")?;
+        Ok(vec![Self::new(*pitcher_id, side, 1)])
+    }
+
+    pub fn new(pitcher_id: Pitcher,
+               side: Side,
+               nth_pitcher: u8) -> Self {
+        Self {
+            pitcher_id,
+            side,
+            nth_pitcher,
+            pitching_stats: PitchingLineStats::default()
+        }
+    }
+}
+
 impl FromRetrosheetRecord for PitchingLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<PitchingLine>{
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<PitchingLine>{
         let arr = record.deserialize::<[&str; 22]>(None)?;
         let p = parse_positive_int::<u8>;
         Ok(PitchingLine{
@@ -252,6 +347,7 @@ impl FromRetrosheetRecord for PitchingLine {
     }
 }
 
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct TeamMiscellaneousLine {
     side: Side,
@@ -261,14 +357,35 @@ pub struct TeamMiscellaneousLine {
     triple_plays_turned: u8
 }
 
+impl TeamMiscellaneousLine {
+    pub fn new(side: Side) -> Self {
+        Self {
+            side,
+            left_on_base: 0,
+            team_earned_runs: None,
+            double_plays_turned: None,
+            triple_plays_turned: 0
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct TeamBattingLine {
     side: Side,
     batting_stats: BattingLineStats
 }
 
+impl TeamBattingLine {
+    pub fn new(side: Side) -> Self {
+        Self {
+            side,
+            batting_stats: Default::default()
+        }
+    }
+}
+
 impl FromRetrosheetRecord for TeamBattingLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<TeamBattingLine> {
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<TeamBattingLine> {
         let arr = record.deserialize::<[&str; 20]>(None)?;
         Ok(TeamBattingLine {
             side: Side::from_str(arr[2])?,
@@ -283,8 +400,17 @@ pub struct TeamDefenseLine {
     defensive_stats: DefenseLineStats
 }
 
+impl TeamDefenseLine {
+    pub fn new(side: Side) -> Self {
+        Self {
+            side,
+            defensive_stats: Default::default()
+        }
+    }
+}
+
 impl FromRetrosheetRecord for TeamDefenseLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<TeamDefenseLine> {
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<TeamDefenseLine> {
         let arr = record.deserialize::<[&str; 10]>(None)?;
         Ok(TeamDefenseLine {
             side: Side::from_str(arr[2])?,
@@ -295,7 +421,7 @@ impl FromRetrosheetRecord for TeamDefenseLine {
 
 
 impl FromRetrosheetRecord for TeamMiscellaneousLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<TeamMiscellaneousLine>{
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<TeamMiscellaneousLine>{
         let arr = record.deserialize::<[&str; 7]>(None)?;
         let o = {|i: usize| arr[i].parse::<u8>().ok()};
         let u = {|i: usize|
@@ -325,17 +451,17 @@ pub enum BoxScoreLine {
 }
 
 impl FromRetrosheetRecord for BoxScoreLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<BoxScoreLine>{
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<BoxScoreLine>{
         let stat_line_type = record.get(1).context("No stat line type")?;
         let mapped= match stat_line_type {
-            "bline" => BoxScoreLine::BattingLine(BattingLine::new(&record)?),
-            "phline" => BoxScoreLine::PinchHittingLine(PinchHittingLine::new(&record)?),
-            "prline" => BoxScoreLine::PinchRunningLine(PinchRunningLine::new(&record)?),
-            "pline" => BoxScoreLine::PitchingLine(PitchingLine::new(&record)?),
-            "dline" => BoxScoreLine::DefenseLine(DefenseLine::new(&record)?),
-            "tline" => BoxScoreLine::TeamMiscellaneousLine(TeamMiscellaneousLine::new(&record).ok()),
-            "btline" => BoxScoreLine::TeamBattingLine(TeamBattingLine::new(&record)?),
-            "dtline" => BoxScoreLine::TeamDefenseLine(TeamDefenseLine::new(&record)?),
+            "bline" => BoxScoreLine::BattingLine(BattingLine::from_retrosheet_record(&record)?),
+            "phline" => BoxScoreLine::PinchHittingLine(PinchHittingLine::from_retrosheet_record(&record)?),
+            "prline" => BoxScoreLine::PinchRunningLine(PinchRunningLine::from_retrosheet_record(&record)?),
+            "pline" => BoxScoreLine::PitchingLine(PitchingLine::from_retrosheet_record(&record)?),
+            "dline" => BoxScoreLine::DefenseLine(DefenseLine::from_retrosheet_record(&record)?),
+            "tline" => BoxScoreLine::TeamMiscellaneousLine(TeamMiscellaneousLine::from_retrosheet_record(&record).ok()),
+            "btline" => BoxScoreLine::TeamBattingLine(TeamBattingLine::from_retrosheet_record(&record)?),
+            "dtline" => BoxScoreLine::TeamDefenseLine(TeamDefenseLine::from_retrosheet_record(&record)?),
             _ => BoxScoreLine::Unrecognized
         };
         match mapped {
@@ -351,8 +477,17 @@ pub struct LineScore {
     line_score: Vec<u8>
 }
 
+impl LineScore {
+    pub fn new(side: Side) -> Self {
+        Self {
+            side,
+            line_score: Default::default()
+        }
+    }
+}
+
 impl FromRetrosheetRecord for LineScore {
-    fn new(record: &RetrosheetEventRecord) -> Result<LineScore>{
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<LineScore>{
         let mut iter = record.iter();
         Ok(LineScore{
             side: Side::from_str(iter.nth(1).context("Missing team side")?)?,
@@ -371,11 +506,20 @@ pub struct FieldingPlayLine {
     fielders: Vec<Fielder>
 }
 
+impl FieldingPlayLine {
+    pub fn new(defense_side: Side) -> Self {
+        Self {
+            defense_side,
+            fielders: Default::default()
+        }
+    }
+}
+
 pub type DoublePlayLine = FieldingPlayLine;
 pub type TriplePlayLine = FieldingPlayLine;
 
 impl FromRetrosheetRecord for FieldingPlayLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<FieldingPlayLine>{
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<FieldingPlayLine>{
         let mut iter = record.iter();
         Ok(FieldingPlayLine{
             defense_side: Side::from_str(iter.nth(2).context("Missing team side")?)?,
@@ -392,8 +536,20 @@ pub struct HitByPitchLine {
     batter_id: Batter
 }
 
+impl HitByPitchLine {
+    pub fn new(pitching_side: Side,
+               pitcher_id: Option<Pitcher>,
+               batter_id: Batter) -> Self {
+        Self {
+            pitching_side,
+            pitcher_id,
+            batter_id
+        }
+    }
+}
+
 impl FromRetrosheetRecord for HitByPitchLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<HitByPitchLine>{
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<HitByPitchLine>{
         let arr = record.deserialize::<[&str; 5]>(None)?;
         Ok(HitByPitchLine{
             pitching_side: Side::from_str(arr[2])?,
@@ -414,8 +570,26 @@ pub struct HomeRunLine {
     outs: Option<u8>
 }
 
+impl HomeRunLine {
+    pub fn new(batting_side: Side,
+               batter_id: Batter,
+               pitcher_id: Pitcher,
+               inning: Option<Inning>,
+               runners_on: Option<u8>,
+               outs: Option<u8>) -> Self {
+        Self {
+            batting_side,
+            batter_id,
+            pitcher_id,
+            inning,
+            runners_on,
+            outs
+        }
+    }
+}
+
 impl FromRetrosheetRecord for HomeRunLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<HomeRunLine>{
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<HomeRunLine>{
         let arr = record.deserialize::<[&str; 8]>(None)?;
         let p = {|i: usize| arr[i].parse::<u8>().ok()};
         Ok(HomeRunLine{
@@ -438,11 +612,28 @@ pub struct StolenBaseAttemptLine {
     inning: Option<Inning>
 }
 
+impl StolenBaseAttemptLine {
+    pub fn new(running_side: Side,
+               runner_id: Batter,
+               pitcher_id: Option<Pitcher>,
+               catcher_id: Option<Fielder>,
+               inning: Option<Inning>) -> Self {
+        Self {
+            running_side,
+            runner_id,
+            pitcher_id,
+            catcher_id,
+            inning
+        }
+    }
+}
+
+
 pub type StolenBaseLine = StolenBaseAttemptLine;
 pub type CaughtStealingLine = StolenBaseAttemptLine;
 
 impl FromRetrosheetRecord for StolenBaseAttemptLine {
-    fn new(record: &RetrosheetEventRecord) -> Result<StolenBaseAttemptLine>{
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<StolenBaseAttemptLine>{
         let arr = record.deserialize::<[&str; 7]>(None)?;
         Ok(StolenBaseAttemptLine{
             running_side: Side::from_str(arr[2])?,
@@ -467,15 +658,15 @@ pub enum BoxScoreEvent {
 }
 
 impl FromRetrosheetRecord for BoxScoreEvent {
-    fn new(record: &RetrosheetEventRecord) -> Result<BoxScoreEvent>{
+    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<BoxScoreEvent>{
         let event_line_type = record.get(1).context("No event type")?;
         let mapped = match event_line_type {
-            "dpline" => BoxScoreEvent::DoublePlay(DoublePlayLine::new(&record)?),
-            "tpline" => BoxScoreEvent::TriplePlay(TriplePlayLine::new(&record)?),
-            "hpline" => BoxScoreEvent::HitByPitch(HitByPitchLine::new(&record)?),
-            "hrline" => BoxScoreEvent::HomeRun(HomeRunLine::new(&record)?),
-            "sbline" => BoxScoreEvent::StolenBase(StolenBaseLine::new(&record)?),
-            "csline" => BoxScoreEvent::CaughtStealing(CaughtStealingLine::new(&record)?),
+            "dpline" => BoxScoreEvent::DoublePlay(DoublePlayLine::from_retrosheet_record(&record)?),
+            "tpline" => BoxScoreEvent::TriplePlay(TriplePlayLine::from_retrosheet_record(&record)?),
+            "hpline" => BoxScoreEvent::HitByPitch(HitByPitchLine::from_retrosheet_record(&record)?),
+            "hrline" => BoxScoreEvent::HomeRun(HomeRunLine::from_retrosheet_record(&record)?),
+            "sbline" => BoxScoreEvent::StolenBase(StolenBaseLine::from_retrosheet_record(&record)?),
+            "csline" => BoxScoreEvent::CaughtStealing(CaughtStealingLine::from_retrosheet_record(&record)?),
             _ => BoxScoreEvent::Unrecognized,
 
         };
