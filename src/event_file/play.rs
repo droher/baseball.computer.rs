@@ -187,8 +187,7 @@ impl ImplicitPlayResults for HitType {
     fn implicit_advance(&self) -> Option<RunnerAdvance> {
         let base = match self {
             Self::Single => Base::First,
-            Self::Double => Base::Second,
-            Self::GroundRuleDouble => Base::Second,
+            Self::Double | Self::GroundRuleDouble => Base::Second,
             Self::Triple => Base::Third,
             Self::HomeRun => Base::Home
         };
@@ -198,7 +197,7 @@ impl ImplicitPlayResults for HitType {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Hit {
-    hit_type: HitType,
+    pub hit_type: HitType,
     positions_hit_to: PositionVec
 }
 
@@ -321,19 +320,25 @@ impl TryFrom<&str> for FieldingPlay {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct BattingOut {
     out_type: OutAtBatType,
-    fielding_play: FieldingPlay
+    fielding_play: Option<FieldingPlay>
 
 }
 
 impl ImplicitPlayResults for BattingOut {
     fn implicit_advance(&self) -> Option<RunnerAdvance> {
-        if self.fielding_play.error.is_some() {
-            Some(RunnerAdvance::batter_advance(Base::First))
-        } else {None}
+        match &self.fielding_play {
+            // Fielder's choice
+            None => Some(RunnerAdvance::batter_advance(Base::First)),
+            Some(fp) if fp.error.is_some() => Some(RunnerAdvance::batter_advance(Base::First)),
+            _ => None
+        }
     }
 
     fn implicit_out(&self) -> Vec<BaseRunner> {
-        let runners_out = &self.fielding_play.runners_out;
+        let runners_out = &self.fielding_play
+            .as_ref()
+            .map(|fp| fp.runners_out.clone())
+            .unwrap_or_default();
         let mut batter_out = if self.implicit_advance().is_none() && runners_out.is_empty() {
             vec![BaseRunner::Batter]} else {vec![]};
         batter_out.extend_from_slice(runners_out);
@@ -351,10 +356,12 @@ impl TryFrom<(&str, &str)> for BattingOut {
         let out_type = OutAtBatType::from_str(first)?;
         let fielding_play = match out_type {
             // Put the whole string in when reaching on error
-            OutAtBatType::ReachedOnError => FieldingPlay::try_from(rejoined.as_str())?,
-            OutAtBatType::StrikeOut if last.is_empty() => FieldingPlay::conventional_strikeout(),
-            OutAtBatType::FieldersChoice if last.is_empty() => FieldingPlay::default(),
-            _ => FieldingPlay::try_from(last)?
+            OutAtBatType::ReachedOnError => Some(FieldingPlay::try_from(rejoined.as_str())?),
+            OutAtBatType::StrikeOut if last.is_empty() => Some(FieldingPlay::conventional_strikeout()),
+            // The fielder specified after a fielder's choice refers to the fielder making
+            // the choice, not necessarily any assist/putout
+            OutAtBatType::FieldersChoice => None,
+            _ => Some(FieldingPlay::try_from(last)?)
         };
         Ok(Self {
             out_type,
@@ -391,37 +398,43 @@ pub enum PlateAppearanceType {
 impl FieldingData for PlateAppearanceType {
     fn putouts(&self) -> PositionVec {
         match self {
-            Self::BattingOut(p) => p.fielding_play.putouts.clone(),
+            Self::BattingOut(p) => {
+                p.fielding_play
+                    .as_ref()
+                    .map(|fp| fp.putouts.clone())
+                    .unwrap_or_default()
+            },
             _ => vec![]
         }
     }
 
     fn assists(&self) -> PositionVec {
         match self {
-            Self::BattingOut(p) => p.fielding_play.assists.clone(),
+            Self::BattingOut(p) => {
+                p.fielding_play
+                    .as_ref()
+                    .map(|fp| fp.assists.clone())
+                    .unwrap_or_default()
+            },
             _ => vec![]
         }    }
 
     fn errors(&self) -> PositionVec {
-        match self {
-            Self::BattingOut(p) => {
-                if let Some(position) = p.fielding_play.error {vec![position]} else {vec![]}
-            },
-            _ => vec![]
-        }
+        if let Self::BattingOut(bo) = self {
+            if let Some(Some(fp)) = bo.fielding_play.as_ref().map(|play| play.error) {
+                vec![fp]
+            } else { vec![] }
+        } else { vec![] }
     }
 }
 
 impl PlateAppearanceType {
-    fn is_strikeout(&self) -> bool {
+    pub fn is_strikeout(&self) -> bool {
         if let Self::BattingOut(b) = self {b.out_type == OutAtBatType::StrikeOut} else {false}
     }
 
-    fn is_at_bat(&self) -> bool {
-        match self {
-            Self::Hit(_) | Self::BattingOut(_) => true,
-            _ => false
-        }
+    pub fn is_at_bat(&self) -> bool {
+        matches!(self, Self::Hit(_) | Self::BattingOut(_))
     }
 }
 
@@ -531,8 +544,8 @@ pub enum BaserunningPlayType {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct BaserunningPlay {
-    baserunning_play_type: BaserunningPlayType,
-    at_base: Option<Base>,
+    pub baserunning_play_type: BaserunningPlayType,
+    pub at_base: Option<Base>,
     baserunning_fielding_info: Option<BaserunningFieldingInfo>
 }
 
@@ -557,6 +570,11 @@ impl FieldingData for BaserunningPlay {
 impl BaserunningPlay {
     fn error_on_play(&self) -> bool {
         self.baserunning_fielding_info.as_ref().map(|i| i.error.is_some()).unwrap_or_default()
+    }
+
+    fn attempted_stolen_base(&self) -> bool {
+        [BaserunningPlayType::StolenBase, BaserunningPlayType::CaughtStealing,
+        BaserunningPlayType::PickedOffCaughtStealing].contains(&self.baserunning_play_type)
     }
 }
 
@@ -637,12 +655,41 @@ pub enum PlayType {
     NoPlay(NoPlay)
 }
 
+impl PlayType {
+
+    pub fn passed_ball(&self) -> bool {
+        match self {
+            Self::BaserunningPlay(bp) => {
+                bp.baserunning_play_type == BaserunningPlayType::PassedBall
+            },
+            _ => false
+        }
+    }
+    pub fn wild_pitch(&self) -> bool {
+        match self {
+            Self::BaserunningPlay(bp) => {
+                bp.baserunning_play_type == BaserunningPlayType::WildPitch
+            },
+            _ => false
+        }
+    }
+
+    pub fn balk(&self) -> bool {
+        match self {
+            Self::BaserunningPlay(bp) => {
+                bp.baserunning_play_type == BaserunningPlayType::Balk
+            },
+            _ => false
+        }
+    }
+}
+
 impl FieldingData for PlayType {
     fn putouts(&self) -> PositionVec {
         match self {
             Self::PlateAppearance(p) => p.putouts(),
             Self::BaserunningPlay(p) => p.putouts(),
-            Self::NoPlay(p) => vec![],
+            Self::NoPlay(_p) => vec![],
         }
     }
 
@@ -650,14 +697,14 @@ impl FieldingData for PlayType {
         match self {
             Self::PlateAppearance(p) => p.assists(),
             Self::BaserunningPlay(p) => p.assists(),
-            Self::NoPlay(p) => vec![],
+            Self::NoPlay(_p) => vec![],
         }
     }
     fn errors(&self) -> PositionVec {
         match self {
             Self::PlateAppearance(p) => p.errors(),
             Self::BaserunningPlay(p) => p.errors(),
-            Self::NoPlay(p) => vec![],
+            Self::NoPlay(_p) => vec![],
         }
     }
 }
@@ -739,9 +786,6 @@ impl FieldingData for RunnerAdvance {
 
 impl RunnerAdvance {
     pub fn batter_advance(to: Base) -> Self {
-        if to == Base::Home {
-
-        }
         Self {
             baserunner: BaseRunner::Batter,
             to,
@@ -1229,6 +1273,8 @@ impl PlayModifier {
     }
 }
 
+// TODO: Some QA here would be nice:
+//  -- Assert no more than one PlateAppearance in the main plays
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct Play {
     pub main_plays: Vec<PlayType>,
@@ -1241,6 +1287,16 @@ pub struct Play {
 impl Play {
     fn explicit_baserunners(&self) -> Vec<BaseRunner> {
         self.explicit_advances.iter().map(|ra| ra.baserunner).collect()
+    }
+
+    pub fn stolen_base_plays(&self) -> Vec<&BaserunningPlay> {
+        self.main_plays
+            .iter()
+            .filter_map(|pt| {
+                if let PlayType::BaserunningPlay(br) = pt {Some(br)} else {None}
+            })
+            .filter(|br| br.attempted_stolen_base())
+            .collect()
     }
 
     pub fn advances(&self) -> Vec<RunnerAdvance> {
@@ -1298,16 +1354,19 @@ impl Play {
         self.filtered_baserunners(|ra: &RunnerAdvance| ra.scored() && ra.earned_run_status() == Some(EarnedRunStatus::TeamUnearned))
     }
 
-    fn default_rbi_status(&self) -> RbiStatus {
-        let is_gdp = self.modifiers
+    pub fn is_gidp(&self) -> bool {
+        self.modifiers
             .iter()
-            .find(|m| m == &&PlayModifier::GroundBallDoublePlay)
-            .is_some();
+            .any(|m| {
+                [PlayModifier::GroundBallDoublePlay, PlayModifier::BuntGroundIntoDoublePlay].contains(m)
+            })
+    }
+
+    fn default_rbi_status(&self) -> RbiStatus {
         let has_rbi_eligible_play = self.main_plays
             .iter()
-            .find(|pt| pt.is_rbi_eligible())
-            .is_some();
-        match has_rbi_eligible_play && !is_gdp {
+            .any(|pt| pt.is_rbi_eligible());
+        match has_rbi_eligible_play && !self.is_gidp() {
             true => RbiStatus::RBI,
             false => RbiStatus::NoRBI
         }
@@ -1328,6 +1387,43 @@ impl Play {
         }
     }
 
+    pub fn passed_ball(&self) -> bool {
+        self.main_plays
+            .iter()
+            .any(|pt| pt.passed_ball())
+    }
+
+    pub fn wild_pitch(&self) -> bool {
+        self.main_plays
+            .iter()
+            .any(|pt| pt.wild_pitch())
+    }
+
+    pub fn balk(&self) -> bool {
+        self.main_plays
+            .iter()
+            .any(|pt| pt.balk())
+    }
+
+    pub fn sacrifice_hit(&self) -> bool {
+        self.modifiers
+            .iter()
+            .any(|pm| pm == &PlayModifier::SacrificeHit)
+    }
+
+    pub fn sacrifice_fly(&self) -> bool {
+        self.modifiers
+            .iter()
+            .any(|pm| pm == &PlayModifier::SacrificeFly)
+    }
+
+    pub fn plate_appearance(&self) -> Option<&PlateAppearanceType> {
+        self.main_plays
+            .iter()
+            .find_map(|pt| {
+                if let PlayType::PlateAppearance(pa) = pt { Some(pa) } else { None }
+            })
+    }
 }
 
 
@@ -1335,39 +1431,39 @@ impl FieldingData for Play {
     fn putouts(&self) -> PositionVec {
         self.main_plays
             .iter()
-            .flat_map(|pt| pt.putouts().clone())
+            .flat_map(|pt| pt.putouts())
             .chain(self.modifiers
                 .iter()
-                .flat_map(|pm| pm.putouts().clone()))
+                .flat_map(|pm| pm.putouts()))
             .chain(self.explicit_advances
                        .iter()
-                       .flat_map(|a| a.putouts().clone())
+                       .flat_map(|a| a.putouts())
             ).collect()
     }
 
     fn assists(&self) -> PositionVec {
         self.main_plays
             .iter()
-            .flat_map(|pt| pt.assists().clone())
+            .flat_map(|pt| pt.assists())
             .chain(self.modifiers
                 .iter()
-                .flat_map(|pm| pm.assists().clone()))
+                .flat_map(|pm| pm.assists()))
             .chain(self.explicit_advances
                 .iter()
-                .flat_map(|a| a.assists().clone())
+                .flat_map(|a| a.assists())
             ).collect()
     }
 
     fn errors(&self) -> PositionVec {
         self.main_plays
             .iter()
-            .flat_map(|pt| pt.errors().clone())
+            .flat_map(|pt| pt.errors())
             .chain(self.modifiers
                 .iter()
-                .flat_map(|pm| pm.errors().clone()))
+                .flat_map(|pm| pm.errors()))
             .chain(self.explicit_advances
                 .iter()
-                .flat_map(|a| a.errors().clone())
+                .flat_map(|a| a.errors())
             ).collect()
     }
 }

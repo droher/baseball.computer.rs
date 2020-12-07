@@ -4,5 +4,5 @@ pub mod play;
 mod traits;
 mod box_score;
 pub mod info;
-mod pbp;
+pub mod pbp;
 mod pitch_sequence;

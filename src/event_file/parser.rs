@@ -21,20 +21,6 @@ use either::{Either, Left, Right};
 pub struct Matchup<T> {away: T, home: T}
 
 impl<T: Clone> Matchup<T> {
-    pub fn get(&self, side: &Side) -> &T {
-        match side {
-            Side::Away => &self.away,
-            Side::Home => &self.home
-        }
-    }
-
-    pub fn get_move(self, side: &Side) -> T {
-        match side {
-            Side::Away => self.away,
-            Side::Home => self.home
-        }
-    }
-
     pub fn cloned_update(&self, side: &Side, new_val: T) -> Self {
         match side {
             Side::Away => Self {away: new_val, home: self.home.clone()},
@@ -47,6 +33,29 @@ impl<T> Matchup<T> {
     pub fn new(away: T, home: T) -> Self {
         Self {away, home}
     }
+
+    pub fn in_place_update(&mut self, side: &Side, new_val: T) -> () {
+        match side {
+            Side::Away => self.away = new_val,
+            Side::Home => self.home = new_val
+        }
+    }
+
+    pub fn get(&self, side: &Side) -> &T {
+        match side {
+            Side::Away => &self.away,
+            Side::Home => &self.home
+        }
+    }
+
+    pub fn get_mut(&mut self, side: &Side) -> &mut T {
+        match side {
+            Side::Away => &mut self.away,
+            Side::Home => &mut self.home
+        }
+    }
+
+
 }
 
 impl<T: Default> Default for Matchup<T> {
@@ -100,7 +109,7 @@ impl TryFrom<&RecordVec> for Game {
         let events = record_vec.iter()
             .filter_map(|m| match m {
                 MappedRecord::Play(pr) => Some(Left(pr.clone())),
-                MappedRecord::Substitution(sr) => Some(Right(sr.clone())),
+                MappedRecord::Substitution(sr) => Some(Right(*sr)),
                 _ => None
             })
             .collect();
@@ -115,6 +124,11 @@ impl TryFrom<&RecordVec> for Game {
 }
 
 impl Game {
+
+    pub fn bat_first_side(&self) -> Side {
+        self.info.setting.bat_first_side
+    }
+
     fn assemble_lineups_and_defense(start_records: Vec<StartRecord>) -> (Matchup<Lineup>, Matchup<Defense>)  {
         // TODO: DRY
         let (mut away_lineup, mut home_lineup) = (Lineup::with_capacity(10), Lineup::with_capacity(10));
@@ -175,7 +189,7 @@ pub struct GameSetting {
     start_time: Option<NaiveTime>,
     time_of_day: DayNight,
     use_dh: bool,
-    home_team_bats_first: bool,
+    bat_first_side: Side,
     sky: Sky,
     temp: Option<u8>,
     field_condition: FieldCondition,
@@ -192,7 +206,7 @@ impl Default for GameSetting {
             start_time: None,
             time_of_day: Default::default(),
             use_dh: false,
-            home_team_bats_first: false,
+            bat_first_side: Side::Away,
             sky: Default::default(),
             temp: None,
             field_condition: Default::default(),
@@ -215,7 +229,9 @@ impl TryFrom<&Vec<InfoRecord>> for GameSetting {
                 InfoRecord::StartTime(x) => {setting.start_time = *x},
                 InfoRecord::DayNight(x) => {setting.time_of_day = *x},
                 InfoRecord::UseDH(x) => {setting.use_dh = *x},
-                InfoRecord::HomeTeamBatsFirst(x) => {setting.home_team_bats_first = *x},
+                InfoRecord::HomeTeamBatsFirst(x) => {
+                    setting.bat_first_side = if *x {Side::Home} else {Side::Away}
+                },
                 InfoRecord::Sky(x) => {setting.sky = *x},
                 InfoRecord::Temp(x) => {setting.temp = *x},
                 InfoRecord::FieldCondition(x) => {setting.field_condition = *x}

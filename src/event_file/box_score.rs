@@ -4,30 +4,29 @@ use std::str::FromStr;
 use anyhow::{anyhow, Context, Error, Result};
 use arrayref::array_ref;
 
-use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, Batter, LineupPosition, Inning, Fielder, FieldingPosition, Pitcher, Side};
+use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, Batter, LineupPosition, Inning, Fielder, FieldingPosition, Pitcher, Side, Player};
 use crate::util::{parse_positive_int, str_to_tinystr};
 use crate::event_file::misc::{Lineup, Defense};
-use crate::event_file::play::BaserunningPlayType::Balk;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
 pub struct BattingLineStats {
-    at_bats: u8,
-    runs: u8,
-    hits: u8,
-    doubles: Option<u8>,
-    triples: Option<u8>,
-    home_runs: Option<u8>,
-    rbi: Option<u8>,
-    sacrifice_hits: Option<u8>,
-    sacrifice_flies: Option<u8>,
-    hit_by_pitch: Option<u8>,
-    walks: Option<u8>,
-    intentional_walks: Option<u8>,
-    strikeouts: Option<u8>,
-    stolen_bases: Option<u8>,
-    caught_stealing: Option<u8>,
-    grounded_into_double_plays: Option<u8>,
-    reached_on_interference: Option<u8>
+    pub at_bats: u8,
+    pub runs: u8,
+    pub hits: u8,
+    pub doubles: Option<u8>,
+    pub triples: Option<u8>,
+    pub home_runs: Option<u8>,
+    pub rbi: Option<u8>,
+    pub sacrifice_hits: Option<u8>,
+    pub sacrifice_flies: Option<u8>,
+    pub hit_by_pitch: Option<u8>,
+    pub walks: Option<u8>,
+    pub intentional_walks: Option<u8>,
+    pub strikeouts: Option<u8>,
+    pub stolen_bases: Option<u8>,
+    pub caught_stealing: Option<u8>,
+    pub grounded_into_double_plays: Option<u8>,
+    pub reached_on_interference: Option<u8>
 }
 
 impl TryFrom<&[&str; 17]> for BattingLineStats {
@@ -184,13 +183,13 @@ impl FromRetrosheetRecord for PinchRunningLine {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
 pub struct DefenseLineStats {
-    outs_played: Option<u8>,
-    putouts: Option<u8>,
-    assists: Option<u8>,
-    errors: Option<u8>,
-    double_plays: Option<u8>,
-    triple_plays: Option<u8>,
-    passed_balls: Option<u8>
+    pub outs_played: Option<u8>,
+    pub putouts: Option<u8>,
+    pub assists: Option<u8>,
+    pub errors: Option<u8>,
+    pub double_plays: Option<u8>,
+    pub triple_plays: Option<u8>,
+    pub passed_balls: Option<u8>
 }
 
 impl TryFrom<&[&str; 7]> for DefenseLineStats {
@@ -258,23 +257,23 @@ impl FromRetrosheetRecord for DefenseLine {
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
 pub struct PitchingLineStats {
-    outs_recorded: u8,
-    no_out_batters: Option<u8>,
-    batters_faced: Option<u8>,
-    hits: u8,
-    doubles: Option<u8>,
-    triples: Option<u8>,
-    home_runs: Option<u8>,
-    runs: u8,
-    earned_runs: Option<u8>,
-    walks: Option<u8>,
-    intentional_walks: Option<u8>,
-    strikeouts: Option<u8>,
-    hit_batsmen: Option<u8>,
-    wild_pitches: Option<u8>,
-    balks: Option<u8>,
-    sacrifice_hits: Option<u8>,
-    sacrifice_files: Option<u8>
+    pub outs_recorded: u8,
+    pub no_out_batters: Option<u8>,
+    pub batters_faced: Option<u8>,
+    pub hits: u8,
+    pub doubles: Option<u8>,
+    pub triples: Option<u8>,
+    pub home_runs: Option<u8>,
+    pub runs: u8,
+    pub earned_runs: Option<u8>,
+    pub walks: Option<u8>,
+    pub intentional_walks: Option<u8>,
+    pub strikeouts: Option<u8>,
+    pub hit_batsmen: Option<u8>,
+    pub wild_pitches: Option<u8>,
+    pub balks: Option<u8>,
+    pub sacrifice_hits: Option<u8>,
+    pub sacrifice_flies: Option<u8>
 }
 
 impl TryFrom<&[&str; 17]> for PitchingLineStats {
@@ -302,17 +301,17 @@ impl TryFrom<&[&str; 17]> for PitchingLineStats {
             wild_pitches: o(13),
             balks: o(14),
             sacrifice_hits: o(15),
-            sacrifice_files: o(16)
+            sacrifice_flies: o(16)
         })
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct PitchingLine {
-    pitcher_id: Pitcher,
+    pub pitcher_id: Pitcher,
     side: Side,
     nth_pitcher: u8,
-    pitching_stats: PitchingLineStats
+    pub pitching_stats: PitchingLineStats
 }
 
 impl PitchingLine {
@@ -350,11 +349,11 @@ impl FromRetrosheetRecord for PitchingLine {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct TeamMiscellaneousLine {
-    side: Side,
-    left_on_base: u8,
-    team_earned_runs: Option<u8>,
-    double_plays_turned: Option<u8>,
-    triple_plays_turned: u8
+    pub side: Side,
+    pub left_on_base: u8,
+    pub team_earned_runs: Option<u8>,
+    pub double_plays_turned: Option<u8>,
+    pub triple_plays_turned: u8
 }
 
 impl TeamMiscellaneousLine {
@@ -396,8 +395,8 @@ impl FromRetrosheetRecord for TeamBattingLine {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct TeamDefenseLine {
-    side: Side,
-    defensive_stats: DefenseLineStats
+    pub side: Side,
+    pub defensive_stats: DefenseLineStats
 }
 
 impl TeamDefenseLine {
@@ -473,8 +472,8 @@ impl FromRetrosheetRecord for BoxScoreLine {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct LineScore {
-    side: Side,
-    line_score: Vec<u8>
+    pub side: Side,
+    pub line_score: Vec<u8>
 }
 
 impl LineScore {

@@ -129,3 +129,12 @@ pub enum Side {
     #[strum(serialize = "1")]
     Home
 }
+
+impl Side {
+    pub fn flip(&self) -> Self {
+        match self {
+            Self::Away => Self::Home,
+            Self::Home => Self::Away
+        }
+    }
+}

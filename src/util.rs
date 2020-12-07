@@ -44,3 +44,15 @@ pub(crate) fn to_str_vec(match_vec: Vec<Option<Match>>) -> Vec<&str> {
         .filter_map(|o| o.map(|m| m.as_str()))
         .collect()
 }
+
+#[inline]
+pub(crate) fn count_occurrences<T: Eq>(match_vec: Vec<T>, object: &T) -> u8 {
+    match_vec.into_iter()
+        .filter(|t| t == object)
+        .count() as u8
+}
+
+#[inline]
+pub(crate) fn opt_add(mut o: Option<u8>, add: u8) -> () {
+    o = Some(o.unwrap_or_default() + add)
+}
