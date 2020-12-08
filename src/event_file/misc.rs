@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
-use anyhow::{Result};
+use anyhow::{Result, Error, anyhow};
 use strum_macros::EnumString;
 
-use crate::event_file::traits::{FromRetrosheetRecord, RetrosheetEventRecord, LineupPosition, Player, FieldingPosition, Pitcher, Side, Batter, Fielder};
+use crate::event_file::traits::{RetrosheetEventRecord, LineupPosition, Player, FieldingPosition, Pitcher, Side, Batter, Fielder};
 use std::convert::TryFrom;
 use tinystr::{TinyStr16};
 use crate::util::str_to_tinystr;
@@ -16,9 +16,11 @@ enum Hand {L, R, S, B}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct GameId {pub id: TinyStr16}
-impl FromRetrosheetRecord for GameId {
+impl TryFrom<&RetrosheetEventRecord>for GameId {
+    type Error = Error;
 
-    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<GameId> {
+
+    fn try_from(record: &RetrosheetEventRecord) -> Result<GameId> {
         let record = record.deserialize::<[&str; 2]>(None)?;
         Ok(GameId { id: str_to_tinystr(record[1])? })
     }
@@ -29,8 +31,10 @@ pub struct HandAdjustment {player_id: Player, hand: Hand}
 pub type BatHandAdjustment = HandAdjustment;
 pub type PitchHandAdjustment = HandAdjustment;
 
-impl FromRetrosheetRecord for HandAdjustment {
-    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<HandAdjustment> {
+impl TryFrom<&RetrosheetEventRecord>for HandAdjustment {
+    type Error = Error;
+
+    fn try_from(record: &RetrosheetEventRecord) -> Result<HandAdjustment> {
         let record = record.deserialize::<[&str; 3]>(None)?;
 
         Ok(HandAdjustment {
@@ -43,8 +47,10 @@ impl FromRetrosheetRecord for HandAdjustment {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct LineupAdjustment { side: Side, lineup_position: LineupPosition}
 
-impl FromRetrosheetRecord for LineupAdjustment {
-    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<LineupAdjustment> {
+impl TryFrom<&RetrosheetEventRecord>for LineupAdjustment {
+    type Error = Error;
+
+    fn try_from(record: &RetrosheetEventRecord) -> Result<LineupAdjustment> {
         let record = record.deserialize::<[&str; 3]>(None)?;
 
         Ok(LineupAdjustment {
@@ -54,18 +60,22 @@ impl FromRetrosheetRecord for LineupAdjustment {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AppearanceRecord {
     pub player: Player,
+    pub player_name: String,
     pub side: Side,
     pub lineup_position: LineupPosition,
     pub fielding_position: FieldingPosition
 }
-impl FromRetrosheetRecord for AppearanceRecord {
-    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<AppearanceRecord> {
+impl TryFrom<&RetrosheetEventRecord>for AppearanceRecord {
+    type Error = Error;
+
+    fn try_from(record: &RetrosheetEventRecord) -> Result<AppearanceRecord> {
         let record = record.deserialize::<[&str; 6]>(None)?;
         Ok(AppearanceRecord {
             player: str_to_tinystr(record[1])?,
+            player_name: record[2].to_string(),
             side: Side::from_str(record[3])?,
             lineup_position: LineupPosition::try_from(record[4])?,
             fielding_position:  FieldingPosition::try_from(record[5].trim_end())?
@@ -78,19 +88,21 @@ pub type SubstitutionRecord = AppearanceRecord;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct EarnedRunRecord {
-    pitcher_id: Pitcher,
-    earned_runs: u8
+    pub pitcher_id: Pitcher,
+    pub earned_runs: u8
 }
 
-impl FromRetrosheetRecord for EarnedRunRecord {
-    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<EarnedRunRecord> {
+impl TryFrom<&RetrosheetEventRecord>for EarnedRunRecord {
+    type Error = Error;
+
+    fn try_from(record: &RetrosheetEventRecord) -> Result<EarnedRunRecord> {
         let arr = record.deserialize::<[&str; 4]>(None)?;
         match arr[1] {
             "er" => Ok(EarnedRunRecord {
                 pitcher_id: str_to_tinystr(arr[2])?,
                 earned_runs: arr[3].trim_end().parse::<u8>()?
             }),
-            _ => Err(Self::error("Unexpected `data` type value", record))
+            _ => Err(anyhow!("Unexpected `data` type value {:?}", record))
         }
     }
 }

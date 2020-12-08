@@ -6,16 +6,13 @@ use anyhow::{anyhow, Context, Error, Result};
 use const_format::{concatcp, formatcp};
 use num_enum::{TryFromPrimitive, IntoPrimitive};
 use lazy_static::lazy_static;
-use regex::{Captures, Match, Regex, Replacer};
+use regex::{Captures, Regex};
 use strum::ParseError;
 use strum_macros::{EnumDiscriminants, EnumString};
 
 use crate::util::{str_to_tinystr, regex_split, to_str_vec, pop_with_vec};
-use crate::event_file::traits::{Inning, Side, Batter, FromRetrosheetRecord, RetrosheetEventRecord, FieldingPosition};
+use crate::event_file::traits::{Inning, Side, Batter, RetrosheetEventRecord, FieldingPosition};
 use std::convert::TryFrom;
-use crate::event_file::pbp::BaseState;
-use either::Either;
-use crate::event_file::misc::EarnedRunRecord;
 use crate::event_file::pitch_sequence::PitchSequence;
 
 const NAMING_PREFIX: &str = r"(?P<";
@@ -326,10 +323,13 @@ pub struct BattingOut {
 
 impl ImplicitPlayResults for BattingOut {
     fn implicit_advance(&self) -> Option<RunnerAdvance> {
+        let batter_advance = Some(RunnerAdvance::batter_advance(Base::First));
         match &self.fielding_play {
             // Fielder's choice
-            None => Some(RunnerAdvance::batter_advance(Base::First)),
-            Some(fp) if fp.error.is_some() => Some(RunnerAdvance::batter_advance(Base::First)),
+            None => batter_advance,
+            Some(fp) if fp.runners_out.contains(&BaseRunner::Batter) => None,
+            Some(fp) if fp.error.is_some() => batter_advance,
+            Some(fp) if fp.putouts.len() <= fp.runners_out.len() => batter_advance,
             _ => None
         }
     }
@@ -485,11 +485,6 @@ pub struct BaserunningFieldingInfo {
     error: Option<FieldingPosition>,
     unearned_run: Option<EarnedRunStatus>
 }
-impl BaserunningFieldingInfo {
-    fn is_out(&self) -> bool {
-        self.putout.is_some()
-    }
-}
 
 impl From<Captures<'_>> for BaserunningFieldingInfo {
     fn from(captures: Captures) -> Self {
@@ -582,6 +577,8 @@ impl ImplicitPlayResults for BaserunningPlay {
     fn implicit_advance(&self) -> Option<RunnerAdvance> {
         if let (Some(b), BaserunningPlayType::StolenBase) = (self.at_base, self.baserunning_play_type) {
             Some(RunnerAdvance::runner_advance_to(b).unwrap())
+        } else if let (true, true, Some(b))  = (self.attempted_stolen_base(), self.error_on_play(), self.at_base) {
+            Some(RunnerAdvance::runner_advance_to(b).unwrap())
         } else {None}
     }
 
@@ -656,6 +653,12 @@ pub enum PlayType {
 }
 
 impl PlayType {
+
+    pub fn no_play(&self) -> bool {
+        if let PlayType::NoPlay(np) = self {
+            np.no_play_type == NoPlayType::NoPlay
+        } else { false }
+    }
 
     pub fn passed_ball(&self) -> bool {
         match self {
@@ -811,15 +814,12 @@ impl RunnerAdvance {
     }
 
     pub fn is_out(&self) -> bool {
-        self.out_or_error && !self.is_error()
+        // In rare cases, a single advance can encompass both an error and a subsequent putout
+        !self.putouts().is_empty()
     }
 
     pub fn scored(&self) -> bool {
         self.to == Base::Home && !self.is_out()
-    }
-
-    pub fn still_on_base(&self) -> bool {
-        !(self.is_out() || self.scored())
     }
 
     pub fn is_this_that_one_time_jean_segura_ran_in_reverse(&self) -> Result<bool> {
@@ -881,7 +881,7 @@ pub enum RunnerAdvanceModifier {
     WildPitch,
     AdvancedOnThrowTo(Option<Base>),
     AdvancedOnError {assists: PositionVec, error: FieldingPosition},
-    Putout{assists: PositionVec, putout: FieldingPosition},
+    Putout {assists: PositionVec, putout: FieldingPosition},
     Unrecognized(String)
 }
 impl RunnerAdvanceModifier {
@@ -1279,12 +1279,18 @@ impl PlayModifier {
 pub struct Play {
     pub main_plays: Vec<PlayType>,
     pub modifiers: Vec<PlayModifier>,
-    explicit_advances: Vec<RunnerAdvance>,
+    pub explicit_advances: Vec<RunnerAdvance>,
     pub uncertain_flag: bool,
     pub exceptional_flag: bool
 }
 
 impl Play {
+    pub fn no_play(&self) -> bool {
+        self.main_plays
+            .iter()
+            .all(|pt| pt.no_play())
+    }
+
     fn explicit_baserunners(&self) -> Vec<BaseRunner> {
         self.explicit_advances.iter().map(|ra| ra.baserunner).collect()
     }
@@ -1299,16 +1305,34 @@ impl Play {
             .collect()
     }
 
+    fn implicit_outs(&self) -> Vec<BaseRunner> {
+        self.main_plays
+            .iter()
+            .flat_map(|pt| pt.implicit_out())
+            .collect()
+    }
+
     pub fn advances(&self) -> Vec<RunnerAdvance> {
-        // If a baserunner is already explicitly represented in `advances`, don't include the implicit advance
+        let cleaned_advances = self.explicit_advances
+            .clone()
+            .into_iter()
+            // Occasionally there is a redundant piece of info like "3-3" that screws stuff up
+            // "3X3" is OK, seems to refer to getting doubled off the bag rather than trying to advance
+            .filter(|ra| ra.to as u8 != ra.baserunner as u8 || ra.is_out())
+            .collect::<Vec<RunnerAdvance>>();
+        // If a baserunner is already explicitly represented in `advances`, or is implicitly out on another main play, don't include the implicit advance
         let implicit_advances = self.main_plays
             .iter()
             .flat_map(|pt| pt
                 .implicit_advance()
-                .map(|ra| if self.explicit_baserunners().contains(&ra.baserunner) { None } else { Some(ra) }))
+                .map(|ra| {
+                    if [self.implicit_outs(), self.explicit_baserunners()].concat().contains(&ra.baserunner) {
+                        None
+                    } else { Some(ra) }
+                }))
             .filter_map(|ra| ra)
             .collect();
-        [self.explicit_advances.clone(), implicit_advances].concat()
+        [cleaned_advances, implicit_advances].concat()
     }
 
     fn filtered_baserunners(&self, filter: fn(&RunnerAdvance) -> bool) -> Vec<BaseRunner> {
@@ -1322,9 +1346,8 @@ impl Play {
         let out_advancing: Vec<BaseRunner> = self.filtered_baserunners(|ra| ra.is_out());
         let safe_advancing: Vec<BaseRunner> = self.filtered_baserunners(|ra|!ra.is_out());
 
-        let implicit_outs = self.main_plays
-            .iter()
-            .flat_map(|pt| pt.implicit_out())
+        let implicit_outs = self.implicit_outs()
+            .into_iter()
             .filter(|br| !safe_advancing.contains(&br))
             .collect();
         let mut full_outs = [out_advancing, implicit_outs].concat();
@@ -1524,8 +1547,10 @@ pub struct PlayRecord {
     pub play: Play
 }
 
-impl FromRetrosheetRecord for PlayRecord {
-    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<PlayRecord> {
+impl TryFrom<&RetrosheetEventRecord>for PlayRecord {
+    type Error = Error;
+
+    fn try_from(record: &RetrosheetEventRecord) -> Result<PlayRecord> {
         let record = record.deserialize::<[&str; 7]>(None)?;
         Ok(PlayRecord {
             inning: record[1].parse::<Inning>()?,

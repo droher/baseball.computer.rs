@@ -1,21 +1,24 @@
 use std::collections::HashMap;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Error, Result};
-use bimap::BiMap;
 use chrono::{NaiveDate, NaiveTime};
 use csv::{Reader, ReaderBuilder, StringRecord};
-use tinystr::TinyStr8;
+use tinystr::{TinyStr8, TinyStr16};
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::{DayNight, FieldCondition, GameType, HowScored, InfoRecord, Park, PitchDetail, Precipitation, Sky, Team, UmpirePosition, WindDirection};
-use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord, Lineup, Defense};
+use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord, Lineup, Defense, AppearanceRecord};
 use crate::event_file::play::PlayRecord;
-use crate::event_file::traits::{Batter, Fielder, FieldingPosition, FromRetrosheetRecord, LineupPosition, Pitcher, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Side, Umpire};
+use crate::event_file::traits::{Batter, Pitcher, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Side, Umpire};
 use either::{Either, Left, Right};
+use std::iter::Map;
+use crate::event_file::play::PlayModifier::RelayToFielderWithNoOutMade;
+use std::ops::Deref;
+use crate::event_file::pbp::GameState;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Matchup<T> {away: T, home: T}
@@ -55,12 +58,27 @@ impl<T> Matchup<T> {
         }
     }
 
+    pub fn get_both(&self) -> (&T, &T) {
+        (&self.away, &self.home)
+    }
+
+    pub fn get_both_mut(&mut self) -> (&mut T, &mut T) {
+        (&mut self.away, &mut self.home)
+    }
 
 }
 
 impl<T: Default> Default for Matchup<T> {
     fn default() -> Self {
         Self {away: T::default(), home: T::default() }
+    }
+}
+
+impl <T: Sized + Clone> Matchup<T> {
+    pub fn apply_both<F, U: Sized>(self, func: F) -> (U, U)
+        where F: Copy + FnOnce(T) -> U
+    {
+        (func(self.away), func(self.home))
     }
 }
 
@@ -87,8 +105,36 @@ pub struct Game {
     pub id: GameId,
     pub info: GameInfo,
     pub events: Vec<EventRecord>,
+    pub starts: Vec<StartRecord>,
     pub starting_lineups: Matchup<Lineup>,
     pub starting_defense: Matchup<Defense>,
+    pub earned_run_data: HashMap<Pitcher, u8>
+}
+
+impl TryInto<Vec<RetrosheetEventRecord>> for Game {
+    type Error = Error;
+
+    fn try_into(self) -> Result<Vec<RetrosheetEventRecord>> {
+        let box_score = GameState::get_box_score(&self)?.into();
+
+        let id_fields =  vec![
+            RetrosheetEventRecord::from(vec!["id", self.id.id.as_str()]),
+            RetrosheetEventRecord::from(vec!["version", "1"])
+        ];
+        let info: Vec<RetrosheetEventRecord> = self.info.into();
+        let starts: Vec<RetrosheetEventRecord> = self.starts.iter().map({
+            |sr| RetrosheetEventRecord::from(vec![
+                "start".to_string(),
+                sr.player.to_string(),
+                sr.player_name.clone(),
+                sr.side.retrosheet_str().to_string(),
+                sr.lineup_position.retrosheet_string(),
+                sr.fielding_position.retrosheet_string()
+            ])
+        })
+            .collect();
+        Ok([id_fields, info, starts, box_score].concat())
+    }
 }
 
 impl TryFrom<&RecordVec> for Game {
@@ -103,24 +149,33 @@ impl TryFrom<&RecordVec> for Game {
             .collect::<Vec<InfoRecord>>();
         let info = GameInfo::try_from(&infos)?;
         let starts =  record_vec.iter()
-            .filter_map(|m| if let MappedRecord::Start(i) = m {Some(*i)} else {None})
+            .filter_map(|m| if let MappedRecord::Start(s) = m {Some(s.clone())} else {None})
             .collect::<Vec<StartRecord>>();
-        let (starting_lineups, starting_defense) = Self::assemble_lineups_and_defense(starts);
+        let (starting_lineups, starting_defense) = Self::assemble_lineups_and_defense(starts.clone());
         let events = record_vec.iter()
             .filter_map(|m| match m {
                 MappedRecord::Play(pr) => Some(Left(pr.clone())),
-                MappedRecord::Substitution(sr) => Some(Right(*sr)),
+                MappedRecord::Substitution(sr) => Some(Right(sr.clone())),
                 _ => None
             })
+            .collect();
+        let earned_run_data = record_vec.iter()
+            .filter_map(|m| if let MappedRecord::EarnedRun(e) = m {
+                Some((e.pitcher_id, e.earned_runs))
+            } else {None})
             .collect();
         Ok(Self {
             id,
             info,
+            starts,
             events,
             starting_lineups,
-            starting_defense
+            starting_defense,
+            earned_run_data
         })
     }
+
+
 }
 
 impl Game {
@@ -158,6 +213,25 @@ pub struct GameUmpires {
     third: Option<Umpire>,
     left: Option<Umpire>,
     right: Option<Umpire>
+}
+
+impl Into<Vec<RetrosheetEventRecord>> for GameUmpires {
+    fn into(self) -> Vec<RetrosheetEventRecord> {
+        let info = "info";
+        let opt_string = {
+            |o: Option<Umpire>| o.map_or("".to_string(), |u| u.to_string())
+        };
+        let ump_types = vec!["umphome", "ump1b", "ump2b", "ump3b", "umplf", "umprf"];
+        let ump_names = vec![self.home, self.first, self.second, self.third, self.left, self.right]
+            .into_iter()
+            .map(opt_string);
+        let vecs: Vec<Vec<String>> = ump_names
+            .zip(ump_types.iter())
+            .map(|(name, pos)|vec!["info".to_string(), pos.to_string(), name])
+            .collect();
+        vecs.into_iter()
+            .map(RetrosheetEventRecord::from).collect()
+    }
 }
 impl TryFrom<&Vec<InfoRecord>> for GameUmpires {
     type Error = Error;
@@ -199,6 +273,33 @@ pub struct GameSetting {
     attendance: Option<u32>,
     park: Park,
 }
+
+impl Into<Vec<RetrosheetEventRecord>> for GameSetting {
+    fn into(self) -> Vec<RetrosheetEventRecord> {
+        let info = "info";
+        let mut vecs = vec![
+            vec!["number".to_string(), self.game_type.to_string()],
+            vec!["starttime".to_string(), self.start_time.map_or("".to_string(), |t| t.to_string())],
+            vec!["daynight".to_string(), self.time_of_day.to_string()],
+            vec!["usedh".to_string(), self.use_dh.to_string()],
+            vec!["htbf".to_string(), (self.bat_first_side == Side::Home).to_string()],
+            vec!["sky".to_string(), self.sky.to_string()],
+            vec!["temp".to_string(), self.temp.map_or("".to_string(), |u| u.to_string())],
+            vec!["fieldcond".to_string(), self.field_condition.to_string()],
+            vec!["precip".to_string(), self.precipitation.to_string()],
+            vec!["winddir".to_string(), self.wind_direction.to_string()],
+            vec!["windspeed".to_string(), self.wind_speed.map_or("".to_string(), |u| u.to_string())],
+            vec!["attendance".to_string(), self.attendance.map_or("".to_string(), |u| u.to_string())],
+            vec!["site".to_string(), self.park.to_string()]
+        ];
+        for mut vec in &mut vecs {
+            vec.insert(0, String::from("info"));
+        }
+        vecs.into_iter()
+            .map(RetrosheetEventRecord::from).collect()
+    }
+}
+
 impl Default for GameSetting {
     fn default() -> Self {
         Self {
@@ -256,6 +357,26 @@ pub struct GameInfo {
     results: GameResults,
     retrosheet_metadata: GameRetrosheetMetadata
 }
+
+impl Into<Vec<RetrosheetEventRecord>> for GameInfo {
+    fn into(self) -> Vec<RetrosheetEventRecord> {
+        let top_level_info: Vec<RetrosheetEventRecord> = vec![
+            vec!["info".to_string(), "visteam".to_string(), self.matchup.away.to_string()],
+            vec!["info".to_string(), "hometeam".to_string(), self.matchup.home.to_string()],
+            vec!["info".to_string(), "date".to_string(), self.date.format("%Y/%m/%d").to_string()]
+        ].into_iter()
+            .map(RetrosheetEventRecord::from).collect();
+
+        [top_level_info,
+            self.setting.into(),
+            self.umpires.into(),
+            self.results.into(),
+            self.retrosheet_metadata.into()
+        ].concat()
+
+    }
+}
+
 impl TryFrom<&Vec<InfoRecord>> for GameInfo {
     type Error = Error;
 
@@ -291,6 +412,28 @@ pub struct GameRetrosheetMetadata {
     translator: Option<RetrosheetVolunteer>
 }
 
+impl Into<Vec<RetrosheetEventRecord>> for GameRetrosheetMetadata {
+    fn into(self) -> Vec<RetrosheetEventRecord> {
+        let opt_string = {
+            |o: Option<TinyStr16>| o.map_or("".to_string(), |u| u.to_string())
+        };
+
+        let mut vecs = vec![
+            vec!["pitches".to_string(), self.pitch_detail.to_string()],
+            vec!["howscored".to_string(), self.scoring_method.to_string()],
+            vec!["inputter".to_string(), opt_string(self.inputter)],
+            vec!["scorer".to_string(), opt_string(self.scorer)],
+            vec!["oscorer".to_string(), opt_string(self.original_scorer)],
+            vec!["translator".to_string(), opt_string(self.translator)],
+        ];
+        for mut vec in &mut vecs {
+            vec.insert(0, String::from("info"));
+        }
+        vecs.into_iter()
+            .map(RetrosheetEventRecord::from).collect()
+    }
+}
+
 impl TryFrom<&Vec<InfoRecord>> for GameRetrosheetMetadata {
     type Error = Error;
 
@@ -320,6 +463,28 @@ pub struct GameResults {
     save: Option<Pitcher>,
     game_winning_rbi: Option<Batter>,
     time_of_game_minutes: Option<u16>,
+}
+
+impl Into<Vec<RetrosheetEventRecord>> for GameResults {
+    fn into(self) -> Vec<RetrosheetEventRecord> {
+        let opt_string = {
+            |o: Option<TinyStr8>| o.map_or("".to_string(), |u| u.to_string())
+        };
+        let mut vecs = vec![
+            vec!["wp".to_string(), opt_string(self.winning_pitcher)],
+            vec!["lp".to_string(), opt_string(self.losing_pitcher)],
+            vec!["save".to_string(), opt_string(self.save)],
+            vec!["gwrbi".to_string(), opt_string(self.game_winning_rbi)],
+            vec!["timeofgame".to_string(), self.time_of_game_minutes.map_or("".to_string(), |u| u.to_string())],
+        ];
+
+        for mut vec in &mut vecs {
+            vec.insert(0, String::from("info"));
+        }
+        vecs.into_iter()
+            .map(RetrosheetEventRecord::from)
+            .collect()
+    }
 }
 
 impl TryFrom<&Vec<InfoRecord>> for GameResults {
@@ -372,7 +537,7 @@ impl RetrosheetReader {
         loop {
             let did_read = self.reader.read_record(&mut self.current_record)?;
             if !did_read {return Ok(false)}
-            let mapped_record = MappedRecord::from_retrosheet_record(&self.current_record);
+            let mapped_record = MappedRecord::try_from(&self.current_record);
             match mapped_record {
                 Ok(MappedRecord::GameId(g)) => {self.current_game_id = g; return Ok(true)},
                 Ok(m) => {self.current_record_vec.push(m)}
@@ -393,7 +558,7 @@ impl TryFrom<&str> for RetrosheetReader {
                     .from_reader(BufReader::new(File::open(path)?));
         let mut current_record = StringRecord::new();
         reader.read_record(&mut current_record)?;
-        let current_game_id = match MappedRecord::from_retrosheet_record(&current_record)? {
+        let current_game_id = match MappedRecord::try_from(&current_record)? {
             MappedRecord::GameId(g) => Ok(g),
             _ => Err(anyhow!("First record was not a game ID, cannot read file."))
         }?;
@@ -424,28 +589,30 @@ pub enum MappedRecord {
 
 pub type EventRecord = Either<PlayRecord, SubstitutionRecord>;
 
-impl FromRetrosheetRecord for MappedRecord {
-    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<MappedRecord>{
+impl TryFrom<&RetrosheetEventRecord>for MappedRecord {
+    type Error = Error;
+
+    fn try_from(record: &RetrosheetEventRecord) -> Result<MappedRecord>{
         let line_type = record.get(0).context("No record")?;
         let mapped= match line_type {
-            "id" => MappedRecord::GameId(GameId::from_retrosheet_record(record)?),
+            "id" => MappedRecord::GameId(GameId::try_from(record)?),
             "version" => MappedRecord::Version,
-            "info" => MappedRecord::Info(InfoRecord::from_retrosheet_record(record)?),
-            "start" => MappedRecord::Start(StartRecord::from_retrosheet_record(record)?),
-            "sub" => MappedRecord::Substitution(SubstitutionRecord::from_retrosheet_record(record)?),
-            "play" => MappedRecord::Play(PlayRecord::from_retrosheet_record(record)?),
-            "badj" => MappedRecord::BatHandAdjustment(BatHandAdjustment::from_retrosheet_record(record)?),
-            "padj" => MappedRecord::PitchHandAdjustment(PitchHandAdjustment::from_retrosheet_record(record)?),
-            "ladj" => MappedRecord::LineupAdjustment(LineupAdjustment::from_retrosheet_record(record)?),
+            "info" => MappedRecord::Info(InfoRecord::try_from(record)?),
+            "start" => MappedRecord::Start(StartRecord::try_from(record)?),
+            "sub" => MappedRecord::Substitution(SubstitutionRecord::try_from(record)?),
+            "play" => MappedRecord::Play(PlayRecord::try_from(record)?),
+            "badj" => MappedRecord::BatHandAdjustment(BatHandAdjustment::try_from(record)?),
+            "padj" => MappedRecord::PitchHandAdjustment(PitchHandAdjustment::try_from(record)?),
+            "ladj" => MappedRecord::LineupAdjustment(LineupAdjustment::try_from(record)?),
             "com" => MappedRecord::Comment(String::from(record.get(1).unwrap())),
-            "data" => MappedRecord::EarnedRun(EarnedRunRecord::from_retrosheet_record(record)?),
-            "stat" => MappedRecord::BoxScoreLine(BoxScoreLine::from_retrosheet_record(record)?),
-            "line" => MappedRecord::LineScore(LineScore::from_retrosheet_record(record)?),
-            "event" => MappedRecord::BoxScoreEvent(BoxScoreEvent::from_retrosheet_record(record)?),
+            "data" => MappedRecord::EarnedRun(EarnedRunRecord::try_from(record)?),
+            "stat" => MappedRecord::BoxScoreLine(BoxScoreLine::try_from(record)?),
+            "line" => MappedRecord::LineScore(LineScore::try_from(record)?),
+            "event" => MappedRecord::BoxScoreEvent(BoxScoreEvent::try_from(record)?),
             _ => MappedRecord::Unrecognized
         };
         match mapped {
-            MappedRecord::Unrecognized => Err(Self::error("Unrecognized record type", record)),
+            MappedRecord::Unrecognized => Err(anyhow!("Unrecognized record type {:?}", record)),
             _ => Ok(mapped)
         }
     }

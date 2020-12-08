@@ -1,13 +1,15 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Result, Error};
 use chrono::{NaiveDate, NaiveTime};
-use strum_macros::EnumString;
+use strum_macros::{EnumString, ToString};
 
-use crate::event_file::traits::{FromRetrosheetRecord, Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire};
+use crate::event_file::traits::{Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire};
 use crate::util::{parse_positive_int, str_to_tinystr};
 use std::str::FromStr;
+use std::string::ToString as ToStringAlias;
 use tinystr::{TinyStr4, TinyStr8, TinyStr16};
+use std::convert::TryFrom;
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString)]
 #[strum(serialize_all = "lowercase")]
 pub enum HowScored {
     Park,
@@ -19,7 +21,7 @@ impl Default for HowScored {
     fn default() -> Self { Self::Unknown }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString)]
 #[strum(serialize_all = "lowercase")]
 pub enum FieldCondition {
     Dry,
@@ -32,7 +34,7 @@ impl Default for FieldCondition {
     fn default() -> Self { Self::Unknown }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString)]
 #[strum(serialize_all = "lowercase")]
 pub enum Precipitation {
     Rain,
@@ -46,7 +48,7 @@ impl Default for Precipitation {
     fn default() -> Self { Self::Unknown }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString)]
 #[strum(serialize_all = "lowercase")]
 pub enum Sky {
     Cloudy,
@@ -60,7 +62,7 @@ impl Default for Sky {
     fn default() -> Self { Self::Unknown }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString)]
 #[strum(serialize_all = "lowercase")]
 pub enum WindDirection {
     FromCF,
@@ -79,11 +81,11 @@ impl Default for WindDirection {
     fn default() -> Self { Self::Unknown }
 }
 
-pub type Team = TinyStr4;
+pub type Team = TinyStr8;
 pub type Park = TinyStr8;
 
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString)]
 #[strum(serialize_all = "lowercase")]
 pub enum DayNight {
     Day,
@@ -94,7 +96,7 @@ impl Default for DayNight {
     fn default() -> Self { Self::Unknown }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString)]
 pub enum GameType {
     #[strum(serialize = "0")]
     SingleGame,
@@ -112,7 +114,7 @@ impl Default for GameType {
 }
 
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, ToString)]
 #[strum(serialize_all = "lowercase")]
 pub enum PitchDetail {
     Pitches,
@@ -124,7 +126,7 @@ impl Default for PitchDetail {
     fn default() -> Self { Self::Unknown }
 }
 
-#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString)]
+#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString, ToString)]
 pub enum UmpirePosition {
     #[strum(serialize = "umphome")]
     Home,
@@ -194,8 +196,10 @@ impl InfoRecord {
     }
 }
 
-impl FromRetrosheetRecord for InfoRecord {
-    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<InfoRecord> {
+impl TryFrom<&RetrosheetEventRecord>for InfoRecord {
+    type Error = Error;
+
+    fn try_from(record: &RetrosheetEventRecord) -> Result<InfoRecord> {
         let record = record.deserialize::<[&str; 3]>(None)?;
 
         let info_type = record[1];

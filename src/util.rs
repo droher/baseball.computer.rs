@@ -53,6 +53,12 @@ pub(crate) fn count_occurrences<T: Eq>(match_vec: Vec<T>, object: &T) -> u8 {
 }
 
 #[inline]
-pub(crate) fn opt_add(mut o: Option<u8>, add: u8) -> () {
-    o = Some(o.unwrap_or_default() + add)
+pub(crate) fn opt_add(o: &mut Option<u8>, add: u8) -> () {
+    *o = Some(o.unwrap_or_default() + add)
+}
+
+
+#[inline]
+pub(crate) fn u8_vec_to_string(vec: Vec<u8>) -> Vec<String> {
+    vec.iter().map(|u| u.to_string()).collect()
 }

@@ -10,15 +10,6 @@ use crate::util::digit_vec;
 
 pub type RetrosheetEventRecord = StringRecord;
 
-
-pub trait FromRetrosheetRecord {
-    fn from_retrosheet_record(record: &RetrosheetEventRecord) -> Result<Self> where Self: Sized;
-
-    fn error(msg: &str, record: &RetrosheetEventRecord) -> Error {
-        anyhow!("{}\nRecord: {:?}", msg, record)
-    }
-}
-
 #[derive(Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash)]
 #[repr(u8)]
 pub enum LineupPosition {
@@ -50,6 +41,11 @@ impl LineupPosition {
 
     pub fn bats_in_lineup(&self) -> bool {
         *self as u8 > 0
+    }
+
+    pub fn retrosheet_string(self) -> String {
+        let as_u8: u8 = self.into();
+        as_u8.to_string()
     }
 }
 
@@ -90,6 +86,11 @@ impl FieldingPosition {
     pub fn plays_in_field(&self) -> bool {
         let numeric_position: u8 = (*self).into();
         (1..10).contains(&numeric_position)
+    }
+
+    pub fn retrosheet_string(self) -> String {
+        let as_u8: u8 = self.into();
+        as_u8.to_string()
     }
 }
 impl Default for FieldingPosition {
@@ -135,6 +136,12 @@ impl Side {
         match self {
             Self::Away => Self::Home,
             Self::Home => Self::Away
+        }
+    }
+    pub fn retrosheet_str(&self) -> &str {
+        match self {
+            Self::Away => "0",
+            Self::Home => "1"
         }
     }
 }

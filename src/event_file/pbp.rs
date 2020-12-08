@@ -1,24 +1,18 @@
 use either::Either;
-use crate::event_file::play::{OtherPlateAppearance, PlayRecord, Count, InningFrame, Play, BaseRunner, Base, RunnerAdvance, FieldingData, PlayType, ImplicitPlayResults, PlateAppearanceType, HitType, BaserunningPlayType};
-use crate::event_file::misc::{SubstitutionRecord, GameId, Lineup, Defense};
-use crate::event_file::traits::{Inning, LineupPosition, Pitcher, Side, FieldingPosition, Fielder, Batter};
-use crate::event_file::parser::{Matchup, GameInfo, Game, EventRecord};
-use either::Either::Right;
+use crate::event_file::play::{OtherPlateAppearance, PlayRecord, Count, InningFrame, Play, BaseRunner, Base, RunnerAdvance, FieldingData, PlateAppearanceType, HitType, BaserunningPlayType, ImplicitPlayResults};
+use crate::event_file::misc::{SubstitutionRecord, Lineup, Defense};
+use crate::event_file::traits::{Inning, LineupPosition, Pitcher, Side, FieldingPosition, Fielder, Batter, RetrosheetEventRecord};
+use crate::event_file::parser::{Matchup, Game, EventRecord};
 
 use anyhow::{anyhow, Result, Context, Error};
-use std::collections::HashMap;
 use crate::event_file::box_score::*;
 use std::convert::TryFrom;
-use std::fs::read_to_string;
-use crate::event_file::play::BaserunningPlayType::{DefensiveIndifference, Balk};
 use arrayvec::ArrayVec;
-use crate::event_file::play::PlayType::{BaserunningPlay, PlateAppearance};
-use std::ops::DerefMut;
-use crate::util::{count_occurrences, opt_add};
+use crate::util::{count_occurrences, opt_add, u8_vec_to_string};
+use crate::event_file::info::InfoRecord::PitchDetail;
+use crate::event_file::play::PlayModifier::RelayToFielderWithNoOutMade;
 
 pub type Outs = u8;
-
-type InitialLineSetup = (Matchup<Vec<BattingLine>>, Matchup<Vec<DefenseLine>>, Matchup<Vec<PitchingLine>>);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct BoxScore {
@@ -30,7 +24,8 @@ pub struct BoxScore {
     pub team_miscellaneous_lines: Matchup<TeamMiscellaneousLine>,
     pub team_batting_lines: Matchup<TeamBattingLine>,
     pub team_defense_lines: Matchup<TeamDefenseLine>,
-    pub events: Vec<BoxScoreEvent>
+    pub events: Vec<BoxScoreEvent>,
+    pub line_score: Matchup<Vec<u8>>
 }
 
 impl BoxScore {
@@ -92,6 +87,43 @@ impl BoxScore {
         player_lines.sort_by_key(|pl| pl.nth_position_played_by_player);
         player_lines.pop()
     }
+
+    fn add_earned_runs(&mut self, game: &Game) -> () {
+        let (away, home) = self.pitching_lines.get_both_mut();
+        for line in away.iter_mut().chain(home) {
+            if let Some((pitcher_id, earned_runs)) = game.earned_run_data.get_key_value(&line.pitcher_id) {
+                opt_add(&mut line.pitching_stats.earned_runs, 1)
+            }
+        }
+    }
+}
+
+// TODO: PH, PR, Team, and Event Records
+impl Into<Vec<RetrosheetEventRecord>> for BoxScore {
+
+    fn into(self) -> Vec<RetrosheetEventRecord> {
+
+        let (line_away, line_home) = self.line_score.apply_both(|v| u8_vec_to_string(v));
+        let lines: Vec<RetrosheetEventRecord> = vec![line_away, line_home].into_iter()
+            .zip(vec!["0", "1"])
+            .map(|(line, side)| [vec!["line".to_string(), side.to_string()], line].concat())
+            .map(RetrosheetEventRecord::from)
+            .collect();
+
+        let (bat_away, bat_home) = self.batting_lines
+            .apply_both(|v| v.into_iter()
+                .map(|b| b.into())
+                .collect::<Vec<RetrosheetEventRecord>>());
+        let (d_away, d_home) = self.defense_lines
+            .apply_both(|v| v.into_iter()
+                .map(|b| b.into())
+                .collect::<Vec<RetrosheetEventRecord>>());
+        let (pitch_away, pitch_home) = self.pitching_lines
+            .apply_both(|v| v.into_iter()
+                .map(|b| b.into())
+                .collect::<Vec<RetrosheetEventRecord>>());
+        [lines, bat_away, bat_home, d_away, d_home, pitch_away, pitch_home].concat()
+    }
 }
 
 impl TryFrom<&Game> for BoxScore {
@@ -131,7 +163,8 @@ impl TryFrom<&Game> for BoxScore {
             team_miscellaneous_lines: Matchup::new(team_miscellaneous_lines[0], team_miscellaneous_lines[1]),
             team_batting_lines: Matchup::new(team_batting_lines[0], team_batting_lines[1]),
             team_defense_lines: Matchup::new(team_defense_lines[0], team_defense_lines[1]),
-            events: vec![]
+            events: vec![],
+            line_score: Default::default()
         })
     }
 }
@@ -199,9 +232,19 @@ impl BaseState {
         self.clone()
     }
 
-    fn new_base_state(&self, play: &Play, batter_lineup_position: LineupPosition, pitcher: Pitcher) -> Result<Self> {
-        println!("{:?}", play.advances());
-        let mut new_state = self.clone();
+    fn new_base_state(&self, start_inning: bool, end_inning: bool, play: &Play, batter_lineup_position: LineupPosition, pitcher: Pitcher) -> Result<Self> {
+        let mut new_state = if start_inning {Self::default()} else {self.clone()};
+        new_state.scored = vec![];
+
+        // Cover cases where outs are not included in advance information
+        for out in play.outs()? {
+            match out {
+                BaseRunner::Third => new_state.third = None,
+                BaseRunner::Second => new_state.second = None,
+                BaseRunner::First => new_state.first = None,
+                _ => ()
+            }
+        }
 
         if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, play) {
             new_state.third = None;
@@ -249,7 +292,7 @@ impl BaseState {
             let new_runner = Runner { lineup_position: batter_lineup_position, charged_to: pitcher };
             let opt_runner = Some(new_runner);
             match a.to {
-                _ if a.is_out() => {},
+                _ if a.is_out() || end_inning => {},
                 _ if new_state.target_base_occupied(&a) => return Err(anyhow!("Batter advanced to an occupied base")),
                 Base::First => new_state.first = opt_runner,
                 Base::Second => new_state.second = opt_runner,
@@ -320,7 +363,7 @@ impl GameState {
 
         // If the substitute is already in the lineup (fielding change)
         // or is a pitcher with an active DH, no need to change batting line info
-        let is_new_player = original_batter == Some(&sub.player);
+        let is_new_player = original_batter != Some(&sub.player);
         if is_new_player && sub.lineup_position.bats_in_lineup() {
             new_lineup.insert(sub.lineup_position, sub.player);
             new_b_lines.push(BattingLine::new(sub.player,
@@ -356,37 +399,37 @@ impl GameState {
         }
     }
 
-    fn update_batter_stats(mut batting_stats: BattingLineStats, play: &Play) -> () {
+    fn update_batter_stats(batting_stats: &mut BattingLineStats, play: &Play) -> () {
         if play.plate_appearance().is_none() {
             return
         }
         let plate_appearance = play.plate_appearance().unwrap();
 
-        opt_add(batting_stats.rbi, play.rbi().len() as u8);
+        opt_add(&mut batting_stats.rbi, play.rbi().len() as u8);
         if plate_appearance.is_at_bat() {batting_stats.at_bats += 1};
-        if plate_appearance.is_strikeout() {opt_add(batting_stats.strikeouts, 1)}
-        if play.is_gidp() {opt_add(batting_stats.grounded_into_double_plays, 1)}
-        if play.sacrifice_hit() {opt_add(batting_stats.sacrifice_hits, 1)}
-        if play.sacrifice_fly() {opt_add(batting_stats.sacrifice_flies, 1)}
+        if plate_appearance.is_strikeout() {opt_add(&mut batting_stats.strikeouts, 1)}
+        if play.is_gidp() {opt_add(&mut batting_stats.grounded_into_double_plays, 1)}
+        if play.sacrifice_hit() {opt_add(&mut batting_stats.sacrifice_hits, 1)}
+        if play.sacrifice_fly() {opt_add(&mut batting_stats.sacrifice_flies, 1)}
 
         match plate_appearance {
             PlateAppearanceType::Hit(h) => {
                 batting_stats.hits += 1;
                 match h.hit_type {
                     HitType::Single => (),
-                    HitType::Double | HitType::GroundRuleDouble => opt_add(batting_stats.doubles, 1),
-                    HitType::Triple => opt_add(batting_stats.triples, 1),
-                    HitType::HomeRun => opt_add(batting_stats.home_runs, 1)
+                    HitType::Double | HitType::GroundRuleDouble => opt_add(&mut batting_stats.doubles, 1),
+                    HitType::Triple => opt_add(&mut batting_stats.triples, 1),
+                    HitType::HomeRun => opt_add(&mut batting_stats.home_runs, 1)
                 }
             },
             PlateAppearanceType::OtherPlateAppearance(opa) => {
                 match opa {
-                    OtherPlateAppearance::Interference => { opt_add(batting_stats.reached_on_interference, 1) },
-                    OtherPlateAppearance::HitByPitch => { opt_add(batting_stats.hit_by_pitch, 1) },
-                    OtherPlateAppearance::Walk => { opt_add(batting_stats.walks, 1) },
+                    OtherPlateAppearance::Interference => { opt_add(&mut batting_stats.reached_on_interference, 1) },
+                    OtherPlateAppearance::HitByPitch => { opt_add(&mut batting_stats.hit_by_pitch, 1) },
+                    OtherPlateAppearance::Walk => { opt_add(&mut batting_stats.walks, 1) },
                     OtherPlateAppearance::IntentionalWalk => {
-                        opt_add(batting_stats.intentional_walks, 1);
-                        opt_add(batting_stats.walks, 1)
+                        opt_add(&mut batting_stats.intentional_walks, 1);
+                        opt_add(&mut batting_stats.walks, 1)
                     }
                 }
             },
@@ -396,33 +439,33 @@ impl GameState {
 
     // TODO: No-out batters
     // Handles everything except runs, earned runs, and no out batters
-    fn update_pitching_stats(mut pitching_stats: PitchingLineStats, play: &Play) {
+    fn update_pitching_stats(pitching_stats: &mut PitchingLineStats, play: &Play) {
         pitching_stats.outs_recorded += play.putouts().len() as u8;
-        if play.wild_pitch() {opt_add(pitching_stats.wild_pitches, 1)}
-        if play.balk() {opt_add(pitching_stats.balks, 1)}
-        if play.sacrifice_hit() {opt_add(pitching_stats.sacrifice_hits, 1)}
-        if play.sacrifice_fly() {opt_add(pitching_stats.sacrifice_flies, 1)}
+        if play.wild_pitch() {opt_add(&mut pitching_stats.wild_pitches, 1)}
+        if play.balk() {opt_add(&mut pitching_stats.balks, 1)}
+        if play.sacrifice_hit() {opt_add(&mut pitching_stats.sacrifice_hits, 1)}
+        if play.sacrifice_fly() {opt_add(&mut pitching_stats.sacrifice_flies, 1)}
 
         if let Some(pa) = play.plate_appearance() {
-            opt_add(pitching_stats.batters_faced, 1);
-            if pa.is_strikeout() {opt_add(pitching_stats.strikeouts, 1)}
+            opt_add(&mut pitching_stats.batters_faced, 1);
+            if pa.is_strikeout() {opt_add(&mut pitching_stats.strikeouts, 1)}
             match pa {
                 PlateAppearanceType::Hit(h) => {
                     pitching_stats.hits += 1;
                     match h.hit_type {
                         HitType::Single => (),
-                        HitType::Double | HitType::GroundRuleDouble => opt_add(pitching_stats.doubles, 1),
-                        HitType::Triple => opt_add(pitching_stats.triples, 1),
-                        HitType::HomeRun => opt_add(pitching_stats.home_runs, 1)
+                        HitType::Double | HitType::GroundRuleDouble => opt_add(&mut pitching_stats.doubles, 1),
+                        HitType::Triple => opt_add(&mut pitching_stats.triples, 1),
+                        HitType::HomeRun => opt_add(&mut pitching_stats.home_runs, 1)
                     }
                 }
                 PlateAppearanceType::OtherPlateAppearance(opa) => {
                     match opa {
-                        OtherPlateAppearance::HitByPitch => { opt_add(pitching_stats.hit_batsmen, 1) },
-                        OtherPlateAppearance::Walk => { opt_add(pitching_stats.walks, 1) },
+                        OtherPlateAppearance::HitByPitch => { opt_add(&mut pitching_stats.hit_batsmen, 1) },
+                        OtherPlateAppearance::Walk => { opt_add(&mut pitching_stats.walks, 1) },
                         OtherPlateAppearance::IntentionalWalk => {
-                            opt_add(pitching_stats.intentional_walks, 1);
-                            opt_add(pitching_stats.walks, 1)
+                            opt_add(&mut pitching_stats.intentional_walks, 1);
+                            opt_add(&mut pitching_stats.walks, 1)
                         }
                         _ => ()
                     }
@@ -433,7 +476,7 @@ impl GameState {
         }
     }
 
-    fn update_defensive_stats(mut defense_stats: Option<DefenseLineStats>,
+    fn update_defensive_stats(defense_stats: Option<&mut DefenseLineStats>,
                               fielding_position: FieldingPosition, play: &Play) -> Result<()> {
         let ds = defense_stats.context("No defense stat object")?;
 
@@ -441,19 +484,19 @@ impl GameState {
         let putouts = count_occurrences(play.putouts(), &fielding_position);
         let errors = count_occurrences(play.errors(), &fielding_position);
 
-        opt_add(ds.outs_played, play.putouts().len() as u8);
-        opt_add(ds.assists, assists);
-        opt_add(ds.putouts, putouts);
-        opt_add(ds.errors, errors);
+        opt_add(&mut ds.outs_played, play.putouts().len() as u8);
+        opt_add(&mut ds.assists, assists);
+        opt_add(&mut ds.putouts, putouts);
+        opt_add(&mut ds.errors, errors);
 
         if play.putouts().len() == 2 && assists + putouts > 0 {
-            opt_add(ds.double_plays, 1)
+            opt_add(&mut ds.double_plays, 1)
         } else if play.putouts().len() == 3 && assists + putouts > 0 {
-            opt_add(ds.triple_plays, 1);
+            opt_add(&mut ds.triple_plays, 1);
         }
 
         if fielding_position == FieldingPosition::Catcher && play.passed_ball() {
-            opt_add(ds.passed_balls, 1);
+            opt_add(&mut ds.passed_balls, 1);
         }
         Ok(())
     }
@@ -470,7 +513,7 @@ impl GameState {
 
         // First add stats relating to the PA (if any) to the batter
         let batter_line = new_box.get_batter_by_id(*batting_side, play_record.batter)?;
-        Self::update_batter_stats(batter_line.batting_stats, play);
+        Self::update_batter_stats(&mut batter_line.batting_stats, play);
 
         // Then add R/SB/CS to the batting lines of the baserunners
         for runner in &new_base_state.scored {
@@ -487,17 +530,17 @@ impl GameState {
                 .context("Stolen base play recorded, but runner is missing")?;
             let runner_line = new_box.get_line_from_runner(*batting_side, lineup, &runner)?;
             if sb_play.baserunning_play_type == BaserunningPlayType::StolenBase {
-                opt_add(runner_line.batting_stats.stolen_bases, 1);
+                opt_add(&mut runner_line.batting_stats.stolen_bases, 1);
             }
             else {
-                opt_add(runner_line.batting_stats.caught_stealing, 1);
+                opt_add(&mut runner_line.batting_stats.caught_stealing, 1);
             }
         }
 
         // Pitching numbers are a bit easier to manage because for the most part there's only one pitcher
         // to keep track of, with the exception of inherited runners
         let pitching_line = new_box.get_pitcher_by_id(*fielding_side, self.pitcher(fielding_side)?)?;
-        Self::update_pitching_stats(pitching_line.pitching_stats, play);
+        Self::update_pitching_stats(&mut pitching_line.pitching_stats, play);
         for runner in &new_base_state.scored {
             let pitching_line = new_box.get_pitcher_by_id(*fielding_side, runner.charged_to)?;
             pitching_line.pitching_stats.runs += 1;
@@ -508,7 +551,7 @@ impl GameState {
         let d_lines = new_box.defense_lines.get_mut(&self.fielding_side());
         for line in d_lines {
             if defense.get_by_left(&line.fielding_position) == Some(&line.fielder_id) {
-                Self::update_defensive_stats(line.defensive_stats, line.fielding_position, play)?;
+                Self::update_defensive_stats(Option::from(&mut line.defensive_stats), line.fielding_position, play)?;
             }
         };
         Ok(new_box)
@@ -527,13 +570,15 @@ impl GameState {
     }
 
     fn update_on_play(&self, play_record: &PlayRecord) -> Result<Self> {
+        if play_record.play.no_play() {
+            return Ok(self.clone())
+        }
+
         let flipped = self.batting_side != play_record.side;
         let frame = if flipped {self.frame.flip()} else {self.frame};
+        let play_outs = play_record.play.outs()?.len() as u8;
 
-        let outs = if flipped {0} else {self.outs + play_record.play.outs()?.len() as u8};
-        println!("{:?}", (frame, play_record.inning, outs, &self.bases));
-        println!("{:?}", play_record.play);
-
+        let outs = if flipped {play_outs} else {self.outs + play_outs};
 
         if outs > 3 {return Err(anyhow!("Illegal state, more than 3 outs recorded"))}
 
@@ -542,9 +587,12 @@ impl GameState {
             .get_by_right(&play_record.batter)
             .context("Could not find batter in current side's lineup")?;
 
-        let new_base_state = self.bases.new_base_state(&play_record.play,
-                                                       self.at_bat,
+        let new_base_state = self.bases.new_base_state(flipped,
+                                                       outs == 3,
+                                                       &play_record.play,
+                                                       *at_bat,
                                                        self.pitcher(&play_record.side.flip())?)?;
+
         let new_box_score = self.update_box_score(play_record, &new_base_state)?;
         let new_line_score = self.update_line_score(play_record)?;
 
@@ -575,6 +623,8 @@ impl GameState {
         for event in &game.events {
             state = state.next_state(event)?;
         }
+        state.box_score.add_earned_runs(game);
+        state.box_score.line_score = state.line_score.clone();
         Ok(state.box_score)
     }
 }
