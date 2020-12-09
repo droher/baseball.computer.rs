@@ -5,8 +5,7 @@ use strum_macros::{EnumString, ToString};
 use crate::event_file::traits::{Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire};
 use crate::util::{parse_positive_int, str_to_tinystr};
 use std::str::FromStr;
-use std::string::ToString as ToStringAlias;
-use tinystr::{TinyStr4, TinyStr8, TinyStr16};
+use tinystr::{TinyStr8, TinyStr16};
 use std::convert::TryFrom;
 
 #[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString)]

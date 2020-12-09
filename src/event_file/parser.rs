@@ -11,13 +11,10 @@ use tinystr::{TinyStr8, TinyStr16};
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::{DayNight, FieldCondition, GameType, HowScored, InfoRecord, Park, PitchDetail, Precipitation, Sky, Team, UmpirePosition, WindDirection};
-use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord, Lineup, Defense, AppearanceRecord};
+use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord, Lineup, Defense};
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{Batter, Pitcher, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Side, Umpire};
 use either::{Either, Left, Right};
-use std::iter::Map;
-use crate::event_file::play::PlayModifier::RelayToFielderWithNoOutMade;
-use std::ops::Deref;
 use crate::event_file::pbp::GameState;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -37,13 +34,6 @@ impl<T> Matchup<T> {
         Self {away, home}
     }
 
-    pub fn in_place_update(&mut self, side: &Side, new_val: T) -> () {
-        match side {
-            Side::Away => self.away = new_val,
-            Side::Home => self.home = new_val
-        }
-    }
-
     pub fn get(&self, side: &Side) -> &T {
         match side {
             Side::Away => &self.away,
@@ -56,10 +46,6 @@ impl<T> Matchup<T> {
             Side::Away => &mut self.away,
             Side::Home => &mut self.home
         }
-    }
-
-    pub fn get_both(&self) -> (&T, &T) {
-        (&self.away, &self.home)
     }
 
     pub fn get_both_mut(&mut self) -> (&mut T, &mut T) {
@@ -217,7 +203,6 @@ pub struct GameUmpires {
 
 impl Into<Vec<RetrosheetEventRecord>> for GameUmpires {
     fn into(self) -> Vec<RetrosheetEventRecord> {
-        let info = "info";
         let opt_string = {
             |o: Option<Umpire>| o.map_or("".to_string(), |u| u.to_string())
         };
@@ -276,7 +261,6 @@ pub struct GameSetting {
 
 impl Into<Vec<RetrosheetEventRecord>> for GameSetting {
     fn into(self) -> Vec<RetrosheetEventRecord> {
-        let info = "info";
         let mut vecs = vec![
             vec!["number".to_string(), self.game_type.to_string()],
             vec!["starttime".to_string(), self.start_time.map_or("".to_string(), |t| t.to_string())],
@@ -292,7 +276,7 @@ impl Into<Vec<RetrosheetEventRecord>> for GameSetting {
             vec!["attendance".to_string(), self.attendance.map_or("".to_string(), |u| u.to_string())],
             vec!["site".to_string(), self.park.to_string()]
         ];
-        for mut vec in &mut vecs {
+        for vec in &mut vecs {
             vec.insert(0, String::from("info"));
         }
         vecs.into_iter()
@@ -426,7 +410,7 @@ impl Into<Vec<RetrosheetEventRecord>> for GameRetrosheetMetadata {
             vec!["oscorer".to_string(), opt_string(self.original_scorer)],
             vec!["translator".to_string(), opt_string(self.translator)],
         ];
-        for mut vec in &mut vecs {
+        for vec in &mut vecs {
             vec.insert(0, String::from("info"));
         }
         vecs.into_iter()
@@ -478,7 +462,7 @@ impl Into<Vec<RetrosheetEventRecord>> for GameResults {
             vec!["timeofgame".to_string(), self.time_of_game_minutes.map_or("".to_string(), |u| u.to_string())],
         ];
 
-        for mut vec in &mut vecs {
+        for vec in &mut vecs {
             vec.insert(0, String::from("info"));
         }
         vecs.into_iter()

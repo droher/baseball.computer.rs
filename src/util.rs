@@ -53,7 +53,7 @@ pub(crate) fn count_occurrences<T: Eq>(match_vec: Vec<T>, object: &T) -> u8 {
 }
 
 #[inline]
-pub(crate) fn opt_add(o: &mut Option<u8>, add: u8) -> () {
+pub(crate) fn opt_add(o: &mut Option<u8>, add: u8) {
     *o = Some(o.unwrap_or_default() + add)
 }
 

@@ -1,5 +1,5 @@
 use either::Either;
-use crate::event_file::play::{OtherPlateAppearance, PlayRecord, Count, InningFrame, Play, BaseRunner, Base, RunnerAdvance, FieldingData, PlateAppearanceType, HitType, BaserunningPlayType, ImplicitPlayResults};
+use crate::event_file::play::{OtherPlateAppearance, PlayRecord, Count, InningFrame, Play, BaseRunner, Base, RunnerAdvance, FieldingData, PlateAppearanceType, HitType, BaserunningPlayType};
 use crate::event_file::misc::{SubstitutionRecord, Lineup, Defense};
 use crate::event_file::traits::{Inning, LineupPosition, Pitcher, Side, FieldingPosition, Fielder, Batter, RetrosheetEventRecord};
 use crate::event_file::parser::{Matchup, Game, EventRecord};
@@ -9,8 +9,6 @@ use crate::event_file::box_score::*;
 use std::convert::TryFrom;
 use arrayvec::ArrayVec;
 use crate::util::{count_occurrences, opt_add, u8_vec_to_string};
-use crate::event_file::info::InfoRecord::PitchDetail;
-use crate::event_file::play::PlayModifier::RelayToFielderWithNoOutMade;
 
 pub type Outs = u8;
 
@@ -88,11 +86,11 @@ impl BoxScore {
         player_lines.pop()
     }
 
-    fn add_earned_runs(&mut self, game: &Game) -> () {
+    fn add_earned_runs(&mut self, game: &Game) {
         let (away, home) = self.pitching_lines.get_both_mut();
         for line in away.iter_mut().chain(home) {
-            if let Some((pitcher_id, earned_runs)) = game.earned_run_data.get_key_value(&line.pitcher_id) {
-                opt_add(&mut line.pitching_stats.earned_runs, 1)
+            if let Some((_pitcher_id, earned_runs)) = game.earned_run_data.get_key_value(&line.pitcher_id) {
+                opt_add(&mut line.pitching_stats.earned_runs, *earned_runs)
             }
         }
     }
@@ -103,7 +101,7 @@ impl Into<Vec<RetrosheetEventRecord>> for BoxScore {
 
     fn into(self) -> Vec<RetrosheetEventRecord> {
 
-        let (line_away, line_home) = self.line_score.apply_both(|v| u8_vec_to_string(v));
+        let (line_away, line_home) = self.line_score.apply_both(u8_vec_to_string);
         let lines: Vec<RetrosheetEventRecord> = vec![line_away, line_home].into_iter()
             .zip(vec!["0", "1"])
             .map(|(line, side)| [vec!["line".to_string(), side.to_string()], line].concat())
@@ -399,7 +397,7 @@ impl GameState {
         }
     }
 
-    fn update_batter_stats(batting_stats: &mut BattingLineStats, play: &Play) -> () {
+    fn update_batter_stats(batting_stats: &mut BattingLineStats, play: &Play) {
         if play.plate_appearance().is_none() {
             return
         }

@@ -7,7 +7,6 @@ use arrayref::array_ref;
 use crate::event_file::traits::{RetrosheetEventRecord, Batter, LineupPosition, Inning, Fielder, FieldingPosition, Pitcher, Side};
 use crate::util::{parse_positive_int, str_to_tinystr};
 use crate::event_file::misc::{Lineup, Defense};
-use std::path::Display;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
 pub struct BattingLineStats {
@@ -585,15 +584,6 @@ impl TryFrom<&RetrosheetEventRecord>for BoxScoreLine {
 pub struct LineScore {
     pub side: Side,
     pub line_score: Vec<u8>
-}
-
-impl LineScore {
-    pub fn new(side: Side) -> Self {
-        Self {
-            side,
-            line_score: Default::default()
-        }
-    }
 }
 
 impl TryFrom<&RetrosheetEventRecord>for LineScore {

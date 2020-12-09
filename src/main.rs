@@ -1,14 +1,16 @@
 #![forbid(unsafe_code)]
 
-use std::time::Instant;
-use event_file::parser::RetrosheetReader;
-use event_file::pbp::GameState;
-use csv::{Writer, WriterBuilder};
 use std::convert::{TryFrom, TryInto};
-use anyhow::Result;
-use crate::event_file::traits::RetrosheetEventRecord;
-use crate::event_file::parser::Game;
 use std::fs::File;
+use std::time::Instant;
+
+use anyhow::Result;
+use csv::{Writer, WriterBuilder};
+
+use event_file::parser::RetrosheetReader;
+
+use crate::event_file::parser::Game;
+use crate::event_file::traits::RetrosheetEventRecord;
 
 mod util;
 mod event_file;

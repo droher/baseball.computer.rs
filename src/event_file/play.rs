@@ -717,7 +717,7 @@ impl ImplicitPlayResults for PlayType {
         match self {
             Self::PlateAppearance(p) => p.implicit_advance(),
             Self::BaserunningPlay(p) => p.implicit_advance(),
-            Self::NoPlay(p) => None,
+            Self::NoPlay(_) => None,
         }
     }
 
@@ -725,7 +725,7 @@ impl ImplicitPlayResults for PlayType {
         match self {
             Self::PlateAppearance(p) => p.implicit_out(),
             Self::BaserunningPlay(p) => p.implicit_out(),
-            Self::NoPlay(p) => vec![],
+            Self::NoPlay(_) => vec![],
         }
     }
 
@@ -761,9 +761,6 @@ impl PlayType {
 
     }
 }
-
-struct ScoringInfo {unearned: Option<EarnedRunStatus>, rbi: bool}
-
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RunnerAdvance {
