@@ -142,10 +142,10 @@ impl Into<RetrosheetEventRecord>for BattingLine {
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct PinchHittingLine {
-    pinch_hitter_id: Batter,
+    pub pinch_hitter_id: Batter,
     inning: Option<Inning>,
     side: Side,
-    batting_stats: Option<BattingLineStats>,
+    pub batting_stats: Option<BattingLineStats>,
 }
 
 impl PinchHittingLine {
@@ -158,6 +158,22 @@ impl PinchHittingLine {
             inning,
             batting_stats: Some(BattingLineStats::default())
         }
+    }
+}
+
+impl Into<RetrosheetEventRecord>for PinchHittingLine {
+
+    fn into(self) -> RetrosheetEventRecord {
+        let info = vec![
+            "stat".to_string(),
+            "phline".to_string(),
+            self.pinch_hitter_id.to_string(),
+            self.inning.map_or("".to_string(), |u| u.to_string()),
+            self.side.retrosheet_str().to_string(),
+        ];
+        let stats: Vec<u8> = self.batting_stats.unwrap_or_default().into();
+        let stats: Vec<String> = stats.iter().map(u8::to_string).collect();
+        RetrosheetEventRecord::from([info, stats].concat())
     }
 }
 
@@ -179,12 +195,12 @@ impl TryFrom<&RetrosheetEventRecord>for PinchHittingLine {
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct PinchRunningLine {
-    pinch_runner_id: Batter,
+    pub pinch_runner_id: Batter,
     inning: Option<Inning>,
     side: Side,
-    runs: Option<u8>,
-    stolen_bases: Option<u8>,
-    caught_stealing: Option<u8>
+    pub runs: Option<u8>,
+    pub stolen_bases: Option<u8>,
+    pub caught_stealing: Option<u8>
 }
 
 impl PinchRunningLine {
@@ -199,6 +215,22 @@ impl PinchRunningLine {
             stolen_bases: Some(0),
             caught_stealing: Some(0)
         }
+    }
+}
+
+impl Into<RetrosheetEventRecord>for PinchRunningLine {
+
+    fn into(self) -> RetrosheetEventRecord {
+        let info = vec![
+            "stat".to_string(),
+            "prline".to_string(),
+            self.pinch_runner_id.to_string(),
+            self.inning.map_or("".to_string(), |u| u.to_string()),
+            self.runs.unwrap_or_default().to_string(),
+            self.runs.unwrap_or_default().to_string(),
+            self.runs.unwrap_or_default().to_string(),
+        ];
+        RetrosheetEventRecord::from(info)
     }
 }
 
