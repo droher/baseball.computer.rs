@@ -227,8 +227,8 @@ impl Into<RetrosheetEventRecord>for PinchRunningLine {
             self.pinch_runner_id.to_string(),
             self.inning.map_or("".to_string(), |u| u.to_string()),
             self.runs.unwrap_or_default().to_string(),
-            self.runs.unwrap_or_default().to_string(),
-            self.runs.unwrap_or_default().to_string(),
+            self.stolen_bases.unwrap_or_default().to_string(),
+            self.caught_stealing.unwrap_or_default().to_string(),
         ];
         RetrosheetEventRecord::from(info)
     }
