@@ -16,6 +16,7 @@ use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{Batter, Pitcher, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Side, Umpire};
 use either::{Either, Left, Right};
 use crate::event_file::pbp::GameState;
+use std::path::PathBuf;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Matchup<T> {away: T, home: T}
@@ -532,10 +533,10 @@ impl RetrosheetReader {
 
 }
 
-impl TryFrom<&str> for RetrosheetReader {
+impl TryFrom<&PathBuf> for RetrosheetReader {
     type Error = Error;
 
-    fn try_from(path: &str) -> Result<Self> {
+    fn try_from(path: &PathBuf) -> Result<Self> {
         let mut reader = ReaderBuilder::new()
                     .has_headers(false)
                     .flexible(true)
