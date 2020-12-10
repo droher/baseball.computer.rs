@@ -4,6 +4,10 @@ version = "0.0.1"
 authors = ["David Roher <david.roher@gmail.com>"]
 edition = "2018"
 
+[[bin]]
+name = "pbp-to-box"
+path = "src/main.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -21,6 +25,7 @@ num_enum = "0.5.1"
 tinystr = "0.4.1"
 bimap = "0.5.3"
 arrayvec = "0.5.2"
+structopt = "0.3.21"
 
 [dependencies.regex]
 version = "1.4.2"
