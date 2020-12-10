@@ -509,6 +509,7 @@ impl Iterator for RetrosheetReader {
         match self.next_game() {
             Err(e) => Some(Err(e)),
             Ok(true) => Some(Game::try_from(&self.current_record_vec)),
+            _ if !&self.current_record_vec.is_empty() => Some(Game::try_from(&self.current_record_vec)),
             _ => None
         }
     }
