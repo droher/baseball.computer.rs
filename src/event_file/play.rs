@@ -433,6 +433,13 @@ impl PlateAppearanceType {
         if let Self::BattingOut(b) = self {b.out_type == OutAtBatType::StrikeOut} else {false}
     }
 
+    pub fn hit_by_pitch(&self) -> bool {
+        if let Self::OtherPlateAppearance(op) = self {op == &OtherPlateAppearance::HitByPitch} else {false}
+    }
+    pub fn home_run(&self) -> bool {
+        if let Self::Hit(h) = self {h.hit_type == HitType::HomeRun} else {false}
+    }
+
     pub fn is_at_bat(&self) -> bool {
         matches!(self, Self::Hit(_) | Self::BattingOut(_))
     }
@@ -685,6 +692,24 @@ impl PlayType {
             _ => false
         }
     }
+
+    pub fn hit_by_pitch(&self) -> bool {
+        match self {
+            Self::PlateAppearance(pt) => {
+                pt.hit_by_pitch()
+            },
+            _ => false
+        }
+    }
+
+    pub fn home_run(&self) -> bool {
+        match self {
+            Self::PlateAppearance(pt) => {
+                pt.home_run()
+            },
+            _ => false
+        }
+    }
 }
 
 impl FieldingData for PlayType {
@@ -804,12 +829,6 @@ impl RunnerAdvance {
         })
     }
 
-    pub fn is_error(&self) -> bool {
-        self.modifiers
-            .iter()
-            .any(|m| m.is_error())
-    }
-
     pub fn is_out(&self) -> bool {
         // In rare cases, a single advance can encompass both an error and a subsequent putout
         !self.putouts().is_empty()
@@ -922,9 +941,6 @@ impl FieldingData for RunnerAdvanceModifier {
     }
 }
 impl RunnerAdvanceModifier {
-    pub fn is_error(&self) -> bool {
-        RunnerAdvanceModifierDiscriminants::AdvancedOnError == self.into()
-    }
 
     fn parse_advance_modifiers(value: &str) -> Result<Vec<RunnerAdvanceModifier>> {
         value
@@ -955,17 +971,33 @@ impl RunnerAdvanceModifier {
         let last = last.unwrap_or_default();
         let last_as_int_vec: PositionVec = FieldingPosition::fielding_vec(last);
         let final_match = match first {
-            "(INT" => RunnerAdvanceModifier::Interference(last_as_int_vec.first().copied().unwrap_or(FieldingPosition::Unknown)),
+            "(INT" => RunnerAdvanceModifier::Interference(last_as_int_vec
+                .first()
+                .copied()
+                .unwrap_or(FieldingPosition::Unknown)),
             "(TH" => RunnerAdvanceModifier::AdvancedOnThrowTo(Base::from_str(last).ok()),
-            "(E" => RunnerAdvanceModifier::AdvancedOnError { assists: Vec::new(), error: FieldingPosition::try_from(last.get(0..1).unwrap_or_default()).unwrap_or(FieldingPosition::Unknown) },
+            "(E" => RunnerAdvanceModifier::AdvancedOnError { assists: Vec::new(), error: FieldingPosition::try_from(last
+                .get(0..1)
+                .unwrap_or_default())
+                .unwrap_or(FieldingPosition::Unknown)
+            },
             "(" if last.contains('E') => {
                 let (assist_str, error_str) = last.split_at(last.find('E').unwrap());
-                let (assists, error) = (FieldingPosition::fielding_vec(assist_str), FieldingPosition::fielding_vec(error_str).first().copied().unwrap_or(FieldingPosition::Unknown));
+                let (assists, error) = (
+                    FieldingPosition::fielding_vec(assist_str),
+                    FieldingPosition::fielding_vec(error_str)
+                        .first()
+                        .copied()
+                        .unwrap_or(FieldingPosition::Unknown));
                 RunnerAdvanceModifier::AdvancedOnError { assists, error }
             },
             "(" => {
                 let mut digits = FieldingPosition::fielding_vec(last);
-                let (putout, assists) = (digits.pop().unwrap_or(FieldingPosition::Unknown), digits);
+                let (putout, assists) = (
+                    digits
+                        .pop()
+                        .unwrap_or(FieldingPosition::Unknown),
+                    digits);
                 RunnerAdvanceModifier::Putout { assists, putout }
             }
             _ => RunnerAdvanceModifier::Unrecognized(value.into())
@@ -1066,7 +1098,8 @@ impl TryFrom<&str> for HitLocation {
 
     fn try_from(value: &str) -> Result<Self> {
         let as_str = {|re: &Regex| re.find(value).map_or("",  |m| m.as_str())};
-        // If there's no general location found, that's unexpected behavior and we should short-circuit, but other missing info is expected
+        // If there's no general location found, that's unexpected behavior and
+        // we should short-circuit, but other missing info is expected
         let general_location = HitLocationGeneral::from_str(as_str(&HIT_LOCATION_GENERAL_REGEX))?;
         let depth = HitDepth::from_str(as_str(&HIT_LOCATION_DEPTH_REGEX)).unwrap_or_default();
         let angle = HitAngle::from_str(as_str(&HIT_LOCATION_ANGLE_REGEX)).unwrap_or_default();
@@ -1366,10 +1399,6 @@ impl Play {
         self.filtered_baserunners(|ra: &RunnerAdvance| ra.scored())
     }
 
-    pub fn unearned_runs(&self) -> Vec<BaseRunner> {
-        self.filtered_baserunners(|ra: &RunnerAdvance| ra.scored() && ra.earned_run_status() == Some(EarnedRunStatus::Unearned))
-    }
-
     pub fn team_unearned_runs(&self) -> Vec<BaseRunner> {
         self.filtered_baserunners(|ra: &RunnerAdvance| ra.scored() && ra.earned_run_status() == Some(EarnedRunStatus::TeamUnearned))
     }
@@ -1435,6 +1464,18 @@ impl Play {
         self.modifiers
             .iter()
             .any(|pm| pm == &PlayModifier::SacrificeFly)
+    }
+
+    pub fn hit_by_pitch(&self) -> bool {
+        self.main_plays
+            .iter()
+            .any(|pt| pt.hit_by_pitch())
+    }
+
+    pub fn home_run(&self) -> bool {
+        self.main_plays
+            .iter()
+            .any(|pt| pt.home_run())
     }
 
     pub fn plate_appearance(&self) -> Option<&PlateAppearanceType> {
