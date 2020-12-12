@@ -24,7 +24,8 @@ pub struct BoxScore {
     pub team_batting_lines: Matchup<TeamBattingLine>,
     pub team_defense_lines: Matchup<TeamDefenseLine>,
     pub events: Vec<BoxScoreEvent>,
-    pub line_score: Matchup<Vec<u8>>
+    pub line_score: Matchup<Vec<u8>>,
+    pub team_unearned_runs: Matchup<u8>
 }
 
 impl BoxScore {
@@ -106,12 +107,22 @@ impl BoxScore {
     }
 
     fn add_earned_runs(&mut self, game: &Game) {
+        // Individual
         let (away, home) = self.pitching_lines.get_both_mut();
+        let mut team_er = Matchup::new(0, 0);
         for line in away.iter_mut().chain(home) {
             if let Some((_pitcher_id, earned_runs)) = game.earned_run_data.get_key_value(&line.pitcher_id) {
-                opt_add(&mut line.pitching_stats.earned_runs, *earned_runs)
+                opt_add(&mut line.pitching_stats.earned_runs, *earned_runs);
+                *team_er.get_mut(&line.side) += *earned_runs;
             }
         }
+        // Team
+        let sides = [Side::Away, Side::Home];
+        sides.iter()
+            .for_each(|s| *team_er.get_mut(s) -= self.team_unearned_runs.get(s));
+        sides.iter()
+            .for_each(|s| opt_add(&mut self.team_miscellaneous_lines.get_mut(s).team_earned_runs,
+                                  *team_er.get(s)));
     }
 }
 
@@ -147,7 +158,11 @@ impl Into<Vec<RetrosheetEventRecord>> for BoxScore {
             .apply_both(|v| v.into_iter()
                 .map(|b| b.into())
                 .collect::<Vec<RetrosheetEventRecord>>());
-        [lines, bat_away, bat_home, d_away, d_home, pitch_away, pitch_home, ph_away, ph_home, pr_away, pr_home].concat()
+        let (misc_away, misc_home) = self.team_miscellaneous_lines
+            .apply_both(|m| vec![m.into()]);
+
+        [lines, bat_away, bat_home, d_away, d_home, pitch_away,
+            pitch_home, ph_away, ph_home, pr_away, pr_home, misc_away, misc_home].concat()
     }
 }
 
@@ -189,7 +204,8 @@ impl TryFrom<&Game> for BoxScore {
             team_batting_lines: Matchup::new(team_batting_lines[0], team_batting_lines[1]),
             team_defense_lines: Matchup::new(team_defense_lines[0], team_defense_lines[1]),
             events: vec![],
-            line_score: Default::default()
+            line_score: Default::default(),
+            team_unearned_runs: Default::default()
         })
     }
 }
@@ -208,6 +224,10 @@ pub struct BaseState {
 }
 
 impl BaseState {
+    fn num_runners_on_base(&self) -> u8 {
+        self.first.is_some() as u8 + self.second.is_some() as u8 + self.third.is_some() as u8
+    }
+
     fn get_baserunner(&self, baserunner: BaseRunner) -> Option<Runner> {
         match baserunner {
             BaseRunner::First => self.first,
@@ -542,6 +562,26 @@ impl GameState {
         Ok(())
     }
 
+    fn update_team_misc(&self, box_score: &mut BoxScore, play: &Play, new_base_state: &BaseState) -> Result<()> {
+        let b_side = self.batting_side;
+        let mut misc = &mut box_score.team_miscellaneous_lines;
+        let lines = misc.get_both_mut();
+        let (batting, defense) = match b_side {
+            Side::Away => lines,
+            Side::Home => (lines.1, lines.0)
+        };
+        let play_outs = play.outs()?.len() as u8;
+        match play_outs {
+            2 => opt_add(&mut defense.double_plays_turned, 1),
+            3 => defense.triple_plays_turned += 1,
+            _ => ()
+        }
+        if play_outs > 0 && self.outs + play_outs == 3 {
+            batting.left_on_base += new_base_state.num_runners_on_base();
+        }
+        Ok(())
+    }
+
     /// TODO: Unmess
     fn update_box_score(&self, play_record: &PlayRecord, new_base_state: &BaseState) -> Result<BoxScore> {
         let (batting_side, fielding_side) = (&play_record.side, &play_record.side.flip());
@@ -627,7 +667,12 @@ impl GameState {
             if defense.get_by_left(&line.fielding_position) == Some(&line.fielder_id) {
                 Self::update_defensive_stats(Option::from(&mut line.defensive_stats), line.fielding_position, play)?;
             }
-        };
+        }
+        // Add team misc info
+        self.update_team_misc(&mut new_box, play, new_base_state);
+        // Add team unearned runs
+        *new_box.team_unearned_runs.get_mut(&fielding_side) += play.team_unearned_runs().len() as u8;
+
         Ok(new_box)
     }
 
@@ -643,6 +688,15 @@ impl GameState {
         Ok(self.line_score.cloned_update(&play_record.side, line_score))
     }
 
+    fn outs_after_play(&self, play_record: &PlayRecord) -> Result<u8> {
+        let flipped = self.batting_side != play_record.side;
+        let play_outs = play_record.play.outs()?.len() as u8;
+        match if flipped {play_outs} else {self.outs + play_outs} {
+            o if o > 3 => Err(anyhow!("Illegal state, more than 3 outs recorded")),
+            o => Ok(o)
+        }
+    }
+
     fn update_on_play(&self, play_record: &PlayRecord) -> Result<Self> {
         if play_record.play.no_play() {
             return Ok(self.clone())
@@ -650,11 +704,7 @@ impl GameState {
 
         let flipped = self.batting_side != play_record.side;
         let frame = if flipped {self.frame.flip()} else {self.frame};
-        let play_outs = play_record.play.outs()?.len() as u8;
-
-        let outs = if flipped {play_outs} else {self.outs + play_outs};
-
-        if outs > 3 {return Err(anyhow!("Illegal state, more than 3 outs recorded"))}
+        let outs = self.outs_after_play(play_record)?;
 
         let at_bat = self.lineups
             .get(&play_record.side)

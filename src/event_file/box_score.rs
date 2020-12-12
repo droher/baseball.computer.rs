@@ -424,7 +424,7 @@ impl TryFrom<&[&str; 17]> for PitchingLineStats {
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct PitchingLine {
     pub pitcher_id: Pitcher,
-    side: Side,
+    pub side: Side,
     nth_pitcher: u8,
     pub pitching_stats: PitchingLineStats
 }
@@ -495,12 +495,29 @@ impl TeamMiscellaneousLine {
         Self {
             side,
             left_on_base: 0,
-            team_earned_runs: None,
-            double_plays_turned: None,
+            team_earned_runs: Some(0),
+            double_plays_turned: Some(0),
             triple_plays_turned: 0
         }
     }
 }
+
+impl Into<RetrosheetEventRecord>for TeamMiscellaneousLine {
+
+    fn into(self) -> RetrosheetEventRecord {
+        let info = vec![
+            "stat".to_string(),
+            "tline".to_string(),
+            self.side.retrosheet_str().to_string(),
+            self.left_on_base.to_string(),
+            self.team_earned_runs.map_or("".to_string(), |u| u.to_string()),
+            self.double_plays_turned.map_or("".to_string(), |u| u.to_string()),
+            self.triple_plays_turned.to_string()
+        ];
+        RetrosheetEventRecord::from(info)
+    }
+}
+
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct TeamBattingLine {
