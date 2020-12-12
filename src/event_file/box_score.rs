@@ -8,7 +8,6 @@ use crate::event_file::traits::{RetrosheetEventRecord, Batter, LineupPosition, I
 use crate::util::{parse_positive_int, str_to_tinystr};
 use crate::event_file::misc::{Lineup, Defense};
 use tinystr::TinyStr8;
-use crate::event_file::play::OutAtBatType::FieldersChoice;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
 pub struct BattingLineStats {

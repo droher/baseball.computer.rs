@@ -82,7 +82,7 @@ pub enum Base {
     Home
 }
 
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, EnumString, Copy, Clone, TryFromPrimitive, IntoPrimitive)]
+#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord, EnumString, Copy, Clone, TryFromPrimitive, IntoPrimitive)]
 #[repr(u8)]
 pub enum BaseRunner {
     #[strum(serialize = "B")]
@@ -99,7 +99,7 @@ impl BaseRunner {
         BaseRunner::try_from((*base as u8) - 1).context("Could not find baserunner for target base")
     }
 
-    fn from_current_base(base: &Base) -> Result<Self> {
+    pub fn from_current_base(base: &Base) -> Result<Self> {
         BaseRunner::try_from(*base as u8).context("Could not find baserunner for current base")
     }
 

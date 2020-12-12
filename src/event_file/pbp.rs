@@ -9,20 +9,21 @@ use crate::event_file::box_score::*;
 use std::convert::TryFrom;
 use arrayvec::ArrayVec;
 use crate::util::{count_occurrences, opt_add, u8_vec_to_string};
+use std::collections::HashMap;
 
 pub type Outs = u8;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct BoxScore {
-    pub batting_lines: Matchup<Vec<BattingLine>>,
-    pub pinch_hitting_lines: Matchup<Vec<PinchHittingLine>>,
-    pub pinch_running_lines: Matchup<Vec<PinchRunningLine>>,
-    pub pitching_lines: Matchup<Vec<PitchingLine>>,
-    pub defense_lines: Matchup<Vec<DefenseLine>>,
-    pub team_miscellaneous_lines: Matchup<TeamMiscellaneousLine>,
-    pub events: Vec<BoxScoreEvent>,
-    pub line_score: Matchup<Vec<u8>>,
-    pub team_unearned_runs: Matchup<u8>
+    batting_lines: Matchup<Vec<BattingLine>>,
+    pinch_hitting_lines: Matchup<Vec<PinchHittingLine>>,
+    pinch_running_lines: Matchup<Vec<PinchRunningLine>>,
+    pitching_lines: Matchup<Vec<PitchingLine>>,
+    defense_lines: Matchup<Vec<DefenseLine>>,
+    team_miscellaneous_lines: Matchup<TeamMiscellaneousLine>,
+    events: Vec<BoxScoreEvent>,
+    line_score: Matchup<Vec<u8>>,
+    team_unearned_runs: Matchup<u8>
 }
 
 impl BoxScore {
@@ -210,24 +211,30 @@ pub struct Runner {lineup_position: LineupPosition, charged_to: Pitcher}
 
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct BaseState {
-    first: Option<Runner>,
-    second: Option<Runner>,
-    third: Option<Runner>,
+    bases: HashMap<BaseRunner, Runner>,
     scored: Vec<Runner>
 }
 
 impl BaseState {
     fn num_runners_on_base(&self) -> u8 {
-        self.first.is_some() as u8 + self.second.is_some() as u8 + self.third.is_some() as u8
+        self.bases.len() as u8
     }
 
-    fn get_baserunner(&self, baserunner: BaseRunner) -> Option<Runner> {
-        match baserunner {
-            BaseRunner::First => self.first,
-            BaseRunner::Second => self.second,
-            BaseRunner::Third => self.third,
-            _ => None
-        }
+    fn get_runner(&self, baserunner: &BaseRunner) -> Option<&Runner> {
+        self.bases.get(baserunner)
+    }
+
+    fn clear_baserunner(&mut self, baserunner: &BaseRunner) -> Option<Runner> {
+        self.bases
+            .remove(baserunner)
+    }
+
+    fn set_runner(&mut self, baserunner: BaseRunner, runner: Runner) {
+        self.bases.insert(baserunner, runner);
+    }
+
+    fn clear_all(&mut self) {
+        self.bases = HashMap::new()
     }
 
     fn get_advance_from_baserunner(baserunner: BaseRunner, play: &Play) -> Option<RunnerAdvance> {
@@ -239,19 +246,17 @@ impl BaseState {
     }
 
     fn current_base_occupied(&self, advance: &RunnerAdvance) -> bool {
-        advance.baserunner == BaseRunner::First && self.first.is_some() ||
-            advance.baserunner == BaseRunner::Second && self.second.is_some() ||
-            advance.baserunner == BaseRunner::Third && self.third.is_some()
+        self.get_runner(&advance.baserunner).is_some()
     }
 
-    fn target_base_occupied(&self, advance: &RunnerAdvance) -> bool {
-        advance.to == Base::First && self.first.is_some() ||
-            advance.to == Base::Second && self.second.is_some() ||
-            advance.to == Base::Third && self.third.is_some()
+    fn target_base_occupied(&self, advance: &RunnerAdvance) -> Result<bool> {
+        let br = BaseRunner::from_target_base(&advance.to);
+        Ok(self.get_runner(&br?).is_some())
+
     }
 
     fn check_integrity(old_state: &Self, new_state: &Self, advance: &RunnerAdvance) -> Result<()> {
-        if new_state.target_base_occupied(advance) {
+        if new_state.target_base_occupied(advance)? {
             Err(anyhow!("Runner is listed as moving to a base that is occupied by another runner"))
         }
         else if !old_state.current_base_occupied(advance) {
@@ -276,66 +281,58 @@ impl BaseState {
 
         // Cover cases where outs are not included in advance information
         for out in play.outs()? {
-            match out {
-                BaseRunner::Third => new_state.third = None,
-                BaseRunner::Second => new_state.second = None,
-                BaseRunner::First => new_state.first = None,
-                _ => ()
-            }
+            new_state.clear_baserunner(&out);
         }
 
         if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, play) {
-            new_state.third = None;
+            new_state.clear_baserunner(&BaseRunner::Third);
             if a.is_out() {}
             else if let Err(e) = Self::check_integrity(&self, &new_state, &a) {
                 return Err(e)
             }
-            else if let Some(r) = self.third {
-                new_state.scored.push(r)
+            else if let Some(r) = self.get_runner(&BaseRunner::Third) {
+                new_state.scored.push(*r)
             }
         }
         if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, play) {
-            new_state.second = None;
+            new_state.clear_baserunner(&BaseRunner::Second);
             if a.is_out() {}
             else if let Err(e) = Self::check_integrity(&self, &new_state, &a) {
                 return Err(e)
             }
-            else if let (Ok(true), Some(r)) = (a.is_this_that_one_time_jean_segura_ran_in_reverse(), self.second) {
-                new_state.first = Some(r)
+            else if let (Ok(true), Some(r)) = (a.is_this_that_one_time_jean_segura_ran_in_reverse(), self.get_runner(&BaseRunner::Second)) {
+                new_state.set_runner(BaseRunner::First, *r)
             }
-            else if let (Base::Third, Some(r)) = (a.to, self.second) {
-                new_state.third = Some(r)
+            else if let (Base::Third, Some(r)) = (a.to, self.get_runner(&BaseRunner::Second)) {
+                new_state.set_runner(BaseRunner::Third, *r)
             }
-            else if let (Base::Home, Some(r)) = (a.to, self.second) {
-                new_state.scored.push(r)
+            else if let (Base::Home, Some(r)) = (a.to, self.get_runner(&BaseRunner::Second)) {
+                new_state.scored.push(*r)
             }
         }
         if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, play) {
-            new_state.first = None;
+            new_state.clear_baserunner(&BaseRunner::First);
             if a.is_out() {}
             else if let Err(e) = Self::check_integrity(&self, &new_state, &a) {
                 return Err(e)
             }
-            else if let (Base::Second, Some(r)) = (&a.to, self.first) {
-                new_state.second = Some(r)
+            else if let (Base::Second, Some(r)) = (&a.to, self.get_runner(&BaseRunner::First)) {
+                new_state.set_runner(BaseRunner::Second, *r)
             }
-            else if let (Base::Third, Some(r)) = (&a.to, self.first) {
-                new_state.third = Some(r)
+            else if let (Base::Third, Some(r)) = (&a.to, self.get_runner(&BaseRunner::First)) {
+                new_state.set_runner(BaseRunner::Third, *r)
             }
-            else if let (Base::Home, Some(r)) = (&a.to, self.first) {
-                new_state.scored.push(r)
+            else if let (Base::Home, Some(r)) = (&a.to, self.get_runner(&BaseRunner::First)) {
+                new_state.scored.push(*r)
             }
         }
         if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Batter, play) {
             let new_runner = Runner { lineup_position: batter_lineup_position, charged_to: pitcher };
-            let opt_runner = Some(new_runner);
             match a.to {
                 _ if a.is_out() || end_inning => {},
-                _ if new_state.target_base_occupied(&a) => return Err(anyhow!("Batter advanced to an occupied base")),
-                Base::First => new_state.first = opt_runner,
-                Base::Second => new_state.second = opt_runner,
-                Base::Third => new_state.third = opt_runner,
-                Base::Home => new_state.scored.push(new_runner)
+                _ if new_state.target_base_occupied(&a)? => return Err(anyhow!("Batter advanced to an occupied base")),
+                Base::Home => new_state.scored.push(new_runner),
+                b => new_state.set_runner(BaseRunner::from_current_base(&b)?, new_runner)
             }
         }
         Ok(new_state.update_runner_charges(play))
@@ -615,7 +612,8 @@ impl GameState {
         for sb_play in play.stolen_base_plays() {
             let base = sb_play.at_base.context("SB play missing base info")?;
             let runner = self.bases
-                .get_baserunner(BaseRunner::from_target_base(&base)?)
+                .get_runner(&BaseRunner::from_target_base(&base)?)
+                .copied()
                 .context("Missing runner info in Base State on SB play")?;
             let runner_id = *self.lineups
                 .get(&play_record.side)
@@ -682,7 +680,7 @@ impl GameState {
                 .context("Missing base info on stolen base attempt record")?;
             let baserunner = BaseRunner::from_target_base(&target_base)?;
             let runner = self.bases
-                .get_baserunner(baserunner)
+                .get_runner(&baserunner)
                 .context("Stolen base play recorded, but runner is missing")?;
             let runner_line = new_box.get_line_from_runner(*batting_side, lineup, &runner)?;
             if sb_play.baserunning_play_type == BaserunningPlayType::StolenBase {
