@@ -1577,6 +1577,7 @@ impl TryFrom<&str> for Play {
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct CachedPlay {
+    pub play: Play,
     pub putouts: PositionVec,
     pub assists: PositionVec,
     pub errors: PositionVec,
@@ -1588,10 +1589,11 @@ pub struct CachedPlay {
     pub plate_appearance: Option<PlateAppearanceType>
 }
 
-impl TryFrom<&Play> for CachedPlay {
+impl TryFrom<&PlayRecord> for CachedPlay {
     type Error = Error;
 
-    fn try_from(play: &Play) -> Result<Self> {
+    fn try_from(play_record: &PlayRecord) -> Result<Self> {
+        let play = Play::try_from(play_record.raw_play.as_str())?;
         Ok(Self {
             putouts: play.putouts(),
             assists: play.assists(),
@@ -1601,7 +1603,8 @@ impl TryFrom<&Play> for CachedPlay {
             runs: play.runs(),
             team_unearned_runs: play.team_unearned_runs(),
             rbi: play.rbi(),
-            plate_appearance: play.plate_appearance().cloned()
+            plate_appearance: play.plate_appearance().cloned(),
+            play
         })
     }
 }
@@ -1627,8 +1630,7 @@ pub struct PlayRecord {
     pub batter: Batter,
     pub count: Count,
     pub pitch_sequence: Option<PitchSequence>,
-    pub play: Play,
-    pub cached_play: CachedPlay
+    raw_play: String,
 }
 
 impl TryFrom<&RetrosheetEventRecord>for PlayRecord {
@@ -1636,16 +1638,13 @@ impl TryFrom<&RetrosheetEventRecord>for PlayRecord {
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<PlayRecord> {
         let record = record.deserialize::<[&str; 7]>(None)?;
-        let play = Play::try_from(record[6])?;
-        let cached_play = CachedPlay::try_from(&play)?;
         Ok(PlayRecord {
             inning: record[1].parse::<Inning>()?,
             side: Side::from_str(record[2])?,
             batter: str_to_tinystr(record[3])?,
             count: Count::new(record[4])?,
             pitch_sequence: {match record[5] {"" => None, s => Some(PitchSequence::try_from(s)?)}},
-            play,
-            cached_play
+            raw_play: record[6].to_string()
         })
     }
 }
