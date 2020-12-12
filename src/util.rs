@@ -46,9 +46,9 @@ pub(crate) fn to_str_vec(match_vec: Vec<Option<Match>>) -> Vec<&str> {
 }
 
 #[inline]
-pub(crate) fn count_occurrences<T: Eq>(match_vec: Vec<T>, object: &T) -> u8 {
+pub(crate) fn count_occurrences<T: Eq>(match_vec: &Vec<T>, object: &T) -> u8 {
     match_vec.into_iter()
-        .filter(|t| t == object)
+        .filter(|t| *t == object)
         .count() as u8
 }
 
