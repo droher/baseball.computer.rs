@@ -19,6 +19,7 @@ use crate::event_file::play::BaserunningPlayType::PickedOffCaughtStealing;
 use crate::event_file::box_score::BoxScoreLine::PitchingLine;
 use crate::event_file::traits::StatKind::Defense;
 use std::iter::FromIterator;
+use std::borrow::Cow;
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
@@ -1350,9 +1351,6 @@ impl Play {
     }
 
     pub fn advances(&self) -> Box<dyn Iterator<Item=RunnerAdvance> + '_> {
-        let check_against: HashSet<BaseRunner> = self.implicit_outs()
-            .chain(self.explicit_baserunners())
-            .collect();
         let cleaned_advances = self.explicit_advances
             .iter()
             // Occasionally there is a redundant piece of info like "3-3" that screws stuff up

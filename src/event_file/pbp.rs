@@ -1,5 +1,5 @@
 use either::Either;
-use crate::event_file::play::{OtherPlateAppearance, PlayRecord, Count, InningFrame, Play, BaseRunner, Base, RunnerAdvance, FieldingData, PlateAppearanceType, HitType, BaserunningPlayType};
+use crate::event_file::play::{OtherPlateAppearance, PlayRecord, Count, InningFrame, Play, BaseRunner, Base, RunnerAdvance, FieldingData, PlateAppearanceType, HitType, BaserunningPlayType, CachedPlay};
 use crate::event_file::misc::{SubstitutionRecord, Lineup, Defense};
 use crate::event_file::traits::{Inning, LineupPosition, Pitcher, Side, FieldingPosition, Fielder, Batter, RetrosheetEventRecord};
 use crate::event_file::parser::{Matchup, Game, EventRecord};
@@ -249,9 +249,10 @@ impl BaseState {
         self.bases = HashMap::new()
     }
 
-    fn get_advance_from_baserunner(baserunner: BaseRunner, play: &Play) -> Option<RunnerAdvance> {
-        play
-            .advances()
+    fn get_advance_from_baserunner(baserunner: BaseRunner, cached_play: &CachedPlay) -> Option<&RunnerAdvance> {
+        cached_play
+            .advances
+            .iter()
             .find(|a| a.baserunner == baserunner)
     }
 
@@ -297,7 +298,7 @@ impl BaseState {
             new_state.clear_baserunner(out);
         }
 
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, play) {
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, cached_play) {
             new_state.clear_baserunner(&BaseRunner::Third);
             if a.is_out() {}
             else if let Err(e) = Self::check_integrity(&self, &new_state, &a) {
@@ -307,7 +308,7 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, play) {
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, cached_play) {
             new_state.clear_baserunner(&BaseRunner::Second);
             if a.is_out() {}
             else if let Err(e) = Self::check_integrity(&self, &new_state, &a) {
@@ -323,7 +324,7 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, play) {
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, cached_play) {
             new_state.clear_baserunner(&BaseRunner::First);
             if a.is_out() {}
             else if let Err(e) = Self::check_integrity(&self, &new_state, &a) {
@@ -339,7 +340,7 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Batter, play) {
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Batter, cached_play) {
             let new_runner = Runner { lineup_position: batter_lineup_position, charged_to: pitcher };
             match a.to {
                 _ if a.is_out() || end_inning => {},
