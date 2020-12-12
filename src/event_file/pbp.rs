@@ -20,10 +20,9 @@ pub struct BoxScore {
     pub pitching_lines: Matchup<Vec<PitchingLine>>,
     pub defense_lines: Matchup<Vec<DefenseLine>>,
     pub team_miscellaneous_lines: Matchup<TeamMiscellaneousLine>,
-    pub team_batting_lines: Matchup<TeamBattingLine>,
-    pub team_defense_lines: Matchup<TeamDefenseLine>,
     pub events: Vec<BoxScoreEvent>,
-    pub line_score: Matchup<Vec<u8>>
+    pub line_score: Matchup<Vec<u8>>,
+    pub team_unearned_runs: Matchup<u8>
 }
 
 impl BoxScore {
@@ -37,6 +36,24 @@ impl BoxScore {
             .iter_mut()
             .find(|br| br.batter_id == batter_id)
             .context("Could not find batter in box score")?
+        )
+    }
+
+    fn get_pinch_hitter_by_id(&mut self, side: Side, batter_id: Batter) -> Result<&mut PinchHittingLine>  {
+        Ok(self.pinch_hitting_lines
+            .get_mut(&side)
+            .iter_mut()
+            .find(|br| br.pinch_hitter_id == batter_id)
+            .context("Could not find pinch-hitter in box score")?
+        )
+    }
+
+    fn get_pinch_runner_by_id(&mut self, side: Side, batter_id: Batter) -> Result<&mut PinchRunningLine>  {
+        Ok(self.pinch_running_lines
+            .get_mut(&side)
+            .iter_mut()
+            .find(|br| br.pinch_runner_id == batter_id)
+            .context("Could not find pinch-runner in box score")?
         )
     }
 
@@ -80,19 +97,29 @@ impl BoxScore {
         let mut player_lines = self.defense_lines
             .get(&side)
             .iter()
-            .filter(|dl| dl.fielding_position.plays_in_field() && dl.fielder_id == fielder_id)
+            .filter(|dl| dl.fielder_id == fielder_id)
             .collect::<Vec<&DefenseLine>>();
         player_lines.sort_by_key(|pl| pl.nth_position_played_by_player);
         player_lines.pop()
     }
 
     fn add_earned_runs(&mut self, game: &Game) {
+        // Individual
         let (away, home) = self.pitching_lines.get_both_mut();
+        let mut team_er = Matchup::new(0, 0);
         for line in away.iter_mut().chain(home) {
             if let Some((_pitcher_id, earned_runs)) = game.earned_run_data.get_key_value(&line.pitcher_id) {
-                opt_add(&mut line.pitching_stats.earned_runs, *earned_runs)
+                opt_add(&mut line.pitching_stats.earned_runs, *earned_runs);
+                *team_er.get_mut(&line.side) += *earned_runs;
             }
         }
+        // Team
+        let sides = [Side::Away, Side::Home];
+        sides.iter()
+            .for_each(|s| *team_er.get_mut(s) -= self.team_unearned_runs.get(s));
+        sides.iter()
+            .for_each(|s| opt_add(&mut self.team_miscellaneous_lines.get_mut(s).team_earned_runs,
+                                  *team_er.get(s)));
     }
 }
 
@@ -120,7 +147,23 @@ impl Into<Vec<RetrosheetEventRecord>> for BoxScore {
             .apply_both(|v| v.into_iter()
                 .map(|b| b.into())
                 .collect::<Vec<RetrosheetEventRecord>>());
-        [lines, bat_away, bat_home, d_away, d_home, pitch_away, pitch_home].concat()
+        let (ph_away, ph_home) = self.pinch_hitting_lines
+            .apply_both(|v| v.into_iter()
+                .map(|b| b.into())
+                .collect::<Vec<RetrosheetEventRecord>>());
+        let (pr_away, pr_home) = self.pinch_running_lines
+            .apply_both(|v| v.into_iter()
+                .map(|b| b.into())
+                .collect::<Vec<RetrosheetEventRecord>>());
+        let (misc_away, misc_home) = self.team_miscellaneous_lines
+            .apply_both(|m| vec![m.into()]);
+        let events = self.events
+            .into_iter()
+            .map(|e| e.into())
+            .collect();
+
+        [lines, bat_away, bat_home, d_away, d_home, pitch_away,
+            pitch_home, ph_away, ph_home, pr_away, pr_home, misc_away, misc_home, events].concat()
     }
 }
 
@@ -146,12 +189,6 @@ impl TryFrom<&Game> for BoxScore {
         let team_miscellaneous_lines = sides.iter()
                 .map(|s| TeamMiscellaneousLine::new(*s))
                 .collect::<ArrayVec<[TeamMiscellaneousLine;2]>>();
-        let team_batting_lines = sides.iter()
-            .map(|s| TeamBattingLine::new(*s))
-            .collect::<ArrayVec<[TeamBattingLine;2]>>();
-        let team_defense_lines = sides.iter()
-            .map(|s| TeamDefenseLine::new(*s))
-            .collect::<ArrayVec<[TeamDefenseLine;2]>>();
         Ok(Self {
             batting_lines,
             pinch_hitting_lines: Default::default(),
@@ -159,10 +196,9 @@ impl TryFrom<&Game> for BoxScore {
             pitching_lines,
             defense_lines,
             team_miscellaneous_lines: Matchup::new(team_miscellaneous_lines[0], team_miscellaneous_lines[1]),
-            team_batting_lines: Matchup::new(team_batting_lines[0], team_batting_lines[1]),
-            team_defense_lines: Matchup::new(team_defense_lines[0], team_defense_lines[1]),
             events: vec![],
-            line_score: Default::default()
+            line_score: Default::default(),
+            team_unearned_runs: Default::default()
         })
     }
 }
@@ -181,6 +217,10 @@ pub struct BaseState {
 }
 
 impl BaseState {
+    fn num_runners_on_base(&self) -> u8 {
+        self.first.is_some() as u8 + self.second.is_some() as u8 + self.third.is_some() as u8
+    }
+
     fn get_baserunner(&self, baserunner: BaseRunner) -> Option<Runner> {
         match baserunner {
             BaseRunner::First => self.first,
@@ -210,7 +250,7 @@ impl BaseState {
             advance.to == Base::Third && self.third.is_some()
     }
 
-    fn check_integrity(old_state: &Self, new_state: &Self, advance: &RunnerAdvance) -> Result<bool> {
+    fn check_integrity(old_state: &Self, new_state: &Self, advance: &RunnerAdvance) -> Result<()> {
         if new_state.target_base_occupied(advance) {
             Err(anyhow!("Runner is listed as moving to a base that is occupied by another runner"))
         }
@@ -218,7 +258,7 @@ impl BaseState {
             Err(anyhow!("Advancement from a base that had no runner on it"))
         }
         else {
-            Ok(true)
+            Ok(())
         }
     }
 
@@ -354,6 +394,9 @@ impl GameState {
         let mut new_b_lines = self.box_score.batting_lines.get(&sub.side).clone();
         let mut new_d_lines = self.box_score.defense_lines.get(&sub.side).clone();
         let mut new_p_lines = self.box_score.pitching_lines.get(&sub.side).clone();
+        let mut new_ph_lines = self.box_score.pinch_hitting_lines.get(&sub.side).clone();
+        let mut new_pr_lines = self.box_score.pinch_running_lines.get(&sub.side).clone();
+
 
         let original_batter = self.lineups
             .get(&sub.side)
@@ -367,16 +410,27 @@ impl GameState {
             new_b_lines.push(BattingLine::new(sub.player,
                                        sub.side,
                                        sub.lineup_position,
-                                       self.box_score.max_n_for_lineup(sub.side, sub.lineup_position) + 1))
+                                       self.box_score.max_n_for_lineup(sub.side, sub.lineup_position) + 1));
+            // Create PH/PR lines if entering as PH/PR
+            match sub.fielding_position {
+                FieldingPosition::PinchHitter => {
+                    new_ph_lines.push(PinchHittingLine::new(sub.player,
+                                                            Some(self.inning),
+                                                            sub.side))
+                },
+                FieldingPosition::PinchRunner => {
+                    new_pr_lines.push(PinchRunningLine::new(sub.player,
+                                                            Some(self.inning),
+                                                            sub.side))
+                },
+                _ => ()
+            }
         }
-        // Only update fielding info for real positions (not DH, PH, etc)
-        if sub.fielding_position.plays_in_field() {
-            new_defense.insert(sub.fielding_position, sub.player);
-            new_d_lines.push(DefenseLine::new(sub.player,
-                                       sub.side,
-                                       sub.fielding_position,
-                                       self.box_score.nth_position_played(sub.side,sub.player) + 1))
-        }
+        new_defense.insert(sub.fielding_position, sub.player);
+        new_d_lines.push(DefenseLine::new(sub.player,
+                                          sub.side,
+                                          sub.fielding_position,
+                                          self.box_score.nth_position_played(sub.side,sub.player) + 1));
         if sub.fielding_position == FieldingPosition::Pitcher {
             let nth_pitcher = new_p_lines.len() as u8 + 1;
             new_p_lines.push(PitchingLine::new(sub.player, sub.side, nth_pitcher));
@@ -386,6 +440,8 @@ impl GameState {
             batting_lines: self.box_score.batting_lines.cloned_update(&sub.side, new_b_lines),
             defense_lines: self.box_score.defense_lines.cloned_update(&sub.side, new_d_lines),
             pitching_lines: self.box_score.pitching_lines.cloned_update(&sub.side, new_p_lines),
+            pinch_hitting_lines: self.box_score.pinch_hitting_lines.cloned_update(&sub.side, new_ph_lines),
+            pinch_running_lines: self.box_score.pinch_running_lines.cloned_update(&sub.side, new_pr_lines),
             ..self.box_score.clone()
         };
 
@@ -499,9 +555,93 @@ impl GameState {
         Ok(())
     }
 
-    /// TODO:
-    ///  -- Pitching: basic stats, inherited runner logic should be settled by this point
-    ///  -- Add any new events (HR, HBP, DP, etc.)
+    fn update_team_misc(&self, box_score: &mut BoxScore, play: &Play, new_base_state: &BaseState) -> Result<()> {
+        let b_side = self.batting_side;
+        let misc = &mut box_score.team_miscellaneous_lines;
+        let lines = misc.get_both_mut();
+        let (batting, defense) = match b_side {
+            Side::Away => lines,
+            Side::Home => (lines.1, lines.0)
+        };
+        let play_outs = play.outs()?.len() as u8;
+        match play_outs {
+            2 => opt_add(&mut defense.double_plays_turned, 1),
+            3 => defense.triple_plays_turned += 1,
+            _ => ()
+        }
+        if play_outs > 0 && self.outs + play_outs == 3 {
+            batting.left_on_base += new_base_state.num_runners_on_base();
+        }
+        Ok(())
+    }
+
+    fn make_events(&self, play_record: &PlayRecord) -> Result<Vec<BoxScoreEvent>> {
+        let play = &play_record.play;
+        let d_side = play_record.side.flip();
+        let mut events: Vec<BoxScoreEvent> = Vec::with_capacity(1);
+        let putouts = play.putouts().clone();
+
+        let get_fielders = || {
+            let mut fielders: Vec<FieldingPosition> = [play.assists(), putouts.clone()].concat();
+            fielders.dedup();
+            fielders.iter()
+                .filter_map(|f| self.defenses
+                    .get(&d_side)
+                    .get_by_left(f))
+                .map(|f| *f)
+                .collect::<Vec<Fielder>>()
+        };
+
+        if putouts.len() == 2 {
+            events.push(BoxScoreEvent::DoublePlay(DoublePlayLine::new(d_side, get_fielders())))
+        }
+        else if putouts.len() == 3 {
+            events.push(BoxScoreEvent::TriplePlay(TriplePlayLine::new(d_side, get_fielders())))
+        }
+
+        if play.hit_by_pitch() {
+            events.push(BoxScoreEvent::HitByPitch(HitByPitchLine::new(d_side,
+                                                                      Some(self.pitcher(&d_side)?),
+                                                                      play_record.batter)))
+        }
+        else if play.home_run() {
+            events.push(BoxScoreEvent::HomeRun(HomeRunLine::new(play_record.side,
+                                                                play_record.batter,
+                                                                self.pitcher(&d_side)?,
+                                                                Some(play_record.inning),
+                                                                Some(self.bases.num_runners_on_base()),
+                                                                Some(self.outs))))
+        }
+        for sb_play in play.stolen_base_plays() {
+            let base = sb_play.at_base.context("SB play missing base info")?;
+            let runner = self.bases
+                .get_baserunner(BaseRunner::from_target_base(&base)?)
+                .context("Missing runner info in Base State on SB play")?;
+            let runner_id = *self.lineups
+                .get(&play_record.side)
+                .get_by_left(&runner.lineup_position)
+                .context("Cannot find runner in lineup")?;
+            let catcher = *self.defenses
+                .get(&d_side)
+                .get_by_left(&FieldingPosition::Catcher)
+                .context("Cannot find catcher on SB play")?;
+            let (running_side, pitcher_id, catcher_id, inning) = (
+                play_record.side, Some(self.pitcher(&d_side)?), Some(catcher), Some(self.inning)
+            );
+            match sb_play.baserunning_play_type {
+                BaserunningPlayType::StolenBase => {
+                    events.push(BoxScoreEvent::StolenBase(StolenBaseLine::new(running_side, runner_id, pitcher_id, catcher_id, inning)));
+                }
+                BaserunningPlayType::CaughtStealing | BaserunningPlayType::PickedOffCaughtStealing => {
+                    events.push(BoxScoreEvent::CaughtStealing(StolenBaseLine::new(running_side, runner_id, pitcher_id, catcher_id, inning)));
+                },
+                _ => ()
+            }
+        }
+        Ok(events)
+    }
+
+    /// TODO: Unmess
     fn update_box_score(&self, play_record: &PlayRecord, new_base_state: &BaseState) -> Result<BoxScore> {
         let (batting_side, fielding_side) = (&play_record.side, &play_record.side.flip());
         let mut new_box = self.box_score.clone();
@@ -512,11 +652,29 @@ impl GameState {
         // First add stats relating to the PA (if any) to the batter
         let batter_line = new_box.get_batter_by_id(*batting_side, play_record.batter)?;
         Self::update_batter_stats(&mut batter_line.batting_stats, play);
+        // Update PH-specific stat lines
+        match  new_box.get_current_line_for_fielder(*batting_side, play_record.batter) {
+            Some(fl) if fl.fielding_position == FieldingPosition::PinchHitter => {
+                let pinch_hit_line = new_box.get_pinch_hitter_by_id(*batting_side, play_record.batter)?;
+                if let Some(stats) = &mut pinch_hit_line.batting_stats {
+                    Self::update_batter_stats(stats, play);
+                }
 
+            },
+            _ => ()
+        }
         // Then add R/SB/CS to the batting lines of the baserunners
         for runner in &new_base_state.scored {
             let runner_line = new_box.get_line_from_runner(*batting_side, lineup, runner)?;
             runner_line.batting_stats.runs += 1;
+            let runner_id = runner_line.batter_id;
+            match self.box_score.get_current_line_for_fielder(*batting_side, runner_id) {
+                Some(fl) if fl.fielding_position == FieldingPosition::PinchRunner => {
+                    let pinch_run_line = new_box.get_pinch_runner_by_id(*batting_side, runner_id)?;
+                    opt_add(&mut pinch_run_line.runs, 1);
+                },
+                _ => ()
+            }
         }
         for sb_play in play.stolen_base_plays() {
             let target_base = sb_play
@@ -532,6 +690,20 @@ impl GameState {
             }
             else {
                 opt_add(&mut runner_line.batting_stats.caught_stealing, 1);
+            }
+
+            let runner_id = runner_line.batter_id;
+            match self.box_score.get_current_line_for_fielder(*batting_side, runner_id) {
+                Some(fl) if fl.fielding_position == FieldingPosition::PinchRunner => {
+                    let pinch_run_line = new_box.get_pinch_runner_by_id(*batting_side, runner_id)?;
+                    if sb_play.baserunning_play_type == BaserunningPlayType::StolenBase {
+                        opt_add(&mut pinch_run_line.stolen_bases, 1);
+                    }
+                    else {
+                        opt_add(&mut pinch_run_line.caught_stealing, 1);
+                    }
+                },
+                _ => ()
             }
         }
 
@@ -551,7 +723,12 @@ impl GameState {
             if defense.get_by_left(&line.fielding_position) == Some(&line.fielder_id) {
                 Self::update_defensive_stats(Option::from(&mut line.defensive_stats), line.fielding_position, play)?;
             }
-        };
+        }
+        // Add team misc info
+        self.update_team_misc(&mut new_box, play, new_base_state)?;
+        *new_box.team_unearned_runs.get_mut(&fielding_side) += play.team_unearned_runs().len() as u8;
+        new_box.events.extend(self.make_events(play_record)?);
+
         Ok(new_box)
     }
 
@@ -567,6 +744,15 @@ impl GameState {
         Ok(self.line_score.cloned_update(&play_record.side, line_score))
     }
 
+    fn outs_after_play(&self, play_record: &PlayRecord) -> Result<u8> {
+        let flipped = self.batting_side != play_record.side;
+        let play_outs = play_record.play.outs()?.len() as u8;
+        match if flipped {play_outs} else {self.outs + play_outs} {
+            o if o > 3 => Err(anyhow!("Illegal state, more than 3 outs recorded")),
+            o => Ok(o)
+        }
+    }
+
     fn update_on_play(&self, play_record: &PlayRecord) -> Result<Self> {
         if play_record.play.no_play() {
             return Ok(self.clone())
@@ -574,11 +760,7 @@ impl GameState {
 
         let flipped = self.batting_side != play_record.side;
         let frame = if flipped {self.frame.flip()} else {self.frame};
-        let play_outs = play_record.play.outs()?.len() as u8;
-
-        let outs = if flipped {play_outs} else {self.outs + play_outs};
-
-        if outs > 3 {return Err(anyhow!("Illegal state, more than 3 outs recorded"))}
+        let outs = self.outs_after_play(play_record)?;
 
         let at_bat = self.lineups
             .get(&play_record.side)

@@ -72,6 +72,12 @@ impl <T: Sized + Clone> Matchup<T> {
 // TODO: Is there a rustier way to write?
 impl<T: Copy> Copy for Matchup<T> {}
 
+impl<T> From<(T, T)> for Matchup<T> {
+    fn from(tup: (T, T)) -> Self {
+        Matchup {away: tup.0, home: tup.1}
+    }
+}
+
 impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
     type Error = Error;
 
