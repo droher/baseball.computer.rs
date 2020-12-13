@@ -371,7 +371,6 @@ pub struct GameState {
     lineups: Matchup<Lineup>,
     defenses: Matchup<Defense>,
     at_bat: LineupPosition,
-    count: Count,
     box_score: BoxScore,
 }
 
@@ -387,7 +386,6 @@ impl GameState {
             lineups: game.starting_lineups.clone(),
             defenses: game.starting_defense.clone(),
             at_bat: LineupPosition::First,
-            count: Count::default(),
             box_score: BoxScore::try_from(game)?,
         })
     }
@@ -398,10 +396,6 @@ impl GameState {
             .get_by_left(&FieldingPosition::Pitcher)
             .context("Missing pitcher")?
         )
-    }
-
-    fn fielding_side(&self) -> Side {
-        self.batting_side.flip()
     }
 
     fn update_on_substitution(&mut self, sub: &SubstitutionRecord) {
@@ -457,7 +451,7 @@ impl GameState {
         }
     }
 
-    fn update_batter_stats(batting_stats: &mut BattingLineStats, play_record: &PlayRecord, cached_play: &CachedPlay) {
+    fn update_batter_stats(batting_stats: &mut BattingLineStats, cached_play: &CachedPlay) {
         let play = &cached_play.play;
 
         if cached_play.plate_appearance.is_none() {
@@ -499,7 +493,7 @@ impl GameState {
 
     // TODO: No-out batters
     // Handles everything except runs, earned runs, and no out batters
-    fn update_pitching_stats(pitching_stats: &mut PitchingLineStats, play_record: &PlayRecord, cached_play: &CachedPlay) {
+    fn update_pitching_stats(pitching_stats: &mut PitchingLineStats, cached_play: &CachedPlay) {
         let play = &cached_play.play;
         pitching_stats.outs_recorded += cached_play.putouts.len() as u8;
         if play.wild_pitch() {opt_add(&mut pitching_stats.wild_pitches, 1)}
@@ -585,10 +579,10 @@ impl GameState {
         Ok(())
     }
 
-    fn make_events(&self, play_record: &PlayRecord, cached_play: &CachedPlay) -> Result<Vec<BoxScoreEvent>> {
+    fn make_events(&self, cached_play: &CachedPlay) -> Result<Vec<BoxScoreEvent>> {
         let play = &cached_play.play;
 
-        let d_side = play_record.side.flip();
+        let d_side = cached_play.batting_side.flip();
         let mut events: Vec<BoxScoreEvent> = Vec::with_capacity(1);
         let putouts = &cached_play.putouts;
 
@@ -613,13 +607,13 @@ impl GameState {
         if play.hit_by_pitch() {
             events.push(BoxScoreEvent::HitByPitch(HitByPitchLine::new(d_side,
                                                                       Some(self.pitcher(&d_side)?),
-                                                                      play_record.batter)))
+                                                                      cached_play.batter)))
         }
         else if play.home_run() {
-            events.push(BoxScoreEvent::HomeRun(HomeRunLine::new(play_record.side,
-                                                                play_record.batter,
+            events.push(BoxScoreEvent::HomeRun(HomeRunLine::new(cached_play.batting_side,
+                                                                cached_play.batter,
                                                                 self.pitcher(&d_side)?,
-                                                                Some(play_record.inning),
+                                                                Some(cached_play.inning),
                                                                 Some(self.bases.num_runners_on_base()),
                                                                 Some(self.outs))))
         }
@@ -630,7 +624,7 @@ impl GameState {
                 .copied()
                 .context("Missing runner info in Base State on SB play")?;
             let runner_id = *self.lineups
-                .get(&play_record.side)
+                .get(&cached_play.batting_side)
                 .get_by_left(&runner.lineup_position)
                 .context("Cannot find runner in lineup")?;
             let catcher = *self.defenses
@@ -638,7 +632,7 @@ impl GameState {
                 .get_by_left(&FieldingPosition::Catcher)
                 .context("Cannot find catcher on SB play")?;
             let (running_side, pitcher_id, catcher_id, inning) = (
-                play_record.side, Some(self.pitcher(&d_side)?), Some(catcher), Some(self.inning)
+                cached_play.batting_side, Some(self.pitcher(&d_side)?), Some(catcher), Some(self.inning)
             );
             match sb_play.baserunning_play_type {
                 BaserunningPlayType::StolenBase => {
@@ -654,10 +648,10 @@ impl GameState {
     }
 
     /// TODO: Unmess
-    fn update_box_score(&mut self, play_record: &PlayRecord, cached_play: &CachedPlay, new_base_state: &BaseState) -> Result<()> {
-        let (batting_side, fielding_side) = (play_record.side, play_record.side.flip());
+    fn update_box_score(&mut self, cached_play: &CachedPlay, new_base_state: &BaseState) -> Result<()> {
+        let (batting_side, fielding_side) = (cached_play.batting_side, cached_play.batting_side.flip());
         let pitcher_id = self.pitcher(&fielding_side)?;
-        let events =self.make_events(play_record, cached_play)?;
+        let events =self.make_events(cached_play)?;
 
         let new_box = &mut self.box_score;
         let play = &cached_play.play;
@@ -665,14 +659,14 @@ impl GameState {
         let defense = self.defenses.get(&fielding_side);
 
         // First add stats relating to the PA (if any) to the batter
-        let batter_line = new_box.get_batter_by_id(batting_side, play_record.batter)?;
-        Self::update_batter_stats(&mut batter_line.batting_stats, play_record, cached_play);
+        let batter_line = new_box.get_batter_by_id(batting_side, cached_play.batter)?;
+        Self::update_batter_stats(&mut batter_line.batting_stats, cached_play);
         // Update PH-specific stat lines
-        match  new_box.get_current_line_for_fielder(batting_side, play_record.batter) {
+        match  new_box.get_current_line_for_fielder(batting_side, cached_play.batter) {
             Some(fl) if fl.fielding_position == FieldingPosition::PinchHitter => {
-                let pinch_hit_line = new_box.get_pinch_hitter_by_id(batting_side, play_record.batter)?;
+                let pinch_hit_line = new_box.get_pinch_hitter_by_id(batting_side, cached_play.batter)?;
                 if let Some(stats) = &mut pinch_hit_line.batting_stats {
-                    Self::update_batter_stats(stats, play_record, cached_play);
+                    Self::update_batter_stats(stats, cached_play);
                 }
 
             },
@@ -725,7 +719,7 @@ impl GameState {
         // Pitching numbers are a bit easier to manage because for the most part there's only one pitcher
         // to keep track of, with the exception of inherited runners
         let pitching_line = new_box.get_pitcher_by_id(fielding_side, pitcher_id)?;
-        Self::update_pitching_stats(&mut pitching_line.pitching_stats, play_record, cached_play);
+        Self::update_pitching_stats(&mut pitching_line.pitching_stats, cached_play);
         for runner in &new_base_state.scored {
             let pitching_line = new_box.get_pitcher_by_id(fielding_side, runner.charged_to)?;
             pitching_line.pitching_stats.runs += 1;
@@ -747,9 +741,9 @@ impl GameState {
         Ok(())
     }
 
-    fn update_line_score(&mut self, play_record: &PlayRecord, cached_play: &CachedPlay) -> Result<()> {
-        let mut line_score = self.line_score.get_mut(&play_record.side);
-        let diff = play_record.inning - line_score.len() as u8;
+    fn update_line_score(&mut self, cached_play: &CachedPlay) -> Result<()> {
+        let mut line_score = self.line_score.get_mut(&cached_play.batting_side);
+        let diff = cached_play.inning - line_score.len() as u8;
         // Add a new frame if needed
         if diff == 1 { line_score.push(0) }
         else if diff != 0 {return Err(anyhow!("Line score out of sync with inning"))}
@@ -760,8 +754,8 @@ impl GameState {
         Ok(())
     }
 
-    fn outs_after_play(&self, play_record: &PlayRecord, cached_play: &CachedPlay) -> Result<u8> {
-        let flipped = self.batting_side != play_record.side;
+    fn outs_after_play(&self, cached_play: &CachedPlay) -> Result<u8> {
+        let flipped = self.batting_side != cached_play.batting_side;
         let play_outs = cached_play.outs.len() as u8;
         match if flipped {play_outs} else {self.outs + play_outs} {
             o if o > 3 => Err(anyhow!("Illegal state, more than 3 outs recorded")),
@@ -769,20 +763,19 @@ impl GameState {
         }
     }
 
-    fn update_on_play(&mut self, play_record: &PlayRecord) -> Result<()> {
-        let cached_play = CachedPlay::try_from(play_record)?;
+    fn update_on_play(&mut self, cached_play: &CachedPlay) -> Result<()> {
         let play = &cached_play.play;
         if play.no_play() {
             return Ok(())
         }
 
-        let flipped = self.batting_side != play_record.side;
+        let flipped = self.batting_side != cached_play.batting_side;
         let frame = if flipped {self.frame.flip()} else {self.frame};
-        let outs = self.outs_after_play(play_record, &cached_play)?;
+        let outs = self.outs_after_play(&cached_play)?;
 
         let at_bat = self.lineups
-            .get(&play_record.side)
-            .get_by_right(&play_record.batter)
+            .get(&cached_play.batting_side)
+            .get_by_right(&cached_play.batter)
             .copied()
             .context("Could not find batter in current side's lineup")?;
 
@@ -790,24 +783,23 @@ impl GameState {
                                                        outs == 3,
                                                        &cached_play,
                                                        at_bat,
-                                                       self.pitcher(&play_record.side.flip())?)?;
+                                                       self.pitcher(&cached_play.batting_side.flip())?)?;
 
-        self.inning = play_record.inning;
+        self.inning = cached_play.inning;
         self.frame = frame;
-        self.batting_side = play_record.side;
+        self.batting_side = cached_play.batting_side;
         self.outs = outs;
-        self.update_box_score(play_record, &cached_play, &new_base_state)?;
+        self.update_box_score(&cached_play, &new_base_state)?;
         self.bases = new_base_state;
-        self.update_line_score(play_record, &cached_play)?;
+        self.update_line_score(&cached_play)?;
         self.at_bat = at_bat;
-        self.count = play_record.count;
 
         Ok(())
     }
 
     fn next_state(&mut self, event_record: &EventRecord) -> Result<()> {
         match event_record {
-            Either::Left(pr) => self.update_on_play(pr),
+            Either::Left(pr) => self.update_on_play(&CachedPlay::try_from(pr)?),
             Either::Right(sr) => Ok(self.update_on_substitution(sr))
         }
     }

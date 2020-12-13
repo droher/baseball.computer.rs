@@ -1578,6 +1578,9 @@ impl TryFrom<&str> for Play {
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct CachedPlay {
     pub play: Play,
+    pub batting_side: Side,
+    pub inning: Inning,
+    pub batter: Batter,
     pub putouts: PositionVec,
     pub assists: PositionVec,
     pub errors: PositionVec,
@@ -1595,6 +1598,9 @@ impl TryFrom<&PlayRecord> for CachedPlay {
     fn try_from(play_record: &PlayRecord) -> Result<Self> {
         let play = Play::try_from(play_record.raw_play.as_str())?;
         Ok(Self {
+            batting_side: play_record.side,
+            inning: play_record.inning,
+            batter: play_record.batter,
             putouts: play.putouts(),
             assists: play.assists(),
             errors: play.errors(),
