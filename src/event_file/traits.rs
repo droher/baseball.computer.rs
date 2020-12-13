@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Error, Result, Context};
 use csv::StringRecord;
-use strum_macros::EnumString;
+use strum_macros::{EnumString, EnumIter};
 use num_enum::{TryFromPrimitive, IntoPrimitive};
 use std::convert::{TryFrom};
 use tinystr::{TinyStr8, TinyStr16};
@@ -10,7 +10,7 @@ use crate::util::digit_vec;
 
 pub type RetrosheetEventRecord = StringRecord;
 
-#[derive(Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash)]
+#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash)]
 #[repr(u8)]
 pub enum LineupPosition {
     PitcherWithDH = 0,
@@ -58,7 +58,7 @@ impl TryFrom<&str> for LineupPosition {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash)]
+#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash, EnumIter)]
 #[repr(u8)]
 pub enum FieldingPosition {
     Unknown = 0,
@@ -143,5 +143,81 @@ impl Side {
             Self::Away => "0",
             Self::Home => "1"
         }
+    }
+}
+
+#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString)]
+pub enum BattingStats {
+    AtBats,
+    Runs,
+    Hits,
+    Doubles,
+    Triples,
+    HomeRuns,
+    RBI,
+    SacrificeHits,
+    SacrificeFlies,
+    HitByPitch,
+    Walks,
+    IntentionalWalks,
+    Strikeouts,
+    StolenBases,
+    CaughtStealing,
+    GroundedIntoDoublePlays,
+    ReachedOnInterference
+}
+
+#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString)]
+pub enum DefenseStats {
+    OutsPlayed,
+    Putouts,
+    Assists,
+    Errors,
+    DoublePlays,
+    TriplePlays,
+    PassedBalls
+}
+
+#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash)]
+pub enum PitchingStats {
+    OutsRecorded,
+    NoOutBatters,
+    BattersFaced,
+    Hits,
+    Doubles,
+    Triples,
+    HomeRuns,
+    Runs,
+    EarnedRuns,
+    Walks,
+    IntentionalWalks,
+    Strikeouts,
+    HitBatsmen,
+    WildPitches,
+    Balks,
+    SacrificeHits,
+    SacrificeFlies
+}
+
+#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash)]
+pub enum StatKind {
+    Batting(BattingStats),
+    Defense(DefenseStats),
+    Pitching(PitchingStats)
+}
+
+#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash)]
+pub struct Stat {
+    kind: StatKind,
+    stat: u8
+}
+
+impl Stat {
+    pub fn new(kind: StatKind, stat: u8) -> Self {
+        Self {kind, stat}
+    }
+
+    pub fn batting(kind: BattingStats, stat: u8) -> Self {
+        Self {kind: StatKind::Batting(kind), stat}
     }
 }

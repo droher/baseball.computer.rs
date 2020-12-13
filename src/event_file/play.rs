@@ -7,13 +7,19 @@ use const_format::{concatcp, formatcp};
 use num_enum::{TryFromPrimitive, IntoPrimitive};
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
-use strum::ParseError;
+use strum::{IntoEnumIterator, ParseError};
 use strum_macros::{EnumDiscriminants, EnumString};
 
 use crate::util::{str_to_tinystr, regex_split, to_str_vec, pop_with_vec};
-use crate::event_file::traits::{Inning, Side, Batter, RetrosheetEventRecord, FieldingPosition};
+use crate::event_file::traits::{Inning, Side, Batter, RetrosheetEventRecord, FieldingPosition, Stat, StatKind, BattingStats, PitchingStats, DefenseStats};
 use std::convert::TryFrom;
 use crate::event_file::pitch_sequence::PitchSequence;
+use std::collections::{HashSet, HashMap};
+use crate::event_file::play::BaserunningPlayType::PickedOffCaughtStealing;
+use crate::event_file::box_score::BoxScoreLine::PitchingLine;
+use crate::event_file::traits::StatKind::Defense;
+use std::iter::FromIterator;
+use std::borrow::Cow;
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
@@ -70,7 +76,7 @@ pub trait FieldingData {
     fn errors(&self) -> PositionVec;
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash)]
 pub enum Base {
     #[strum(serialize = "1")]
     First = 1,
@@ -82,7 +88,7 @@ pub enum Base {
     Home
 }
 
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, EnumString, Copy, Clone, TryFromPrimitive, IntoPrimitive)]
+#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord, EnumString, Copy, Clone, TryFromPrimitive, IntoPrimitive)]
 #[repr(u8)]
 pub enum BaseRunner {
     #[strum(serialize = "B")]
@@ -99,7 +105,7 @@ impl BaseRunner {
         BaseRunner::try_from((*base as u8) - 1).context("Could not find baserunner for target base")
     }
 
-    fn from_current_base(base: &Base) -> Result<Self> {
+    pub fn from_current_base(base: &Base) -> Result<Self> {
         BaseRunner::try_from(*base as u8).context("Could not find baserunner for current base")
     }
 
@@ -126,7 +132,7 @@ impl Default for InningFrame {
     fn default() -> Self {Self::Top}
 }
 
-#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum EarnedRunStatus {
     #[strum(serialize = "UR")]
     Unearned,
@@ -134,7 +140,7 @@ pub enum EarnedRunStatus {
     TeamUnearned // Earned to the (relief) pitcher, unearned to the team
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub enum RbiStatus {
     RBI,
     NoRBI
@@ -166,7 +172,7 @@ pub trait ImplicitPlayResults {
 
 }
 
-#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum HitType {
     #[strum(serialize = "S")]
     Single,
@@ -192,7 +198,7 @@ impl ImplicitPlayResults for HitType {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Hit {
     pub hit_type: HitType,
     positions_hit_to: PositionVec
@@ -222,7 +228,7 @@ impl TryFrom<(&str, &str)> for Hit {
 /// just a play which never counts for a hit and usually counts for an at-bat. Exceptions
 /// include reaching on a fielder's choice, error, passed ball, or wild pitch, which count as at-bats but not outs,
 /// and sacrifices, which count as outs but not at-bats. Baseball!
-#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum OutAtBatType {
     // Note that these may not always be at bats or outs in the event of SF, SH, PB, WP, and E
     #[strum(serialize = "")]
@@ -235,7 +241,7 @@ pub enum OutAtBatType {
     ReachedOnError
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FieldingPlay {
     assists: PositionVec,
     putouts: PositionVec,
@@ -314,7 +320,7 @@ impl TryFrom<&str> for FieldingPlay {
 }
 
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct BattingOut {
     out_type: OutAtBatType,
     fielding_play: Option<FieldingPlay>
@@ -370,7 +376,7 @@ impl TryFrom<(&str, &str)> for BattingOut {
     }
 }
 
-#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum OtherPlateAppearance {
     #[strum(serialize = "C")]
     Interference,
@@ -388,7 +394,7 @@ impl ImplicitPlayResults for OtherPlateAppearance {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum PlateAppearanceType {
     Hit(Hit),
     BattingOut(BattingOut),
@@ -485,7 +491,7 @@ impl TryFrom<(&str, &str)> for PlateAppearanceType {
 
 
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct BaserunningFieldingInfo {
     assists: PositionVec,
     putout: Option<FieldingPosition>,
@@ -522,7 +528,7 @@ impl From<Captures<'_>> for BaserunningFieldingInfo {
     }
 }
 
-#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum BaserunningPlayType {
     #[strum(serialize = "PO")]
     PickedOff,
@@ -544,7 +550,7 @@ pub enum BaserunningPlayType {
     PassedBall
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct BaserunningPlay {
     pub baserunning_play_type: BaserunningPlayType,
     pub at_base: Option<Base>,
@@ -622,7 +628,7 @@ impl TryFrom<&str> for BaserunningPlay {
     }
 }
 
-#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum NoPlayType {
     #[strum(serialize = "NP")]
     NoPlay,
@@ -631,7 +637,7 @@ pub enum NoPlayType {
 }
 impl ImplicitPlayResults for NoPlayType {}
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct NoPlay {
     no_play_type: NoPlayType,
     error: Option<FieldingPosition>
@@ -652,7 +658,7 @@ impl TryFrom<(&str, &str)> for NoPlay {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub enum PlayType {
     PlateAppearance(PlateAppearanceType),
     BaserunningPlay(BaserunningPlay),
@@ -787,7 +793,7 @@ impl PlayType {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct RunnerAdvance {
     pub baserunner: BaseRunner,
     pub to: Base,
@@ -886,7 +892,7 @@ impl RunnerAdvance {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, EnumDiscriminants, Clone)]
+#[derive(Debug, PartialEq, Eq, EnumDiscriminants, Clone, Hash)]
 pub enum RunnerAdvanceModifier {
     UnearnedRun,
     TeamUnearnedRun,
@@ -1006,7 +1012,7 @@ impl RunnerAdvanceModifier {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash)]
 pub enum HitStrength {
     #[strum(serialize = "+")]
     Hard,
@@ -1018,7 +1024,7 @@ impl Default for HitStrength {
     fn default() -> Self {Self::Default}
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash)]
 pub enum HitDepth {
     #[strum(serialize = "S")]
     Shallow,
@@ -1032,7 +1038,7 @@ impl Default for HitDepth {
     fn default() -> Self {Self::Default}
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash)]
 pub enum HitAngle {
     #[strum(serialize = "F")]
     Foul,
@@ -1046,7 +1052,7 @@ impl Default for HitAngle {
     fn default() -> Self {Self::Default}
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash)]
 pub enum HitLocationGeneral {
     #[strum(serialize = "1")]
     Pitcher,
@@ -1086,7 +1092,7 @@ pub enum HitLocationGeneral {
     Right,
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub struct HitLocation {
     general_location: HitLocationGeneral,
     depth: HitDepth,
@@ -1115,7 +1121,7 @@ impl TryFrom<&str> for HitLocation {
 
 
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub struct ContactDescription {
     contact_type: ContactType,
     location: Option<HitLocation>
@@ -1143,7 +1149,7 @@ impl TryFrom<(&str, &str)> for ContactDescription {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, EnumString)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, EnumString, Hash)]
 pub enum ContactType {
     #[strum(serialize = "B")]
     UnspecifiedBunt,
@@ -1167,7 +1173,7 @@ pub enum ContactType {
     Unknown
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Clone, Hash)]
 pub enum PlayModifier {
     ContactDescription(ContactDescription),
     #[strum(serialize = "AP")]
@@ -1305,7 +1311,7 @@ impl PlayModifier {
 
 // TODO: Some QA here would be nice:
 //  -- Assert no more than one PlateAppearance in the main plays
-#[derive(Debug, Eq, PartialEq, Default, Clone)]
+#[derive(Debug, Eq, PartialEq, Default, Clone, Hash)]
 pub struct Play {
     pub main_plays: Vec<PlayType>,
     pub modifiers: Vec<PlayModifier>,
@@ -1321,8 +1327,10 @@ impl Play {
             .all(|pt| pt.no_play())
     }
 
-    fn explicit_baserunners(&self) -> Vec<BaseRunner> {
-        self.explicit_advances.iter().map(|ra| ra.baserunner).collect()
+    fn explicit_baserunners(&self) -> Box<dyn Iterator<Item=BaseRunner> + '_> {
+        Box::from(self.explicit_advances
+            .iter()
+            .map(|ra| ra.baserunner))
     }
 
     pub fn stolen_base_plays(&self) -> Vec<&BaserunningPlay> {
@@ -1335,54 +1343,58 @@ impl Play {
             .collect()
     }
 
-    fn implicit_outs(&self) -> Vec<BaseRunner> {
-        self.main_plays
+    fn implicit_outs(&self) -> Box<dyn Iterator<Item=BaseRunner> + '_> {
+        Box::from(self.main_plays
             .iter()
             .flat_map(|pt| pt.implicit_out())
-            .collect()
+        )
     }
 
-    pub fn advances(&self) -> Vec<RunnerAdvance> {
+    pub fn advances(&self) -> Box<dyn Iterator<Item=RunnerAdvance> + '_> {
         let cleaned_advances = self.explicit_advances
-            .clone()
-            .into_iter()
+            .iter()
             // Occasionally there is a redundant piece of info like "3-3" that screws stuff up
             // "3X3" is OK, seems to refer to getting doubled off the bag rather than trying to advance
             .filter(|ra| ra.to as u8 != ra.baserunner as u8 || ra.is_out())
-            .collect::<Vec<RunnerAdvance>>();
+            .cloned();
         // If a baserunner is already explicitly represented in `advances`, or is implicitly out on another main play, don't include the implicit advance
         let implicit_advances = self.main_plays
             .iter()
-            .flat_map(|pt| pt
+            .flat_map(move |pt| pt
                 .implicit_advance()
                 .map(|ra| {
-                    if [self.implicit_outs(), self.explicit_baserunners()].concat().contains(&ra.baserunner) {
+                    if self.implicit_outs()
+                        .chain(self.explicit_baserunners())
+                        .any(|br| br == ra.baserunner) {
                         None
                     } else { Some(ra) }
                 }))
-            .filter_map(|ra| ra)
-            .collect();
-        [cleaned_advances, implicit_advances].concat()
+            .filter_map(|ra| ra.clone());
+        Box::from(cleaned_advances.chain(implicit_advances))
     }
 
-    fn filtered_baserunners(&self, filter: fn(&RunnerAdvance) -> bool) -> Vec<BaseRunner> {
-        self.advances()
-            .iter()
-            .filter_map(|ra| if filter(ra) {Some(ra.baserunner)} else {None})
-            .collect()
+    fn filtered_baserunners(&self, filter: fn(&RunnerAdvance) -> bool) -> Box<dyn Iterator<Item=BaseRunner> + '_> {
+        Box::from(self.advances()
+            .filter_map(move |ra| if filter(&ra) {Some(ra.baserunner)} else {None})
+        )
     }
 
     pub fn outs(&self) -> Result<Vec<BaseRunner>> {
-        let out_advancing: Vec<BaseRunner> = self.filtered_baserunners(|ra| ra.is_out());
-        let safe_advancing: Vec<BaseRunner> = self.filtered_baserunners(|ra|!ra.is_out());
+        let (out_advancing, safe_advancing): (Vec<RunnerAdvance>, Vec<RunnerAdvance>) = self
+            .advances()
+            .partition(|ra| ra.is_out());
 
         let implicit_outs = self.implicit_outs()
-            .into_iter()
-            .filter(|br| !safe_advancing.contains(&br))
-            .collect();
-        let mut full_outs = [out_advancing, implicit_outs].concat();
-        full_outs.sort();
-        full_outs.dedup();
+            .filter(|br| safe_advancing
+                .iter()
+                .all(|ra| ra.baserunner != *br));
+        let full_outs = Vec::from_iter(
+            implicit_outs
+            .chain(out_advancing
+                .iter()
+                .map(|ra| ra.baserunner))
+            .collect::<HashSet<BaseRunner>>()
+        );
 
         let extra_outs = self.modifiers.iter().find_map(|f| f.multi_out_play());
         if let Some(o) = extra_outs {
@@ -1396,11 +1408,12 @@ impl Play {
     }
 
     pub fn runs(&self) -> Vec<BaseRunner> {
-        self.filtered_baserunners(|ra: &RunnerAdvance| ra.scored())
+        self.filtered_baserunners(|ra: &RunnerAdvance| ra.scored()).collect()
     }
 
     pub fn team_unearned_runs(&self) -> Vec<BaseRunner> {
         self.filtered_baserunners(|ra: &RunnerAdvance| ra.scored() && ra.earned_run_status() == Some(EarnedRunStatus::TeamUnearned))
+            .collect()
     }
 
     pub fn is_gidp(&self) -> bool {
@@ -1430,10 +1443,11 @@ impl Play {
             |ra: &RunnerAdvance|
                 ra.scored() && ra.explicit_rbi_status() == Some(RbiStatus::RBI)
         };
-        match self.default_rbi_status() {
+        let rbis = match self.default_rbi_status() {
             RbiStatus::RBI => self.filtered_baserunners(default_filter),
             RbiStatus::NoRBI => self.filtered_baserunners(no_default_filter)
-        }
+        };
+        rbis.collect()
     }
 
     pub fn passed_ball(&self) -> bool {
@@ -1561,7 +1575,47 @@ impl TryFrom<&str> for Play {
     }
 }
 
-#[derive(Debug, Default, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+pub struct CachedPlay {
+    pub play: Play,
+    pub batting_side: Side,
+    pub inning: Inning,
+    pub batter: Batter,
+    pub putouts: PositionVec,
+    pub assists: PositionVec,
+    pub errors: PositionVec,
+    pub outs: Vec<BaseRunner>,
+    pub advances: Vec<RunnerAdvance>,
+    pub runs: Vec<BaseRunner>,
+    pub team_unearned_runs: Vec<BaseRunner>,
+    pub rbi: Vec<BaseRunner>,
+    pub plate_appearance: Option<PlateAppearanceType>
+}
+
+impl TryFrom<&PlayRecord> for CachedPlay {
+    type Error = Error;
+
+    fn try_from(play_record: &PlayRecord) -> Result<Self> {
+        let play = Play::try_from(play_record.raw_play.as_str())?;
+        Ok(Self {
+            batting_side: play_record.side,
+            inning: play_record.inning,
+            batter: play_record.batter,
+            putouts: play.putouts(),
+            assists: play.assists(),
+            errors: play.errors(),
+            outs: play.outs()?,
+            advances: play.advances().collect(),
+            runs: play.runs(),
+            team_unearned_runs: play.team_unearned_runs(),
+            rbi: play.rbi(),
+            plate_appearance: play.plate_appearance().cloned(),
+            play
+        })
+    }
+}
+
+#[derive(Debug, Default, Eq, PartialEq, Copy, Clone, Hash)]
 pub struct Count { balls: Option<u8>, strikes: Option<u8> }
 
 impl Count {
@@ -1582,7 +1636,7 @@ pub struct PlayRecord {
     pub batter: Batter,
     pub count: Count,
     pub pitch_sequence: Option<PitchSequence>,
-    pub play: Play
+    raw_play: String,
 }
 
 impl TryFrom<&RetrosheetEventRecord>for PlayRecord {
@@ -1596,7 +1650,160 @@ impl TryFrom<&RetrosheetEventRecord>for PlayRecord {
             batter: str_to_tinystr(record[3])?,
             count: Count::new(record[4])?,
             pitch_sequence: {match record[5] {"" => None, s => Some(PitchSequence::try_from(s)?)}},
-            play: Play::try_from(record[6])?
+            raw_play: record[6].to_string()
         })
     }
+}
+
+fn increment_batting_stat(kind: BattingStats, vec: &mut Vec<Stat>) {
+    vec.push(Stat::batting(kind, 1))
+}
+
+fn add_pitching_stat(kind: PitchingStats, amount: u8, vec: &mut Vec<Stat>) {
+    vec.push(Stat::new(StatKind::Pitching(kind), amount))
+}
+
+fn increment_pitching_stat(kind: PitchingStats, vec: &mut Vec<Stat>) {
+    vec.push(Stat::new(StatKind::Pitching(kind), 1))
+}
+
+fn add_defensive_stat(pos: FieldingPosition, kind: DefenseStats, amount: u8, stat_map: &mut HashMap<FieldingPosition, Vec<Stat>>) {
+    stat_map.entry(pos)
+        .or_insert_with(|| vec![])
+        .push(Stat::new(StatKind::Defense(kind), amount))
+}
+
+fn increment_defensive_stat(pos: FieldingPosition, kind: DefenseStats, stat_map: &mut HashMap<FieldingPosition, Vec<Stat>>) {
+    add_defensive_stat(pos, kind, 1, stat_map)
+}
+
+fn batter_stats(play: &Play) -> Vec<Stat> {
+    let mut vec = Vec::with_capacity(5);
+
+    if play.plate_appearance().is_none() {
+        return vec
+    }
+    let plate_appearance = play.plate_appearance().unwrap();
+
+    vec.push(Stat::batting(BattingStats::RBI, play.rbi().len() as u8));
+
+    if plate_appearance.is_at_bat() { increment_batting_stat(BattingStats::AtBats, &mut vec) }
+
+    if plate_appearance.is_strikeout() { increment_batting_stat(BattingStats::Strikeouts, &mut vec) }
+    if play.is_gidp() { increment_batting_stat(BattingStats::GroundedIntoDoublePlays, &mut vec) }
+    if play.sacrifice_hit() { increment_batting_stat(BattingStats::SacrificeHits, &mut vec) }
+    if play.sacrifice_fly() { increment_batting_stat(BattingStats::SacrificeFlies, &mut vec) }
+
+    if play.runs().contains(&BaseRunner::Batter) { increment_batting_stat(BattingStats::Runs, &mut vec)}
+
+    match plate_appearance {
+        PlateAppearanceType::Hit(h) => {
+            increment_batting_stat(BattingStats::Hits, &mut vec);
+            match h.hit_type {
+                HitType::Single => (),
+                HitType::Double | HitType::GroundRuleDouble => increment_batting_stat(BattingStats::Doubles, &mut vec),
+                HitType::Triple => increment_batting_stat(BattingStats::Triples, &mut vec),
+                HitType::HomeRun => increment_batting_stat(BattingStats::HomeRuns, &mut vec),
+            }
+        },
+        PlateAppearanceType::OtherPlateAppearance(opa) => {
+            match opa {
+                OtherPlateAppearance::Interference => increment_batting_stat(BattingStats::ReachedOnInterference, &mut vec),
+                OtherPlateAppearance::HitByPitch => increment_batting_stat(BattingStats::HitByPitch, &mut vec),
+                OtherPlateAppearance::Walk => increment_batting_stat(BattingStats::Walks, &mut vec),
+                OtherPlateAppearance::IntentionalWalk => {
+                    increment_batting_stat(BattingStats::Walks, &mut vec);
+                    increment_batting_stat(BattingStats::IntentionalWalks, &mut vec)
+                }
+            }
+        },
+        _ => ()
+    }
+    vec
+}
+
+fn pitcher_stats(play: &Play) -> Vec<Stat> {
+    let mut vec = Vec::with_capacity(5);
+    let r = &mut vec;
+    let inc = increment_pitching_stat;
+
+    add_pitching_stat(PitchingStats::OutsRecorded, play.putouts().len() as u8, r);
+    if play.wild_pitch() { inc(PitchingStats::WildPitches, r) }
+    if play.balk() { inc(PitchingStats::Balks, r)}
+    if play.sacrifice_hit() { inc(PitchingStats::SacrificeHits, r)}
+    if play.sacrifice_fly() { inc(PitchingStats::SacrificeFlies, r)}
+
+    if let Some(pa) = play.plate_appearance() {
+        inc(PitchingStats::BattersFaced, r);
+        if pa.is_strikeout() { inc(PitchingStats::Strikeouts, r)}
+        match pa {
+            PlateAppearanceType::Hit(h) => {
+                inc(PitchingStats::Hits, r);
+                match h.hit_type {
+                    HitType::Single => (),
+                    HitType::Double | HitType::GroundRuleDouble => inc(PitchingStats::Doubles, r),
+                    HitType::Triple => inc(PitchingStats::Triples, r),
+                    HitType::HomeRun => inc(PitchingStats::HomeRuns, r)
+                }
+            },
+            PlateAppearanceType::OtherPlateAppearance(opa) => {
+                match opa {
+                    OtherPlateAppearance::HitByPitch => inc(PitchingStats::HitBatsmen, r),
+                    OtherPlateAppearance::Walk => inc(PitchingStats::Walks, r),
+                    OtherPlateAppearance::IntentionalWalk => {
+                        inc(PitchingStats::Walks, r);
+                        inc(PitchingStats::IntentionalWalks, r)
+                    }
+                    _ => ()
+                }
+            }
+            _ => ()
+        }
+
+    }
+    vec
+}
+
+fn defense_stats(play: &Play) -> HashMap<FieldingPosition, Vec<Stat>> {
+    let mut stat_map = HashMap::with_capacity(15);
+    let r = &mut stat_map;
+
+    let (assists, putouts, errors) = (play.assists(), play.putouts(), play.errors());
+
+    let outs = putouts.len();
+
+    for pos in FieldingPosition::iter().filter(|fp| fp.plays_in_field()) {
+        add_defensive_stat(pos, DefenseStats::OutsPlayed, putouts.len() as u8, r)
+    }
+    for pos in &assists {
+        increment_defensive_stat(*pos, DefenseStats::Assists, r)
+    }
+    for pos in &putouts {
+        increment_defensive_stat(*pos, DefenseStats::Putouts, r)
+
+    }
+    for pos in &errors {
+        increment_defensive_stat(*pos, DefenseStats::Errors, r)
+    }
+
+    let fielders = || {
+        let mut fielders = [assists, putouts].concat();
+        fielders.dedup();
+        fielders
+    };
+
+    match outs {
+        2 => for f in fielders() {
+            increment_defensive_stat(f, DefenseStats::DoublePlays, r)
+        },
+        3 => for f in fielders() {
+            increment_defensive_stat(f, DefenseStats::TriplePlays, r)
+        },
+        _ => ()
+    }
+
+    if play.passed_ball() {
+        increment_defensive_stat(FieldingPosition::Catcher, DefenseStats::PassedBalls, r)
+    }
+    stat_map
 }

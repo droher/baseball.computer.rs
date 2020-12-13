@@ -13,6 +13,7 @@ use event_file::parser::RetrosheetReader;
 
 use crate::event_file::parser::Game;
 use crate::event_file::traits::RetrosheetEventRecord;
+use crate::event_file::pbp::GameState;
 
 mod util;
 mod event_file;

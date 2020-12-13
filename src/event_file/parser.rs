@@ -126,6 +126,7 @@ impl TryInto<Vec<RetrosheetEventRecord>> for Game {
             ])
         })
             .collect();
+
         Ok([id_fields, info, starts, box_score].concat())
     }
 }
@@ -198,7 +199,7 @@ impl Game {
 
 }
 
-#[derive(Debug, Default, PartialOrd, PartialEq, Eq, Clone)]
+#[derive(Debug, Default, PartialOrd, PartialEq, Eq, Clone, Copy)]
 pub struct GameUmpires {
     home: Option<Umpire>,
     first: Option<Umpire>,
@@ -249,7 +250,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameUmpires {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct GameSetting {
     game_type: GameType,
     start_time: Option<NaiveTime>,
@@ -339,7 +340,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameSetting {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct GameInfo {
     matchup: Teams,
     date: NaiveDate,
@@ -393,7 +394,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameInfo {
 
 
 /// Info fields relating to how the game was scored, obtained, and inputted.
-#[derive(Debug, Default, Eq, PartialEq, Clone)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
 pub struct GameRetrosheetMetadata {
     pitch_detail: PitchDetail,
     scoring_method: HowScored,
@@ -447,7 +448,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameRetrosheetMetadata {
 
 /// These fields only refer to data from the info section, and thus do not include
 /// any kind of box score data.
-#[derive(Debug, Default, Eq, PartialEq, Clone)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
 pub struct GameResults {
     winning_pitcher: Option<Pitcher>,
     losing_pitcher: Option<Pitcher>,

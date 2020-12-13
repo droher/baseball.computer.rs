@@ -8,7 +8,7 @@ use crate::event_file::traits::{RetrosheetEventRecord, Batter, LineupPosition, I
 use crate::util::{parse_positive_int, str_to_tinystr};
 use crate::event_file::misc::{Lineup, Defense};
 use tinystr::TinyStr8;
-use crate::event_file::play::OutAtBatType::FieldersChoice;
+use crate::event_file::play::PlayModifier::RelayToFielderWithNoOutMade;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
 pub struct BattingLineStats {
@@ -125,20 +125,22 @@ impl TryFrom<&RetrosheetEventRecord>for BattingLine {
     }
 }
 
-impl Into<RetrosheetEventRecord>for BattingLine {
+impl From<BattingLine> for RetrosheetEventRecord {
 
-    fn into(self) -> RetrosheetEventRecord {
-        let info = vec![
-            "stat".to_string(),
-            "bline".to_string(),
-            self.batter_id.to_string(),
-            self.side.retrosheet_str().to_string(),
-            self.lineup_position.retrosheet_string(),
-            self.nth_player_at_position.to_string()
-        ];
-        let stats: Vec<u8> = self.batting_stats.into();
-        let stats: Vec<String> = stats.iter().map(u8::to_string).collect();
-        RetrosheetEventRecord::from([info, stats].concat())
+    fn from(line: BattingLine) -> RetrosheetEventRecord {
+        let mut record = RetrosheetEventRecord::with_capacity(200, 24);
+        record.push_field("info");
+        record.push_field("stat");
+        record.push_field("bline");
+        record.push_field(line.batter_id.as_str());
+        record.push_field(line.side.retrosheet_str());
+        record.push_field(&line.lineup_position.retrosheet_string());
+        record.push_field(&line.nth_player_at_position.to_string());
+        let stats: Vec<u8> = line.batting_stats.into();
+        for stat in stats {
+            record.push_field(&stat.to_string())
+        }
+        record
     }
 }
 
@@ -163,19 +165,20 @@ impl PinchHittingLine {
     }
 }
 
-impl Into<RetrosheetEventRecord>for PinchHittingLine {
+impl From<PinchHittingLine> for RetrosheetEventRecord {
 
-    fn into(self) -> RetrosheetEventRecord {
-        let info = vec![
-            "stat".to_string(),
-            "phline".to_string(),
-            self.pinch_hitter_id.to_string(),
-            self.inning.map_or("".to_string(), |u| u.to_string()),
-            self.side.retrosheet_str().to_string(),
-        ];
-        let stats: Vec<u8> = self.batting_stats.unwrap_or_default().into();
-        let stats: Vec<String> = stats.iter().map(u8::to_string).collect();
-        RetrosheetEventRecord::from([info, stats].concat())
+    fn from(line: PinchHittingLine) -> RetrosheetEventRecord {
+        let mut record = RetrosheetEventRecord::with_capacity(200, 24);
+        record.push_field("stat");
+        record.push_field("phline");
+        record.push_field(line.pinch_hitter_id.as_str());
+        record.push_field(&line.inning.map_or("".to_string(), |u| u.to_string()));
+        record.push_field(line.side.retrosheet_str());
+        let stats: Vec<u8> = line.batting_stats.unwrap_or_default().into();
+        for stat in stats {
+            record.push_field(&stat.to_string())
+        }
+        record
     }
 }
 
@@ -220,19 +223,20 @@ impl PinchRunningLine {
     }
 }
 
-impl Into<RetrosheetEventRecord>for PinchRunningLine {
+impl From<PinchRunningLine> for RetrosheetEventRecord {
 
-    fn into(self) -> RetrosheetEventRecord {
-        let info = vec![
-            "stat".to_string(),
-            "prline".to_string(),
-            self.pinch_runner_id.to_string(),
-            self.inning.map_or("".to_string(), |u| u.to_string()),
-            self.runs.unwrap_or_default().to_string(),
-            self.stolen_bases.unwrap_or_default().to_string(),
-            self.caught_stealing.unwrap_or_default().to_string(),
-        ];
-        RetrosheetEventRecord::from(info)
+    fn from(line: PinchRunningLine) -> RetrosheetEventRecord {
+        let mut record = RetrosheetEventRecord::with_capacity(50, 7);
+        record.push_field("stat");
+        record.push_field("prline");
+        record.push_field(line.pinch_runner_id.as_str());
+        record.push_field( &line.inning.map_or("".to_string(), |u| u.to_string()));
+        record.push_field(line.side.retrosheet_str());
+        record.push_field( &line.runs.unwrap_or_default().to_string());
+        record.push_field( &line.stolen_bases.unwrap_or_default().to_string());
+        record.push_field( &line.caught_stealing.unwrap_or_default().to_string());
+
+        record
     }
 }
 
@@ -340,20 +344,23 @@ impl TryFrom<&RetrosheetEventRecord>for DefenseLine {
     }
 }
 
-impl Into<RetrosheetEventRecord>for DefenseLine {
+impl From<DefenseLine> for RetrosheetEventRecord {
 
-    fn into(self) -> RetrosheetEventRecord {
-        let info = vec![
-            "stat".to_string(),
-            "dline".to_string(),
-            self.fielder_id.to_string(),
-            self.side.retrosheet_str().to_string(),
-            self.fielding_position.retrosheet_string(),
-            self.nth_position_played_by_player.to_string()
-        ];
-        let stats: Vec<u8> = self.defensive_stats.unwrap_or_default().into();
-        let stats: Vec<String> = stats.iter().map(u8::to_string).collect();
-        RetrosheetEventRecord::from([info, stats].concat())
+    fn from(line: DefenseLine) -> RetrosheetEventRecord {
+        let mut record = RetrosheetEventRecord::with_capacity(50, 13);
+
+        record.push_field("stat");
+        record.push_field("dline");
+        record.push_field(line.fielder_id.as_str());
+        record.push_field(line.side.retrosheet_str());
+        record.push_field(&line.nth_position_played_by_player.to_string());
+        record.push_field(&line.fielding_position.retrosheet_string());
+
+        let stats: Vec<u8> = line.defensive_stats.unwrap_or_default().into();
+        for stat in stats {
+            record.push_field(&stat.to_string())
+        }
+        record
     }
 }
 
@@ -465,19 +472,22 @@ impl TryFrom<&RetrosheetEventRecord>for PitchingLine {
     }
 }
 
-impl Into<RetrosheetEventRecord>for PitchingLine {
+impl From<PitchingLine>for RetrosheetEventRecord {
 
-    fn into(self) -> RetrosheetEventRecord {
-        let info = vec![
-            "stat".to_string(),
-            "pline".to_string(),
-            self.pitcher_id.to_string(),
-            self.side.retrosheet_str().to_string(),
-            self.nth_pitcher.to_string()
-        ];
-        let stats: Vec<u8> = self.pitching_stats.into();
-        let stats: Vec<String> = stats.iter().map(u8::to_string).collect();
-        RetrosheetEventRecord::from([info, stats].concat())
+    fn from(line: PitchingLine) -> RetrosheetEventRecord {
+        let mut record = RetrosheetEventRecord::with_capacity(200, 24);
+
+        record.push_field("stat");
+        record.push_field("pline");
+        record.push_field(line.pitcher_id.as_str());
+        record.push_field(line.side.retrosheet_str());
+        record.push_field(&line.nth_pitcher.to_string());
+
+        let stats: Vec<u8> = line.pitching_stats.into();
+        for stat in stats {
+            record.push_field(&stat.to_string())
+        }
+        record
     }
 }
 
@@ -504,17 +514,17 @@ impl TeamMiscellaneousLine {
     }
 }
 
-impl Into<RetrosheetEventRecord>for TeamMiscellaneousLine {
+impl From<TeamMiscellaneousLine> for RetrosheetEventRecord {
 
-    fn into(self) -> RetrosheetEventRecord {
+    fn from(line: TeamMiscellaneousLine) -> RetrosheetEventRecord {
         let info = vec![
             "stat".to_string(),
             "tline".to_string(),
-            self.side.retrosheet_str().to_string(),
-            self.left_on_base.to_string(),
-            self.team_earned_runs.map_or("".to_string(), |u| u.to_string()),
-            self.double_plays_turned.map_or("".to_string(), |u| u.to_string()),
-            self.triple_plays_turned.to_string()
+            line.side.retrosheet_str().to_string(),
+            line.left_on_base.to_string(),
+            line.team_earned_runs.map_or("".to_string(), |u| u.to_string()),
+            line.double_plays_turned.map_or("".to_string(), |u| u.to_string()),
+            line.triple_plays_turned.to_string()
         ];
         RetrosheetEventRecord::from(info)
     }
@@ -818,39 +828,61 @@ pub enum BoxScoreEvent {
     Unrecognized
 }
 
-impl Into<RetrosheetEventRecord> for BoxScoreEvent {
-    fn into(self) -> RetrosheetEventRecord {
-        let event = "event".to_string();
+impl From<BoxScoreEvent> for RetrosheetEventRecord {
+    fn from(event: BoxScoreEvent) -> RetrosheetEventRecord {
         let opt_str = |o: Option<TinyStr8>| {
             o.map(|s| s.to_string()).unwrap_or_default()
         };
-        let vec = match self {
+        let mut record = RetrosheetEventRecord::with_capacity(64, 8);
+        record.push_field("event");
+        match event {
             BoxScoreEvent::DoublePlay(dp) => {
-                let base = vec![event, "dpline".to_string(), dp.defense_side.retrosheet_str().to_string()];
-                [base, dp.fielders.iter().map(Fielder::to_string).collect()].concat()
+                record.push_field("dpline");
+                record.push_field(dp.defense_side.retrosheet_str());
+                for fielder in dp.fielders {
+                    record.push_field(fielder.as_str())
+                }
             }
             BoxScoreEvent::TriplePlay(tp) => {
-                let base = vec![event, "tpline".to_string(), tp.defense_side.retrosheet_str().to_string()];
-                [base, tp.fielders.iter().map(Fielder::to_string).collect()].concat()
+                record.push_field("tpline");
+                record.push_field(tp.defense_side.retrosheet_str());
+                for fielder in tp.fielders {
+                    record.push_field(fielder.as_str())
+                }
             }
             BoxScoreEvent::HitByPitch(hbp) => {
-                vec![event, "hpline".to_string(), hbp.pitching_side.retrosheet_str().to_string(), opt_str(hbp.pitcher_id), hbp.batter_id.to_string()]
+                record.push_field("hpline");
+                record.push_field(hbp.pitching_side.retrosheet_str());
+                record.push_field(&opt_str(hbp.pitcher_id));
+                record.push_field(hbp.batter_id.as_str());
             }
             BoxScoreEvent::HomeRun(hr) => {
-                vec![event, "hrline".to_string(), hr.batting_side.retrosheet_str().to_string(), hr.batter_id.to_string(), hr.pitcher_id.to_string(),
-                     hr.inning.unwrap_or_default().to_string(), hr.outs.unwrap_or_default().to_string()]
+                record.push_field("hrline");
+                record.push_field(hr.batting_side.retrosheet_str());
+                record.push_field(hr.batter_id.as_str());
+                record.push_field(hr.pitcher_id.as_str());
+                record.push_field(&hr.inning.unwrap_or_default().to_string());
+                record.push_field(&hr.outs.unwrap_or_default().to_string());
             }
             BoxScoreEvent::StolenBase(sb) => {
-                vec![event, "sbline".to_string(), sb.running_side.retrosheet_str().to_string(), sb.runner_id.to_string(), opt_str(sb.pitcher_id),
-                     opt_str(sb.pitcher_id), opt_str(sb.catcher_id)]
+                record.push_field("sbline");
+                record.push_field(sb.running_side.retrosheet_str());
+                record.push_field(sb.runner_id.as_str());
+                record.push_field(&opt_str(sb.pitcher_id));
+                record.push_field(&opt_str(sb.catcher_id));
+                record.push_field(&sb.inning.unwrap_or_default().to_string());
             }
             BoxScoreEvent::CaughtStealing(cs) => {
-                vec![event, "csline".to_string(), cs.running_side.retrosheet_str().to_string(), cs.runner_id.to_string(), opt_str(cs.pitcher_id),
-                     opt_str(cs.pitcher_id), opt_str(cs.catcher_id)]
+                record.push_field("sbline");
+                record.push_field(cs.running_side.retrosheet_str());
+                record.push_field(cs.runner_id.as_str());
+                record.push_field(&opt_str(cs.pitcher_id));
+                record.push_field(&opt_str(cs.catcher_id));
+                record.push_field(&cs.inning.unwrap_or_default().to_string());
             }
-            _ => {vec![]}
+            _ => ()
         };
-        RetrosheetEventRecord::from(vec)
+        record
     }
 }
 
