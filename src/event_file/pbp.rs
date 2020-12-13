@@ -1,15 +1,19 @@
-use either::Either;
-use crate::event_file::play::{OtherPlateAppearance, PlayRecord, Count, InningFrame, Play, BaseRunner, Base, RunnerAdvance, FieldingData, PlateAppearanceType, HitType, BaserunningPlayType, CachedPlay};
-use crate::event_file::misc::{SubstitutionRecord, Lineup, Defense};
-use crate::event_file::traits::{Inning, LineupPosition, Pitcher, Side, FieldingPosition, Fielder, Batter, RetrosheetEventRecord};
-use crate::event_file::parser::{Matchup, Game, EventRecord};
-
-use anyhow::{anyhow, Result, Context, Error};
-use crate::event_file::box_score::*;
-use std::convert::TryFrom;
-use arrayvec::ArrayVec;
-use crate::util::{count_occurrences, opt_add, u8_vec_to_string};
 use std::collections::HashMap;
+use std::convert::TryFrom;
+
+use anyhow::{anyhow, Context, Error, Result};
+use arrayvec::ArrayVec;
+use either::Either;
+use itertools::Itertools;
+
+use crate::event_file::box_score::*;
+use crate::event_file::misc::{Defense, Lineup, SubstitutionRecord};
+use crate::event_file::parser::{EventRecord, Game, Matchup};
+use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, Count, FieldingData, HitType, InningFrame, OtherPlateAppearance, PlateAppearanceType, Play, PlayRecord, RunnerAdvance};
+use crate::event_file::traits::{Batter, Fielder, FieldingPosition, Inning, LineupPosition, Pitcher, RetrosheetEventRecord, Side};
+use crate::util::{count_occurrences, opt_add, u8_vec_to_string};
+use std::path::Iter;
+use std::ops::Deref;
 
 pub type Outs = u8;
 
@@ -130,41 +134,43 @@ impl Into<Vec<RetrosheetEventRecord>> for BoxScore {
     fn into(self) -> Vec<RetrosheetEventRecord> {
 
         let (line_away, line_home) = self.line_score.apply_both(u8_vec_to_string);
-        let lines: Vec<RetrosheetEventRecord> = vec![line_away, line_home].into_iter()
+        let lines = vec![line_away, line_home].into_iter()
             .zip(vec!["0", "1"])
             .map(|(line, side)| [vec!["line".to_string(), side.to_string()], line].concat())
             .map(RetrosheetEventRecord::from)
-            .collect();
+            .collect::<Vec<RetrosheetEventRecord>>();
 
         let (bat_away, bat_home) = self.batting_lines
             .apply_both(|v| v.into_iter()
-                .map(|b| b.into())
-                .collect::<Vec<RetrosheetEventRecord>>());
+                .sorted_by_key(|b| (b.lineup_position, b.nth_player_at_position))
+                .map(RetrosheetEventRecord::from)
+                .collect());
         let (d_away, d_home) = self.defense_lines
             .apply_both(|v| v.into_iter()
-                .map(|b| b.into())
-                .collect::<Vec<RetrosheetEventRecord>>());
+                .sorted_by_key(|d| (d.fielding_position, d.nth_position_played_by_player))
+                .map(RetrosheetEventRecord::from)
+                .collect());
         let (pitch_away, pitch_home) = self.pitching_lines
             .apply_both(|v| v.into_iter()
-                .map(|b| b.into())
-                .collect::<Vec<RetrosheetEventRecord>>());
+                .map(RetrosheetEventRecord::from)
+                .collect());
         let (ph_away, ph_home) = self.pinch_hitting_lines
             .apply_both(|v| v.into_iter()
-                .map(|b| b.into())
-                .collect::<Vec<RetrosheetEventRecord>>());
+                .map(RetrosheetEventRecord::from)
+                .collect());
         let (pr_away, pr_home) = self.pinch_running_lines
             .apply_both(|v| v.into_iter()
-                .map(|b| b.into())
-                .collect::<Vec<RetrosheetEventRecord>>());
+                .map(RetrosheetEventRecord::from)
+                .collect());
         let (misc_away, misc_home) = self.team_miscellaneous_lines
-            .apply_both(|m| vec![m.into()]);
+            .apply_both(|m| vec![RetrosheetEventRecord::from(m)]);
         let events = self.events
             .into_iter()
-            .map(|e| e.into())
+            .map(RetrosheetEventRecord::from)
             .collect();
 
-        [lines, bat_away, bat_home, d_away, d_home, pitch_away,
-            pitch_home, ph_away, ph_home, pr_away, pr_home, misc_away, misc_home, events].concat()
+        [bat_away, bat_home, d_away, d_home, pitch_away, pitch_home, ph_away,
+            ph_home, pr_away, pr_home, events, lines, misc_away, misc_home].concat()
     }
 }
 
@@ -730,7 +736,7 @@ impl GameState {
         let d_lines = new_box.defense_lines.get_mut(&fielding_side);
         for line in d_lines {
             if defense.get_by_left(&line.fielding_position) == Some(&line.fielder_id) {
-                Self::update_defensive_stats(Option::from(&mut line.defensive_stats), line.fielding_position, cached_play);
+                Self::update_defensive_stats(Option::from(&mut line.defensive_stats), line.fielding_position, cached_play)?;
             }
         }
         // Add team misc info
@@ -792,7 +798,7 @@ impl GameState {
         self.outs = outs;
         self.update_box_score(play_record, &cached_play, &new_base_state)?;
         self.bases = new_base_state;
-        self.update_line_score(play_record, &cached_play);
+        self.update_line_score(play_record, &cached_play)?;
         self.at_bat = at_bat;
         self.count = play_record.count;
 

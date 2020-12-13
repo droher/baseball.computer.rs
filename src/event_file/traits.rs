@@ -10,7 +10,7 @@ use crate::util::digit_vec;
 
 pub type RetrosheetEventRecord = StringRecord;
 
-#[derive(Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash)]
+#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash)]
 #[repr(u8)]
 pub enum LineupPosition {
     PitcherWithDH = 0,
@@ -58,7 +58,7 @@ impl TryFrom<&str> for LineupPosition {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash, EnumIter)]
+#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash, EnumIter)]
 #[repr(u8)]
 pub enum FieldingPosition {
     Unknown = 0,

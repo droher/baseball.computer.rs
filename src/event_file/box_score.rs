@@ -125,18 +125,18 @@ impl TryFrom<&RetrosheetEventRecord>for BattingLine {
     }
 }
 
-impl Into<RetrosheetEventRecord>for BattingLine {
+impl From<BattingLine> for RetrosheetEventRecord {
 
-    fn into(self) -> RetrosheetEventRecord {
+    fn from(line: BattingLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(200, 24);
         record.push_field("info");
         record.push_field("stat");
         record.push_field("bline");
-        record.push_field(self.batter_id.as_str());
-        record.push_field(self.side.retrosheet_str());
-        record.push_field(&self.lineup_position.retrosheet_string());
-        record.push_field(&self.nth_player_at_position.to_string());
-        let stats: Vec<u8> = self.batting_stats.into();
+        record.push_field(line.batter_id.as_str());
+        record.push_field(line.side.retrosheet_str());
+        record.push_field(&line.lineup_position.retrosheet_string());
+        record.push_field(&line.nth_player_at_position.to_string());
+        let stats: Vec<u8> = line.batting_stats.into();
         for stat in stats {
             record.push_field(&stat.to_string())
         }
@@ -165,16 +165,16 @@ impl PinchHittingLine {
     }
 }
 
-impl Into<RetrosheetEventRecord>for PinchHittingLine {
+impl From<PinchHittingLine> for RetrosheetEventRecord {
 
-    fn into(self) -> RetrosheetEventRecord {
+    fn from(line: PinchHittingLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(200, 24);
         record.push_field("stat");
         record.push_field("phline");
-        record.push_field(self.pinch_hitter_id.as_str());
-        record.push_field(&self.inning.map_or("".to_string(), |u| u.to_string()));
-        record.push_field(self.side.retrosheet_str());
-        let stats: Vec<u8> = self.batting_stats.unwrap_or_default().into();
+        record.push_field(line.pinch_hitter_id.as_str());
+        record.push_field(&line.inning.map_or("".to_string(), |u| u.to_string()));
+        record.push_field(line.side.retrosheet_str());
+        let stats: Vec<u8> = line.batting_stats.unwrap_or_default().into();
         for stat in stats {
             record.push_field(&stat.to_string())
         }
@@ -223,18 +223,18 @@ impl PinchRunningLine {
     }
 }
 
-impl Into<RetrosheetEventRecord>for PinchRunningLine {
+impl From<PinchRunningLine> for RetrosheetEventRecord {
 
-    fn into(self) -> RetrosheetEventRecord {
+    fn from(line: PinchRunningLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(50, 7);
         record.push_field("stat");
         record.push_field("prline");
-        record.push_field(self.pinch_runner_id.as_str());
-        record.push_field( &self.inning.map_or("".to_string(), |u| u.to_string()));
-        record.push_field(self.side.retrosheet_str());
-        record.push_field( &self.runs.unwrap_or_default().to_string());
-        record.push_field( &self.stolen_bases.unwrap_or_default().to_string());
-        record.push_field( &self.caught_stealing.unwrap_or_default().to_string());
+        record.push_field(line.pinch_runner_id.as_str());
+        record.push_field( &line.inning.map_or("".to_string(), |u| u.to_string()));
+        record.push_field(line.side.retrosheet_str());
+        record.push_field( &line.runs.unwrap_or_default().to_string());
+        record.push_field( &line.stolen_bases.unwrap_or_default().to_string());
+        record.push_field( &line.caught_stealing.unwrap_or_default().to_string());
 
         record
     }
@@ -344,19 +344,19 @@ impl TryFrom<&RetrosheetEventRecord>for DefenseLine {
     }
 }
 
-impl Into<RetrosheetEventRecord>for DefenseLine {
+impl From<DefenseLine> for RetrosheetEventRecord {
 
-    fn into(self) -> RetrosheetEventRecord {
+    fn from(line: DefenseLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(50, 13);
 
         record.push_field("stat");
         record.push_field("dline");
-        record.push_field(self.fielder_id.as_str());
-        record.push_field(self.side.retrosheet_str());
-        record.push_field(&self.nth_position_played_by_player.to_string());
-        record.push_field(&self.fielding_position.retrosheet_string());
+        record.push_field(line.fielder_id.as_str());
+        record.push_field(line.side.retrosheet_str());
+        record.push_field(&line.nth_position_played_by_player.to_string());
+        record.push_field(&line.fielding_position.retrosheet_string());
 
-        let stats: Vec<u8> = self.defensive_stats.unwrap_or_default().into();
+        let stats: Vec<u8> = line.defensive_stats.unwrap_or_default().into();
         for stat in stats {
             record.push_field(&stat.to_string())
         }
@@ -472,18 +472,18 @@ impl TryFrom<&RetrosheetEventRecord>for PitchingLine {
     }
 }
 
-impl Into<RetrosheetEventRecord>for PitchingLine {
+impl From<PitchingLine>for RetrosheetEventRecord {
 
-    fn into(self) -> RetrosheetEventRecord {
+    fn from(line: PitchingLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(200, 24);
 
         record.push_field("stat");
         record.push_field("pline");
-        record.push_field(self.pitcher_id.as_str());
-        record.push_field(self.side.retrosheet_str());
-        record.push_field(&self.nth_pitcher.to_string());
+        record.push_field(line.pitcher_id.as_str());
+        record.push_field(line.side.retrosheet_str());
+        record.push_field(&line.nth_pitcher.to_string());
 
-        let stats: Vec<u8> = self.pitching_stats.into();
+        let stats: Vec<u8> = line.pitching_stats.into();
         for stat in stats {
             record.push_field(&stat.to_string())
         }
@@ -514,17 +514,17 @@ impl TeamMiscellaneousLine {
     }
 }
 
-impl Into<RetrosheetEventRecord>for TeamMiscellaneousLine {
+impl From<TeamMiscellaneousLine> for RetrosheetEventRecord {
 
-    fn into(self) -> RetrosheetEventRecord {
+    fn from(line: TeamMiscellaneousLine) -> RetrosheetEventRecord {
         let info = vec![
             "stat".to_string(),
             "tline".to_string(),
-            self.side.retrosheet_str().to_string(),
-            self.left_on_base.to_string(),
-            self.team_earned_runs.map_or("".to_string(), |u| u.to_string()),
-            self.double_plays_turned.map_or("".to_string(), |u| u.to_string()),
-            self.triple_plays_turned.to_string()
+            line.side.retrosheet_str().to_string(),
+            line.left_on_base.to_string(),
+            line.team_earned_runs.map_or("".to_string(), |u| u.to_string()),
+            line.double_plays_turned.map_or("".to_string(), |u| u.to_string()),
+            line.triple_plays_turned.to_string()
         ];
         RetrosheetEventRecord::from(info)
     }
@@ -828,14 +828,14 @@ pub enum BoxScoreEvent {
     Unrecognized
 }
 
-impl Into<RetrosheetEventRecord> for BoxScoreEvent {
-    fn into(self) -> RetrosheetEventRecord {
+impl From<BoxScoreEvent> for RetrosheetEventRecord {
+    fn from(event: BoxScoreEvent) -> RetrosheetEventRecord {
         let opt_str = |o: Option<TinyStr8>| {
             o.map(|s| s.to_string()).unwrap_or_default()
         };
         let mut record = RetrosheetEventRecord::with_capacity(64, 8);
         record.push_field("event");
-        match self {
+        match event {
             BoxScoreEvent::DoublePlay(dp) => {
                 record.push_field("dpline");
                 record.push_field(dp.defense_side.retrosheet_str());
