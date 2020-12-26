@@ -147,6 +147,8 @@ impl Into<Vec<RetrosheetEventRecord>> for BoxScore {
                 .collect());
         let (d_away, d_home) = self.defense_lines
             .apply_both(|v| v.into_iter()
+                // Filter out non-fielding positions
+                .filter(|d| d.fielding_position.plays_in_field())
                 .sorted_by_key(|d| (d.fielding_position, d.nth_position_played_by_player))
                 .map(RetrosheetEventRecord::from)
                 .collect());
@@ -404,7 +406,8 @@ impl GameState {
             .get_by_left(&sub.lineup_position)
             .copied();
         let nth_player_at_position = self.box_score.max_n_for_lineup(sub.side, sub.lineup_position) + 1;
-        let nth_position_played_by_player = self.box_score.nth_position_played(sub.side,sub.player) + 1;
+        let defense_incrementer: u8 = if sub.fielding_position.plays_in_field() {1} else {0};
+        let nth_position_played_by_player = self.box_score.nth_position_played(sub.side,sub.player) + defense_incrementer;
 
         let mut new_lineup = self.lineups.get_mut(&sub.side);
         let mut new_defense = self.defenses.get_mut(&sub.side);

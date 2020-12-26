@@ -112,7 +112,8 @@ impl TryInto<Vec<RetrosheetEventRecord>> for Game {
 
         let id_fields =  vec![
             RetrosheetEventRecord::from(vec!["id", self.id.id.as_str()]),
-            RetrosheetEventRecord::from(vec!["version", "1"])
+            RetrosheetEventRecord::from(vec!["version", "3"]),
+            RetrosheetEventRecord::from(vec!["info", "inputprogvers", "version 7RS(19) of 07/07/92"])
         ];
         let info: Vec<RetrosheetEventRecord> = self.info.into();
         let starts: Vec<RetrosheetEventRecord> = self.starts.iter().map({
