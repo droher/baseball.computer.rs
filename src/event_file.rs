@@ -6,3 +6,4 @@ pub mod box_score;
 pub mod info;
 pub mod pbp;
 pub mod pitch_sequence;
+mod event_output;

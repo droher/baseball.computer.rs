@@ -49,8 +49,7 @@ struct Person {
     place_of_birth: City,
     place_of_death: City,
     retrosheet_id: String,
-    first_name: String,
-    last_name: String
+    full_name: String
 }
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
