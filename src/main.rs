@@ -17,6 +17,7 @@ use crate::event_file::pbp::GameState;
 
 mod util;
 mod event_file;
+mod db;
 
 const ABOUT: &str = "Transforms Retrosheet .EV* files (play-by-play) into .EB* files (box score).";
 

@@ -1,16 +1,17 @@
 use anyhow::{anyhow, Error, Result, Context};
 use csv::StringRecord;
-use strum_macros::{EnumString, EnumIter};
+use strum_macros::{EnumString, EnumIter, Display};
 use num_enum::{TryFromPrimitive, IntoPrimitive};
 use std::convert::{TryFrom};
 use tinystr::{TinyStr8, TinyStr16};
+use serde::{Serialize, Deserialize};
 
 use crate::util::digit_vec;
 
 
 pub type RetrosheetEventRecord = StringRecord;
 
-#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash)]
+#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum LineupPosition {
     PitcherWithDH = 0,
@@ -58,7 +59,7 @@ impl TryFrom<&str> for LineupPosition {
     }
 }
 
-#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash, EnumIter)]
+#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash, EnumIter, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum FieldingPosition {
     Unknown = 0,
@@ -106,6 +107,42 @@ impl TryFrom<&str> for FieldingPosition {
     }
 }
 
+#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
+pub enum Handedness {
+    Left,
+    Right,
+    Switch,
+    Unknown
+}
+
+#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
+pub enum GameType {
+    SpringTraining,
+    RegularSeason,
+    WildCardSeries,
+    DivisionSeries,
+    LeagueChampionshipSeries,
+    WorldSeries,
+    Other
+}
+
+#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
+pub enum GameFileStatus {
+    Event,
+    DerivedAndBoxScore,
+    BoxScoreOnly,
+    GameLogOnly
+}
+
+#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
+pub enum FieldingPlayType {
+    FieldersChoice,
+    Putout,
+    Assist,
+    Error
+}
+
+
 
 pub type Inning = u8;
 
@@ -123,7 +160,7 @@ pub type Fielder = Player;
 pub type RetrosheetVolunteer = MiscInfoString;
 pub type Scorer = MiscInfoString;
 
-#[derive(Debug, Eq, PartialEq, EnumString, Hash, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Hash, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum Side {
     #[strum(serialize = "0")]
     Away,
@@ -146,7 +183,8 @@ impl Side {
     }
 }
 
-#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString)]
+#[derive(Display, Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString, EnumIter, IntoPrimitive)]
+#[repr(u8)]
 pub enum BattingStats {
     AtBats,
     Runs,
@@ -167,7 +205,8 @@ pub enum BattingStats {
     ReachedOnInterference
 }
 
-#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString)]
+#[derive(Display, Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString, EnumIter, IntoPrimitive)]
+#[repr(u8)]
 pub enum DefenseStats {
     OutsPlayed,
     Putouts,
@@ -178,7 +217,8 @@ pub enum DefenseStats {
     PassedBalls
 }
 
-#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash)]
+#[derive(Display, Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString, EnumIter, IntoPrimitive)]
+#[repr(u8)]
 pub enum PitchingStats {
     OutsRecorded,
     NoOutBatters,

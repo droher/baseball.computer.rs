@@ -8,7 +8,8 @@ use num_enum::{TryFromPrimitive, IntoPrimitive};
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
 use strum::{IntoEnumIterator, ParseError};
-use strum_macros::{EnumDiscriminants, EnumString};
+use strum_macros::{EnumDiscriminants, EnumString, EnumIter, Display};
+use serde::{Serialize, Deserialize};
 
 use crate::util::{str_to_tinystr, regex_split, to_str_vec, pop_with_vec};
 use crate::event_file::traits::{Inning, Side, Batter, RetrosheetEventRecord, FieldingPosition, Stat, StatKind, BattingStats, PitchingStats, DefenseStats};
@@ -76,7 +77,8 @@ pub trait FieldingData {
     fn errors(&self) -> PositionVec;
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash)]
+#[derive(Display, Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, IntoPrimitive, EnumIter, Serialize, Deserialize, Ord, PartialOrd)]
+#[repr(u8)]
 pub enum Base {
     #[strum(serialize = "1")]
     First = 1,
@@ -88,7 +90,7 @@ pub enum Base {
     Home
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord, EnumString, Copy, Clone, TryFromPrimitive, IntoPrimitive)]
+#[derive(Display, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, EnumString, Copy, Clone, TryFromPrimitive, IntoPrimitive, EnumIter, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum BaseRunner {
     #[strum(serialize = "B")]
@@ -112,7 +114,7 @@ impl BaseRunner {
 
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize)]
 #[strum(serialize_all = "lowercase")]
 pub(crate) enum InningFrame {
     Top,
@@ -172,7 +174,7 @@ pub trait ImplicitPlayResults {
 
 }
 
-#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum HitType {
     #[strum(serialize = "S")]
     Single,
@@ -198,7 +200,7 @@ impl ImplicitPlayResults for HitType {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Hit {
     pub hit_type: HitType,
     positions_hit_to: PositionVec
@@ -228,7 +230,7 @@ impl TryFrom<(&str, &str)> for Hit {
 /// just a play which never counts for a hit and usually counts for an at-bat. Exceptions
 /// include reaching on a fielder's choice, error, passed ball, or wild pitch, which count as at-bats but not outs,
 /// and sacrifices, which count as outs but not at-bats. Baseball!
-#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum OutAtBatType {
     // Note that these may not always be at bats or outs in the event of SF, SH, PB, WP, and E
     #[strum(serialize = "")]
@@ -241,7 +243,7 @@ pub enum OutAtBatType {
     ReachedOnError
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct FieldingPlay {
     assists: PositionVec,
     putouts: PositionVec,
@@ -320,7 +322,7 @@ impl TryFrom<&str> for FieldingPlay {
 }
 
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct BattingOut {
     out_type: OutAtBatType,
     fielding_play: Option<FieldingPlay>
@@ -376,7 +378,7 @@ impl TryFrom<(&str, &str)> for BattingOut {
     }
 }
 
-#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum OtherPlateAppearance {
     #[strum(serialize = "C")]
     Interference,
@@ -394,7 +396,7 @@ impl ImplicitPlayResults for OtherPlateAppearance {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum PlateAppearanceType {
     Hit(Hit),
     BattingOut(BattingOut),
@@ -528,7 +530,8 @@ impl From<Captures<'_>> for BaserunningFieldingInfo {
     }
 }
 
-#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Display, Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash, IntoPrimitive, EnumIter, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum BaserunningPlayType {
     #[strum(serialize = "PO")]
     PickedOff,
@@ -1012,7 +1015,7 @@ impl RunnerAdvanceModifier {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum HitStrength {
     #[strum(serialize = "+")]
     Hard,
@@ -1024,7 +1027,7 @@ impl Default for HitStrength {
     fn default() -> Self {Self::Default}
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum HitDepth {
     #[strum(serialize = "S")]
     Shallow,
@@ -1038,7 +1041,7 @@ impl Default for HitDepth {
     fn default() -> Self {Self::Default}
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum HitAngle {
     #[strum(serialize = "F")]
     Foul,
@@ -1052,7 +1055,7 @@ impl Default for HitAngle {
     fn default() -> Self {Self::Default}
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum HitLocationGeneral {
     #[strum(serialize = "1")]
     Pitcher,
@@ -1092,7 +1095,7 @@ pub enum HitLocationGeneral {
     Right,
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct HitLocation {
     general_location: HitLocationGeneral,
     depth: HitDepth,
@@ -1615,7 +1618,7 @@ impl TryFrom<&PlayRecord> for CachedPlay {
     }
 }
 
-#[derive(Debug, Default, Eq, PartialEq, Copy, Clone, Hash)]
+#[derive(Debug, Default, Eq, PartialEq, Copy, Clone, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Count { balls: Option<u8>, strikes: Option<u8> }
 
 impl Count {

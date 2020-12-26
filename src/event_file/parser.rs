@@ -10,13 +10,15 @@ use csv::{Reader, ReaderBuilder, StringRecord};
 use tinystr::{TinyStr8, TinyStr16};
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
-use crate::event_file::info::{DayNight, FieldCondition, GameType, HowScored, InfoRecord, Park, PitchDetail, Precipitation, Sky, Team, UmpirePosition, WindDirection};
+use crate::event_file::info::{DayNight, FieldCondition, DoubleheaderStatus, HowScored, InfoRecord, Park, PitchDetail, Precipitation, Sky, Team, UmpirePosition, WindDirection};
 use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord, Lineup, Defense};
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{Batter, Pitcher, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Side, Umpire};
 use either::{Either, Left, Right};
 use crate::event_file::pbp::GameState;
 use std::path::PathBuf;
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Matchup<T> {away: T, home: T}
@@ -69,6 +71,16 @@ impl <T: Sized + Clone> Matchup<T> {
     }
 }
 
+impl <T: Serialize> Serialize for Matchup<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error> where
+        S: Serializer {
+        let mut state = serializer.serialize_struct("Matchup", 2)?;
+        state.serialize_field("away", &self.away)?;
+        state.serialize_field("home", &self.home)?;
+        state.end()
+    }
+}
+
 // TODO: Is there a rustier way to write?
 impl<T: Copy> Copy for Matchup<T> {}
 
@@ -95,7 +107,7 @@ pub type Teams = Matchup<Team>;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Game {
-    pub id: GameId,
+    pub retrosheet_id: GameId,
     pub info: GameInfo,
     pub events: Vec<EventRecord>,
     pub starts: Vec<StartRecord>,
@@ -111,7 +123,7 @@ impl TryInto<Vec<RetrosheetEventRecord>> for Game {
         let box_score = GameState::get_box_score(&self)?.into();
 
         let id_fields =  vec![
-            RetrosheetEventRecord::from(vec!["id", self.id.id.as_str()]),
+            RetrosheetEventRecord::from(vec!["id", self.retrosheet_id.id.as_str()]),
             RetrosheetEventRecord::from(vec!["version", "1"])
         ];
         let info: Vec<RetrosheetEventRecord> = self.info.into();
@@ -159,7 +171,7 @@ impl TryFrom<&RecordVec> for Game {
             } else {None})
             .collect();
         Ok(Self {
-            id,
+            retrosheet_id: id,
             info,
             starts,
             events,
@@ -252,7 +264,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameUmpires {
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct GameSetting {
-    game_type: GameType,
+    doubleheader_status: DoubleheaderStatus,
     start_time: Option<NaiveTime>,
     time_of_day: DayNight,
     use_dh: bool,
@@ -270,7 +282,7 @@ pub struct GameSetting {
 impl Into<Vec<RetrosheetEventRecord>> for GameSetting {
     fn into(self) -> Vec<RetrosheetEventRecord> {
         let mut vecs = vec![
-            vec!["number".to_string(), self.game_type.to_string()],
+            vec!["number".to_string(), self.doubleheader_status.to_string()],
             vec!["starttime".to_string(), self.start_time.map_or("".to_string(), |t| t.to_string())],
             vec!["daynight".to_string(), self.time_of_day.to_string()],
             vec!["usedh".to_string(), self.use_dh.to_string()],
@@ -295,7 +307,7 @@ impl Into<Vec<RetrosheetEventRecord>> for GameSetting {
 impl Default for GameSetting {
     fn default() -> Self {
         Self {
-            game_type: Default::default(),
+            doubleheader_status: Default::default(),
             start_time: None,
             time_of_day: Default::default(),
             use_dh: false,
@@ -318,7 +330,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameSetting {
         let mut setting = Self::default();
         for info in infos {
             match info {
-                InfoRecord::GameType(x) => {setting.game_type = *x},
+                InfoRecord::GameType(x) => {setting.doubleheader_status = *x},
                 InfoRecord::StartTime(x) => {setting.start_time = *x},
                 InfoRecord::DayNight(x) => {setting.time_of_day = *x},
                 InfoRecord::UseDH(x) => {setting.use_dh = *x},
