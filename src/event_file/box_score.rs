@@ -36,7 +36,7 @@ impl Into<Vec<u8>> for BattingLineStats {
         vec![
             self.at_bats, self.runs, self.hits, self.doubles.unwrap_or_default(),
             self.triples.unwrap_or_default(), self.home_runs.unwrap_or_default(),
-            self.rbi.unwrap_or_default(), self.sacrifice_flies.unwrap_or_default(),
+            self.rbi.unwrap_or_default(), self.sacrifice_hits.unwrap_or_default(), self.sacrifice_flies.unwrap_or_default(),
             self.hit_by_pitch.unwrap_or_default(), self.walks.unwrap_or_default(),
             self.intentional_walks.unwrap_or_default(), self.strikeouts.unwrap_or_default(),
             self.stolen_bases.unwrap_or_default(), self.caught_stealing.unwrap_or_default(),
@@ -129,7 +129,6 @@ impl From<BattingLine> for RetrosheetEventRecord {
 
     fn from(line: BattingLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(200, 24);
-        record.push_field("info");
         record.push_field("stat");
         record.push_field("bline");
         record.push_field(line.batter_id.as_str());
