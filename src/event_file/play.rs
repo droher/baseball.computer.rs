@@ -24,17 +24,27 @@ use std::borrow::Cow;
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
+
+//noinspection RsTypeCheck
 const GROUP_ASSISTS1: &str = concatcp!(NAMING_PREFIX, "a1", GROUP_ASSISTS);
+//noinspection RsTypeCheck
 const GROUP_ASSISTS2: &str = concatcp!(NAMING_PREFIX, "a2", GROUP_ASSISTS);
+//noinspection RsTypeCheck
 const GROUP_ASSISTS3: &str = concatcp!(NAMING_PREFIX, "a3", GROUP_ASSISTS);
 const GROUP_PUTOUT: &str = r">[0-9])";
+//noinspection RsTypeCheck
 const GROUP_PUTOUT1: &str = concatcp!(NAMING_PREFIX, "po1", GROUP_PUTOUT);
+//noinspection RsTypeCheck
 const GROUP_PUTOUT2: &str = concatcp!(NAMING_PREFIX, "po2", GROUP_PUTOUT);
+//noinspection RsTypeCheck
 const GROUP_PUTOUT3: &str = concatcp!(NAMING_PREFIX, "po3", GROUP_PUTOUT);
 const GROUP_OUT_AT_BASE_PREFIX: &str = r"(?:\((?P<runner";
 const GROUP_OUT_AT_BASE_SUFFIX: &str = r">[B123])\))?";
+//noinspection RsTypeCheck
 const GROUP_OUT_AT_BASE1: &str = concatcp!(GROUP_OUT_AT_BASE_PREFIX, "1", GROUP_OUT_AT_BASE_SUFFIX);
+//noinspection RsTypeCheck
 const GROUP_OUT_AT_BASE2: &str = concatcp!(GROUP_OUT_AT_BASE_PREFIX, "2", GROUP_OUT_AT_BASE_SUFFIX);
+//noinspection RsTypeCheck
 const GROUP_OUT_AT_BASE3: &str = concatcp!(GROUP_OUT_AT_BASE_PREFIX, "3", GROUP_OUT_AT_BASE_SUFFIX);
 
 const OUT: &str = &formatcp!(r"^{}{}{}({}{}{})?({}{}{})?$",

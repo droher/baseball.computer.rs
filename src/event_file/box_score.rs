@@ -166,6 +166,7 @@ impl PinchHittingLine {
 
 impl From<PinchHittingLine> for RetrosheetEventRecord {
 
+    //noinspection RsTypeCheck
     fn from(line: PinchHittingLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(200, 24);
         record.push_field("stat");
@@ -224,6 +225,8 @@ impl PinchRunningLine {
 
 impl From<PinchRunningLine> for RetrosheetEventRecord {
 
+    //noinspection RsTypeCheck
+    //noinspection RsTypeCheck
     fn from(line: PinchRunningLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(50, 7);
         record.push_field("stat");
