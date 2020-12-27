@@ -8,9 +8,9 @@ use itertools::Itertools;
 
 use crate::event_file::box_score::*;
 use crate::event_file::misc::{Defense, Lineup, SubstitutionRecord, GameId, StartRecord};
-use crate::event_file::parser::{EventRecord, Matchup, RecordVec, MappedRecord, Teams};
+use crate::event_file::parser::{EventRecord, RecordVec, MappedRecord, Teams};
 use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, Count, FieldingData, HitType, InningFrame, OtherPlateAppearance, PlateAppearanceType, Play, PlayRecord, RunnerAdvance};
-use crate::event_file::traits::{Batter, Fielder, FieldingPosition, Inning, LineupPosition, Pitcher, RetrosheetEventRecord, Side, Umpire, RetrosheetVolunteer, Scorer};
+use crate::event_file::traits::{Batter, Fielder, FieldingPosition, Inning, LineupPosition, Pitcher, RetrosheetEventRecord, Side, Umpire, RetrosheetVolunteer, Scorer, Matchup};
 use crate::util::{count_occurrences, opt_add, u8_vec_to_string};
 use std::path::Iter;
 use std::ops::Deref;

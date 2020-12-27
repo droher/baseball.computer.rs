@@ -4,9 +4,11 @@ use strum_macros::{EnumString, EnumIter, Display};
 use num_enum::{TryFromPrimitive, IntoPrimitive};
 use std::convert::{TryFrom};
 use tinystr::{TinyStr8, TinyStr16};
-use serde::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize, Serializer};
 
 use crate::util::digit_vec;
+use crate::event_file::info::{InfoRecord, Team};
+use serde::ser::SerializeStruct;
 
 
 pub type RetrosheetEventRecord = StringRecord;
@@ -259,5 +261,88 @@ impl Stat {
 
     pub fn batting(kind: BattingStats, stat: u8) -> Self {
         Self {kind: StatKind::Batting(kind), stat}
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Matchup<T> {pub away: T, pub home: T}
+
+impl<T: Clone> Matchup<T> {
+    pub fn cloned_update(&self, side: &Side, new_val: T) -> Self {
+        match side {
+            Side::Away => Self {away: new_val, home: self.home.clone()},
+            Side::Home => Self {home: new_val, away: self.away.clone()}
+        }
+    }
+}
+
+impl<T> Matchup<T> {
+    pub fn new(away: T, home: T) -> Self {
+        Self {away, home}
+    }
+
+    pub fn get(&self, side: &Side) -> &T {
+        match side {
+            Side::Away => &self.away,
+            Side::Home => &self.home
+        }
+    }
+
+    pub fn get_mut(&mut self, side: &Side) -> &mut T {
+        match side {
+            Side::Away => &mut self.away,
+            Side::Home => &mut self.home
+        }
+    }
+
+    pub fn get_both_mut(&mut self) -> (&mut T, &mut T) {
+        (&mut self.away, &mut self.home)
+    }
+
+}
+
+impl<T: Default> Default for Matchup<T> {
+    fn default() -> Self {
+        Self {away: T::default(), home: T::default() }
+    }
+}
+
+impl <T: Sized + Clone> Matchup<T> {
+    pub fn apply_both<F, U: Sized>(self, func: F) -> (U, U)
+        where F: Copy + FnOnce(T) -> U
+    {
+        (func(self.away), func(self.home))
+    }
+}
+
+impl <T: Serialize> Serialize for Matchup<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error> where
+        S: Serializer {
+        let mut state = serializer.serialize_struct("Matchup", 2)?;
+        state.serialize_field("away", &self.away)?;
+        state.serialize_field("home", &self.home)?;
+        state.end()
+    }
+}
+
+// TODO: Is there a rustier way to write?
+impl<T: Copy> Copy for Matchup<T> {}
+
+impl<T> From<(T, T)> for Matchup<T> {
+    fn from(tup: (T, T)) -> Self {
+        Matchup {away: tup.0, home: tup.1}
+    }
+}
+
+impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
+    type Error = Error;
+
+    fn try_from(infos: &Vec<InfoRecord>) -> Result<Self> {
+        let home_team = infos.iter().find_map(|m| if let InfoRecord::HomeTeam(t) = m {Some(t)} else {None});
+        let away_team = infos.iter().find_map(|m| if let InfoRecord::VisitingTeam(t) = m {Some(t)} else {None});
+        Ok(Self {
+            away: *away_team.context("Could not find away team info in records")?,
+            home: *home_team.context("Could not find home team info in records")?
+        })
     }
 }

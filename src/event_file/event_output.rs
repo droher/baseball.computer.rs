@@ -3,7 +3,7 @@ use chrono::{Date, NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 
 use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Precipitation, Sky, UmpirePosition, WindDirection};
-use crate::event_file::parser::Matchup;
+use crate::event_file::traits::Matchup;
 use crate::event_file::pitch_sequence::{Pitch, PitchSequence};
 use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, Count, HitLocation, InningFrame, PlateAppearanceType};
 use crate::event_file::traits::{BattingStats, DefenseStats, FieldingPlayType, FieldingPosition, GameFileStatus, GameType, Handedness, LineupPosition, PitchingStats, Side};
