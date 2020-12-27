@@ -9,11 +9,9 @@ use itertools::Itertools;
 use crate::event_file::box_score::*;
 use crate::event_file::misc::{Defense, Lineup, SubstitutionRecord, GameId, StartRecord};
 use crate::event_file::parser::{EventRecord, RecordVec, MappedRecord, Teams};
-use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, Count, FieldingData, HitType, InningFrame, OtherPlateAppearance, PlateAppearanceType, Play, PlayRecord, RunnerAdvance};
+use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, HitType, InningFrame, OtherPlateAppearance, PlateAppearanceType, Play, RunnerAdvance};
 use crate::event_file::traits::{Batter, Fielder, FieldingPosition, Inning, LineupPosition, Pitcher, RetrosheetEventRecord, Side, Umpire, RetrosheetVolunteer, Scorer, Matchup};
 use crate::util::{count_occurrences, opt_add, u8_vec_to_string};
-use std::path::Iter;
-use std::ops::Deref;
 use crate::event_file::info::{InfoRecord, UmpirePosition, DoubleheaderStatus, DayNight, Sky, FieldCondition, Precipitation, WindDirection, Park, PitchDetail, HowScored};
 use either::Either::{Left, Right};
 use chrono::{NaiveTime, NaiveDate};
@@ -258,10 +256,6 @@ impl BaseState {
         self.bases.insert(baserunner, runner);
     }
 
-    fn clear_all(&mut self) {
-        self.bases = HashMap::new()
-    }
-
     fn get_advance_from_baserunner(baserunner: BaseRunner, cached_play: &CachedPlay) -> Option<&RunnerAdvance> {
         cached_play
             .advances
@@ -294,7 +288,7 @@ impl BaseState {
     ///  Accounts for Rule 9.16(g) regarding the assignment of trailing
     ///  baserunners as inherited if they reach on a fielder's choice
     ///  in which an inherited runner is forced out 🙃
-    fn update_runner_charges(self, play: &Play) -> Self {
+    fn update_runner_charges(self, _play: &Play) -> Self {
         // TODO: This
         self
     }
@@ -414,13 +408,13 @@ impl GameState {
         let defense_incrementer: u8 = if sub.fielding_position.plays_in_field() {1} else {0};
         let nth_position_played_by_player = self.box_score.nth_position_played(sub.side,sub.player) + defense_incrementer;
 
-        let mut new_lineup = self.lineups.get_mut(&sub.side);
-        let mut new_defense = self.defenses.get_mut(&sub.side);
-        let mut new_b_lines = self.box_score.batting_lines.get_mut(&sub.side);
-        let mut new_d_lines = self.box_score.defense_lines.get_mut(&sub.side);
-        let mut new_p_lines = self.box_score.pitching_lines.get_mut(&sub.side);
-        let mut new_ph_lines = self.box_score.pinch_hitting_lines.get_mut(&sub.side);
-        let mut new_pr_lines = self.box_score.pinch_running_lines.get_mut(&sub.side);
+        let new_lineup = self.lineups.get_mut(&sub.side);
+        let new_defense = self.defenses.get_mut(&sub.side);
+        let new_b_lines = self.box_score.batting_lines.get_mut(&sub.side);
+        let new_d_lines = self.box_score.defense_lines.get_mut(&sub.side);
+        let new_p_lines = self.box_score.pitching_lines.get_mut(&sub.side);
+        let new_ph_lines = self.box_score.pinch_hitting_lines.get_mut(&sub.side);
+        let new_pr_lines = self.box_score.pinch_running_lines.get_mut(&sub.side);
 
 
 
@@ -750,7 +744,7 @@ impl GameState {
     }
 
     fn update_line_score(&mut self, cached_play: &CachedPlay) -> Result<()> {
-        let mut line_score = self.line_score.get_mut(&cached_play.batting_side);
+        let line_score = self.line_score.get_mut(&cached_play.batting_side);
         let diff = cached_play.inning - line_score.len() as u8;
         // Add a new frame if needed
         if diff == 1 { line_score.push(0) }
@@ -808,7 +802,10 @@ impl GameState {
     fn next_state(&mut self, event_record: &EventRecord) -> Result<()> {
         match event_record {
             Either::Left(pr) => self.update_on_play(&CachedPlay::try_from(pr)?),
-            Either::Right(sr) => Ok(self.update_on_substitution(sr))
+            Either::Right(sr) => {
+                self.update_on_substitution(sr);
+                Ok(())
+            }
         }
     }
 

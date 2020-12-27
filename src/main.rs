@@ -13,7 +13,6 @@ use event_file::parser::RetrosheetReader;
 
 use event_file::pbp_to_box::BoxScoreGame;
 use crate::event_file::traits::RetrosheetEventRecord;
-use crate::event_file::pbp_to_box::GameState;
 
 mod util;
 mod event_file;
@@ -44,10 +43,7 @@ fn main() {
         .from_path(&opt.output).unwrap();
 
     for game in reader.iter_box() {
-        match handle_game(&mut writer, game) {
-            Err(e) => println!("{:?}", e),
-            _ => ()
-        }
+        if let Err(e) = handle_game(&mut writer, game) { println!("{:?}", e) }
     }
     let end = start.elapsed();
     println!("Elapsed: {:?}", end);

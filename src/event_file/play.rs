@@ -1,5 +1,4 @@
 use std::cmp::min;
-use std::ops::Deref;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Error, Result};
@@ -7,20 +6,16 @@ use const_format::{concatcp, formatcp};
 use num_enum::{TryFromPrimitive, IntoPrimitive};
 use lazy_static::lazy_static;
 use regex::{Captures, Regex, Match};
-use strum::{IntoEnumIterator, ParseError};
+use strum::{ParseError};
 use strum_macros::{EnumDiscriminants, EnumString, EnumIter, Display};
 use serde::{Serialize, Deserialize};
 
-use crate::util::{str_to_tinystr, regex_split, to_str_vec, pop_with_vec};
-use crate::event_file::traits::{Inning, Side, Batter, RetrosheetEventRecord, FieldingPosition, Stat, StatKind, BattingStats, PitchingStats, DefenseStats, FieldingPlayType};
+use crate::util::{str_to_tinystr, regex_split, to_str_vec};
+use crate::event_file::traits::{Inning, Side, Batter, RetrosheetEventRecord, FieldingPosition, FieldingPlayType};
 use std::convert::TryFrom;
 use crate::event_file::pitch_sequence::PitchSequence;
-use std::collections::{HashSet, HashMap};
-use crate::event_file::play::BaserunningPlayType::PickedOffCaughtStealing;
-use crate::event_file::box_score::BoxScoreLine::PitchingLine;
-use crate::event_file::traits::StatKind::Defense;
+use std::collections::{HashSet};
 use std::iter::FromIterator;
-use std::borrow::Cow;
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
@@ -90,14 +85,14 @@ impl FieldersData {
         Self {fielding_position, fielding_play_type}
     }
 
-    fn find_error(fielders_datas: &Vec<Self>) -> Option<FieldersData> {
+    fn find_error(fielders_datas: &[Self]) -> Option<FieldersData> {
         fielders_datas
             .iter()
             .find(|fd| fd.fielding_play_type == FieldingPlayType::Error)
             .copied()
     }
 
-    fn filter_by_type(fielders_datas: &Vec<Self>, fielding_play_type: FieldingPlayType) -> PositionVec {
+    fn filter_by_type(fielders_datas: &[Self], fielding_play_type: FieldingPlayType) -> PositionVec {
         fielders_datas
             .iter()
             .filter_map(|fp|
@@ -107,15 +102,15 @@ impl FieldersData {
             .collect()
     }
 
-    fn putouts(fielders_datas: &Vec<Self>) -> PositionVec {
+    fn putouts(fielders_datas: &[Self]) -> PositionVec {
         Self::filter_by_type(fielders_datas, FieldingPlayType::Putout)
     }
 
-    fn assists(fielders_datas: &Vec<Self>) -> PositionVec {
+    fn assists(fielders_datas: &[Self]) -> PositionVec {
         Self::filter_by_type(fielders_datas, FieldingPlayType::Assist)
     }
 
-    fn errors(fielders_datas: &Vec<Self>) -> PositionVec {
+    fn errors(fielders_datas: &[Self]) -> PositionVec {
         Self::filter_by_type(fielders_datas, FieldingPlayType::Error)
     }
 
@@ -133,8 +128,8 @@ impl FieldersData {
         }
     }
 
-    fn from_vec(vec: &PositionVec, fielding_play_type: FieldingPlayType) -> Vec<Self> {
-        vec.into_iter()
+    fn from_vec(vec: &[FieldingPosition], fielding_play_type: FieldingPlayType) -> Vec<Self> {
+        vec.iter()
             .map(|fp| Self::new(*fp, fielding_play_type))
             .collect()
     }
@@ -338,7 +333,9 @@ impl From<PositionVec> for FieldingPlay {
         let mut fielders_data: Vec<FieldersData> = value.into_iter()
             .map(|fp| FieldersData::new(fp, FieldingPlayType::Assist))
             .collect();
-        fielders_data.last_mut().map(|fd| fd.fielding_play_type = FieldingPlayType::Putout);
+        if let Some(fd) = fielders_data.last_mut() {
+            fd.fielding_play_type = FieldingPlayType::Putout
+        }
         Self {
             fielders_data,
             runners_out: vec![]
@@ -567,8 +564,8 @@ impl From<Captures<'_>> for BaserunningFieldingInfo {
         if let Some(fp) = get_capture("error").get(0).copied() {
             fielders_data.push(FieldersData::new(fp, FieldingPlayType::Error))
 
-        } else {
-            fielders_data.last_mut().map(|fd| fd.fielding_play_type = FieldingPlayType::Putout);
+        } else if let Some(fd) = fielders_data.last_mut() {
+            fd.fielding_play_type = FieldingPlayType::Putout;
         }
         Self {
             fielders_data,
@@ -1374,7 +1371,7 @@ impl Play {
                         None
                     } else { Some(ra) }
                 }))
-            .filter_map(|ra| ra.clone());
+            .filter_map(|ra| ra);
         Box::from(cleaned_advances.chain(implicit_advances))
     }
 
@@ -1632,159 +1629,4 @@ impl TryFrom<&RetrosheetEventRecord>for PlayRecord {
             raw_play: record[6].to_string()
         })
     }
-}
-
-fn increment_batting_stat(kind: BattingStats, vec: &mut Vec<Stat>) {
-    vec.push(Stat::batting(kind, 1))
-}
-
-fn add_pitching_stat(kind: PitchingStats, amount: u8, vec: &mut Vec<Stat>) {
-    vec.push(Stat::new(StatKind::Pitching(kind), amount))
-}
-
-fn increment_pitching_stat(kind: PitchingStats, vec: &mut Vec<Stat>) {
-    vec.push(Stat::new(StatKind::Pitching(kind), 1))
-}
-
-fn add_defensive_stat(pos: FieldingPosition, kind: DefenseStats, amount: u8, stat_map: &mut HashMap<FieldingPosition, Vec<Stat>>) {
-    stat_map.entry(pos)
-        .or_insert_with(|| vec![])
-        .push(Stat::new(StatKind::Defense(kind), amount))
-}
-
-fn increment_defensive_stat(pos: FieldingPosition, kind: DefenseStats, stat_map: &mut HashMap<FieldingPosition, Vec<Stat>>) {
-    add_defensive_stat(pos, kind, 1, stat_map)
-}
-
-fn batter_stats(play: &Play) -> Vec<Stat> {
-    let mut vec = Vec::with_capacity(5);
-
-    if play.plate_appearance().is_none() {
-        return vec
-    }
-    let plate_appearance = play.plate_appearance().unwrap();
-
-    vec.push(Stat::batting(BattingStats::RBI, play.rbi().len() as u8));
-
-    if plate_appearance.is_at_bat() { increment_batting_stat(BattingStats::AtBats, &mut vec) }
-
-    if plate_appearance.is_strikeout() { increment_batting_stat(BattingStats::Strikeouts, &mut vec) }
-    if play.is_gidp() { increment_batting_stat(BattingStats::GroundedIntoDoublePlays, &mut vec) }
-    if play.sacrifice_hit() { increment_batting_stat(BattingStats::SacrificeHits, &mut vec) }
-    if play.sacrifice_fly() { increment_batting_stat(BattingStats::SacrificeFlies, &mut vec) }
-
-    if play.runs().contains(&BaseRunner::Batter) { increment_batting_stat(BattingStats::Runs, &mut vec)}
-
-    match plate_appearance {
-        PlateAppearanceType::Hit(h) => {
-            increment_batting_stat(BattingStats::Hits, &mut vec);
-            match h.hit_type {
-                HitType::Single => (),
-                HitType::Double | HitType::GroundRuleDouble => increment_batting_stat(BattingStats::Doubles, &mut vec),
-                HitType::Triple => increment_batting_stat(BattingStats::Triples, &mut vec),
-                HitType::HomeRun => increment_batting_stat(BattingStats::HomeRuns, &mut vec),
-            }
-        },
-        PlateAppearanceType::OtherPlateAppearance(opa) => {
-            match opa {
-                OtherPlateAppearance::Interference => increment_batting_stat(BattingStats::ReachedOnInterference, &mut vec),
-                OtherPlateAppearance::HitByPitch => increment_batting_stat(BattingStats::HitByPitch, &mut vec),
-                OtherPlateAppearance::Walk => increment_batting_stat(BattingStats::Walks, &mut vec),
-                OtherPlateAppearance::IntentionalWalk => {
-                    increment_batting_stat(BattingStats::Walks, &mut vec);
-                    increment_batting_stat(BattingStats::IntentionalWalks, &mut vec)
-                }
-            }
-        },
-        _ => ()
-    }
-    vec
-}
-
-fn pitcher_stats(play: &CachedPlay) -> Vec<Stat> {
-    let raw_play = &play.play;
-    let mut vec = Vec::with_capacity(5);
-    let r = &mut vec;
-    let inc = increment_pitching_stat;
-
-    add_pitching_stat(PitchingStats::OutsRecorded, play.putouts.len() as u8, r);
-    if raw_play.wild_pitch() { inc(PitchingStats::WildPitches, r) }
-    if raw_play.balk() { inc(PitchingStats::Balks, r)}
-    if raw_play.sacrifice_hit() { inc(PitchingStats::SacrificeHits, r)}
-    if raw_play.sacrifice_fly() { inc(PitchingStats::SacrificeFlies, r)}
-
-    if let Some(pa) = raw_play.plate_appearance() {
-        inc(PitchingStats::BattersFaced, r);
-        if pa.is_strikeout() { inc(PitchingStats::Strikeouts, r)}
-        match pa {
-            PlateAppearanceType::Hit(h) => {
-                inc(PitchingStats::Hits, r);
-                match h.hit_type {
-                    HitType::Single => (),
-                    HitType::Double | HitType::GroundRuleDouble => inc(PitchingStats::Doubles, r),
-                    HitType::Triple => inc(PitchingStats::Triples, r),
-                    HitType::HomeRun => inc(PitchingStats::HomeRuns, r)
-                }
-            },
-            PlateAppearanceType::OtherPlateAppearance(opa) => {
-                match opa {
-                    OtherPlateAppearance::HitByPitch => inc(PitchingStats::HitBatsmen, r),
-                    OtherPlateAppearance::Walk => inc(PitchingStats::Walks, r),
-                    OtherPlateAppearance::IntentionalWalk => {
-                        inc(PitchingStats::Walks, r);
-                        inc(PitchingStats::IntentionalWalks, r)
-                    }
-                    _ => ()
-                }
-            }
-            _ => ()
-        }
-
-    }
-    vec
-}
-
-fn defense_stats(play: &CachedPlay) -> HashMap<FieldingPosition, Vec<Stat>> {
-    let raw_play = &play.play;
-    let mut stat_map = HashMap::with_capacity(15);
-    let r = &mut stat_map;
-
-    let (assists, putouts, errors) = (&play.assists, &play.putouts, &play.errors);
-
-    let outs = putouts.len();
-
-    for pos in FieldingPosition::iter().filter(|fp| fp.plays_in_field()) {
-        add_defensive_stat(pos, DefenseStats::OutsPlayed, putouts.len() as u8, r)
-    }
-    for pos in assists {
-        increment_defensive_stat(*pos, DefenseStats::Assists, r)
-    }
-    for pos in putouts {
-        increment_defensive_stat(*pos, DefenseStats::Putouts, r)
-
-    }
-    for pos in errors {
-        increment_defensive_stat(*pos, DefenseStats::Errors, r)
-    }
-
-    let fielders = || {
-        let mut fielders = [assists.clone(), putouts.clone()].concat();
-        fielders.dedup();
-        fielders
-    };
-
-    match outs {
-        2 => for f in fielders() {
-            increment_defensive_stat(f, DefenseStats::DoublePlays, r)
-        },
-        3 => for f in fielders() {
-            increment_defensive_stat(f, DefenseStats::TriplePlays, r)
-        },
-        _ => ()
-    }
-
-    if raw_play.passed_ball() {
-        increment_defensive_stat(FieldingPosition::Catcher, DefenseStats::PassedBalls, r)
-    }
-    stat_map
 }

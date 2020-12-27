@@ -1,25 +1,19 @@
-use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::fs::File;
 use std::io::BufReader;
-use std::str::FromStr;
+use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Error, Result};
-use chrono::{NaiveDate, NaiveTime};
 use csv::{Reader, ReaderBuilder, StringRecord};
-use tinystr::{TinyStr8, TinyStr16};
+use either::{Either};
+use itertools::Itertools;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
-use crate::event_file::info::{DayNight, FieldCondition, DoubleheaderStatus, HowScored, InfoRecord, Park, PitchDetail, Precipitation, Sky, Team, UmpirePosition, WindDirection};
-use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord, Lineup, Defense};
+use crate::event_file::info::{InfoRecord, Team};
+use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord};
+use crate::event_file::pbp_to_box::{BoxScoreGame};
 use crate::event_file::play::PlayRecord;
-use crate::event_file::traits::{Batter, Pitcher, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Side, Umpire, Matchup};
-use either::{Either, Left, Right};
-use crate::event_file::pbp_to_box::{GameState, BoxScoreGame};
-use std::path::PathBuf;
-use serde::{Serialize, Serializer};
-use serde::ser::SerializeStruct;
-use itertools::Itertools;
+use crate::event_file::traits::{Matchup, RetrosheetEventRecord};
 
 pub type Teams = Matchup<Team>;
 

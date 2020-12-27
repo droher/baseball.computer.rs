@@ -241,40 +241,8 @@ pub enum PitchingStats {
     SacrificeFlies
 }
 
-#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash)]
-pub enum StatKind {
-    Batting(BattingStats),
-    Defense(DefenseStats),
-    Pitching(PitchingStats)
-}
-
-#[derive(Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash)]
-pub struct Stat {
-    kind: StatKind,
-    stat: u8
-}
-
-impl Stat {
-    pub fn new(kind: StatKind, stat: u8) -> Self {
-        Self {kind, stat}
-    }
-
-    pub fn batting(kind: BattingStats, stat: u8) -> Self {
-        Self {kind: StatKind::Batting(kind), stat}
-    }
-}
-
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Matchup<T> {pub away: T, pub home: T}
-
-impl<T: Clone> Matchup<T> {
-    pub fn cloned_update(&self, side: &Side, new_val: T) -> Self {
-        match side {
-            Side::Away => Self {away: new_val, home: self.home.clone()},
-            Side::Home => Self {home: new_val, away: self.away.clone()}
-        }
-    }
-}
 
 impl<T> Matchup<T> {
     pub fn new(away: T, home: T) -> Self {
