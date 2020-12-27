@@ -8,7 +8,6 @@ use crate::event_file::traits::{RetrosheetEventRecord, Batter, LineupPosition, I
 use crate::util::{parse_positive_int, str_to_tinystr};
 use crate::event_file::misc::{Lineup, Defense};
 use tinystr::TinyStr8;
-use crate::event_file::play::PlayModifier::RelayToFielderWithNoOutMade;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
 pub struct BattingLineStats {
@@ -166,6 +165,7 @@ impl PinchHittingLine {
 
 impl From<PinchHittingLine> for RetrosheetEventRecord {
 
+    //noinspection RsTypeCheck
     fn from(line: PinchHittingLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(200, 24);
         record.push_field("stat");
@@ -224,6 +224,8 @@ impl PinchRunningLine {
 
 impl From<PinchRunningLine> for RetrosheetEventRecord {
 
+    //noinspection RsTypeCheck
+    //noinspection RsTypeCheck
     fn from(line: PinchRunningLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(50, 7);
         record.push_field("stat");
@@ -536,15 +538,6 @@ pub struct TeamBattingLine {
     batting_stats: BattingLineStats
 }
 
-impl TeamBattingLine {
-    pub fn new(side: Side) -> Self {
-        Self {
-            side,
-            batting_stats: Default::default()
-        }
-    }
-}
-
 impl TryFrom<&RetrosheetEventRecord>for TeamBattingLine {
     type Error = Error;
 
@@ -561,15 +554,6 @@ impl TryFrom<&RetrosheetEventRecord>for TeamBattingLine {
 pub struct TeamDefenseLine {
     pub side: Side,
     pub defensive_stats: DefenseLineStats
-}
-
-impl TeamDefenseLine {
-    pub fn new(side: Side) -> Self {
-        Self {
-            side,
-            defensive_stats: Default::default()
-        }
-    }
 }
 
 impl TryFrom<&RetrosheetEventRecord>for TeamDefenseLine {

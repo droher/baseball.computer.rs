@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use std::convert::TryFrom;
+use serde::{Serialize, Deserialize};
 
 use anyhow::{Error, Result, Context};
 use strum_macros::EnumString;
@@ -7,7 +8,7 @@ use strum_macros::EnumString;
 use crate::event_file::play::Base;
 use std::ops::Deref;
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize)]
 enum PitchType {
     #[strum(serialize = "1")]
     PickoffAttemptFirst,
@@ -61,7 +62,7 @@ impl Default for PitchType {
     fn default() -> Self { PitchType::Unknown }
 }
 
-#[derive(Debug, PartialEq, Eq, Default, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Default, Copy, Clone, Serialize, Deserialize)]
 pub struct Pitch {
     pitch_type: PitchType,
     runners_going: bool,

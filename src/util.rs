@@ -26,11 +26,6 @@ pub(crate) fn str_to_tinystr<T: FromStr>(s: &str) -> Result<T> {
 }
 
 #[inline]
-pub(crate) fn pop_with_vec<T: Sized>(mut v: Vec<T>) -> (Option<T>, Vec<T>) {
-    (v.pop(), v)
-}
-
-#[inline]
 pub(crate) fn regex_split<'a>(s: &'a str, re: &'static Regex) -> (&'a str, Option<&'a str>) {
     match re.find(s) {
         None => (s, None),
@@ -46,8 +41,8 @@ pub(crate) fn to_str_vec(match_vec: Vec<Option<Match>>) -> Vec<&str> {
 }
 
 #[inline]
-pub(crate) fn count_occurrences<T: Eq>(match_vec: &Vec<T>, object: &T) -> u8 {
-    match_vec.into_iter()
+pub(crate) fn count_occurrences<T: Eq>(match_vec: &[T], object: &T) -> u8 {
+    match_vec.iter()
         .filter(|t| *t == object)
         .count() as u8
 }
