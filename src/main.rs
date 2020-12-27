@@ -11,9 +11,9 @@ use structopt::StructOpt;
 
 use event_file::parser::RetrosheetReader;
 
-use crate::event_file::parser::Game;
+use event_file::pbp_to_box::BoxScoreGame;
 use crate::event_file::traits::RetrosheetEventRecord;
-use crate::event_file::pbp::GameState;
+use crate::event_file::pbp_to_box::GameState;
 
 mod util;
 mod event_file;
@@ -37,13 +37,13 @@ fn main() {
     let start = Instant::now();
     let opt: Opt = Opt::from_args();
 
-    let reader= RetrosheetReader::try_from(&opt.input).unwrap();
+    let mut reader = RetrosheetReader::try_from(&opt.input).unwrap();
     let mut writer = WriterBuilder::new()
         .has_headers(false)
         .flexible(true)
         .from_path(&opt.output).unwrap();
 
-    for game in reader {
+    for game in reader.iter_box() {
         match handle_game(&mut writer, game) {
             Err(e) => println!("{:?}", e),
             _ => ()
@@ -53,7 +53,7 @@ fn main() {
     println!("Elapsed: {:?}", end);
 }
 
-fn handle_game(writer: &mut Writer<File>, game: Result<Game>) -> Result<()> {
+fn handle_game(writer: &mut Writer<File>, game: Result<BoxScoreGame>) -> Result<()> {
     let g = game?;
     if g.events.is_empty() { return Ok(()) }
     let vec: Vec<RetrosheetEventRecord> = g.try_into()?;

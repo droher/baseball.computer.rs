@@ -138,7 +138,6 @@ struct GameContext {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 struct EventStartingBaseState {
-    event: Event,
     base: Base,
     runner: LineupPosition,
     charged_to_pitcher: GameFieldingAppearance,
@@ -146,7 +145,6 @@ struct EventStartingBaseState {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 struct EventPlayAtBase {
-    event: Event,
     baserunning_play_type: BaserunningPlayType,
     base: Base
 }
