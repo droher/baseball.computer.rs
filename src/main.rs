@@ -9,8 +9,8 @@ use anyhow::Result;
 use csv::{Writer, WriterBuilder};
 use structopt::StructOpt;
 
-use event_file::parser::RetrosheetReader;
-
+use event_file::parser::{MappedRecord, RetrosheetReader};
+use event_file::event_output::GameState2;
 use event_file::pbp_to_box::BoxScoreGame;
 use crate::event_file::traits::RetrosheetEventRecord;
 
@@ -42,8 +42,20 @@ fn main() {
         .flexible(true)
         .from_path(&opt.output).unwrap();
 
-    for game in reader.iter_box() {
-        if let Err(e) = handle_game(&mut writer, game) { println!("{:?}", e) }
+    for vec in reader {
+        if let Ok(rv) = vec {
+            if rv.iter().any(|mr| if let MappedRecord::BoxScoreEvent(_) = mr {true} else {false}) {
+                continue
+            }
+            let mut init = GameState2::new(&rv);
+            for record in &rv {
+                let updated = init.update(record, 0);
+                if let Err(e) = updated {
+                    println!("Game: {:?}:\n{:?}", &rv.first(), e);
+                    break
+                }
+            }
+        }
     }
     let end = start.elapsed();
     println!("Elapsed: {:?}", end);

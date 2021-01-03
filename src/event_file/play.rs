@@ -166,11 +166,11 @@ pub enum BaseRunner {
 }
 impl BaseRunner {
     pub fn from_target_base(base: &Base) -> Result<Self> {
-        BaseRunner::try_from((*base as u8) - 1).context("Could not find baserunner for target base")
+        BaseRunner::try_from((*base as u8) - 1).with_context(|| format!("Could not find baserunner for target base {:?}", base))
     }
 
     pub fn from_current_base(base: &Base) -> Result<Self> {
-        BaseRunner::try_from(*base as u8).context("Could not find baserunner for current base")
+        BaseRunner::try_from(*base as u8).with_context(|| format!("Could not find baserunner for current base {:?}", base))
     }
 
 

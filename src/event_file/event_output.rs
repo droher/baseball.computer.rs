@@ -13,11 +13,12 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use tinystr::TinyStr8;
 use crate::event_file::pbp_to_box::{Outs, BaseState};
-use crate::event_file::misc::{SubstitutionRecord, BatHandAdjustment, PitchHandAdjustment, LineupAdjustment, RunnerAdjustment, Comment, AppearanceRecord};
+use crate::event_file::misc::{SubstitutionRecord, BatHandAdjustment, PitchHandAdjustment, LineupAdjustment, RunnerAdjustment, Comment, AppearanceRecord, StartRecord};
 use std::convert::TryFrom;
 use either::Either;
 use bimap::BiMap;
 use std::hash::Hash;
+use std::fs::read_to_string;
 
 const UNKNOWN_STRINGS: [&str;1] = ["unknown"];
 const NONE_STRINGS: [&str;2] = ["(none)", "none"];
@@ -273,6 +274,18 @@ struct GameLineupAppearance {
     end_event: Option<u16>
 }
 
+impl GameLineupAppearance {
+    fn new_starter(player: String, lineup_position: LineupPosition) -> Self {
+        Self {
+            player,
+            lineup_position,
+            entered_game_as: EnteredGameAs::Starter,
+            start_event: 0,
+            end_event: None
+        }
+    }
+}
+
 #[derive(Default, Debug, Eq, PartialEq, Clone, Serialize)]
 struct GameFieldingAppearance {
     player: String,
@@ -282,6 +295,15 @@ struct GameFieldingAppearance {
 }
 
 impl GameFieldingAppearance {
+    fn new_starter(player: String, fielding_position: FieldingPosition) -> Self {
+        Self {
+            player,
+            fielding_position,
+            start_event: 0,
+            end_event: None
+        }
+    }
+
     fn new(player: String, fielding_position: FieldingPosition, start_event: u16) -> Self {
         Self {
             player,
@@ -392,18 +414,43 @@ struct Event {
 
 /// Keeps track of the current players on the field at any given point
 /// and records their exits/entries.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
 struct Personnel {
     personnel_state: Matchup<(Lineup, Defense)>,
     // A player should only have one lineup position per game,
     // but can move freely from one defensive position to another.
+    // However, in the rare case of a courtesy runner, a player can
+    // potentially become a pinch-runner for another player before
+    // switching back to his old lineup position.
     // (This also makes the convenient assumption that a player cannot play for both sides in
     // the same game, which has never happened but could theoretically).
-    lineup_appearances: HashMap<Player, GameLineupAppearance>,
+    lineup_appearances: HashMap<Player, Vec<GameLineupAppearance>>,
     defense_appearances: HashMap<Player, Vec<GameFieldingAppearance>>,
 }
 
 impl Personnel {
+
+    fn new(record_vec: &RecordVec) -> Self {
+        let mut personnel = Self::default();
+        let start_iter = record_vec.iter()
+            .filter_map(|rv|
+                if let MappedRecord::Start(sr) = rv {Some(sr)} else {None});
+        for start in start_iter {
+            let (lineup, defense) = personnel.personnel_state.get_mut(&start.side);
+            let lineup_appearance = GameLineupAppearance::new_starter(
+                start.player.to_string(), start.lineup_position
+            );
+            let fielding_appearance = GameFieldingAppearance::new_starter(
+                start.player.to_string(), start.fielding_position
+            );
+            lineup.insert(Either::Left(start.lineup_position), start.player);
+            defense.insert(Either::Right(start.fielding_position), start.player);
+            personnel.lineup_appearances.insert(start.player, vec![lineup_appearance]);
+            personnel.defense_appearances.insert(start.player, vec![fielding_appearance]);
+
+        }
+        personnel
+    }
 
     fn pitcher(&self, side: &Side) -> Result<Pitcher> {
         self.get_at_position(side, &Either::Right(FieldingPosition::Pitcher))
@@ -414,7 +461,7 @@ impl Personnel {
         let map = if let Either::Left(lp) = position {&map_tup.0} else {&map_tup.1};
         map.get_by_left(position)
             .copied()
-            .context("Position missing from current game state")
+            .with_context(|| format!("Position {:?} for side {:?} missing from current game state: {:?}", position, side, map))
     }
 
     fn at_bat(&self, play: &CachedPlay) -> Result<LineupPosition> {
@@ -426,24 +473,36 @@ impl Personnel {
 
         if let Some(Either::Left(lp)) = position {
             Ok(lp)
-        } else {Err(anyhow!("Cannot find lineup position of player currently at bat"))}
+        } else {Err(anyhow!("Cannot find lineup position of player currently at bat {:?}.\nFull state: {:?}", &play.batter, self.personnel_state))}
     }
 
-    fn get_current_appearance(&mut self, player: &Player) -> Result<&mut GameFieldingAppearance> {
+    fn get_current_lineup_appearance(&mut self, player: &Player) -> Result<&mut GameLineupAppearance> {
+        self.lineup_appearances
+            .get_mut(player)
+            .with_context(|| format!("Cannot find existing player {:?} in appearance records", player))?
+            .last_mut()
+            .with_context(|| format!("Player {:?} has an empty list of lineup appearances", player))
+    }
+
+    fn get_current_fielding_appearance(&mut self, player: &Player) -> Result<&mut GameFieldingAppearance> {
         self.defense_appearances
             .get_mut(player)
-            .context("Cannot find existing player in appearance records")?
+            .with_context(|| format!("Cannot find existing player {:?} in appearance records", player))?
             .last_mut()
-            .context("Cannot find existing player in appearance records)")
+            .with_context(|| format!("Player {:?} has an empty list of fielding appearances", player))
     }
 
     fn update_lineup_on_substitution(&mut self, sub: &SubstitutionRecord, sequence: u16) -> Result<()> {
-        let (lineup, _) = self.personnel_state.get_mut(&sub.side);
-        let original_lineup_appearance = self.lineup_appearances
-            .get_mut(&sub.player)
-            .context("Cannot find existing appearance record for substituted batter")?;
+        // There should almost always be an original batter, but in
+        // the extremely rare case of a courtesy runner, there might not be.
+        let original_batter = self.get_at_position(&sub.side, &Either::Left(sub.lineup_position)).ok();
+        if let Some(p) = original_batter {
+            let original_lineup_appearance = self.get_current_lineup_appearance(&p)?;
+            original_lineup_appearance.end_event = Some(sequence);
+        }
 
-        original_lineup_appearance.end_event = Some(sequence);
+        let (lineup, _) = self.personnel_state.get_mut(&sub.side);
+
         let new_lineup_appearance = GameLineupAppearance {
             player: sub.player.to_string(),
             lineup_position: sub.lineup_position,
@@ -452,16 +511,21 @@ impl Personnel {
             end_event: None
         };
         lineup.insert(Either::Left(sub.lineup_position), sub.player);
-        self.lineup_appearances.insert(sub.player, new_lineup_appearance);
+        self.lineup_appearances
+            .entry(sub.player)
+            .or_insert(Vec::with_capacity(1))
+            .push(new_lineup_appearance);
         Ok(())
     }
 
     // The semantics of defensive substitutions are more complicated, because the new player
     // could already have been in the game, and the replaced player might not have left the game.
     fn update_defense_on_substitution(&mut self, sub: &SubstitutionRecord, sequence: u16) -> Result<()> {
-        let original_fielder = self.get_at_position(&sub.side, &Either::Right(sub.fielding_position))?;
+        let original_fielder = self.get_at_position(&sub.side, &Either::Right(sub.fielding_position)).ok();
+        if let Some(p) = original_fielder {
+            self.get_current_fielding_appearance(&p)?.end_event = Some(sequence);
+        }
         let (_, defense) = self.personnel_state.get_mut(&sub.side);
-
 
         // We maintain a 1:1 relationship between players and positions at all times,
         // so the entire position must be removed from the defense temporarily.
@@ -470,7 +534,6 @@ impl Personnel {
         defense.remove_by_right(&sub.player);
         defense.insert( Either::Right(sub.fielding_position), sub.player);
 
-        self.get_current_appearance(&original_fielder)?.end_event = Some(sequence);
         self.defense_appearances.entry(sub.player)
             .or_insert(Vec::with_capacity(1))
             .push(GameFieldingAppearance::new(sub.player.to_string(),
@@ -509,6 +572,24 @@ pub struct GameState2 {
 
 impl GameState2 {
 
+    pub(crate) fn new(record_vec: &RecordVec) -> Self {
+        let batting_side = record_vec.iter()
+            .find_map(|rv|
+                            if let MappedRecord::Info(InfoRecord::HomeTeamBatsFirst(b)) = rv
+                            { Some(if *b {Side::Home} else {Side::Away}) } else {None})
+            .map_or(Side::Away, |s| s);
+
+        Self {
+            inning: 1,
+            frame: InningFrame::Top,
+            batting_side,
+            outs: 0,
+            bases: Default::default(),
+            at_bat: Default::default(),
+            personnel: Personnel::new(record_vec)
+        }
+    }
+
     fn is_frame_flipped(&self, play: &CachedPlay) -> bool {
         self.batting_side != play.batting_side
     }
@@ -527,6 +608,7 @@ impl GameState2 {
 
     fn update_on_play(&mut self, record: &PlayRecord) -> Result<()> {
         let play = CachedPlay::try_from(record)?;
+        if play.play.no_play() {return Ok(())}
         let new_frame = self.get_new_frame(&play);
         let new_outs = self.outs_after_play(&play)?;
 
@@ -556,23 +638,21 @@ impl GameState2 {
         self.personnel.update_on_substitution(record, sequence)
     }
 
-    fn update_on_bat_hand_adjustment(&mut self, record: &BatHandAdjustment) {
+    fn update_on_bat_hand_adjustment(&mut self, _record: &BatHandAdjustment) {
         // TODO
     }
 
-    fn update_on_pitch_hand_adjustment(&mut self, record: &PitchHandAdjustment) {
+    fn update_on_pitch_hand_adjustment(&mut self, _record: &PitchHandAdjustment) {
         // TODO
     }
 
-    fn update_on_lineup_adjustment(&mut self, record: &LineupAdjustment) {
+    fn update_on_lineup_adjustment(&mut self, _record: &LineupAdjustment) {
         // Nothing to do here, since we map player to batting order anyway
     }
 
     fn update_on_runner_adjustment(&mut self, record: &RunnerAdjustment) -> Result<()> {
         let runner_pos = self.personnel
-            .lineup_appearances
-            .get(&record.runner_id)
-            .context("Tiebreaker runner not found in lineup appearances; should already be in lineup")?
+            .get_current_lineup_appearance(&record.runner_id)?
             .lineup_position;
         let pitching_side = if self.outs == 3 {self.batting_side} else {self.batting_side.flip()};
         let pitcher = self.personnel.pitcher(&pitching_side)?;
@@ -581,11 +661,11 @@ impl GameState2 {
         Ok(())
     }
 
-    fn update_on_comment(&mut self, record: &Comment) {
+    fn update_on_comment(&mut self, _record: &Comment) {
         // TODO
     }
 
-    fn update(&mut self, record: &MappedRecord, sequence: u16) -> Result<()> {
+    pub fn update(&mut self, record: &MappedRecord, sequence: u16) -> Result<()> {
         Ok(match record {
             MappedRecord::Play(r) => self.update_on_play(r)?,
             MappedRecord::Substitution(r) => self.update_on_substitution(r, sequence)?,
