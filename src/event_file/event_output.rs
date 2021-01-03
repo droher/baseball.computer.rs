@@ -1,5 +1,5 @@
 
-use anyhow::{Result, Context, anyhow, Error};
+use anyhow::{Result, Context, anyhow, Error, bail};
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 
@@ -53,7 +53,7 @@ impl TryFrom<&MappedRecord> for EnteredGameAs {
         match record {
             MappedRecord::Start(_) => Ok(Self::Starter),
             MappedRecord::Substitution(sr) => Ok(Self::get_substitution_type(sr)),
-            _ => Err(anyhow!("Appearance type can only be determined from an appearance record"))
+            _ => bail!("Appearance type can only be determined from an appearance record")
         }
     }
 }
@@ -473,7 +473,7 @@ impl Personnel {
 
         if let Some(Either::Left(lp)) = position {
             Ok(lp)
-        } else {Err(anyhow!("Cannot find lineup position of player currently at bat {:?}.\nFull state: {:?}", &play.batter, self.personnel_state))}
+        } else {bail!("Cannot find lineup position of player currently at bat {:?}.\nFull state: {:?}", &play.batter, self.personnel_state)}
     }
 
     fn get_current_lineup_appearance(&mut self, player: &Player) -> Result<&mut GameLineupAppearance> {
@@ -601,7 +601,7 @@ impl GameState2 {
     fn outs_after_play(&self, play: &CachedPlay) -> Result<u8> {
         let play_outs = play.outs.len() as u8;
         match if self.is_frame_flipped(play) {play_outs} else {self.outs + play_outs} {
-            o if o > 3 => Err(anyhow!("Illegal state, more than 3 outs recorded")),
+            o if o > 3 => bail!("Illegal state, more than 3 outs recorded"),
             o => Ok(o)
         }
     }
@@ -651,11 +651,19 @@ impl GameState2 {
     }
 
     fn update_on_runner_adjustment(&mut self, record: &RunnerAdjustment) -> Result<()> {
+        // The 2020 tiebreaker runner record can appear before or after the first record of the next
+        // inning, and it doesn't have a side associated with it, so we have to do some messy
+        // state changes to get it right.
+        if self.outs == 3 {
+            self.frame = self.frame.flip();
+            self.batting_side = self.batting_side.flip();
+            self.outs = 0;
+        }
+
         let runner_pos = self.personnel
             .get_current_lineup_appearance(&record.runner_id)?
             .lineup_position;
-        let pitching_side = if self.outs == 3 {self.batting_side} else {self.batting_side.flip()};
-        let pitcher = self.personnel.pitcher(&pitching_side)?;
+        let pitcher = self.personnel.pitcher(&self.batting_side.flip())?;
         self.bases = BaseState::new_inning_tiebreaker(runner_pos, pitcher);
 
         Ok(())

@@ -123,6 +123,7 @@ impl TryFrom<&RetrosheetEventRecord>for MappedRecord {
             "badj" => MappedRecord::BatHandAdjustment(BatHandAdjustment::try_from(record)?),
             "padj" => MappedRecord::PitchHandAdjustment(PitchHandAdjustment::try_from(record)?),
             "ladj" => MappedRecord::LineupAdjustment(LineupAdjustment::try_from(record)?),
+            "radj" => MappedRecord::RunnerAdjustment(RunnerAdjustment::try_from(record)?),
             "com" => MappedRecord::Comment(String::from(record.get(1).unwrap())),
             "data" => MappedRecord::EarnedRun(EarnedRunRecord::try_from(record)?),
             "stat" => MappedRecord::BoxScoreLine(BoxScoreLine::try_from(record)?),

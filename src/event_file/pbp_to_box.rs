@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, Context, Error, Result, bail};
 use arrayvec::ArrayVec;
 use either::Either;
 use itertools::Itertools;
@@ -282,10 +282,13 @@ impl BaseState {
 
     fn check_integrity(old_state: &Self, new_state: &Self, advance: &RunnerAdvance) -> Result<()> {
         if new_state.target_base_occupied(advance)? {
-            Err(anyhow!("Runner is listed as moving to a base that is occupied by another runner"))
+            bail!("Runner is listed as moving to a base that is occupied by another runner")
         }
         else if !old_state.current_base_occupied(advance) {
-            Err(anyhow!("Advancement from a base that had no runner on it"))
+            bail!("Advancement from a base that had no runner on it.\n\
+            Old state: {:?}\n\
+            New state: {:?}\n\
+            Advance: {:?}\n", old_state, new_state, advance)
         }
         else {
             Ok(())

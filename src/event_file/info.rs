@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result, Error};
+use anyhow::{anyhow, Result, Error, bail};
 use chrono::{NaiveDate, NaiveTime};
 use strum_macros::{EnumString, ToString};
 use serde::{Serialize, Deserialize};
@@ -177,6 +177,7 @@ pub enum InfoRecord {
     OriginalScorer(Scorer),
     Translator(Option<RetrosheetVolunteer>),
     Innings(Option<u8>),
+    Tiebreaker,
     // We currently don't parse umpire changes as they only occur in box scores
     // and are irregularly shaped
     UmpireChange,
@@ -248,6 +249,7 @@ impl TryFrom<&RetrosheetEventRecord>for InfoRecord {
             "scorer" => I::Scorer(t16().ok()),
             "inputter" => I::Inputter(t16().ok()),
             "translator" => I::Translator(t16().ok()),
+            "tiebreaker" => I::Tiebreaker,
             "inputprogvers" => I::InputProgramVersion,
             "umpchange" => I::UmpireChange,
             "inputtime" => I::InputTime,
@@ -255,7 +257,7 @@ impl TryFrom<&RetrosheetEventRecord>for InfoRecord {
             _ => I::Unrecognized
         };
         match info {
-            I::Unrecognized => Err(anyhow!("Unrecognized info type")),
+            I::Unrecognized => bail!("Unrecognized info type"),
             _ => Ok(info)
         }
     }

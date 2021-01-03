@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, Context, Error, Result, bail};
 use const_format::{concatcp, formatcp};
 use num_enum::{TryFromPrimitive, IntoPrimitive};
 use lazy_static::lazy_static;
@@ -387,7 +387,7 @@ impl TryFrom<&str> for FieldingPlay {
                     runners_out: vec![]
                 })
             }
-            Err(anyhow!("Unable to parse fielding play"))
+            bail!("Unable to parse fielding play")
     }
 }
 
@@ -535,7 +535,7 @@ impl TryFrom<(&str, &str)> for PlateAppearanceType {
         else if let Ok(pa) = OtherPlateAppearance::from_str(value.0) {
             Ok(Self::OtherPlateAppearance(pa))
         }
-        else {Err(anyhow!("Unable to parse plate appearance"))}
+        else {bail!("Unable to parse plate appearance")}
     }
 }
 
@@ -809,7 +809,7 @@ impl PlayType {
         else if let Ok(np) = NoPlay::try_from(str_tuple) {
             Ok(vec![Self::NoPlay(np)])
         }
-        else {Err(anyhow!("Unable to parse play"))}
+        else {bail!("Unable to parse play")}
 
     }
 }
@@ -1401,7 +1401,7 @@ impl Play {
         let extra_outs = self.modifiers.iter().find_map(|f| f.multi_out_play());
         if let Some(o) = extra_outs {
             if o as usize > full_outs.len() {
-                if full_outs.contains(&BaseRunner::Batter) {Err(anyhow!("Double play indicated, but cannot be resolved"))}
+                if full_outs.contains(&BaseRunner::Batter) {bail!("Double play indicated, but cannot be resolved")}
                 else {Ok([full_outs, vec![BaseRunner::Batter]].concat())}
             }
             else {Ok(full_outs)}
