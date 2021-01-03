@@ -227,6 +227,13 @@ pub struct BaseState {
 }
 
 impl BaseState {
+    pub fn new_inning_tiebreaker(new_runner: LineupPosition, current_pitcher: Pitcher) -> Self {
+        let mut state = Self::default();
+        let runner = Runner { lineup_position: new_runner, charged_to: current_pitcher };
+        state.bases.insert(BaseRunner::Second, runner);
+        state
+    }
+
     fn num_runners_on_base(&self) -> u8 {
         self.bases.len() as u8
     }
@@ -293,7 +300,7 @@ impl BaseState {
         self
     }
 
-    fn new_base_state(&self, start_inning: bool, end_inning: bool, cached_play: &CachedPlay, batter_lineup_position: LineupPosition, pitcher: Pitcher) -> Result<Self> {
+    pub(crate) fn new_base_state(&self, start_inning: bool, end_inning: bool, cached_play: &CachedPlay, batter_lineup_position: LineupPosition, pitcher: Pitcher) -> Result<Self> {
         let play = &cached_play.play;
 
         let mut new_state = if start_inning {Self::default()} else {self.clone()};
@@ -994,6 +1001,7 @@ pub struct GameSetting {
     wind_speed: Option<u8>,
     attendance: Option<u32>,
     park: Park,
+    scheduled_innings: Option<u8>
 }
 
 impl Into<Vec<RetrosheetEventRecord>> for GameSetting {
@@ -1036,7 +1044,8 @@ impl Default for GameSetting {
             wind_direction: Default::default(),
             wind_speed: None,
             attendance: None,
-            park: TinyStr8::from_str("NA").unwrap()
+            park: TinyStr8::from_str("NA").unwrap(),
+            scheduled_innings: Some(9)
         }
     }
 }
@@ -1048,7 +1057,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameSetting {
         let mut setting = Self::default();
         for info in infos {
             match info {
-                InfoRecord::GameType(x) => {setting.doubleheader_status = *x},
+                InfoRecord::DoubleheaderStatus(x) => {setting.doubleheader_status = *x},
                 InfoRecord::StartTime(x) => {setting.start_time = *x},
                 InfoRecord::DayNight(x) => {setting.time_of_day = *x},
                 InfoRecord::UseDH(x) => {setting.use_dh = *x},
@@ -1063,6 +1072,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameSetting {
                 InfoRecord::WindSpeed(x) => {setting.wind_speed = *x},
                 InfoRecord::Attendance(x) => {setting.attendance = *x},
                 InfoRecord::Park(x) => {setting.park = *x},
+                InfoRecord::Innings(x) => {setting.scheduled_innings = *x}
                 _ => {}
             }
         }

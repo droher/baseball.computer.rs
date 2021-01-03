@@ -121,6 +121,7 @@ pub enum Handedness {
 pub enum GameType {
     SpringTraining,
     RegularSeason,
+    AllStarGame,
     WildCardSeries,
     DivisionSeries,
     LeagueChampionshipSeries,

@@ -1,132 +1,300 @@
 
+use anyhow::{Result, Context, anyhow, Error};
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 
-use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Precipitation, Sky, UmpirePosition, WindDirection};
-use crate::event_file::traits::Matchup;
+use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Precipitation, Sky, UmpirePosition, WindDirection, InfoRecord, UmpireAssignment};
+use crate::event_file::traits::{Matchup, Inning, Player, Pitcher, Batter, Fielder};
 use crate::event_file::pitch_sequence::{Pitch};
-use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, Count, HitLocation, InningFrame, PlateAppearanceType};
+use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, Count, HitLocation, InningFrame, PlateAppearanceType, PlayRecord, CachedPlay};
 use crate::event_file::traits::{FieldingPlayType, FieldingPosition, GameFileStatus, GameType, Handedness, LineupPosition, Side};
+use crate::event_file::parser::{MappedRecord, RecordVec};
+use std::collections::HashMap;
+use itertools::Itertools;
+use tinystr::TinyStr8;
+use crate::event_file::pbp_to_box::{Outs, BaseState};
+use crate::event_file::misc::{SubstitutionRecord, BatHandAdjustment, PitchHandAdjustment, LineupAdjustment, RunnerAdjustment, Comment, AppearanceRecord};
+use std::convert::TryFrom;
+use either::Either;
+use bimap::BiMap;
+use std::hash::Hash;
+
+const UNKNOWN_STRINGS: [&str;1] = ["unknown"];
+const NONE_STRINGS: [&str;2] = ["(none)", "none"];
+
+type Position = Either<LineupPosition, FieldingPosition>;
+type PersonnelState = BiMap<Position, Player>;
+type Lineup = PersonnelState;
+type Defense = PersonnelState;
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub enum EnteredGameAs {
+    Starter,
+    PinchHitter,
+    PinchRunner,
+    DefensiveSubstitution
+}
+
+impl EnteredGameAs {
+    fn get_substitution_type(sub: &SubstitutionRecord) -> Self {
+        match sub.fielding_position {
+            FieldingPosition::PinchHitter => Self::PinchHitter,
+            FieldingPosition::PinchRunner => Self::PinchRunner,
+            _ => Self::DefensiveSubstitution
+        }
+    }
+}
+
+impl TryFrom<&MappedRecord> for EnteredGameAs {
+    type Error = Error;
+
+    fn try_from(record: &MappedRecord) -> Result<Self> {
+        match record {
+            MappedRecord::Start(_) => Ok(Self::Starter),
+            MappedRecord::Substitution(sr) => Ok(Self::get_substitution_type(sr)),
+            _ => Err(anyhow!("Appearance type can only be determined from an appearance record"))
+        }
+    }
+}
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 enum EventInfoType {}
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 struct Season(u16);
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 struct League(String);
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct Franchise {
-    retrosheet_id: String,
-    franchise_name: String
-}
+// #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
+// struct Franchise {
+//     retrosheet_id: String,
+//     franchise_name: String
+// }
+//
+// #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
+// struct Division {
+//     league: League,
+//     division_name: String
+// }
+//
+// #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
+// struct City {
+//     city_name: Option<String>,
+//     state_name: Option<String>,
+//     country_name: String
+// }
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct Division {
-    league: League,
-    division_name: String
-}
+// #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
+// struct Person {
+//     date_of_birth: Option<NaiveDate>,
+//     date_of_death: Option<NaiveDate>,
+//     bats: Handedness,
+//     throws: Handedness,
+//     // Provide default here if birth_date is populated
+//     birth_year: Option<u16>,
+//     weight_pounds: Option<u16>,
+//     height_inches: Option<u16>,
+//     place_of_birth: City,
+//     place_of_death: City,
+//     retrosheet_id: String,
+//     full_name: String
+// }
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct City {
-    city_name: Option<String>,
-    state_name: Option<String>,
-    country_name: String
-}
+// #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
+// struct Park {
+//     park_name: String,
+//     alias: String,
+//     retrosheet_id: String,
+//     city: City
+// }
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct Person {
-    date_of_birth: Option<NaiveDate>,
-    date_of_death: Option<NaiveDate>,
-    bats: Handedness,
-    throws: Handedness,
-    // Provide default here if birth_date is populated
-    birth_year: Option<u16>,
-    weight_pounds: Option<u16>,
-    height_inches: Option<u16>,
-    place_of_birth: City,
-    place_of_death: City,
-    retrosheet_id: String,
-    full_name: String
-}
+// #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
+// struct FranchiseSeason {
+//     franchise: Franchise,
+//     season: Season,
+//     division: Division
+// }
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct Park {
-    park_name: String,
-    alias: String,
-    retrosheet_id: String,
-    city: City
-}
-
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct FranchiseSeason {
-    franchise: Franchise,
-    season: Season,
-    division: Division
-}
-
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize,)]
 struct GameSetting {
-    start_time: NaiveTime,
+    start_time: Option<NaiveTime>,
     doubleheader_status: DoubleheaderStatus,
     time_of_day: DayNight,
     game_type: GameType,
     bat_first_side: Side,
     sky: Sky,
-    field_condition: FieldCondition,
+    field_condition:  FieldCondition,
     precipitation: Precipitation,
     wind_direction: WindDirection,
     how_scored: HowScored,
     game_file_status: GameFileStatus,
     season: Season,
-    park: Park,
+    park_id: String,
     temperature_fahrenheit: Option<u8>,
-    attendance: Option<u8>,
+    attendance: Option<u32>,
     wind_speed_mph: Option<u8>,
     use_dh: bool
+}
+
+impl Default for GameSetting {
+    fn default() -> Self {
+        Self {
+            doubleheader_status: Default::default(),
+            start_time: Default::default(),
+            time_of_day: Default::default(),
+            use_dh: false,
+            bat_first_side: Side::Away,
+            sky: Default::default(),
+            temperature_fahrenheit: Default::default(),
+            field_condition: Default::default(),
+            precipitation: Default::default(),
+            wind_direction: Default::default(),
+            how_scored: Default::default(),
+            game_file_status: GameFileStatus::Event,
+            wind_speed_mph: Default::default(),
+            attendance: None,
+            park_id: Default::default(),
+            game_type: GameType::RegularSeason,
+            season: Season(0)
+        }
+    }
+}
+
+impl From<&RecordVec> for GameSetting {
+    fn from(vec: &RecordVec) -> Self {
+
+        let infos = vec.iter()
+            .filter_map(|rv| if let MappedRecord::Info(i) = rv {Some(i)} else {None});
+
+        let mut setting = Self::default();
+
+        for info in infos {
+
+            match info {
+                InfoRecord::DoubleheaderStatus(x) => {setting.doubleheader_status = *x},
+                InfoRecord::StartTime(x) => {setting.start_time = *x },
+                InfoRecord::DayNight(x) => {setting.time_of_day = *x},
+                InfoRecord::UseDH(x) => {setting.use_dh = *x},
+                InfoRecord::HomeTeamBatsFirst(x) => {
+                    setting.bat_first_side = if *x {Side::Home} else {Side::Away}
+                },
+                InfoRecord::Sky(x) => {setting.sky = *x},
+                InfoRecord::Temp(x) => {setting.temperature_fahrenheit = *x},
+                InfoRecord::FieldCondition(x) => {setting.field_condition = *x}
+                InfoRecord::Precipitation(x) => {setting.precipitation = *x}
+                InfoRecord::WindDirection(x) => {setting.wind_direction = *x},
+                InfoRecord::WindSpeed(x) => {setting.wind_speed_mph = *x},
+                InfoRecord::Attendance(x) => {setting.attendance = *x },
+                InfoRecord::Park(x) => {setting.park_id = x.to_string()},
+                InfoRecord::HowScored(x) => {setting.how_scored = *x},
+                // TODO: Season, GameType
+                _ => {}
+            }
+        }
+        setting
+    }
 }
 
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 struct GameUmpire {
     position: UmpirePosition,
-    umpire: Option<Person>
+    umpire: Option<String>
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
+
+impl GameUmpire {
+    // Retrosheet has two different possible null-like values for umpire names, "none"
+    // and "unknown". We take "none" to mean that there was no umpire at that position,
+    // so we do not create a record. If "unknown", we assume there was someone at that position,
+    // so a struct is created with a None umpire ID.
+    fn from_umpire_assignment(ua: &UmpireAssignment) -> Option<Self> {
+        let umpire = ua.umpire?;
+        let position = ua.position;
+        if NONE_STRINGS.contains(&umpire.as_str()) { None }
+        else if UNKNOWN_STRINGS.contains(&umpire.as_str()) {
+            Some(Self {position, umpire: None})
+        }
+        else {
+            Some(Self {position, umpire: Some(umpire.to_string())})
+        }
+    }
+
+    fn from_record_vec(vec: &RecordVec) -> Vec<Self> {
+        vec.iter()
+            .filter_map(|rv| if let MappedRecord::Info(InfoRecord::UmpireAssignment(ua)) = rv
+                { Self::from_umpire_assignment(ua) } else { None }
+            )
+            .collect_vec()
+    }
+}
+
+
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Default)]
 struct GameResults {
-    winning_pitcher: Option<Person>,
-    losing_pitcher: Option<Person>,
-    save_pitcher: Option<Person>,
-    game_winning_rbi: Option<Person>,
-    time_of_game_minutes: u16,
+    winning_pitcher: Option<String>,
+    losing_pitcher: Option<String>,
+    save_pitcher: Option<String>,
+    game_winning_rbi: Option<String>,
+    time_of_game_minutes: Option<u16>,
     protest_info: Option<String>,
     completion_info: Option<String>,
-    line_score: Option<Matchup<Vec<u8>>>,
+    //line_score: Matchup<LineScore>
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+impl From<&Vec<MappedRecord>> for GameResults {
+
+    fn from(vec: &Vec<MappedRecord>) -> Self {
+        let s = |opt_str: &Option<TinyStr8>| opt_str.map(|t| t.to_string());
+
+        let mut results = Self::default();
+        vec.iter()
+            .filter_map(|rv| if let MappedRecord::Info(i) = rv {Some(i)} else { None })
+            .for_each(|info| match info {
+                InfoRecord::WinningPitcher(x) => {results.winning_pitcher = s(x)},
+                InfoRecord::LosingPitcher(x) => {results.losing_pitcher = s(x)},
+                InfoRecord::SavePitcher(x) => {results.save_pitcher = s(x)},
+                InfoRecord::GameWinningRBI(x) => {results.game_winning_rbi = s(x)},
+                InfoRecord::TimeOfGameMinutes(x) => {results.time_of_game_minutes = *x},
+                _ => {}
+            });
+        results
+    }
+}
+
+
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 struct GameLineupAppearance {
-    player: Person,
+    player: String,
     lineup_position: LineupPosition,
-    start_event: Event,
-    end_event: Event
+    entered_game_as: EnteredGameAs,
+    start_event: u16,
+    end_event: Option<u16>
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Eq, PartialEq, Clone, Serialize)]
 struct GameFieldingAppearance {
-    player: Person,
+    player: String,
     fielding_position: FieldingPosition,
-    lineup_appearance: GameLineupAppearance,
-    start_event: Event,
-    end_event: Event
+    start_event: u16,
+    end_event: Option<u16>
+}
+
+impl GameFieldingAppearance {
+    fn new(player: String, fielding_position: FieldingPosition, start_event: u16) -> Self {
+        Self {
+            player,
+            fielding_position,
+            start_event,
+            end_event: None
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 struct GameContext {
-    teams: Matchup<Franchise>,
+    teams: Matchup<String>,
     date: NaiveDate,
     setting: GameSetting,
     umpires: Vec<GameUmpire>,
@@ -136,7 +304,7 @@ struct GameContext {
     events: Vec<Event>
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 struct EventStartingBaseState {
     base: Base,
     runner: LineupPosition,
@@ -182,7 +350,7 @@ struct EventBaserunningAdvances {
     team_unearned: bool
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 struct EventContext {
     inning: u8,
     batting_side: Side,
@@ -204,8 +372,229 @@ struct EventResults {
     comment: Option<String>
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 struct Event {
     context: EventContext,
     results: EventResults
+}
+
+/// This tracks the more unusual/miscellaneous elements of the state of the game,,
+/// such as batters batting from an unexpected side or a substitution in the middle of
+/// an at-bat. Further exceptions should go here as they come up.
+// #[derive(Default, Debug, Eq, PartialEq, Clone)]
+// pub struct WeirdGameState {
+//     batter_hand: Option<Handedness>,
+//     pitcher_hand: Option<Handedness>,
+//     responsible_batter: Option<String>,
+//     responsible_pitcher: Option<String>,
+//     mid_at_bat_interruption_flag: bool
+// }
+
+/// Keeps track of the current players on the field at any given point
+/// and records their exits/entries.
+#[derive(Debug, Eq, PartialEq, Clone)]
+struct Personnel {
+    personnel_state: Matchup<(Lineup, Defense)>,
+    // A player should only have one lineup position per game,
+    // but can move freely from one defensive position to another.
+    // (This also makes the convenient assumption that a player cannot play for both sides in
+    // the same game, which has never happened but could theoretically).
+    lineup_appearances: HashMap<Player, GameLineupAppearance>,
+    defense_appearances: HashMap<Player, Vec<GameFieldingAppearance>>,
+}
+
+impl Personnel {
+
+    fn pitcher(&self, side: &Side) -> Result<Pitcher> {
+        self.get_at_position(side, &Either::Right(FieldingPosition::Pitcher))
+    }
+
+    fn get_at_position(&self, side: &Side, position: &Position) -> Result<Player> {
+        let map_tup = self.personnel_state.get(side);
+        let map = if let Either::Left(lp) = position {&map_tup.0} else {&map_tup.1};
+        map.get_by_left(position)
+            .copied()
+            .context("Position missing from current game state")
+    }
+
+    fn at_bat(&self, play: &CachedPlay) -> Result<LineupPosition> {
+        let position = self.personnel_state
+            .get(&play.batting_side)
+            .0
+            .get_by_right(&play.batter)
+            .copied();
+
+        if let Some(Either::Left(lp)) = position {
+            Ok(lp)
+        } else {Err(anyhow!("Cannot find lineup position of player currently at bat"))}
+    }
+
+    fn get_current_appearance(&mut self, player: &Player) -> Result<&mut GameFieldingAppearance> {
+        self.defense_appearances
+            .get_mut(player)
+            .context("Cannot find existing player in appearance records")?
+            .last_mut()
+            .context("Cannot find existing player in appearance records)")
+    }
+
+    fn update_lineup_on_substitution(&mut self, sub: &SubstitutionRecord, sequence: u16) -> Result<()> {
+        let (lineup, _) = self.personnel_state.get_mut(&sub.side);
+        let original_lineup_appearance = self.lineup_appearances
+            .get_mut(&sub.player)
+            .context("Cannot find existing appearance record for substituted batter")?;
+
+        original_lineup_appearance.end_event = Some(sequence);
+        let new_lineup_appearance = GameLineupAppearance {
+            player: sub.player.to_string(),
+            lineup_position: sub.lineup_position,
+            entered_game_as: EnteredGameAs::Starter,
+            start_event: sequence,
+            end_event: None
+        };
+        lineup.insert(Either::Left(sub.lineup_position), sub.player);
+        self.lineup_appearances.insert(sub.player, new_lineup_appearance);
+        Ok(())
+    }
+
+    // The semantics of defensive substitutions are more complicated, because the new player
+    // could already have been in the game, and the replaced player might not have left the game.
+    fn update_defense_on_substitution(&mut self, sub: &SubstitutionRecord, sequence: u16) -> Result<()> {
+        let original_fielder = self.get_at_position(&sub.side, &Either::Right(sub.fielding_position))?;
+        let (_, defense) = self.personnel_state.get_mut(&sub.side);
+
+
+        // We maintain a 1:1 relationship between players and positions at all times,
+        // so the entire position must be removed from the defense temporarily.
+        // If the data is consistent, this state (< 9 positions) can only exist between substitutions,
+        // and cannot exist at the start of a play.
+        defense.remove_by_right(&sub.player);
+        defense.insert( Either::Right(sub.fielding_position), sub.player);
+
+        self.get_current_appearance(&original_fielder)?.end_event = Some(sequence);
+        self.defense_appearances.entry(sub.player)
+            .or_insert(Vec::with_capacity(1))
+            .push(GameFieldingAppearance::new(sub.player.to_string(),
+                                              sub.fielding_position,
+                                              sequence));
+
+        Ok(())
+    }
+
+    fn update_on_substitution(&mut self, sub: &SubstitutionRecord, sequence: u16) -> Result<()> {
+        if sub.lineup_position.bats_in_lineup() { self.update_lineup_on_substitution(sub, sequence)? };
+        if sub.fielding_position.plays_in_field() { self.update_defense_on_substitution(sub, sequence)? };
+
+        Ok(())
+
+    }
+
+}
+
+struct HandednessPair {
+    batter: Option<Handedness>,
+    pitcher: Option<Handedness>
+}
+
+/// Tracks the information necessary to populate each event.
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct GameState2 {
+    inning: Inning,
+    frame: InningFrame,
+    batting_side: Side,
+    outs: Outs,
+    bases: BaseState,
+    at_bat: LineupPosition,
+    personnel: Personnel,
+}
+
+impl GameState2 {
+
+    fn is_frame_flipped(&self, play: &CachedPlay) -> bool {
+        self.batting_side != play.batting_side
+    }
+
+    fn get_new_frame(&self, play: &CachedPlay) -> InningFrame {
+        if self.is_frame_flipped(play) {self.frame.flip()} else {self.frame}
+    }
+
+    fn outs_after_play(&self, play: &CachedPlay) -> Result<u8> {
+        let play_outs = play.outs.len() as u8;
+        match if self.is_frame_flipped(play) {play_outs} else {self.outs + play_outs} {
+            o if o > 3 => Err(anyhow!("Illegal state, more than 3 outs recorded")),
+            o => Ok(o)
+        }
+    }
+
+    fn update_on_play(&mut self, record: &PlayRecord) -> Result<()> {
+        let play = CachedPlay::try_from(record)?;
+        let new_frame = self.get_new_frame(&play);
+        let new_outs = self.outs_after_play(&play)?;
+
+        let pitcher = self.personnel.pitcher(&play.batting_side.flip())?;
+        let batter_lineup_position = self.personnel.at_bat(&play)?;
+
+        let new_base_state = self.bases.new_base_state(
+            self.is_frame_flipped(&play),
+            new_outs == 3,
+            &play,
+            batter_lineup_position,
+            pitcher
+        )?;
+
+        self.inning = play.inning;
+        self.frame = new_frame;
+        self.batting_side = play.batting_side;
+        self.outs = new_outs;
+        self.bases = new_base_state;
+        self.at_bat = batter_lineup_position;
+
+        Ok(())
+
+    }
+
+    fn update_on_substitution(&mut self, record: &SubstitutionRecord, sequence: u16) -> Result<()> {
+        self.personnel.update_on_substitution(record, sequence)
+    }
+
+    fn update_on_bat_hand_adjustment(&mut self, record: &BatHandAdjustment) {
+        // TODO
+    }
+
+    fn update_on_pitch_hand_adjustment(&mut self, record: &PitchHandAdjustment) {
+        // TODO
+    }
+
+    fn update_on_lineup_adjustment(&mut self, record: &LineupAdjustment) {
+        // Nothing to do here, since we map player to batting order anyway
+    }
+
+    fn update_on_runner_adjustment(&mut self, record: &RunnerAdjustment) -> Result<()> {
+        let runner_pos = self.personnel
+            .lineup_appearances
+            .get(&record.runner_id)
+            .context("Tiebreaker runner not found in lineup appearances; should already be in lineup")?
+            .lineup_position;
+        let pitching_side = if self.outs == 3 {self.batting_side} else {self.batting_side.flip()};
+        let pitcher = self.personnel.pitcher(&pitching_side)?;
+        self.bases = BaseState::new_inning_tiebreaker(runner_pos, pitcher);
+
+        Ok(())
+    }
+
+    fn update_on_comment(&mut self, record: &Comment) {
+        // TODO
+    }
+
+    fn update(&mut self, record: &MappedRecord, sequence: u16) -> Result<()> {
+        Ok(match record {
+            MappedRecord::Play(r) => self.update_on_play(r)?,
+            MappedRecord::Substitution(r) => self.update_on_substitution(r, sequence)?,
+            MappedRecord::BatHandAdjustment(r) => self.update_on_bat_hand_adjustment(r),
+            MappedRecord::PitchHandAdjustment(r) => self.update_on_pitch_hand_adjustment(r),
+            MappedRecord::LineupAdjustment(r) => self.update_on_lineup_adjustment(r),
+            MappedRecord::RunnerAdjustment(r) => self.update_on_runner_adjustment(r)?,
+            MappedRecord::Comment(r) => self.update_on_comment(r),
+            _ => ()
+        })
+    }
 }

@@ -10,7 +10,7 @@ use itertools::Itertools;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::{InfoRecord, Team};
-use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord};
+use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord, RunnerAdjustment, AppearanceRecord};
 use crate::event_file::pbp_to_box::{BoxScoreGame};
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{Matchup, RetrosheetEventRecord};
@@ -97,6 +97,7 @@ pub enum MappedRecord {
     BatHandAdjustment(BatHandAdjustment),
     PitchHandAdjustment(PitchHandAdjustment),
     LineupAdjustment(LineupAdjustment),
+    RunnerAdjustment(RunnerAdjustment),
     EarnedRun(EarnedRunRecord),
     Comment(Comment),
     BoxScoreLine(BoxScoreLine),
