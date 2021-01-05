@@ -218,7 +218,7 @@ impl TryFrom<&BoxScoreGame> for BoxScore {
 
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub struct Runner {lineup_position: LineupPosition, charged_to: Pitcher}
+pub struct Runner {pub lineup_position: LineupPosition, pub charged_to: Pitcher}
 
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct BaseState {
@@ -232,6 +232,10 @@ impl BaseState {
         let runner = Runner { lineup_position: new_runner, charged_to: current_pitcher };
         state.bases.insert(BaseRunner::Second, runner);
         state
+    }
+
+    pub fn get_bases(&self) -> &HashMap<BaseRunner, Runner> {
+        &self.bases
     }
 
     fn num_runners_on_base(&self) -> u8 {

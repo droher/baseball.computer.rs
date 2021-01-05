@@ -3,10 +3,10 @@ use anyhow::{Result, Context, anyhow, Error, bail};
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 
-use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Precipitation, Sky, UmpirePosition, WindDirection, InfoRecord, UmpireAssignment};
+use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Precipitation, Sky, UmpirePosition, WindDirection, InfoRecord, UmpireAssignment, Team};
 use crate::event_file::traits::{Matchup, Inning, Player, Pitcher, Batter, Fielder};
-use crate::event_file::pitch_sequence::{Pitch};
-use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, Count, HitLocation, InningFrame, PlateAppearanceType, PlayRecord, CachedPlay};
+use crate::event_file::pitch_sequence::{PitchSequenceItem};
+use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, Count, HitLocation, InningFrame, PlateAppearanceType, PlayRecord, CachedPlay, PlayType, HitType, OtherPlateAppearance, OutAtBatType, ImplicitPlayResults, ContactDescription, ContactType};
 use crate::event_file::traits::{FieldingPlayType, FieldingPosition, GameFileStatus, GameType, Handedness, LineupPosition, Side};
 use crate::event_file::parser::{MappedRecord, RecordVec};
 use std::collections::HashMap;
@@ -18,7 +18,6 @@ use std::convert::TryFrom;
 use either::Either;
 use bimap::BiMap;
 use std::hash::Hash;
-use std::fs::read_to_string;
 
 const UNKNOWN_STRINGS: [&str;1] = ["unknown"];
 const NONE_STRINGS: [&str;2] = ["(none)", "none"];
@@ -54,6 +53,50 @@ impl TryFrom<&MappedRecord> for EnteredGameAs {
             MappedRecord::Start(_) => Ok(Self::Starter),
             MappedRecord::Substitution(sr) => Ok(Self::get_substitution_type(sr)),
             _ => bail!("Appearance type can only be determined from an appearance record")
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub enum PlateAppearanceResultType {
+    Single,
+    Double,
+    GroundRuleDouble,
+    Triple,
+    HomeRun,
+    InPlayOut,
+    StrikeOut,
+    FieldersChoice,
+    ReachedOnError,
+    Interference,
+    HitByPitch,
+    Walk,
+    IntentionalWalk
+}
+
+impl From<&PlateAppearanceType> for PlateAppearanceResultType {
+    fn from(plate_appearance: &PlateAppearanceType) -> Self {
+        match plate_appearance {
+            PlateAppearanceType::Hit(h) => match h.hit_type {
+                HitType::Single => Self::Single,
+                HitType::Double => Self::Double,
+                HitType::GroundRuleDouble => Self::GroundRuleDouble,
+                HitType::Triple => Self::Triple,
+                HitType::HomeRun => Self::HomeRun
+            },
+            PlateAppearanceType::OtherPlateAppearance(opa ) => match opa {
+                OtherPlateAppearance::Walk => Self::Walk,
+                OtherPlateAppearance::IntentionalWalk => Self::IntentionalWalk,
+                OtherPlateAppearance::HitByPitch => Self::HitByPitch,
+                OtherPlateAppearance::Interference => Self::Interference
+            },
+            PlateAppearanceType::BattingOut(bo) => match bo.out_type {
+                OutAtBatType::ReachedOnError => Self::ReachedOnError,
+                OutAtBatType::InPlayOut if bo.implicit_advance().is_some() => Self::ReachedOnError,
+                OutAtBatType::StrikeOut => Self::StrikeOut,
+                OutAtBatType::FieldersChoice => Self::FieldersChoice,
+                OutAtBatType::InPlayOut => Self::InPlayOut,
+            }
         }
     }
 }
@@ -119,6 +162,7 @@ struct League(String);
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize,)]
 struct GameSetting {
+    date: NaiveDate,
     start_time: Option<NaiveTime>,
     doubleheader_status: DoubleheaderStatus,
     time_of_day: DayNight,
@@ -141,6 +185,7 @@ struct GameSetting {
 impl Default for GameSetting {
     fn default() -> Self {
         Self {
+            date: NaiveDate::from_num_days_from_ce(0),
             doubleheader_status: Default::default(),
             start_time: Default::default(),
             time_of_day: Default::default(),
@@ -173,6 +218,7 @@ impl From<&RecordVec> for GameSetting {
         for info in infos {
 
             match info {
+                InfoRecord::GameDate(x) => {setting.date = *x},
                 InfoRecord::DoubleheaderStatus(x) => {setting.doubleheader_status = *x},
                 InfoRecord::StartTime(x) => {setting.start_time = *x },
                 InfoRecord::DayNight(x) => {setting.time_of_day = *x},
@@ -280,7 +326,7 @@ impl GameLineupAppearance {
             player,
             lineup_position,
             entered_game_as: EnteredGameAs::Starter,
-            start_event: 0,
+            start_event: 1,
             end_event: None
         }
     }
@@ -299,7 +345,7 @@ impl GameFieldingAppearance {
         Self {
             player,
             fielding_position,
-            start_event: 0,
+            start_event: 1,
             end_event: None
         }
     }
@@ -317,7 +363,6 @@ impl GameFieldingAppearance {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 struct GameContext {
     teams: Matchup<String>,
-    date: NaiveDate,
     setting: GameSetting,
     umpires: Vec<GameUmpire>,
     results: GameResults,
@@ -326,33 +371,84 @@ struct GameContext {
     events: Vec<Event>
 }
 
+impl TryFrom<&RecordVec> for GameContext {
+    type Error = Error;
+
+    fn try_from(record_vec: &RecordVec) -> Result<Self> {
+        let teams: Matchup<String> = Matchup::try_from(record_vec)?
+            .apply_both(|t| t.to_string())
+            .into();
+        let setting = GameSetting::try_from(record_vec)?;
+        let umpires = GameUmpire::from_record_vec(record_vec);
+        let results = GameResults::try_from(record_vec)?;
+
+        unimplemented!()
+
+    }
+
+}
+
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 struct EventStartingBaseState {
-    base: Base,
-    runner: LineupPosition,
-    charged_to_pitcher: GameFieldingAppearance,
+    baserunner: BaseRunner,
+    runner_lineup_position: LineupPosition,
+    charged_to_pitcher: String,
+}
+
+impl EventStartingBaseState {
+    fn from_base_state(state: &BaseState) -> Vec<Self> {
+        state.get_bases()
+            .iter()
+            .map(|(baserunner, runner)| Self {
+                baserunner: *baserunner,
+                runner_lineup_position: runner.lineup_position,
+                charged_to_pitcher: runner.charged_to.to_string()
+            })
+            .collect_vec()
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct EventPlayAtBase {
+struct EventBaserunningPlay {
     baserunning_play_type: BaserunningPlayType,
-    base: Base
+    base: Option<Base>
+}
+
+impl EventBaserunningPlay {
+    fn from_play(play: &CachedPlay) -> Option<Self> {
+        play.play
+            .main_plays
+            .iter()
+            .find_map(|pt| if let PlayType::BaserunningPlay(br) = pt {
+                Some(Self {baserunning_play_type: br.baserunning_play_type, base: br.at_base})
+            } else {None})
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 struct EventPlateAppearance {
     batter_hand: Handedness,
     pitcher_hand: Handedness,
-    plate_appearance_type: PlateAppearanceType,
+    plate_appearance_type: PlateAppearanceResultType,
+    contact_type: Option<ContactType>,
     hit_location: Option<HitLocation>
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct EventPitchDetail {
-    pitch_type: Pitch,
-    runners_going: bool,
-    blocked_by_catcher: bool,
-    catcher_pickoff_attempt: Option<Base>
+impl EventPlateAppearance {
+    fn from_play(play: &CachedPlay) -> Option<Self> {
+        play.play
+            .main_plays
+            .iter()
+            .find_map(|pt| if let PlayType::PlateAppearance(pa) = pt {
+                Some(Self {
+                    batter_hand: Handedness::Unknown,
+                    pitcher_hand: Handedness::Unknown,
+                    plate_appearance_type: PlateAppearanceResultType::from(pa),
+                    contact_type: play.contact_description.map(|cd| cd.contact_type),
+                    hit_location: play.contact_description.map(|cd| cd.location).flatten(),
+                })
+            } else {None})
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -385,9 +481,9 @@ struct EventContext {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 struct EventResults {
     count_at_event: Count,
-    pitch_sequence: Vec<EventPitchDetail>,
+    pitch_sequence: Vec<PitchSequenceItem>,
     plate_appearance: Option<EventPlateAppearance>,
-    plays_at_base: Vec<EventPlayAtBase>,
+    plays_at_base: Vec<EventBaserunningPlay>,
     fielding_sequence: Vec<EventFielder>,
     baserunning_advances: Vec<EventBaserunningAdvances>,
     play_info: Vec<EventInfoType>,
@@ -571,6 +667,37 @@ pub struct GameState2 {
 }
 
 impl GameState2 {
+
+    pub fn create_events(record_vec: &RecordVec) {
+        let mut events: Vec<Event> = Vec::with_capacity(100);
+
+        let mut sequence: u16 = 1;
+        let mut state = Self::new(record_vec);
+        for record in record_vec {
+            let context = EventContext {
+                inning: state.inning,
+                batting_side: state.batting_side,
+                frame: state.frame,
+                at_bat: state.at_bat,
+                outs: state.outs,
+                starting_base_state: EventStartingBaseState::from_base_state(&state.bases)
+            };
+            state.update(record, sequence);
+            if let MappedRecord::Play(pr) = record {
+                let results = EventResults {
+                    count_at_event: pr.count,
+                    pitch_sequence: pr.pitch_sequence,
+                    plate_appearance: EventPlateAppearance::from_play(),
+                    plays_at_base: EventBaserunningPlay::from_play(),
+                    fielding_sequence: EventFielder::from(),
+                    baserunning_advances: EventBaserunningAdvances::from(),
+                    play_info: EventInfoType::from(),
+                    comment: None
+                };
+            }
+
+        }
+    }
 
     pub(crate) fn new(record_vec: &RecordVec) -> Self {
         let batting_side = record_vec.iter()

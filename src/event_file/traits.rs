@@ -9,6 +9,7 @@ use serde::{Serialize, Deserialize, Serializer};
 use crate::util::digit_vec;
 use crate::event_file::info::{InfoRecord, Team};
 use serde::ser::SerializeStruct;
+use crate::event_file::parser::{RecordVec, MappedRecord};
 
 
 pub type RetrosheetEventRecord = StringRecord;
@@ -300,6 +301,21 @@ impl<T: Copy> Copy for Matchup<T> {}
 impl<T> From<(T, T)> for Matchup<T> {
     fn from(tup: (T, T)) -> Self {
         Matchup {away: tup.0, home: tup.1}
+    }
+}
+
+impl TryFrom<&RecordVec> for Matchup<Team> {
+    type Error = Error;
+
+    fn try_from(records: &RecordVec) -> Result<Self> {
+        let home_team = records.iter().find_map(|m|
+            if let MappedRecord::Info(InfoRecord::HomeTeam(t)) = m {Some(t)} else {None});
+        let away_team = records.iter().find_map(|m|
+            if let MappedRecord::Info(InfoRecord::VisitingTeam(t)) = m {Some(t)} else {None});
+        Ok(Self {
+            away: *away_team.context("Could not find away team info in records")?,
+            home: *home_team.context("Could not find home team info in records")?
+        })
     }
 }
 

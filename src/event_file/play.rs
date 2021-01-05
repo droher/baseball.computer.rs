@@ -394,7 +394,7 @@ impl TryFrom<&str> for FieldingPlay {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct BattingOut {
-    out_type: OutAtBatType,
+    pub out_type: OutAtBatType,
     fielding_play: Option<FieldingPlay>
 
 }
@@ -1131,8 +1131,8 @@ impl TryFrom<&str> for HitLocation {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub struct ContactDescription {
-    contact_type: ContactType,
-    location: Option<HitLocation>
+    pub contact_type: ContactType,
+    pub location: Option<HitLocation>
 }
 impl Default for ContactDescription {
     fn default() -> Self {
@@ -1157,7 +1157,7 @@ impl TryFrom<(&str, &str)> for ContactDescription {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, EnumString, Hash)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, EnumString, Hash, Serialize, Deserialize)]
 pub enum ContactType {
     #[strum(serialize = "B")]
     UnspecifiedBunt,
@@ -1501,6 +1501,14 @@ impl Play {
                 if let PlayType::PlateAppearance(pa) = pt { Some(pa) } else { None }
             })
     }
+
+    pub fn contact_description(&self) -> Option<&ContactDescription> {
+        self.modifiers
+            .iter()
+            .find_map(|pm|
+                if let PlayModifier::ContactDescription(cd) = pm {Some(cd)} else {None}
+            )
+    }
 }
 
 
@@ -1565,7 +1573,8 @@ pub struct CachedPlay {
     pub runs: Vec<BaseRunner>,
     pub team_unearned_runs: Vec<BaseRunner>,
     pub rbi: Vec<BaseRunner>,
-    pub plate_appearance: Option<PlateAppearanceType>
+    pub plate_appearance: Option<PlateAppearanceType>,
+    pub contact_description: Option<ContactDescription>
 }
 
 impl TryFrom<&PlayRecord> for CachedPlay {
@@ -1586,6 +1595,7 @@ impl TryFrom<&PlayRecord> for CachedPlay {
             team_unearned_runs: play.team_unearned_runs(),
             rbi: play.rbi(),
             plate_appearance: play.plate_appearance().cloned(),
+            contact_description: play.contact_description().copied(),
             play
         })
     }
