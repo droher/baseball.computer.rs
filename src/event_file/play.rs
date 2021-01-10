@@ -77,15 +77,15 @@ lazy_static!{
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 pub struct FieldersData {
-    fielding_position: FieldingPosition,
-    fielding_play_type: FieldingPlayType
+    pub fielding_position: FieldingPosition,
+    pub fielding_play_type: FieldingPlayType
 }
 impl FieldersData {
     fn new(fielding_position: FieldingPosition, fielding_play_type: FieldingPlayType) -> Self {
         Self {fielding_position, fielding_play_type}
     }
 
-    fn find_error(fielders_datas: &[Self]) -> Option<FieldersData> {
+    pub fn find_error(fielders_datas: &[Self]) -> Option<FieldersData> {
         fielders_datas
             .iter()
             .find(|fd| fd.fielding_play_type == FieldingPlayType::Error)
@@ -1565,6 +1565,7 @@ pub struct CachedPlay {
     pub batting_side: Side,
     pub inning: Inning,
     pub batter: Batter,
+    pub fielders_data: Vec<FieldersData>,
     pub putouts: PositionVec,
     pub assists: PositionVec,
     pub errors: PositionVec,
@@ -1582,13 +1583,15 @@ impl TryFrom<&PlayRecord> for CachedPlay {
 
     fn try_from(play_record: &PlayRecord) -> Result<Self> {
         let play = Play::try_from(play_record.raw_play.as_str())?;
+        let fielders_data = play.fielders_data();
         Ok(Self {
             batting_side: play_record.side,
             inning: play_record.inning,
             batter: play_record.batter,
-            putouts: FieldersData::putouts(&play.fielders_data()),
-            assists: FieldersData::assists(&play.fielders_data()),
-            errors: FieldersData::errors(&play.fielders_data()),
+            putouts: FieldersData::putouts(&fielders_data),
+            assists: FieldersData::assists(&fielders_data),
+            errors: FieldersData::errors(&fielders_data),
+            fielders_data,
             outs: play.outs()?,
             advances: play.advances().collect(),
             runs: play.runs(),

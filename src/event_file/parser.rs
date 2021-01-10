@@ -45,7 +45,7 @@ impl RetrosheetReader {
 
     pub fn iter_box(&mut self) -> impl Iterator<Item=Result<BoxScoreGame>> + '_ {
         self.into_iter()
-            .map_results(|rv| BoxScoreGame::try_from(&rv))
+            .map_ok(|rv| BoxScoreGame::try_from(&rv))
             .map(|r| r.and_then(|r| r))
     }
 

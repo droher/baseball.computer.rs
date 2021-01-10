@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Precipitation, Sky, UmpirePosition, WindDirection, InfoRecord, UmpireAssignment, Team};
 use crate::event_file::traits::{Matchup, Inning, Player, Pitcher, Batter, Fielder};
 use crate::event_file::pitch_sequence::{PitchSequenceItem};
-use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, Count, HitLocation, InningFrame, PlateAppearanceType, PlayRecord, CachedPlay, PlayType, HitType, OtherPlateAppearance, OutAtBatType, ImplicitPlayResults, ContactDescription, ContactType};
+use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, Count, HitLocation, InningFrame, PlateAppearanceType, PlayRecord, CachedPlay, PlayType, HitType, OtherPlateAppearance, OutAtBatType, ImplicitPlayResults, ContactDescription, ContactType, FieldersData, EarnedRunStatus, RunnerAdvanceModifier, FieldingData};
 use crate::event_file::traits::{FieldingPlayType, FieldingPosition, GameFileStatus, GameType, Handedness, LineupPosition, Side};
 use crate::event_file::parser::{MappedRecord, RecordVec};
 use std::collections::HashMap;
@@ -103,6 +103,12 @@ impl From<&PlateAppearanceType> for PlateAppearanceResultType {
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 enum EventInfoType {}
+
+impl EventInfoType {
+    fn from_play(play: &CachedPlay) -> Vec<Self> {
+        vec![]
+    }
+    }
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 struct Season(u16);
@@ -312,7 +318,7 @@ impl From<&Vec<MappedRecord>> for GameResults {
 
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
-struct GameLineupAppearance {
+pub struct GameLineupAppearance {
     player: String,
     lineup_position: LineupPosition,
     entered_game_as: EnteredGameAs,
@@ -333,7 +339,7 @@ impl GameLineupAppearance {
 }
 
 #[derive(Default, Debug, Eq, PartialEq, Clone, Serialize)]
-struct GameFieldingAppearance {
+pub struct GameFieldingAppearance {
     player: String,
     fielding_position: FieldingPosition,
     start_event: u16,
@@ -361,7 +367,7 @@ impl GameFieldingAppearance {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
-struct GameContext {
+pub struct GameContext {
     teams: Matchup<String>,
     setting: GameSetting,
     umpires: Vec<GameUmpire>,
@@ -382,8 +388,16 @@ impl TryFrom<&RecordVec> for GameContext {
         let umpires = GameUmpire::from_record_vec(record_vec);
         let results = GameResults::try_from(record_vec)?;
 
-        unimplemented!()
-
+        let (events, lineup_appearances, fielding_appearances) = GameState2::create_events(record_vec)?;
+        Ok(Self {
+            teams,
+            setting,
+            umpires,
+            results,
+            lineup_appearances,
+            fielding_appearances,
+            events
+        })
     }
 
 }
@@ -415,13 +429,15 @@ struct EventBaserunningPlay {
 }
 
 impl EventBaserunningPlay {
-    fn from_play(play: &CachedPlay) -> Option<Self> {
-        play.play
+    fn from_play(play: &CachedPlay) -> Option<Vec<Self>> {
+        let vec = play.play
             .main_plays
             .iter()
-            .find_map(|pt| if let PlayType::BaserunningPlay(br) = pt {
+            .filter_map(|pt| if let PlayType::BaserunningPlay(br) = pt {
                 Some(Self {baserunning_play_type: br.baserunning_play_type, base: br.at_base})
             } else {None})
+            .collect_vec();
+        if vec.is_empty() { None } else { Some(vec) }
     }
 }
 
@@ -452,20 +468,29 @@ impl EventPlateAppearance {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct EventFielder {
-    fielder: FieldingPosition,
-    fielding_play_type: FieldingPlayType,
-    exceptional_flag: bool,
-    uncertain_flag: bool
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 struct EventBaserunningAdvances {
     baserunner: BaseRunner,
     attempted_advance_to: Base,
     is_out: bool,
+    advanced_on_error: bool,
     rbi: bool,
     team_unearned: bool
+}
+
+impl EventBaserunningAdvances {
+    fn from_play(play: &CachedPlay) -> Vec<Self> {
+        play.advances
+            .iter()
+            .map(|ra| Self {
+                baserunner: ra.baserunner,
+                attempted_advance_to: ra.to,
+                advanced_on_error: FieldersData::find_error(ra.fielders_data().as_slice()).is_some(),
+                is_out: ra.is_out(),
+                rbi: play.rbi.contains(&ra.baserunner),
+                team_unearned: ra.earned_run_status() == Some(EarnedRunStatus::TeamUnearned)
+            })
+            .collect_vec()
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
@@ -481,17 +506,17 @@ struct EventContext {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 struct EventResults {
     count_at_event: Count,
-    pitch_sequence: Vec<PitchSequenceItem>,
+    pitch_sequence: Option<Vec<PitchSequenceItem>>,
     plate_appearance: Option<EventPlateAppearance>,
-    plays_at_base: Vec<EventBaserunningPlay>,
-    fielding_sequence: Vec<EventFielder>,
+    plays_at_base: Option<Vec<EventBaserunningPlay>>,
+    fielding_plays: Vec<FieldersData>,
     baserunning_advances: Vec<EventBaserunningAdvances>,
     play_info: Vec<EventInfoType>,
     comment: Option<String>
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
-struct Event {
+pub struct Event {
     context: EventContext,
     results: EventResults
 }
@@ -668,35 +693,38 @@ pub struct GameState2 {
 
 impl GameState2 {
 
-    pub fn create_events(record_vec: &RecordVec) {
+    pub fn create_events(record_vec: &RecordVec) -> Result<(Vec<Event>, Vec<GameLineupAppearance>, Vec<GameFieldingAppearance>)> {
         let mut events: Vec<Event> = Vec::with_capacity(100);
 
         let mut sequence: u16 = 1;
         let mut state = Self::new(record_vec);
         for record in record_vec {
-            let context = EventContext {
-                inning: state.inning,
-                batting_side: state.batting_side,
-                frame: state.frame,
-                at_bat: state.at_bat,
-                outs: state.outs,
-                starting_base_state: EventStartingBaseState::from_base_state(&state.bases)
-            };
-            state.update(record, sequence);
+            state.update(record, sequence)?;
             if let MappedRecord::Play(pr) = record {
+                let play = &CachedPlay::try_from(pr)?;
+                let context = EventContext {
+                    inning: state.inning,
+                    batting_side: state.batting_side,
+                    frame: state.frame,
+                    at_bat: state.at_bat,
+                    outs: state.outs,
+                    starting_base_state: EventStartingBaseState::from_base_state(&state.bases)
+                };
                 let results = EventResults {
                     count_at_event: pr.count,
-                    pitch_sequence: pr.pitch_sequence,
-                    plate_appearance: EventPlateAppearance::from_play(),
-                    plays_at_base: EventBaserunningPlay::from_play(),
-                    fielding_sequence: EventFielder::from(),
-                    baserunning_advances: EventBaserunningAdvances::from(),
-                    play_info: EventInfoType::from(),
-                    comment: None
+                    pitch_sequence: pr.pitch_sequence.as_ref().map(|ps| ps.0.clone()),
+                    plate_appearance: EventPlateAppearance::from_play(play),
+                    plays_at_base: EventBaserunningPlay::from_play(play),
+                    baserunning_advances: EventBaserunningAdvances::from_play(play),
+                    play_info: EventInfoType::from_play(play),
+                    comment: None,
+                    fielding_plays: play.fielders_data.clone(),
                 };
+                events.push(Event {context, results} );
+                sequence += 1;
             }
-
         }
+        Ok((events, state.personnel.lineup_appearances.values().flatten().cloned().collect_vec(), state.personnel.defense_appearances.values().flatten().cloned().collect_vec()))
     }
 
     pub(crate) fn new(record_vec: &RecordVec) -> Self {
