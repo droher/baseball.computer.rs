@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, Context, Error, Result, bail};
 use arrayref::array_ref;
 
 use crate::event_file::traits::{RetrosheetEventRecord, Batter, LineupPosition, Inning, Fielder, FieldingPosition, Pitcher, Side};
@@ -618,7 +618,7 @@ impl TryFrom<&RetrosheetEventRecord>for BoxScoreLine {
             _ => BoxScoreLine::Unrecognized
         };
         match mapped {
-            BoxScoreLine::Unrecognized => Err(anyhow!("Unrecognized box score line type {:?}", record)),
+            BoxScoreLine::Unrecognized => bail!("Unrecognized box score line type {:?}", record),
             _ => Ok(mapped)
         }
     }
@@ -885,7 +885,7 @@ impl TryFrom<&RetrosheetEventRecord>for BoxScoreEvent {
 
         };
         match mapped {
-            BoxScoreEvent::Unrecognized => Err(anyhow!("Unrecognized box score event type")),
+            BoxScoreEvent::Unrecognized => bail!("Unrecognized box score event type"),
             _ => Ok(mapped)
         }
     }

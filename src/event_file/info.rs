@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result, Error};
+use anyhow::{anyhow, Result, Error, bail};
 use chrono::{NaiveDate, NaiveTime};
 use strum_macros::{EnumString, ToString};
 use serde::{Serialize, Deserialize};
@@ -151,7 +151,7 @@ pub enum InfoRecord {
     VisitingTeam(Team),
     HomeTeam(Team),
     GameDate(NaiveDate),
-    GameType(DoubleheaderStatus),
+    DoubleheaderStatus(DoubleheaderStatus),
     StartTime(Option<NaiveTime>),
     DayNight(DayNight),
     UseDH(bool),
@@ -176,6 +176,8 @@ pub enum InfoRecord {
     Scorer(Option<Scorer>),
     OriginalScorer(Scorer),
     Translator(Option<RetrosheetVolunteer>),
+    Innings(Option<u8>),
+    Tiebreaker,
     // We currently don't parse umpire changes as they only occur in box scores
     // and are irregularly shaped
     UmpireChange,
@@ -219,7 +221,7 @@ impl TryFrom<&RetrosheetEventRecord>for InfoRecord {
                 I::UmpireAssignment(UmpireAssignment {position: UmpirePosition::from_str(info_type)?, umpire: t8().ok()})
             },
 
-            "number" => I::GameType(DoubleheaderStatus::from_str(value)?),
+            "number" => I::DoubleheaderStatus(DoubleheaderStatus::from_str(value)?),
             "daynight" => I::DayNight(DayNight::from_str(value)?),
             "pitches" => I::PitchDetail(PitchDetail::from_str(value)?),
             "fieldcond" | "fieldcon" => I::FieldCondition(FieldCondition::from_str(value)?),
@@ -232,6 +234,7 @@ impl TryFrom<&RetrosheetEventRecord>for InfoRecord {
             "timeofgame" => I::TimeOfGameMinutes(parse_positive_int::<u16>(value)),
             "attendance" => I::Attendance(parse_positive_int::<u32>(value)),
             "temp" => I::Temp(parse_positive_int::<u8>(value)),
+            "innings" => I::Innings(parse_positive_int::<u8>(value)),
 
             "usedh" => I::UseDH(bool::from_str(value)?),
             "htbf" => I::HomeTeamBatsFirst(bool::from_str(value)?),
@@ -246,6 +249,7 @@ impl TryFrom<&RetrosheetEventRecord>for InfoRecord {
             "scorer" => I::Scorer(t16().ok()),
             "inputter" => I::Inputter(t16().ok()),
             "translator" => I::Translator(t16().ok()),
+            "tiebreaker" => I::Tiebreaker,
             "inputprogvers" => I::InputProgramVersion,
             "umpchange" => I::UmpireChange,
             "inputtime" => I::InputTime,
@@ -253,7 +257,7 @@ impl TryFrom<&RetrosheetEventRecord>for InfoRecord {
             _ => I::Unrecognized
         };
         match info {
-            I::Unrecognized => Err(anyhow!("Unrecognized info type")),
+            I::Unrecognized => bail!("Unrecognized info type"),
             _ => Ok(info)
         }
     }

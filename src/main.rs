@@ -6,13 +6,15 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use anyhow::Result;
-use csv::{Writer, WriterBuilder};
+use csv::{Writer, WriterBuilder, QuoteStyle};
+use serde_json;
 use structopt::StructOpt;
 
-use event_file::parser::RetrosheetReader;
-
+use event_file::parser::{MappedRecord, RetrosheetReader};
+use event_file::event_output::GameState2;
 use event_file::pbp_to_box::BoxScoreGame;
 use crate::event_file::traits::RetrosheetEventRecord;
+use crate::event_file::event_output::GameContext;
 
 mod util;
 mod event_file;
@@ -40,21 +42,21 @@ fn main() {
     let mut writer = WriterBuilder::new()
         .has_headers(false)
         .flexible(true)
+        .quote_style(QuoteStyle::Never)
         .from_path(&opt.output).unwrap();
 
-    for game in reader.iter_box() {
-        if let Err(e) = handle_game(&mut writer, game) { println!("{:?}", e) }
+    for vec in reader {
+        if let Ok(rv) = vec {
+            if rv.iter().any(|mr| matches!(mr, MappedRecord::BoxScoreEvent(_))) {
+                continue
+            }
+            let game = GameContext::try_from(&rv);
+            match game {
+                Ok(v) =>  {writer.write_record(serde_json::to_string(&v));},
+                Err(e) => println!("Game: {:?}:\n{:?}", &rv.first(), e)
+            }
+        }
     }
     let end = start.elapsed();
     println!("Elapsed: {:?}", end);
-}
-
-fn handle_game(writer: &mut Writer<File>, game: Result<BoxScoreGame>) -> Result<()> {
-    let g = game?;
-    if g.events.is_empty() { return Ok(()) }
-    let vec: Vec<RetrosheetEventRecord> = g.try_into()?;
-    for record in vec {
-        writer.write_record(&record)?;
-    }
-    Ok(())
 }

@@ -8,6 +8,8 @@ use std::convert::TryFrom;
 use tinystr::{TinyStr16};
 use crate::util::str_to_tinystr;
 use bimap::BiMap;
+use crate::event_file::play::Base;
+use crate::event_file::pbp_to_box::Runner;
 
 pub type Comment = String;
 
@@ -68,6 +70,7 @@ pub struct AppearanceRecord {
     pub lineup_position: LineupPosition,
     pub fielding_position: FieldingPosition
 }
+
 impl TryFrom<&RetrosheetEventRecord>for AppearanceRecord {
     type Error = Error;
 
@@ -104,6 +107,26 @@ impl TryFrom<&RetrosheetEventRecord>for EarnedRunRecord {
             }),
             _ => Err(anyhow!("Unexpected `data` type value {:?}", record))
         }
+    }
+}
+
+/// This is for the extra-inning courtesy runner introduced in 2020
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct RunnerAdjustment {
+    pub runner_id: Batter,
+    pub base: Base
+}
+
+impl TryFrom<&RetrosheetEventRecord>for RunnerAdjustment {
+    type Error = Error;
+
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
+        let record = record.deserialize::<[&str; 3]>(None)?;
+
+        Ok(Self {
+            runner_id: str_to_tinystr(record[1])?,
+            base: Base::from_str(record[2])?
+        })
     }
 }
 

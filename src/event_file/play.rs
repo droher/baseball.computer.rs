@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, Context, Error, Result, bail};
 use const_format::{concatcp, formatcp};
 use num_enum::{TryFromPrimitive, IntoPrimitive};
 use lazy_static::lazy_static;
@@ -77,15 +77,15 @@ lazy_static!{
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 pub struct FieldersData {
-    fielding_position: FieldingPosition,
-    fielding_play_type: FieldingPlayType
+    pub fielding_position: FieldingPosition,
+    pub fielding_play_type: FieldingPlayType
 }
 impl FieldersData {
     fn new(fielding_position: FieldingPosition, fielding_play_type: FieldingPlayType) -> Self {
         Self {fielding_position, fielding_play_type}
     }
 
-    fn find_error(fielders_datas: &[Self]) -> Option<FieldersData> {
+    pub fn find_error(fielders_datas: &[Self]) -> Option<FieldersData> {
         fielders_datas
             .iter()
             .find(|fd| fd.fielding_play_type == FieldingPlayType::Error)
@@ -166,11 +166,11 @@ pub enum BaseRunner {
 }
 impl BaseRunner {
     pub fn from_target_base(base: &Base) -> Result<Self> {
-        BaseRunner::try_from((*base as u8) - 1).context("Could not find baserunner for target base")
+        BaseRunner::try_from((*base as u8) - 1).with_context(|| format!("Could not find baserunner for target base {:?}", base))
     }
 
     pub fn from_current_base(base: &Base) -> Result<Self> {
-        BaseRunner::try_from(*base as u8).context("Could not find baserunner for current base")
+        BaseRunner::try_from(*base as u8).with_context(|| format!("Could not find baserunner for current base {:?}", base))
     }
 
 
@@ -387,14 +387,14 @@ impl TryFrom<&str> for FieldingPlay {
                     runners_out: vec![]
                 })
             }
-            Err(anyhow!("Unable to parse fielding play"))
+            bail!("Unable to parse fielding play")
     }
 }
 
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct BattingOut {
-    out_type: OutAtBatType,
+    pub out_type: OutAtBatType,
     fielding_play: Option<FieldingPlay>
 
 }
@@ -535,7 +535,7 @@ impl TryFrom<(&str, &str)> for PlateAppearanceType {
         else if let Ok(pa) = OtherPlateAppearance::from_str(value.0) {
             Ok(Self::OtherPlateAppearance(pa))
         }
-        else {Err(anyhow!("Unable to parse plate appearance"))}
+        else {bail!("Unable to parse plate appearance")}
     }
 }
 
@@ -809,7 +809,7 @@ impl PlayType {
         else if let Ok(np) = NoPlay::try_from(str_tuple) {
             Ok(vec![Self::NoPlay(np)])
         }
-        else {Err(anyhow!("Unable to parse play"))}
+        else {bail!("Unable to parse play")}
 
     }
 }
@@ -1131,8 +1131,8 @@ impl TryFrom<&str> for HitLocation {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub struct ContactDescription {
-    contact_type: ContactType,
-    location: Option<HitLocation>
+    pub contact_type: ContactType,
+    pub location: Option<HitLocation>
 }
 impl Default for ContactDescription {
     fn default() -> Self {
@@ -1157,7 +1157,7 @@ impl TryFrom<(&str, &str)> for ContactDescription {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, EnumString, Hash)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, EnumString, Hash, Serialize, Deserialize)]
 pub enum ContactType {
     #[strum(serialize = "B")]
     UnspecifiedBunt,
@@ -1401,7 +1401,7 @@ impl Play {
         let extra_outs = self.modifiers.iter().find_map(|f| f.multi_out_play());
         if let Some(o) = extra_outs {
             if o as usize > full_outs.len() {
-                if full_outs.contains(&BaseRunner::Batter) {Err(anyhow!("Double play indicated, but cannot be resolved"))}
+                if full_outs.contains(&BaseRunner::Batter) {bail!("Double play indicated, but cannot be resolved")}
                 else {Ok([full_outs, vec![BaseRunner::Batter]].concat())}
             }
             else {Ok(full_outs)}
@@ -1501,6 +1501,14 @@ impl Play {
                 if let PlayType::PlateAppearance(pa) = pt { Some(pa) } else { None }
             })
     }
+
+    pub fn contact_description(&self) -> Option<&ContactDescription> {
+        self.modifiers
+            .iter()
+            .find_map(|pm|
+                if let PlayModifier::ContactDescription(cd) = pm {Some(cd)} else {None}
+            )
+    }
 }
 
 
@@ -1557,6 +1565,7 @@ pub struct CachedPlay {
     pub batting_side: Side,
     pub inning: Inning,
     pub batter: Batter,
+    pub fielders_data: Vec<FieldersData>,
     pub putouts: PositionVec,
     pub assists: PositionVec,
     pub errors: PositionVec,
@@ -1565,7 +1574,8 @@ pub struct CachedPlay {
     pub runs: Vec<BaseRunner>,
     pub team_unearned_runs: Vec<BaseRunner>,
     pub rbi: Vec<BaseRunner>,
-    pub plate_appearance: Option<PlateAppearanceType>
+    pub plate_appearance: Option<PlateAppearanceType>,
+    pub contact_description: Option<ContactDescription>
 }
 
 impl TryFrom<&PlayRecord> for CachedPlay {
@@ -1573,19 +1583,22 @@ impl TryFrom<&PlayRecord> for CachedPlay {
 
     fn try_from(play_record: &PlayRecord) -> Result<Self> {
         let play = Play::try_from(play_record.raw_play.as_str())?;
+        let fielders_data = play.fielders_data();
         Ok(Self {
             batting_side: play_record.side,
             inning: play_record.inning,
             batter: play_record.batter,
-            putouts: FieldersData::putouts(&play.fielders_data()),
-            assists: FieldersData::assists(&play.fielders_data()),
-            errors: FieldersData::errors(&play.fielders_data()),
+            putouts: FieldersData::putouts(&fielders_data),
+            assists: FieldersData::assists(&fielders_data),
+            errors: FieldersData::errors(&fielders_data),
+            fielders_data,
             outs: play.outs()?,
             advances: play.advances().collect(),
             runs: play.runs(),
             team_unearned_runs: play.team_unearned_runs(),
             rbi: play.rbi(),
             plate_appearance: play.plate_appearance().cloned(),
+            contact_description: play.contact_description().copied(),
             play
         })
     }

@@ -58,19 +58,39 @@ enum PitchType {
     InPlayOnPitchout
 }
 
+impl PitchType {
+    fn is_pitch(&self) -> bool {
+        self.is_strike() || [Self::Ball, Self::HitBatter, Self::IntentionalBall].contains(&self)
+    }
+
+    fn is_strike(&self) -> bool {
+        self.is_in_play() || [
+            Self::CalledStrike, Self::Foul, Self::StrikeUnknownType, Self::FoulBunt,
+            Self::MissedBunt, Self::FoulTipBunt, Self::SwingingOnPitchout, Self::FoulOnPitchout,
+            Self::SwingingStrike, Self::FoulTip
+        ].contains(&self)
+
+    }
+
+    fn is_in_play(&self) -> bool {
+        [Self::InPlay, Self::InPlayOnPitchout].contains(&self)
+    }
+}
+
+
 impl Default for PitchType {
     fn default() -> Self { PitchType::Unknown }
 }
 
 #[derive(Debug, PartialEq, Eq, Default, Copy, Clone, Serialize, Deserialize)]
-pub struct Pitch {
+pub struct PitchSequenceItem {
     pitch_type: PitchType,
     runners_going: bool,
     blocked_by_catcher: bool,
     catcher_pickoff_attempt: Option<Base>
 }
 
-impl Pitch {
+impl PitchSequenceItem {
     fn update_pitch_type(&mut self, pitch_type: PitchType) {
         self.pitch_type = pitch_type
     }
@@ -86,7 +106,7 @@ impl Pitch {
 }
 
 #[derive(Debug, Default, Eq, PartialEq, Clone)]
-pub struct PitchSequence(pub Vec<Pitch>);
+pub struct PitchSequence(pub Vec<PitchSequenceItem>);
 
 impl TryFrom<&str> for PitchSequence {
     type Error = Error;
@@ -94,7 +114,7 @@ impl TryFrom<&str> for PitchSequence {
     fn try_from(str_sequence: &str) -> Result<Self> {
         let mut pitches= Vec::with_capacity(10);
         let mut char_iter = str_sequence.chars().peekable();
-        let mut pitch = Pitch::default();
+        let mut pitch = PitchSequenceItem::default();
 
         let get_catcher_pickoff_base = { |c: Option<char>|
             Base::from_str(&c.unwrap_or('.').to_string()).ok()
@@ -133,7 +153,7 @@ impl TryFrom<&str> for PitchSequence {
                 _ => {}
             }
             let final_pitch = pitch;
-            pitch = Pitch::default();
+            pitch = PitchSequenceItem::default();
             pitches.push(final_pitch);
         }
         Ok(Self(pitches))

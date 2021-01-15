@@ -10,7 +10,7 @@ use itertools::Itertools;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::{InfoRecord, Team};
-use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord};
+use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord, RunnerAdjustment, AppearanceRecord};
 use crate::event_file::pbp_to_box::{BoxScoreGame};
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{Matchup, RetrosheetEventRecord};
@@ -45,7 +45,7 @@ impl RetrosheetReader {
 
     pub fn iter_box(&mut self) -> impl Iterator<Item=Result<BoxScoreGame>> + '_ {
         self.into_iter()
-            .map_results(|rv| BoxScoreGame::try_from(&rv))
+            .map_ok(|rv| BoxScoreGame::try_from(&rv))
             .map(|r| r.and_then(|r| r))
     }
 
@@ -97,6 +97,7 @@ pub enum MappedRecord {
     BatHandAdjustment(BatHandAdjustment),
     PitchHandAdjustment(PitchHandAdjustment),
     LineupAdjustment(LineupAdjustment),
+    RunnerAdjustment(RunnerAdjustment),
     EarnedRun(EarnedRunRecord),
     Comment(Comment),
     BoxScoreLine(BoxScoreLine),
@@ -122,6 +123,7 @@ impl TryFrom<&RetrosheetEventRecord>for MappedRecord {
             "badj" => MappedRecord::BatHandAdjustment(BatHandAdjustment::try_from(record)?),
             "padj" => MappedRecord::PitchHandAdjustment(PitchHandAdjustment::try_from(record)?),
             "ladj" => MappedRecord::LineupAdjustment(LineupAdjustment::try_from(record)?),
+            "radj" => MappedRecord::RunnerAdjustment(RunnerAdjustment::try_from(record)?),
             "com" => MappedRecord::Comment(String::from(record.get(1).unwrap())),
             "data" => MappedRecord::EarnedRun(EarnedRunRecord::try_from(record)?),
             "stat" => MappedRecord::BoxScoreLine(BoxScoreLine::try_from(record)?),
