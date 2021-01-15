@@ -535,7 +535,7 @@ pub struct Event {
 
 /// Keeps track of the current players on the field at any given point
 /// and records their exits/entries.
-#[derive(Debug, Eq, PartialEq, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 struct Personnel {
     personnel_state: Matchup<(Lineup, Defense)>,
     // A player should only have one lineup position per game,
@@ -547,6 +547,17 @@ struct Personnel {
     // the same game, which has never happened but could theoretically).
     lineup_appearances: HashMap<Player, Vec<GameLineupAppearance>>,
     defense_appearances: HashMap<Player, Vec<GameFieldingAppearance>>,
+}
+
+impl Default for Personnel {
+    fn default() -> Self {
+        Self {
+            personnel_state: Matchup::new((BiMap::with_capacity(15), BiMap::with_capacity(15)),
+                                          (BiMap::with_capacity(15), BiMap::with_capacity(15))),
+            lineup_appearances: HashMap::with_capacity(30),
+            defense_appearances: HashMap::with_capacity(30)
+        }
+    }
 }
 
 impl Personnel {
@@ -699,9 +710,11 @@ impl GameState2 {
         let mut sequence: u16 = 1;
         let mut state = Self::new(record_vec);
         for record in record_vec {
-            state.update(record, sequence)?;
-            if let MappedRecord::Play(pr) = record {
-                let play = &CachedPlay::try_from(pr)?;
+            let (pr, cached_play) = if let MappedRecord::Play(pr) = record {
+                (Some(pr), Some(CachedPlay::try_from(pr)?))
+            } else { (None, None) };
+            state.update(record, sequence, &cached_play)?;
+            if let (Some(pr), Some(play)) = (pr, cached_play) {
                 let context = EventContext {
                     inning: state.inning,
                     batting_side: state.batting_side,
@@ -713,10 +726,10 @@ impl GameState2 {
                 let results = EventResults {
                     count_at_event: pr.count,
                     pitch_sequence: pr.pitch_sequence.as_ref().map(|ps| ps.0.clone()),
-                    plate_appearance: EventPlateAppearance::from_play(play),
-                    plays_at_base: EventBaserunningPlay::from_play(play),
-                    baserunning_advances: EventBaserunningAdvances::from_play(play),
-                    play_info: EventInfoType::from_play(play),
+                    plate_appearance: EventPlateAppearance::from_play(&play),
+                    plays_at_base: EventBaserunningPlay::from_play(&play),
+                    baserunning_advances: EventBaserunningAdvances::from_play(&play),
+                    play_info: EventInfoType::from_play(&play),
                     comment: None,
                     fielding_plays: play.fielders_data.clone(),
                 };
@@ -745,33 +758,35 @@ impl GameState2 {
         }
     }
 
-    fn is_frame_flipped(&self, play: &CachedPlay) -> bool {
-        self.batting_side != play.batting_side
+    fn is_frame_flipped(&self, play: &CachedPlay) -> Result<bool> {
+        if self.batting_side != play.batting_side {
+            if self.outs < 3 { bail!("New frame without 3 outs recorded") }
+            else { Ok(true) }
+        } else { Ok(false) }
     }
 
-    fn get_new_frame(&self, play: &CachedPlay) -> InningFrame {
-        if self.is_frame_flipped(play) {self.frame.flip()} else {self.frame}
+    fn get_new_frame(&self, play: &CachedPlay) -> Result<InningFrame> {
+        Ok(if self.is_frame_flipped(play)? {self.frame.flip()} else {self.frame})
     }
 
     fn outs_after_play(&self, play: &CachedPlay) -> Result<u8> {
         let play_outs = play.outs.len() as u8;
-        match if self.is_frame_flipped(play) {play_outs} else {self.outs + play_outs} {
+        match if self.is_frame_flipped(play)? {play_outs} else {self.outs + play_outs} {
             o if o > 3 => bail!("Illegal state, more than 3 outs recorded"),
             o => Ok(o)
         }
     }
 
-    fn update_on_play(&mut self, record: &PlayRecord) -> Result<()> {
-        let play = CachedPlay::try_from(record)?;
+    fn update_on_play(&mut self, play: &CachedPlay) -> Result<()> {
         if play.play.no_play() {return Ok(())}
-        let new_frame = self.get_new_frame(&play);
+        let new_frame = self.get_new_frame(&play)?;
         let new_outs = self.outs_after_play(&play)?;
 
         let pitcher = self.personnel.pitcher(&play.batting_side.flip())?;
         let batter_lineup_position = self.personnel.at_bat(&play)?;
 
         let new_base_state = self.bases.new_base_state(
-            self.is_frame_flipped(&play),
+            self.is_frame_flipped(&play)?,
             new_outs == 3,
             &play,
             batter_lineup_position,
@@ -828,9 +843,12 @@ impl GameState2 {
         // TODO
     }
 
-    pub fn update(&mut self, record: &MappedRecord, sequence: u16) -> Result<()> {
+    pub fn update(&mut self, record: &MappedRecord, sequence: u16, cached_play: &Option<CachedPlay>) -> Result<()> {
         Ok(match record {
-            MappedRecord::Play(r) => self.update_on_play(r)?,
+            MappedRecord::Play(r) => {
+                if let Some(cp) = cached_play
+                { self.update_on_play(cp) } else { bail!("Expected cached play but got None") }
+            }?,
             MappedRecord::Substitution(r) => self.update_on_substitution(r, sequence)?,
             MappedRecord::BatHandAdjustment(r) => self.update_on_bat_hand_adjustment(r),
             MappedRecord::PitchHandAdjustment(r) => self.update_on_pitch_hand_adjustment(r),

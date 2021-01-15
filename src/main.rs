@@ -52,7 +52,7 @@ fn main() {
             }
             let game = GameContext::try_from(&rv);
             match game {
-                Ok(v) =>  {writer.write_record(serde_json::to_string(&v));},
+                Ok(v) =>  (),
                 Err(e) => println!("Game: {:?}:\n{:?}", &rv.first(), e)
             }
         }
