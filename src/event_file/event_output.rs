@@ -1,23 +1,22 @@
 
-use anyhow::{Result, Context, anyhow, Error, bail};
+use anyhow::{Result, Context, Error, bail};
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 
-use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Precipitation, Sky, UmpirePosition, WindDirection, InfoRecord, UmpireAssignment, Team};
-use crate::event_file::traits::{Matchup, Inning, Player, Pitcher, Batter, Fielder};
+use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Precipitation, Sky, UmpirePosition, WindDirection, InfoRecord, UmpireAssignment};
+use crate::event_file::traits::{Matchup, Inning, Player, Pitcher};
 use crate::event_file::pitch_sequence::{PitchSequenceItem};
 use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, Count, HitLocation, InningFrame, PlateAppearanceType, PlayRecord, CachedPlay, PlayType, HitType, OtherPlateAppearance, OutAtBatType, ImplicitPlayResults, ContactDescription, ContactType, FieldersData, EarnedRunStatus, RunnerAdvanceModifier, FieldingData};
-use crate::event_file::traits::{FieldingPlayType, FieldingPosition, GameFileStatus, GameType, Handedness, LineupPosition, Side};
+use crate::event_file::traits::{FieldingPosition, GameFileStatus, GameType, Handedness, LineupPosition, Side};
 use crate::event_file::parser::{MappedRecord, RecordVec};
 use std::collections::HashMap;
 use itertools::Itertools;
 use tinystr::TinyStr8;
 use crate::event_file::pbp_to_box::{Outs, BaseState};
-use crate::event_file::misc::{SubstitutionRecord, BatHandAdjustment, PitchHandAdjustment, LineupAdjustment, RunnerAdjustment, Comment, AppearanceRecord, StartRecord};
+use crate::event_file::misc::{SubstitutionRecord, BatHandAdjustment, PitchHandAdjustment, LineupAdjustment, RunnerAdjustment, Comment};
 use std::convert::TryFrom;
 use either::Either;
 use bimap::BiMap;
-use std::hash::Hash;
 
 const UNKNOWN_STRINGS: [&str;1] = ["unknown"];
 const NONE_STRINGS: [&str;2] = ["(none)", "none"];
@@ -105,7 +104,7 @@ impl From<&PlateAppearanceType> for PlateAppearanceResultType {
 enum EventInfoType {}
 
 impl EventInfoType {
-    fn from_play(play: &CachedPlay) -> Vec<Self> {
+    fn from_play(_play: &CachedPlay) -> Vec<Self> {
         vec![]
     }
     }
@@ -228,7 +227,7 @@ impl From<&RecordVec> for GameSetting {
                 InfoRecord::DoubleheaderStatus(x) => {setting.doubleheader_status = *x},
                 InfoRecord::StartTime(x) => {setting.start_time = *x },
                 InfoRecord::DayNight(x) => {setting.time_of_day = *x},
-                InfoRecord::UseDH(x) => {setting.use_dh = *x},
+                InfoRecord::UseDh(x) => {setting.use_dh = *x},
                 InfoRecord::HomeTeamBatsFirst(x) => {
                     setting.bat_first_side = if *x {Side::Home} else {Side::Away}
                 },
@@ -308,7 +307,7 @@ impl From<&Vec<MappedRecord>> for GameResults {
                 InfoRecord::WinningPitcher(x) => {results.winning_pitcher = s(x)},
                 InfoRecord::LosingPitcher(x) => {results.losing_pitcher = s(x)},
                 InfoRecord::SavePitcher(x) => {results.save_pitcher = s(x)},
-                InfoRecord::GameWinningRBI(x) => {results.game_winning_rbi = s(x)},
+                InfoRecord::GameWinningRbi(x) => {results.game_winning_rbi = s(x)},
                 InfoRecord::TimeOfGameMinutes(x) => {results.time_of_game_minutes = *x},
                 _ => {}
             });
@@ -590,7 +589,7 @@ impl Personnel {
 
     fn get_at_position(&self, side: &Side, position: &Position) -> Result<Player> {
         let map_tup = self.personnel_state.get(side);
-        let map = if let Either::Left(lp) = position {&map_tup.0} else {&map_tup.1};
+        let map = if let Either::Left(_) = position {&map_tup.0} else {&map_tup.1};
         map.get_by_left(position)
             .copied()
             .with_context(|| format!("Position {:?} for side {:?} missing from current game state: {:?}", position, side, map))
@@ -645,7 +644,7 @@ impl Personnel {
         lineup.insert(Either::Left(sub.lineup_position), sub.player);
         self.lineup_appearances
             .entry(sub.player)
-            .or_insert(Vec::with_capacity(1))
+            .or_insert_with(|| Vec::with_capacity(1))
             .push(new_lineup_appearance);
         Ok(())
     }
@@ -667,7 +666,7 @@ impl Personnel {
         defense.insert( Either::Right(sub.fielding_position), sub.player);
 
         self.defense_appearances.entry(sub.player)
-            .or_insert(Vec::with_capacity(1))
+            .or_insert_with(|| Vec::with_capacity(1))
             .push(GameFieldingAppearance::new(sub.player.to_string(),
                                               sub.fielding_position,
                                               sequence));
@@ -845,7 +844,7 @@ impl GameState2 {
 
     pub fn update(&mut self, record: &MappedRecord, sequence: u16, cached_play: &Option<CachedPlay>) -> Result<()> {
         Ok(match record {
-            MappedRecord::Play(r) => {
+            MappedRecord::Play(_) => {
                 if let Some(cp) = cached_play
                 { self.update_on_play(cp) } else { bail!("Expected cached play but got None") }
             }?,

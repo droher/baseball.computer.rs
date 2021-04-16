@@ -9,7 +9,6 @@ use tinystr::{TinyStr16};
 use crate::util::str_to_tinystr;
 use bimap::BiMap;
 use crate::event_file::play::Base;
-use crate::event_file::pbp_to_box::Runner;
 
 pub type Comment = String;
 

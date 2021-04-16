@@ -17,7 +17,7 @@ pub type RetrosheetEventRecord = StringRecord;
 #[derive(Ord, PartialOrd, Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum LineupPosition {
-    PitcherWithDH = 0,
+    PitcherWithDh = 0,
     First,
     Second,
     Third,
@@ -37,7 +37,7 @@ impl LineupPosition {
     pub fn next(self) -> Result<Self> {
         let as_u8: u8 = self.into();
         match self {
-            Self::PitcherWithDH => Err(anyhow!("Pitcher has no lineup position with DH in the game")),
+            Self::PitcherWithDh => Err(anyhow!("Pitcher has no lineup position with DH in the game")),
             Self::Ninth => Ok(Self::First),
             _ => Ok(Self::try_from(as_u8 + 1)?)
         }
@@ -196,7 +196,7 @@ pub enum BattingStats {
     Doubles,
     Triples,
     HomeRuns,
-    RBI,
+    Rbi,
     SacrificeHits,
     SacrificeFlies,
     HitByPitch,

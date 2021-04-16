@@ -34,35 +34,32 @@ pub struct BoxScore {
 }
 
 impl BoxScore {
-    fn matchup_vec<T>(mut vecs: ArrayVec<[Vec<T>;2]>) -> Matchup<Vec<T>> {
+    fn matchup_vec<T>(mut vecs: ArrayVec<Vec<T>, 2>) -> Matchup<Vec<T>> {
         Matchup::new(vecs.remove(0), vecs.remove(0))
     }
 
     fn get_batter_by_id(&mut self, side: Side, batter_id: Batter) -> Result<&mut BattingLine>  {
-        Ok(self.batting_lines
+        self.batting_lines
             .get_mut(&side)
             .iter_mut()
             .find(|br| br.batter_id == batter_id)
-            .context("Could not find batter in box score")?
-        )
+            .context("Could not find batter in box score")
     }
 
     fn get_pinch_hitter_by_id(&mut self, side: Side, batter_id: Batter) -> Result<&mut PinchHittingLine>  {
-        Ok(self.pinch_hitting_lines
+        self.pinch_hitting_lines
             .get_mut(&side)
             .iter_mut()
             .find(|br| br.pinch_hitter_id == batter_id)
-            .context("Could not find pinch-hitter in box score")?
-        )
+            .context("Could not find pinch-hitter in box score")
     }
 
     fn get_pinch_runner_by_id(&mut self, side: Side, batter_id: Batter) -> Result<&mut PinchRunningLine>  {
-        Ok(self.pinch_running_lines
+        self.pinch_running_lines
             .get_mut(&side)
             .iter_mut()
             .find(|br| br.pinch_runner_id == batter_id)
-            .context("Could not find pinch-runner in box score")?
-        )
+            .context("Could not find pinch-runner in box score")
     }
 
     fn get_line_from_runner(&mut self, side: Side, lineup: &Lineup, runner: &Runner) -> Result<&mut BattingLine>  {
@@ -75,12 +72,11 @@ impl BoxScore {
     // TODO: Handle the Bryan Mitchell case (pitches, switches to another defensive position,
     //  pitches again)
     fn get_pitcher_by_id(&mut self, side: Side, pitcher_id: Pitcher) -> Result<&mut PitchingLine>  {
-        Ok(self.pitching_lines
+        self.pitching_lines
             .get_mut(&side)
             .iter_mut()
             .find(|pl| pl.pitcher_id == pitcher_id)
-            .context("Could not find pitcher in box score")?
-        )
+            .context("Could not find pitcher in box score")
     }
 
 
@@ -197,10 +193,10 @@ impl TryFrom<&BoxScoreGame> for BoxScore {
                 .collect());
         let pitching_lines = Self::matchup_vec(sides.iter()
             .map(|s| PitchingLine::from_defense(*s, game.starting_defense.get(s)))
-            .collect::<Result<ArrayVec<[Vec<PitchingLine>;2]>>>()?);
+            .collect::<Result<ArrayVec<Vec<PitchingLine>, 2>>>()?);
         let team_miscellaneous_lines = sides.iter()
                 .map(|s| TeamMiscellaneousLine::new(*s))
-                .collect::<ArrayVec<[TeamMiscellaneousLine;2]>>();
+                .collect::<ArrayVec<TeamMiscellaneousLine, 2>>();
         Ok(Self {
             batting_lines,
             pinch_hitting_lines: Default::default(),
@@ -1067,7 +1063,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameSetting {
                 InfoRecord::DoubleheaderStatus(x) => {setting.doubleheader_status = *x},
                 InfoRecord::StartTime(x) => {setting.start_time = *x},
                 InfoRecord::DayNight(x) => {setting.time_of_day = *x},
-                InfoRecord::UseDH(x) => {setting.use_dh = *x},
+                InfoRecord::UseDh(x) => {setting.use_dh = *x},
                 InfoRecord::HomeTeamBatsFirst(x) => {
                     setting.bat_first_side = if *x {Side::Home} else {Side::Away}
                 },
@@ -1236,7 +1232,7 @@ impl TryFrom<&Vec<InfoRecord>> for GameResults {
                 InfoRecord::WinningPitcher(x) => {results.winning_pitcher = *x},
                 InfoRecord::LosingPitcher(x) => {results.losing_pitcher = *x},
                 InfoRecord::SavePitcher(x) => {results.save = *x},
-                InfoRecord::GameWinningRBI(x) => {results.game_winning_rbi = *x},
+                InfoRecord::GameWinningRbi(x) => {results.game_winning_rbi = *x},
                 InfoRecord::TimeOfGameMinutes(x) => {results.time_of_game_minutes = *x},
                 _ => {}
             }

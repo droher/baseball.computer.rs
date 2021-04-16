@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result, Error, bail};
+use anyhow::{Result, Error, bail};
 use chrono::{NaiveDate, NaiveTime};
 use strum_macros::{EnumString, ToString};
 use serde::{Serialize, Deserialize};
@@ -65,16 +65,16 @@ impl Default for Sky {
 #[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString, Ord, PartialOrd, Serialize, Deserialize)]
 #[strum(serialize_all = "lowercase")]
 pub enum WindDirection {
-    FromCF,
-    FromLF,
-    FromRF,
+    FromCf,
+    FromLf,
+    FromRf,
     #[strum(serialize = "ltor")]
     LeftToRight,
     #[strum(serialize = "rtol")]
     RightToLeft,
-    ToCF,
-    ToLF,
-    ToRF,
+    ToCf,
+    ToLf,
+    ToRf,
     Unknown
 }
 impl Default for WindDirection {
@@ -154,7 +154,7 @@ pub enum InfoRecord {
     DoubleheaderStatus(DoubleheaderStatus),
     StartTime(Option<NaiveTime>),
     DayNight(DayNight),
-    UseDH(bool),
+    UseDh(bool),
     HomeTeamBatsFirst(bool),
     PitchDetail(PitchDetail),
     UmpireAssignment(UmpireAssignment),
@@ -170,7 +170,7 @@ pub enum InfoRecord {
     WinningPitcher(Option<Player>),
     LosingPitcher(Option<Player>),
     SavePitcher(Option<Player>),
-    GameWinningRBI(Option<Player>),
+    GameWinningRbi(Option<Player>),
     HowScored(HowScored),
     Inputter(Option<RetrosheetVolunteer>),
     Scorer(Option<Scorer>),
@@ -236,7 +236,7 @@ impl TryFrom<&RetrosheetEventRecord>for InfoRecord {
             "temp" => I::Temp(parse_positive_int::<u8>(value)),
             "innings" => I::Innings(parse_positive_int::<u8>(value)),
 
-            "usedh" => I::UseDH(bool::from_str(value)?),
+            "usedh" => I::UseDh(bool::from_str(value)?),
             "htbf" => I::HomeTeamBatsFirst(bool::from_str(value)?),
             "date" => I::GameDate(NaiveDate::parse_from_str(value, "%Y/%m/%d")?),
             "starttime" => I::parse_time(value),
@@ -245,7 +245,7 @@ impl TryFrom<&RetrosheetEventRecord>for InfoRecord {
             "wp" => I::WinningPitcher(t8().ok()),
             "lp" => I::LosingPitcher(t8().ok()),
             "save" => I::SavePitcher(t8().ok()),
-            "gwrbi" => I::GameWinningRBI(t8().ok()),
+            "gwrbi" => I::GameWinningRbi(t8().ok()),
             "scorer" => I::Scorer(t16().ok()),
             "inputter" => I::Inputter(t16().ok()),
             "translator" => I::Translator(t16().ok()),

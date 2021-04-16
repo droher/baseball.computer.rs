@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Context, Error, Result, bail};
+use anyhow::{Context, Error, Result, bail};
 use const_format::{concatcp, formatcp};
 use num_enum::{TryFromPrimitive, IntoPrimitive};
 use lazy_static::lazy_static;
@@ -206,8 +206,8 @@ pub enum EarnedRunStatus {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub enum RbiStatus {
-    RBI,
-    NoRBI
+    Rbi,
+    NoRbi
 }
 
 type PositionVec = Vec<FieldingPosition>;
@@ -909,9 +909,9 @@ impl RunnerAdvance {
 pub enum RunnerAdvanceModifier {
     UnearnedRun,
     TeamUnearnedRun,
-    NoRBI,
+    NoRbi,
     Interference(FieldingPosition),
-    RBI,
+    Rbi,
     PassedBall,
     WildPitch,
     AdvancedOnThrowTo(Option<Base>),
@@ -930,8 +930,8 @@ impl RunnerAdvanceModifier {
 
     fn rbi_status(&self) -> Option<RbiStatus> {
         match self {
-            Self::RBI => Some(RbiStatus::RBI),
-            Self::NoRBI => Some(RbiStatus::NoRBI),
+            Self::Rbi => Some(RbiStatus::Rbi),
+            Self::NoRbi => Some(RbiStatus::NoRbi),
             _ => None
         }
     }
@@ -968,8 +968,8 @@ impl RunnerAdvanceModifier {
         let simple_match = match value {
             "(UR" => RunnerAdvanceModifier::UnearnedRun,
             "(TUR" => RunnerAdvanceModifier::TeamUnearnedRun,
-            "(NR" | "(NORBI" => RunnerAdvanceModifier::NoRBI,
-            "(RBI" => RunnerAdvanceModifier::RBI,
+            "(NR" | "(NORBI" => RunnerAdvanceModifier::NoRbi,
+            "(RBI" => RunnerAdvanceModifier::Rbi,
             "(PB" => RunnerAdvanceModifier::PassedBall,
             "(WP" => RunnerAdvanceModifier::WildPitch,
             "(THH" => RunnerAdvanceModifier::AdvancedOnThrowTo(Some(Base::Home)),
@@ -1431,23 +1431,23 @@ impl Play {
             .iter()
             .any(|pt| pt.is_rbi_eligible());
         match has_rbi_eligible_play && !self.is_gidp() {
-            true => RbiStatus::RBI,
-            false => RbiStatus::NoRBI
+            true => RbiStatus::Rbi,
+            false => RbiStatus::NoRbi
         }
     }
 
     pub fn rbi(&self) -> Vec<BaseRunner> {
         let default_filter = {
             |ra: &RunnerAdvance|
-                ra.scored() && ra.explicit_rbi_status() != Some(RbiStatus::NoRBI)
+                ra.scored() && ra.explicit_rbi_status() != Some(RbiStatus::NoRbi)
         };
         let no_default_filter = {
             |ra: &RunnerAdvance|
-                ra.scored() && ra.explicit_rbi_status() == Some(RbiStatus::RBI)
+                ra.scored() && ra.explicit_rbi_status() == Some(RbiStatus::Rbi)
         };
         let rbis = match self.default_rbi_status() {
-            RbiStatus::RBI => self.filtered_baserunners(default_filter),
-            RbiStatus::NoRBI => self.filtered_baserunners(no_default_filter)
+            RbiStatus::Rbi => self.filtered_baserunners(default_filter),
+            RbiStatus::NoRbi => self.filtered_baserunners(no_default_filter)
         };
         rbis.collect()
     }

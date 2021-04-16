@@ -1,19 +1,13 @@
 #![forbid(unsafe_code)]
 
-use std::convert::{TryFrom, TryInto};
-use std::fs::File;
+use std::convert::{TryFrom};
 use std::path::PathBuf;
 use std::time::Instant;
 
-use anyhow::Result;
-use csv::{Writer, WriterBuilder, QuoteStyle};
-use serde_json;
+use csv::{WriterBuilder, QuoteStyle};
 use structopt::StructOpt;
 
 use event_file::parser::{MappedRecord, RetrosheetReader};
-use event_file::event_output::GameState2;
-use event_file::pbp_to_box::BoxScoreGame;
-use crate::event_file::traits::RetrosheetEventRecord;
 use crate::event_file::event_output::GameContext;
 
 mod util;
@@ -38,7 +32,7 @@ fn main() {
     let start = Instant::now();
     let opt: Opt = Opt::from_args();
 
-    let mut reader = RetrosheetReader::try_from(&opt.input).unwrap();
+    let reader = RetrosheetReader::try_from(&opt.input).unwrap();
     let mut writer = WriterBuilder::new()
         .has_headers(false)
         .flexible(true)
@@ -52,7 +46,7 @@ fn main() {
             }
             let game = GameContext::try_from(&rv);
             match game {
-                Ok(v) =>  (),
+                Ok(v) =>  {writer.write_record(serde_json::to_string(&v));},
                 Err(e) => println!("Game: {:?}:\n{:?}", &rv.first(), e)
             }
         }
