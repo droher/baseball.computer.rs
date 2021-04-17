@@ -1,22 +1,21 @@
-
-use anyhow::{Result, Context, Error, bail};
-use chrono::{NaiveDate, NaiveTime};
-use serde::{Deserialize, Serialize};
-
-use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Precipitation, Sky, UmpirePosition, WindDirection, InfoRecord, UmpireAssignment};
-use crate::event_file::traits::{Matchup, Inning, Player, Pitcher};
-use crate::event_file::pitch_sequence::{PitchSequenceItem};
-use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, Count, HitLocation, InningFrame, PlateAppearanceType, PlayRecord, CachedPlay, PlayType, HitType, OtherPlateAppearance, OutAtBatType, ImplicitPlayResults, ContactDescription, ContactType, FieldersData, EarnedRunStatus, RunnerAdvanceModifier, FieldingData};
-use crate::event_file::traits::{FieldingPosition, GameFileStatus, GameType, Handedness, LineupPosition, Side};
-use crate::event_file::parser::{MappedRecord, RecordVec};
 use std::collections::HashMap;
-use itertools::Itertools;
-use tinystr::TinyStr8;
-use crate::event_file::pbp_to_box::{Outs, BaseState};
-use crate::event_file::misc::{SubstitutionRecord, BatHandAdjustment, PitchHandAdjustment, LineupAdjustment, RunnerAdjustment, Comment};
 use std::convert::TryFrom;
-use either::Either;
+
+use anyhow::{anyhow, bail, Context, Error, Result};
 use bimap::BiMap;
+use chrono::{NaiveDate, NaiveTime};
+use either::Either;
+use itertools::Itertools;
+use serde::{Deserialize, Serialize};
+use tinystr::TinyStr8;
+
+use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Precipitation, Sky, UmpireAssignment, UmpirePosition, WindDirection};
+use crate::event_file::misc::{BatHandAdjustment, Comment, LineupAdjustment, PitchHandAdjustment, RunnerAdjustment, SubstitutionRecord};
+use crate::event_file::parser::{MappedRecord, RecordVec};
+use crate::event_file::pitch_sequence::PitchSequenceItem;
+use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, ContactDescription, ContactType, Count, EarnedRunStatus, FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayRecord, PlayType, RunnerAdvance, RunnerAdvanceModifier};
+use crate::event_file::traits::{Inning, Matchup, Pitcher, Player};
+use crate::event_file::traits::{FieldingPosition, GameFileStatus, GameType, Handedness, LineupPosition, Side};
 
 const UNKNOWN_STRINGS: [&str;1] = ["unknown"];
 const NONE_STRINGS: [&str;2] = ["(none)", "none"];
@@ -387,7 +386,7 @@ impl TryFrom<&RecordVec> for GameContext {
         let umpires = GameUmpire::from_record_vec(record_vec);
         let results = GameResults::try_from(record_vec)?;
 
-        let (events, lineup_appearances, fielding_appearances) = GameState2::create_events(record_vec)?;
+        let (events, lineup_appearances, fielding_appearances) = GameState::create_events(record_vec)?;
         Ok(Self {
             teams,
             setting,
@@ -691,7 +690,7 @@ struct HandednessPair {
 
 /// Tracks the information necessary to populate each event.
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct GameState2 {
+pub struct GameState {
     inning: Inning,
     frame: InningFrame,
     batting_side: Side,
@@ -701,7 +700,7 @@ pub struct GameState2 {
     personnel: Personnel,
 }
 
-impl GameState2 {
+impl GameState {
 
     pub fn create_events(record_vec: &RecordVec) -> Result<(Vec<Event>, Vec<GameLineupAppearance>, Vec<GameFieldingAppearance>)> {
         let mut events: Vec<Event> = Vec::with_capacity(100);
@@ -858,3 +857,164 @@ impl GameState2 {
         })
     }
 }
+
+pub type Outs = u8;
+
+#[derive(Debug, Eq, PartialEq, Default, Clone)]
+pub struct BaseState {
+    bases: HashMap<BaseRunner, Runner>,
+    scored: Vec<Runner>
+}
+
+impl BaseState {
+    pub fn new_inning_tiebreaker(new_runner: LineupPosition, current_pitcher: Pitcher) -> Self {
+        let mut state = Self::default();
+        let runner = Runner { lineup_position: new_runner, charged_to: current_pitcher };
+        state.bases.insert(BaseRunner::Second, runner);
+        state
+    }
+
+    pub fn get_bases(&self) -> &HashMap<BaseRunner, Runner> {
+        &self.bases
+    }
+
+    fn num_runners_on_base(&self) -> u8 {
+        self.bases.len() as u8
+    }
+
+    fn get_runner(&self, baserunner: &BaseRunner) -> Option<&Runner> {
+        self.bases.get(baserunner)
+    }
+
+    fn get_first(&self) -> Option<&Runner> {
+        self.bases.get( &BaseRunner::First)
+    }
+
+    fn get_second(&self) -> Option<&Runner> {
+        self.bases.get( &BaseRunner::Second)
+    }
+
+    fn get_third(&self) -> Option<&Runner> {
+        self.bases.get( &BaseRunner::Third)
+    }
+
+    fn clear_baserunner(&mut self, baserunner: &BaseRunner) -> Option<Runner> {
+        self.bases
+            .remove(baserunner)
+    }
+
+    fn set_runner(&mut self, baserunner: BaseRunner, runner: Runner) {
+        self.bases.insert(baserunner, runner);
+    }
+
+    fn get_advance_from_baserunner(baserunner: BaseRunner, cached_play: &CachedPlay) -> Option<&RunnerAdvance> {
+        cached_play
+            .advances
+            .iter()
+            .find(|a| a.baserunner == baserunner)
+    }
+
+    fn current_base_occupied(&self, advance: &RunnerAdvance) -> bool {
+        self.get_runner(&advance.baserunner).is_some()
+    }
+
+    fn target_base_occupied(&self, advance: &RunnerAdvance) -> Result<bool> {
+        let br = BaseRunner::from_target_base(&advance.to);
+        Ok(self.get_runner(&br?).is_some())
+
+    }
+
+    fn check_integrity(old_state: &Self, new_state: &Self, advance: &RunnerAdvance) -> Result<()> {
+        if new_state.target_base_occupied(advance)? {
+            bail!("Runner is listed as moving to a base that is occupied by another runner")
+        }
+        else if !old_state.current_base_occupied(advance) {
+            bail!("Advancement from a base that had no runner on it.\n\
+            Old state: {:?}\n\
+            New state: {:?}\n\
+            Advance: {:?}\n", old_state, new_state, advance)
+        }
+        else {
+            Ok(())
+        }
+    }
+
+    ///  Accounts for Rule 9.16(g) regarding the assignment of trailing
+    ///  baserunners as inherited if they reach on a fielder's choice
+    ///  in which an inherited runner is forced out 🙃
+    fn update_runner_charges(self, _play: &Play) -> Self {
+        // TODO: This
+        self
+    }
+
+    pub(crate) fn new_base_state(&self, start_inning: bool, end_inning: bool, cached_play: &CachedPlay, batter_lineup_position: LineupPosition, pitcher: Pitcher) -> Result<Self> {
+        let play = &cached_play.play;
+
+        let mut new_state = if start_inning {Self::default()} else {self.clone()};
+        new_state.scored = vec![];
+
+        // Cover cases where outs are not included in advance information
+        for out in &cached_play.outs {
+            new_state.clear_baserunner(out);
+        }
+
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, &cached_play) {
+            new_state.clear_baserunner(&BaseRunner::Third);
+            if a.is_out() {}
+            else if let Err(e) = Self::check_integrity(&self, &new_state, &a) {
+                return Err(e)
+            }
+            else if let Some(r) = self.get_third() {
+                new_state.scored.push(*r)
+            }
+        }
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, &cached_play) {
+            new_state.clear_baserunner(&BaseRunner::Second);
+            if a.is_out() {}
+            else if let Err(e) = Self::check_integrity(&self, &new_state, &a) {
+                return Err(e)
+            }
+            else if let (Ok(true), Some(r)) = (a.is_this_that_one_time_jean_segura_ran_in_reverse(), self.get_second()) {
+                new_state.set_runner(BaseRunner::First, *r)
+            }
+            else if let (Base::Third, Some(r)) = (a.to, self.get_second()) {
+                new_state.set_runner(BaseRunner::Third, *r)
+            }
+            else if let (Base::Home, Some(r)) = (a.to, self.get_second()) {
+                new_state.scored.push(*r)
+            }
+        }
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, &cached_play) {
+            new_state.clear_baserunner(&BaseRunner::First);
+            if a.is_out() {}
+            else if let Err(e) = Self::check_integrity(&self, &new_state, &a) {
+                return Err(e)
+            }
+            else if let (Base::Second, Some(r)) = (&a.to, self.get_first()) {
+                new_state.set_runner(BaseRunner::Second, *r)
+            }
+            else if let (Base::Third, Some(r)) = (&a.to, self.get_first()) {
+                new_state.set_runner(BaseRunner::Third, *r)
+            }
+            else if let (Base::Home, Some(r)) = (&a.to, self.get_first()) {
+                new_state.scored.push(*r)
+            }
+        }
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Batter, &cached_play) {
+            let new_runner = Runner { lineup_position: batter_lineup_position, charged_to: pitcher };
+            match a.to {
+                _ if a.is_out() || end_inning => {},
+                _ if new_state.target_base_occupied(&a)? => return Err(anyhow!("Batter advanced to an occupied base")),
+                Base::Home => new_state.scored.push(new_runner),
+                b => new_state.set_runner(BaseRunner::from_current_base(&b)?, new_runner)
+            }
+        }
+        Ok(new_state.update_runner_charges(&play))
+    }
+
+
+}
+
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct Runner {pub lineup_position: LineupPosition, pub charged_to: Pitcher}
