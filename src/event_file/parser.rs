@@ -6,16 +6,13 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Context, Error, Result};
 use csv::{Reader, ReaderBuilder, StringRecord};
 use either::{Either};
-use itertools::Itertools;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::{InfoRecord, Team};
-use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord, RunnerAdjustment, AppearanceRecord};
-use crate::event_file::pbp_to_box::{BoxScoreGame};
+use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord, RunnerAdjustment};
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{Matchup, RetrosheetEventRecord};
 
-pub type Teams = Matchup<Team>;
 
 pub type RecordVec = Vec<MappedRecord>;
 
@@ -42,12 +39,6 @@ impl Iterator for RetrosheetReader {
 }
 
 impl RetrosheetReader {
-
-    pub fn iter_box(&mut self) -> impl Iterator<Item=Result<BoxScoreGame>> + '_ {
-        self.into_iter()
-            .map_ok(|rv| BoxScoreGame::try_from(&rv))
-            .map(|r| r.and_then(|r| r))
-    }
 
     fn next_game(&mut self) -> Result<bool> {
         if self.reader.is_done() {return Ok(false)}
@@ -105,8 +96,6 @@ pub enum MappedRecord {
     BoxScoreEvent(BoxScoreEvent),
     Unrecognized
 }
-
-pub type EventRecord = Either<PlayRecord, SubstitutionRecord>;
 
 impl TryFrom<&RetrosheetEventRecord>for MappedRecord {
     type Error = Error;
