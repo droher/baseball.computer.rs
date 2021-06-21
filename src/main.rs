@@ -8,7 +8,7 @@ use csv::{WriterBuilder, QuoteStyle};
 use structopt::StructOpt;
 
 use event_file::parser::{MappedRecord, RetrosheetReader};
-use crate::event_file::event_output::GameContext;
+use crate::event_file::game_state::GameContext;
 
 mod util;
 mod event_file;

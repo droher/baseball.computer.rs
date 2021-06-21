@@ -519,17 +519,17 @@ pub struct Event {
     results: EventResults
 }
 
-/// This tracks the more unusual/miscellaneous elements of the state of the game,,
-/// such as batters batting from an unexpected side or a substitution in the middle of
-/// an at-bat. Further exceptions should go here as they come up.
-// #[derive(Default, Debug, Eq, PartialEq, Clone)]
-// pub struct WeirdGameState {
-//     batter_hand: Option<Handedness>,
-//     pitcher_hand: Option<Handedness>,
-//     responsible_batter: Option<String>,
-//     responsible_pitcher: Option<String>,
-//     mid_at_bat_interruption_flag: bool
-// }
+/// TODO: This tracks the more unusual/miscellaneous elements of the state of the game,,
+///     such as batters batting from an unexpected side or a substitution in the middle of
+///     an at-bat. Further exceptions should go here as they come up.
+#[derive(Default, Debug, Eq, PartialEq, Clone)]
+pub struct WeirdGameState {
+    batter_hand: Option<Handedness>,
+    pitcher_hand: Option<Handedness>,
+    responsible_batter: Option<String>,
+    responsible_pitcher: Option<String>,
+    mid_at_bat_interruption_flag: bool
+}
 
 /// Keeps track of the current players on the field at any given point
 /// and records their exits/entries.
@@ -735,7 +735,21 @@ impl GameState {
                 sequence += 1;
             }
         }
-        Ok((events, state.personnel.lineup_appearances.values().flatten().cloned().collect_vec(), state.personnel.defense_appearances.values().flatten().cloned().collect_vec()))
+        Ok((events,
+            state
+                .personnel
+                .lineup_appearances
+                .values()
+                .flatten()
+                .cloned()
+                .collect_vec(),
+            state
+                .personnel
+                .defense_appearances
+                .values()
+                .flatten()
+                .cloned()
+                .collect_vec()))
     }
 
     pub(crate) fn new(record_vec: &RecordVec) -> Self {

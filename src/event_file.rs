@@ -5,4 +5,4 @@ pub mod traits;
 pub mod box_score;
 pub mod info;
 pub mod pitch_sequence;
-pub mod event_output;
+pub mod game_state;
