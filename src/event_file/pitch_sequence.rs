@@ -8,8 +8,17 @@ use strum_macros::EnumString;
 use crate::event_file::play::Base;
 use std::ops::Deref;
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize)]
-enum PitchType {
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
+pub enum SequenceItemTypeGeneral {
+    Ball,
+    Strike,
+    InPlay,
+    NoPitch
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize)]
+pub enum PitchType {
     #[strum(serialize = "1")]
     PickoffAttemptFirst,
     #[strum(serialize = "2")]

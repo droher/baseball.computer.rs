@@ -1060,7 +1060,7 @@ impl Default for HitAngle {
     fn default() -> Self {Self::Default}
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum HitLocationGeneral {
     #[strum(serialize = "1")]
     Pitcher,
@@ -1157,7 +1157,7 @@ impl TryFrom<(&str, &str)> for ContactDescription {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, EnumString, Hash, Serialize, Deserialize)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, EnumString, Hash, Serialize, Deserialize)]
 pub enum ContactType {
     #[strum(serialize = "B")]
     UnspecifiedBunt,

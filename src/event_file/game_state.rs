@@ -25,7 +25,7 @@ type PersonnelState = BiMap<Position, Player>;
 type Lineup = PersonnelState;
 type Defense = PersonnelState;
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum EnteredGameAs {
     Starter,
     PinchHitter,
@@ -55,7 +55,7 @@ impl TryFrom<&MappedRecord> for EnteredGameAs {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum PlateAppearanceResultType {
     Single,
     Double,
@@ -99,8 +99,8 @@ impl From<&PlateAppearanceType> for PlateAppearanceResultType {
     }
 }
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-enum EventInfoType {}
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
+pub enum EventInfoType {}
 
 impl EventInfoType {
     fn from_play(_play: &CachedPlay) -> Vec<Self> {
@@ -109,60 +109,10 @@ impl EventInfoType {
     }
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-struct Season(u16);
+pub struct Season(u16);
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 struct League(String);
-
-// #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-// struct Franchise {
-//     retrosheet_id: String,
-//     franchise_name: String
-// }
-//
-// #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-// struct Division {
-//     league: League,
-//     division_name: String
-// }
-//
-// #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-// struct City {
-//     city_name: Option<String>,
-//     state_name: Option<String>,
-//     country_name: String
-// }
-
-// #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-// struct Person {
-//     date_of_birth: Option<NaiveDate>,
-//     date_of_death: Option<NaiveDate>,
-//     bats: Handedness,
-//     throws: Handedness,
-//     // Provide default here if birth_date is populated
-//     birth_year: Option<u16>,
-//     weight_pounds: Option<u16>,
-//     height_inches: Option<u16>,
-//     place_of_birth: City,
-//     place_of_death: City,
-//     retrosheet_id: String,
-//     full_name: String
-// }
-
-// #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-// struct Park {
-//     park_name: String,
-//     alias: String,
-//     retrosheet_id: String,
-//     city: City
-// }
-
-// #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-// struct FranchiseSeason {
-//     franchise: Franchise,
-//     season: Season,
-//     division: Division
-// }
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize,)]
 struct GameSetting {
