@@ -16,6 +16,7 @@ use std::convert::TryFrom;
 use crate::event_file::pitch_sequence::PitchSequence;
 use std::collections::{HashSet};
 use std::iter::FromIterator;
+use std::mem::discriminant;
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
@@ -1271,6 +1272,13 @@ impl FieldingData for PlayModifier {
 }
 
 impl PlayModifier {
+     /// Determines whether the modifier should be included in the event type output
+     /// For now this is everything except ContactDescription
+     pub fn is_valid_event_type(&self) -> bool {
+         let dummy = &Self::ContactDescription(ContactDescription::default());
+         discriminant(dummy) != discriminant(self)
+     }
+
      const fn double_plays() -> [Self; 6] {
          [Self::BuntGroundIntoDoublePlay, Self::BuntPoppedIntoDoublePlay, Self::FlyBallDoublePlay,
          Self::GroundBallDoublePlay, Self::LinedIntoDoublePlay, Self::UnspecifiedDoublePlay]

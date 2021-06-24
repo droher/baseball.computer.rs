@@ -99,14 +99,24 @@ impl From<&PlateAppearanceType> for PlateAppearanceResultType {
     }
 }
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
-pub enum EventInfoType {}
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct EventInfoType(String);
 
 impl EventInfoType {
-    fn from_play(_play: &CachedPlay) -> Vec<Self> {
-        vec![]
+    fn from_play(play: &CachedPlay) -> Vec<Self> {
+        play
+            .play
+            .modifiers
+            .iter()
+            .filter_map(|pm| {
+                if pm.is_valid_event_type() {
+                    Some(EventInfoType(format!("{:?}", pm)))
+                } else {None}
+            })
+            .collect_vec()
+
     }
-    }
+}
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Season(u16);

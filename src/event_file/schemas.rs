@@ -99,7 +99,7 @@ pub struct EventStartingBaseState<'a> {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventPitchSequence<'a> {
+pub struct EventPitches<'a> {
     game_id: &'a str,
     event_id: u16,
     sequence_id: u8,
@@ -166,7 +166,7 @@ pub struct EventFlags<'a> {
     game_id: &'a str,
     event_id: u16,
     sequence_id: u8,
-    flag: EventInfoType
+    flag: &'a str
 }
 
 // Box score stats
