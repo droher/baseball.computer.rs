@@ -1,21 +1,22 @@
+use std::convert::TryFrom;
 use std::str::FromStr;
 
-use anyhow::{Result, Error, anyhow};
-use strum_macros::EnumString;
-
-use crate::event_file::traits::{RetrosheetEventRecord, LineupPosition, Player, FieldingPosition, Pitcher, Side, Batter, Fielder};
-use std::convert::TryFrom;
-use tinystr::{TinyStr16};
-use crate::util::str_to_tinystr;
+use anyhow::{anyhow, Error, Result};
 use bimap::BiMap;
+use serde::{Deserialize, Serialize};
+use strum_macros::EnumString;
+use tinystr::TinyStr16;
+
 use crate::event_file::play::Base;
+use crate::event_file::traits::{Batter, Fielder, FieldingPosition, LineupPosition, Pitcher, Player, RetrosheetEventRecord, Side};
+use crate::util::str_to_tinystr;
 
 pub type Comment = String;
 
 #[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
 enum Hand {L, R, S, B}
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Ord, PartialOrd, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct GameId {pub id: TinyStr16}
 impl TryFrom<&RetrosheetEventRecord>for GameId {
     type Error = Error;

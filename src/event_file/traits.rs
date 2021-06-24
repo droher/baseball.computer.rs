@@ -1,16 +1,16 @@
-use anyhow::{anyhow, Error, Result, Context};
+use std::convert::TryFrom;
+
+use anyhow::{anyhow, Context, Error, Result};
 use csv::StringRecord;
-use strum_macros::{EnumString, EnumIter, Display};
-use num_enum::{TryFromPrimitive, IntoPrimitive};
-use std::convert::{TryFrom};
-use tinystr::{TinyStr8, TinyStr16};
-use serde::{Serialize, Deserialize, Serializer};
-
-use crate::util::digit_vec;
-use crate::event_file::info::{InfoRecord, Team};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+use serde::{Deserialize, Serialize, Serializer};
 use serde::ser::SerializeStruct;
-use crate::event_file::parser::{RecordVec, MappedRecord};
+use strum_macros::{Display, EnumIter, EnumString};
+use tinystr::{TinyStr16, TinyStr8};
 
+use crate::event_file::info::{InfoRecord, Team};
+use crate::event_file::parser::{MappedRecord, RecordVec};
+use crate::util::digit_vec;
 
 pub type RetrosheetEventRecord = StringRecord;
 
@@ -128,14 +128,6 @@ pub enum GameType {
     LeagueChampionshipSeries,
     WorldSeries,
     Other
-}
-
-#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
-pub enum GameFileStatus {
-    Event,
-    DerivedAndBoxScore,
-    BoxScoreOnly,
-    GameLogOnly
 }
 
 #[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]

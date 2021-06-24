@@ -964,6 +964,7 @@ version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4bbe33cb8f36dc886f2de095af6c7aefd2b36a4f084081885054ad964422b46f"
 dependencies = [
+ "serde",
  "tinystr-macros",
  "tinystr-raw",
 ]

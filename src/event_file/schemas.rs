@@ -2,16 +2,16 @@ use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 
 use crate::event_file::box_score::PitchingLineStats;
-use crate::event_file::game_state::{EnteredGameAs, EventInfoType, PlateAppearanceResultType, Season};
-use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Precipitation, Sky, UmpirePosition, WindDirection};
+use crate::event_file::game_state::{EnteredGameAs, EventInfoType, GameContext, PlateAppearanceResultType, Season};
+use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Park, Precipitation, Sky, Team, UmpirePosition, WindDirection};
+use crate::event_file::misc::GameId;
 use crate::event_file::pitch_sequence::{PitchType, SequenceItemTypeGeneral};
-use crate::event_file::play::{Base, BaseRunner, BaserunningPlay, ContactType, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame, BaserunningPlayType};
-use crate::event_file::traits::{Fielder, FieldingPlayType, FieldingPosition, GameFileStatus, GameType, Handedness, LineupPosition, Side};
-
+use crate::event_file::play::{Base, BaseRunner, BaserunningPlay, BaserunningPlayType, ContactType, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame};
+use crate::event_file::traits::{Fielder, FieldingPlayType, FieldingPosition, GameType, Handedness, LineupPosition, Player, Side, Umpire};
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Game<'a> {
-    game_id: &'a str,
+    game_id: GameId,
     date: NaiveDate,
     start_time: Option<NaiveTime>,
     doubleheader_status: DoubleheaderStatus,
@@ -22,41 +22,89 @@ pub struct Game<'a> {
     field_condition: FieldCondition,
     precipitation: Precipitation,
     wind_direction: WindDirection,
-    how_scored: HowScored,
-    game_file_status: GameFileStatus,
-    season: Season,
-    park_id: &'a str,
+    scoring_method: HowScored,
+    park_id: Park,
     temperature_fahrenheit: Option<u8>,
     attendance: Option<u32>,
     wind_speed_mph: Option<u8>,
     use_dh: bool,
-    winning_pitcher:  Option<&'a str>,
-    losing_pitcher: Option<&'a str>,
-    save_pitcher: Option<&'a str>,
-    game_winning_rbi: Option<&'a str>,
+    winning_pitcher:  Option<Player>,
+    losing_pitcher: Option<Player>,
+    save_pitcher: Option<Player>,
+    game_winning_rbi: Option<Player>,
     time_of_game_minutes: Option<u16>,
     protest_info: Option<&'a str>,
     completion_info: Option<&'a str>
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct GameTeams<'a> {
-    game_id: &'a str,
-    team_id: &'a str,
-    side: Side
+impl<'a> From<&'a GameContext> for Game<'a> {
+    fn from(gc: &'a GameContext) -> Self {
+        let setting = &gc.setting;
+        let results = &gc.results;
+        Self {
+            game_id: setting.game_id,
+            date: setting.date,
+            start_time: setting.start_time,
+            doubleheader_status: setting.doubleheader_status,
+            time_of_day: setting.time_of_day,
+            game_type: setting.game_type,
+            bat_first_side: setting.bat_first_side,
+            sky: setting.sky,
+            field_condition: setting.field_condition,
+            precipitation: setting.precipitation,
+            wind_direction: setting.wind_direction,
+            scoring_method: setting.how_scored,
+            park_id: setting.park_id,
+            temperature_fahrenheit: setting.temperature_fahrenheit,
+            attendance: setting.attendance,
+            wind_speed_mph: setting.wind_speed_mph,
+            use_dh: setting.use_dh,
+            winning_pitcher: results.winning_pitcher,
+            losing_pitcher: results.losing_pitcher,
+            save_pitcher: results.save_pitcher,
+            game_winning_rbi: results.game_winning_rbi,
+            time_of_game_minutes: results.time_of_game_minutes,
+            protest_info: results.protest_info.as_deref(),
+            completion_info: results.completion_info.as_deref()
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct GameUmpires<'a> {
-    game_id: &'a str,
-    umpire_id: &'a str,
+pub struct GameTeams {
+    game_id: GameId,
+    team_id: Team,
+    side: Side
+}
+
+impl GameTeams {
+    fn from_game_context(gc: &GameContext) -> Vec<Self> {
+        vec![
+            Self {
+                game_id: gc.setting.game_id,
+                team_id: gc.teams.away,
+                side: Side::Away
+            },
+            Self {
+                game_id: gc.setting.game_id,
+                team_id: gc.teams.home,
+                side: Side::Home
+            }
+            ]
+        }
+    }
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
+pub struct GameUmpires {
+    game_id: GameId,
+    umpire_id: Umpire,
     position: UmpirePosition
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct GameLineupAppearance<'a> {
-    game_id: &'a str,
-    player_id: &'a str,
+pub struct GameLineupAppearance {
+    game_id: GameId,
+    player_id: Player,
     side: Side,
     lineup_position: LineupPosition,
     entered_game_as: EnteredGameAs,
@@ -65,9 +113,9 @@ pub struct GameLineupAppearance<'a> {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct GameFieldingAppearance<'a> {
-    game_id: &'a str,
-    player_id: &'a str,
+pub struct GameFieldingAppearance {
+    game_id: GameId,
+    player_id: Player,
     side: Side,
     fielding_position: FieldingPosition,
     start_event_id: u16,
@@ -76,7 +124,7 @@ pub struct GameFieldingAppearance<'a> {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Event<'a> {
-    game_id: &'a str,
+    game_id: GameId,
     event_id: u16,
     batting_side: Side,
     frame: InningFrame,
@@ -90,17 +138,17 @@ pub struct Event<'a> {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventStartingBaseState<'a> {
-    game_id: &'a str,
+pub struct EventStartingBaseState {
+    game_id: GameId,
     event_id: u16,
     occupied_base: BaseRunner,
     runner_lineup_position: LineupPosition,
-    charged_to_pitcher_id: &'a str
+    charged_to_pitcher_id: Player
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventPitches<'a> {
-    game_id: &'a str,
+pub struct EventPitches {
+    game_id: GameId,
     event_id: u16,
     sequence_id: u8,
     is_pitch: bool,
@@ -112,16 +160,16 @@ pub struct EventPitches<'a> {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventPlateAppearance<'a> {
-    game_id: &'a str,
+pub struct EventPlateAppearance {
+    game_id: GameId,
     event_id: u16,
     plate_appearance_result: PlateAppearanceResultType,
     contact: Option<ContactType>
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventFieldingPlays<'a> {
-    game_id: &'a str,
+pub struct EventFieldingPlays {
+    game_id: GameId,
     event_id: u16,
     sequence_id: u8,
     fielding_position: FieldingPosition,
@@ -129,8 +177,8 @@ pub struct EventFieldingPlays<'a> {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventPlateAppearanceHitLocation<'a> {
-    game_id: &'a str,
+pub struct EventPlateAppearanceHitLocation {
+    game_id: GameId,
     event_id: u16,
     general_location: HitLocationGeneral,
     depth: HitDepth,
@@ -139,8 +187,8 @@ pub struct EventPlateAppearanceHitLocation<'a> {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventBaserunningPlays<'a> {
-    game_id: &'a str,
+pub struct EventBaserunningPlays {
+    game_id: GameId,
     event_id: u16,
     sequence_id: u8,
     baserunning_play: BaserunningPlayType,
@@ -148,8 +196,8 @@ pub struct EventBaserunningPlays<'a> {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventOuts<'a> {
-    game_id: &'a str,
+pub struct EventOuts {
+    game_id: GameId,
     event_id: u16,
     sequence_id: u8,
     baserunner_out: BaseRunner
@@ -157,8 +205,8 @@ pub struct EventOuts<'a> {
 
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventBaserunningAdvanceAttempts<'a> {
-    game_id: &'a str,
+pub struct EventBaserunningAdvanceAttempts {
+    game_id: GameId,
     event_id: u16,
     sequence_id: u8,
     baserunner: BaseRunner,
@@ -171,22 +219,22 @@ pub struct EventBaserunningAdvanceAttempts<'a> {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventFlags<'a> {
-    game_id: &'a str,
+    game_id: GameId,
     event_id: u16,
     sequence_id: u8,
     flag: &'a str
 }
 
 // Box score stats
-pub struct BoxScoreLineScore<'a> {
-    game_id: &'a str,
+pub struct BoxScoreLineScore {
+    game_id: GameId,
     inning: u8,
     side: Side,
     runs: u8
 }
 
 pub struct BoxScorePlayerHitting<'a> {
-    game_id: &'a str,
+    game_id: GameId,
     player_id: &'a str,
     side: Side,
     lineup_position: LineupPosition,
@@ -210,8 +258,8 @@ pub struct BoxScorePlayerHitting<'a> {
     reached_on_interference: Option<u8>
 }
 
-pub struct BoxScorePlayerFielding<'a> {
-    game_id: &'a str,
+pub struct BoxScorePlayerFielding {
+    game_id: GameId,
     fielder_id: Fielder,
     side: Side,
     fielding_position: FieldingPosition,
@@ -225,8 +273,8 @@ pub struct BoxScorePlayerFielding<'a> {
     passed_balls: Option<u8>
 }
 
-pub struct BoxScorePlayerPitching<'a> {
-    pitcher_id: &'a str,
+pub struct BoxScorePlayerPitching {
+    pitcher_id: Player,
     side: Side,
     nth_pitcher: u8,
     pitching_stats: PitchingLineStats,

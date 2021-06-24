@@ -7,15 +7,15 @@ use chrono::{NaiveDate, NaiveTime};
 use either::Either;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tinystr::TinyStr8;
+use tinystr::{tinystr16, tinystr8};
 
-use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Precipitation, Sky, UmpireAssignment, UmpirePosition, WindDirection};
-use crate::event_file::misc::{BatHandAdjustment, Comment, LineupAdjustment, PitchHandAdjustment, RunnerAdjustment, SubstitutionRecord};
+use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky, Team, UmpireAssignment, UmpirePosition, WindDirection};
+use crate::event_file::misc::{BatHandAdjustment, Comment, GameId, LineupAdjustment, PitchHandAdjustment, RunnerAdjustment, SubstitutionRecord};
 use crate::event_file::parser::{MappedRecord, RecordVec};
 use crate::event_file::pitch_sequence::PitchSequenceItem;
 use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, ContactDescription, ContactType, Count, EarnedRunStatus, FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayRecord, PlayType, RunnerAdvance, RunnerAdvanceModifier};
 use crate::event_file::traits::{Inning, Matchup, Pitcher, Player};
-use crate::event_file::traits::{FieldingPosition, GameFileStatus, GameType, Handedness, LineupPosition, Side};
+use crate::event_file::traits::{FieldingPosition, GameType, Handedness, LineupPosition, Side};
 
 const UNKNOWN_STRINGS: [&str;1] = ["unknown"];
 const NONE_STRINGS: [&str;2] = ["(none)", "none"];
@@ -125,30 +125,31 @@ pub struct Season(u16);
 struct League(String);
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize,)]
-struct GameSetting {
-    date: NaiveDate,
-    start_time: Option<NaiveTime>,
-    doubleheader_status: DoubleheaderStatus,
-    time_of_day: DayNight,
-    game_type: GameType,
-    bat_first_side: Side,
-    sky: Sky,
-    field_condition:  FieldCondition,
-    precipitation: Precipitation,
-    wind_direction: WindDirection,
-    how_scored: HowScored,
-    game_file_status: GameFileStatus,
-    season: Season,
-    park_id: String,
-    temperature_fahrenheit: Option<u8>,
-    attendance: Option<u32>,
-    wind_speed_mph: Option<u8>,
-    use_dh: bool
+pub struct GameSetting {
+    pub game_id: GameId,
+    pub date: NaiveDate,
+    pub start_time: Option<NaiveTime>,
+    pub doubleheader_status: DoubleheaderStatus,
+    pub time_of_day: DayNight,
+    pub game_type: GameType,
+    pub bat_first_side: Side,
+    pub sky: Sky,
+    pub field_condition:  FieldCondition,
+    pub precipitation: Precipitation,
+    pub wind_direction: WindDirection,
+    pub how_scored: HowScored,
+    pub season: Season,
+    pub park_id: Park,
+    pub temperature_fahrenheit: Option<u8>,
+    pub attendance: Option<u32>,
+    pub wind_speed_mph: Option<u8>,
+    pub use_dh: bool
 }
 
 impl Default for GameSetting {
     fn default() -> Self {
         Self {
+            game_id: GameId { id: tinystr16!("test_game_id") },
             date: NaiveDate::from_num_days_from_ce(0),
             doubleheader_status: Default::default(),
             start_time: Default::default(),
@@ -161,23 +162,32 @@ impl Default for GameSetting {
             precipitation: Default::default(),
             wind_direction: Default::default(),
             how_scored: Default::default(),
-            game_file_status: GameFileStatus::Event,
             wind_speed_mph: Default::default(),
             attendance: None,
-            park_id: Default::default(),
+            park_id: tinystr8!("testpark"),
             game_type: GameType::RegularSeason,
             season: Season(0)
         }
     }
 }
 
-impl From<&RecordVec> for GameSetting {
-    fn from(vec: &RecordVec) -> Self {
+impl TryFrom<&RecordVec> for GameSetting {
+    type Error = Error;
+
+    fn try_from(vec: &RecordVec) -> Result<Self> {
+
+        let game_id = vec
+            .iter()
+            .find_map(|mr|
+                if let &MappedRecord::GameId(g) = mr { Some(g) } else { None }
+            )
+            .context("No Game ID found in records")?;
 
         let infos = vec.iter()
             .filter_map(|rv| if let MappedRecord::Info(i) = rv {Some(i)} else {None});
 
         let mut setting = Self::default();
+        setting.game_id = game_id;
 
         for info in infos {
 
@@ -197,19 +207,19 @@ impl From<&RecordVec> for GameSetting {
                 InfoRecord::WindDirection(x) => {setting.wind_direction = *x},
                 InfoRecord::WindSpeed(x) => {setting.wind_speed_mph = *x},
                 InfoRecord::Attendance(x) => {setting.attendance = *x },
-                InfoRecord::Park(x) => {setting.park_id = x.to_string()},
+                InfoRecord::Park(x) => {setting.park_id = *x},
                 InfoRecord::HowScored(x) => {setting.how_scored = *x},
                 // TODO: Season, GameType
                 _ => {}
             }
         }
-        setting
+        Ok(setting)
     }
 }
 
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct GameUmpire {
+pub struct GameUmpire {
     position: UmpirePosition,
     umpire: Option<String>
 }
@@ -243,30 +253,27 @@ impl GameUmpire {
 
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Default)]
-struct GameResults {
-    winning_pitcher: Option<String>,
-    losing_pitcher: Option<String>,
-    save_pitcher: Option<String>,
-    game_winning_rbi: Option<String>,
-    time_of_game_minutes: Option<u16>,
-    protest_info: Option<String>,
-    completion_info: Option<String>,
-    //line_score: Matchup<LineScore>
+pub struct GameResults {
+    pub winning_pitcher: Option<Player>,
+    pub losing_pitcher: Option<Player>,
+    pub save_pitcher: Option<Player>,
+    pub game_winning_rbi: Option<Player>,
+    pub time_of_game_minutes: Option<u16>,
+    pub protest_info: Option<String>,
+    pub completion_info: Option<String>,
 }
 
 impl From<&Vec<MappedRecord>> for GameResults {
 
     fn from(vec: &Vec<MappedRecord>) -> Self {
-        let s = |opt_str: &Option<TinyStr8>| opt_str.map(|t| t.to_string());
-
         let mut results = Self::default();
         vec.iter()
             .filter_map(|rv| if let MappedRecord::Info(i) = rv {Some(i)} else { None })
             .for_each(|info| match info {
-                InfoRecord::WinningPitcher(x) => {results.winning_pitcher = s(x)},
-                InfoRecord::LosingPitcher(x) => {results.losing_pitcher = s(x)},
-                InfoRecord::SavePitcher(x) => {results.save_pitcher = s(x)},
-                InfoRecord::GameWinningRbi(x) => {results.game_winning_rbi = s(x)},
+                InfoRecord::WinningPitcher(x) => {results.winning_pitcher = *x},
+                InfoRecord::LosingPitcher(x) => {results.losing_pitcher = *x},
+                InfoRecord::SavePitcher(x) => {results.save_pitcher = *x},
+                InfoRecord::GameWinningRbi(x) => {results.game_winning_rbi = *x},
                 InfoRecord::TimeOfGameMinutes(x) => {results.time_of_game_minutes = *x},
                 _ => {}
             });
@@ -326,22 +333,20 @@ impl GameFieldingAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct GameContext {
-    teams: Matchup<String>,
-    setting: GameSetting,
-    umpires: Vec<GameUmpire>,
-    results: GameResults,
-    lineup_appearances: Vec<GameLineupAppearance>,
-    fielding_appearances: Vec<GameFieldingAppearance>,
-    events: Vec<Event>
+    pub teams: Matchup<Team>,
+    pub setting: GameSetting,
+    pub umpires: Vec<GameUmpire>,
+    pub results: GameResults,
+    pub lineup_appearances: Vec<GameLineupAppearance>,
+    pub fielding_appearances: Vec<GameFieldingAppearance>,
+    pub events: Vec<Event>
 }
 
 impl TryFrom<&RecordVec> for GameContext {
     type Error = Error;
 
     fn try_from(record_vec: &RecordVec) -> Result<Self> {
-        let teams: Matchup<String> = Matchup::try_from(record_vec)?
-            .apply_both(|t| t.to_string())
-            .into();
+        let teams: Matchup<Team> = Matchup::try_from(record_vec)?;
         let setting = GameSetting::try_from(record_vec)?;
         let umpires = GameUmpire::from_record_vec(record_vec);
         let results = GameResults::try_from(record_vec)?;
@@ -596,6 +601,7 @@ impl Personnel {
         let new_lineup_appearance = GameLineupAppearance {
             player: sub.player.to_string(),
             lineup_position: sub.lineup_position,
+            // TODO: Fix
             entered_game_as: EnteredGameAs::Starter,
             start_event: sequence,
             end_event: None
