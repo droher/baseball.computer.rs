@@ -147,15 +147,23 @@ pub struct EventBaserunningPlays<'a> {
     at_base: Option<Base>
 }
 
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
+pub struct EventOuts<'a> {
+    game_id: &'a str,
+    event_id: u16,
+    sequence_id: u8,
+    baserunner_out: BaseRunner
+}
+
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventBaserunningAdvances<'a> {
+pub struct EventBaserunningAdvanceAttempts<'a> {
     game_id: &'a str,
     event_id: u16,
     sequence_id: u8,
     baserunner: BaseRunner,
     attempted_advance_to: Base,
-    is_out: bool,
+    is_successful: bool,
     advanced_on_error_flag: bool,
     rbi_flag: bool,
     team_unearned_run_flag: bool
