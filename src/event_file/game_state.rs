@@ -9,13 +9,19 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tinystr::{tinystr16, tinystr8};
 
-use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky, Team, UmpireAssignment, UmpirePosition, WindDirection};
-use crate::event_file::misc::{BatHandAdjustment, Comment, GameId, LineupAdjustment, PitchHandAdjustment, RunnerAdjustment, SubstitutionRecord};
+use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord,
+                              Park, Precipitation, Sky, Team, UmpireAssignment, UmpirePosition, WindDirection};
+use crate::event_file::misc::{BatHandAdjustment, Comment, GameId, LineupAdjustment,
+                              PitchHandAdjustment, RunnerAdjustment, SubstitutionRecord};
 use crate::event_file::parser::{MappedRecord, RecordVec};
 use crate::event_file::pitch_sequence::PitchSequenceItem;
-use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, ContactDescription, ContactType, Count, EarnedRunStatus, FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayRecord, PlayType, RunnerAdvance, RunnerAdvanceModifier};
-use crate::event_file::traits::{Inning, Matchup, Pitcher, Player};
+use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, ContactType, Count,
+                              EarnedRunStatus, FieldersData, FieldingData, HitLocation, HitType,
+                              ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType,
+                              PlateAppearanceType, Play, PlayType, RunnerAdvance};
+use crate::event_file::traits::{Inning, Matchup, Pitcher, Player, Umpire};
 use crate::event_file::traits::{FieldingPosition, GameType, Handedness, LineupPosition, Side};
+use std::num::NonZeroU16;
 
 const UNKNOWN_STRINGS: [&str;1] = ["unknown"];
 const NONE_STRINGS: [&str;2] = ["(none)", "none"];
@@ -24,6 +30,16 @@ type Position = Either<LineupPosition, FieldingPosition>;
 type PersonnelState = BiMap<Position, Player>;
 type Lineup = PersonnelState;
 type Defense = PersonnelState;
+pub type EventId = NonZeroU16;
+
+fn get_game_id(rv: &RecordVec) -> Result<GameId> {
+    rv
+        .iter()
+        .find_map(|mr|
+            if let MappedRecord::GameId(g) = *mr { Some(g) } else { None }
+        )
+        .context("No Game ID found in records")
+}
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum EnteredGameAs {
@@ -126,7 +142,6 @@ struct League(String);
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize,)]
 pub struct GameSetting {
-    pub game_id: GameId,
     pub date: NaiveDate,
     pub start_time: Option<NaiveTime>,
     pub doubleheader_status: DoubleheaderStatus,
@@ -149,7 +164,6 @@ pub struct GameSetting {
 impl Default for GameSetting {
     fn default() -> Self {
         Self {
-            game_id: GameId { id: tinystr16!("test_game_id") },
             date: NaiveDate::from_num_days_from_ce(0),
             doubleheader_status: Default::default(),
             start_time: Default::default(),
@@ -171,23 +185,13 @@ impl Default for GameSetting {
     }
 }
 
-impl TryFrom<&RecordVec> for GameSetting {
-    type Error = Error;
+impl From<&RecordVec> for GameSetting {
 
-    fn try_from(vec: &RecordVec) -> Result<Self> {
-
-        let game_id = vec
-            .iter()
-            .find_map(|mr|
-                if let &MappedRecord::GameId(g) = mr { Some(g) } else { None }
-            )
-            .context("No Game ID found in records")?;
-
+    fn from(vec: &RecordVec) -> Self {
         let infos = vec.iter()
             .filter_map(|rv| if let MappedRecord::Info(i) = rv {Some(i)} else {None});
 
         let mut setting = Self::default();
-        setting.game_id = game_id;
 
         for info in infos {
 
@@ -213,15 +217,16 @@ impl TryFrom<&RecordVec> for GameSetting {
                 _ => {}
             }
         }
-        Ok(setting)
+        setting
     }
 }
 
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GameUmpire {
-    position: UmpirePosition,
-    umpire: Option<String>
+    pub game_id: GameId,
+    pub position: UmpirePosition,
+    pub umpire: Option<Umpire>
 }
 
 
@@ -230,24 +235,26 @@ impl GameUmpire {
     // and "unknown". We take "none" to mean that there was no umpire at that position,
     // so we do not create a record. If "unknown", we assume there was someone at that position,
     // so a struct is created with a None umpire ID.
-    fn from_umpire_assignment(ua: &UmpireAssignment) -> Option<Self> {
+    fn from_umpire_assignment(ua: &UmpireAssignment, game_id: GameId) -> Option<Self> {
         let umpire = ua.umpire?;
         let position = ua.position;
         if NONE_STRINGS.contains(&umpire.as_str()) { None }
         else if UNKNOWN_STRINGS.contains(&umpire.as_str()) {
-            Some(Self {position, umpire: None})
+            Some(Self { game_id, position, umpire: None})
         }
         else {
-            Some(Self {position, umpire: Some(umpire.to_string())})
+            Some(Self { game_id, position, umpire: Some(umpire)})
         }
     }
 
-    fn from_record_vec(vec: &RecordVec) -> Vec<Self> {
-        vec.iter()
-            .filter_map(|rv| if let MappedRecord::Info(InfoRecord::UmpireAssignment(ua)) = rv
-                { Self::from_umpire_assignment(ua) } else { None }
+    fn from_record_vec(vec: &RecordVec) -> Result<Vec<Self>> {
+        let game_id = get_game_id(vec)?;
+        Ok(vec.iter()
+            .filter_map(|rv| if let MappedRecord::Info(InfoRecord::UmpireAssignment(ua)) = rv 
+            { Self::from_umpire_assignment(ua, game_id) } else { None }
             )
             .collect_vec()
+        )
     }
 }
 
@@ -282,49 +289,59 @@ impl From<&Vec<MappedRecord>> for GameResults {
 }
 
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct GameLineupAppearance {
-    player: String,
-    lineup_position: LineupPosition,
-    entered_game_as: EnteredGameAs,
-    start_event: u16,
-    end_event: Option<u16>
+    pub game_id: GameId,
+    pub player: Player,
+    pub side: Side,
+    pub lineup_position: LineupPosition,
+    pub entered_game_as: EnteredGameAs,
+    pub start_event: EventId,
+    pub end_event: Option<EventId>
 }
 
 impl GameLineupAppearance {
-    fn new_starter(player: String, lineup_position: LineupPosition) -> Self {
+    fn new_starter(player: Player, lineup_position: LineupPosition, side: Side, game_id: GameId) -> Self {
         Self {
+            game_id,
             player,
             lineup_position,
+            side,
             entered_game_as: EnteredGameAs::Starter,
-            start_event: 1,
+            start_event: NonZeroU16::new(1 as u16).unwrap(),
             end_event: None
         }
     }
 }
 
-#[derive(Default, Debug, Eq, PartialEq, Clone, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct GameFieldingAppearance {
-    player: String,
-    fielding_position: FieldingPosition,
-    start_event: u16,
-    end_event: Option<u16>
+    pub game_id: GameId,
+    pub player: Player,
+    pub side: Side,
+    pub fielding_position: FieldingPosition,
+    pub start_event: EventId,
+    pub end_event: Option<EventId>
 }
 
 impl GameFieldingAppearance {
-    fn new_starter(player: String, fielding_position: FieldingPosition) -> Self {
+    fn new_starter(player: Player, fielding_position: FieldingPosition, side: Side, game_id: GameId) -> Self {
         Self {
+            game_id,
             player,
             fielding_position,
-            start_event: 1,
+            side,
+            start_event: NonZeroU16::new(1 as u16).unwrap(),
             end_event: None
         }
     }
 
-    fn new(player: String, fielding_position: FieldingPosition, start_event: u16) -> Self {
+    fn new(player: Player, fielding_position: FieldingPosition, side: Side, game_id: GameId, start_event: EventId) -> Self {
         Self {
+            game_id,
             player,
             fielding_position,
+            side,
             start_event,
             end_event: None
         }
@@ -333,6 +350,7 @@ impl GameFieldingAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct GameContext {
+    pub game_id: GameId,
     pub teams: Matchup<Team>,
     pub setting: GameSetting,
     pub umpires: Vec<GameUmpire>,
@@ -346,13 +364,15 @@ impl TryFrom<&RecordVec> for GameContext {
     type Error = Error;
 
     fn try_from(record_vec: &RecordVec) -> Result<Self> {
+        let game_id = get_game_id(record_vec)?;
         let teams: Matchup<Team> = Matchup::try_from(record_vec)?;
         let setting = GameSetting::try_from(record_vec)?;
-        let umpires = GameUmpire::from_record_vec(record_vec);
+        let umpires = GameUmpire::from_record_vec(record_vec)?;
         let results = GameResults::try_from(record_vec)?;
 
         let (events, lineup_appearances, fielding_appearances) = GameState::create_events(record_vec)?;
         Ok(Self {
+            game_id,
             teams,
             setting,
             umpires,
@@ -366,38 +386,48 @@ impl TryFrom<&RecordVec> for GameContext {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
-struct EventStartingBaseState {
-    baserunner: BaseRunner,
-    runner_lineup_position: LineupPosition,
-    charged_to_pitcher: String,
+pub struct EventBaserunner {
+    pub game_id: GameId,
+    pub event_id: EventId,
+    pub baserunner: BaseRunner,
+    pub runner_lineup_position: LineupPosition,
+    pub charged_to_pitcher: Pitcher,
 }
 
-impl EventStartingBaseState {
-    fn from_base_state(state: &BaseState) -> Vec<Self> {
+impl EventBaserunner {
+    fn from_base_state(state: &BaseState, game_id: GameId, event_id: EventId) -> Vec<Self> {
         state.get_bases()
             .iter()
             .map(|(baserunner, runner)| Self {
+                game_id,
+                event_id,
                 baserunner: *baserunner,
                 runner_lineup_position: runner.lineup_position,
-                charged_to_pitcher: runner.charged_to.to_string()
+                charged_to_pitcher: runner.charged_to
             })
             .collect_vec()
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct EventBaserunningPlay {
-    baserunning_play_type: BaserunningPlayType,
-    base: Option<Base>
+pub struct EventBaserunningPlay {
+    pub game_id: GameId,
+    pub event_id: EventId,
+    pub baserunning_play_type: BaserunningPlayType,
+    pub base: Option<Base>
 }
 
 impl EventBaserunningPlay {
-    fn from_play(play: &CachedPlay) -> Option<Vec<Self>> {
+    fn from_play(play: &CachedPlay, game_id: GameId, event_id: EventId) -> Option<Vec<Self>> {
         let vec = play.play
             .main_plays
             .iter()
             .filter_map(|pt| if let PlayType::BaserunningPlay(br) = pt {
-                Some(Self {baserunning_play_type: br.baserunning_play_type, base: br.at_base})
+                Some(Self {
+                    game_id,
+                    event_id,
+                    baserunning_play_type: br.baserunning_play_type,
+                    base: br.at_base})
             } else {None})
             .collect_vec();
         if vec.is_empty() { None } else { Some(vec) }
@@ -405,21 +435,25 @@ impl EventBaserunningPlay {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct EventPlateAppearance {
-    batter_hand: Handedness,
-    pitcher_hand: Handedness,
-    plate_appearance_type: PlateAppearanceResultType,
-    contact_type: Option<ContactType>,
-    hit_location: Option<HitLocation>
+pub struct EventPlateAppearance {
+    pub game_id: GameId,
+    pub event_id: EventId,
+    pub batter_hand: Handedness,
+    pub pitcher_hand: Handedness,
+    pub plate_appearance_type: PlateAppearanceResultType,
+    pub contact_type: Option<ContactType>,
+    pub hit_location: Option<HitLocation>
 }
 
 impl EventPlateAppearance {
-    fn from_play(play: &CachedPlay) -> Option<Self> {
+    fn from_play(play: &CachedPlay, game_id: GameId, event_id: EventId)  -> Option<Self> {
         play.play
             .main_plays
             .iter()
             .find_map(|pt| if let PlayType::PlateAppearance(pa) = pt {
                 Some(Self {
+                    game_id,
+                    event_id,
                     batter_hand: Handedness::Unknown,
                     pitcher_hand: Handedness::Unknown,
                     plate_appearance_type: PlateAppearanceResultType::from(pa),
@@ -431,20 +465,24 @@ impl EventPlateAppearance {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct EventBaserunningAdvances {
-    baserunner: BaseRunner,
-    attempted_advance_to: Base,
-    is_out: bool,
-    advanced_on_error: bool,
-    rbi: bool,
-    team_unearned: bool
+pub struct EventBaserunningAdvances {
+    pub game_id: GameId,
+    pub event_id: EventId,
+    pub baserunner: BaseRunner,
+    pub attempted_advance_to: Base,
+    pub is_out: bool,
+    pub advanced_on_error: bool,
+    pub rbi: bool,
+    pub team_unearned: bool
 }
 
 impl EventBaserunningAdvances {
-    fn from_play(play: &CachedPlay) -> Vec<Self> {
+    fn from_play(play: &CachedPlay, game_id: GameId, event_id: EventId) -> Vec<Self> {
         play.advances
             .iter()
             .map(|ra| Self {
+                game_id,
+                event_id,
                 baserunner: ra.baserunner,
                 attempted_advance_to: ra.to,
                 advanced_on_error: FieldersData::find_error(ra.fielders_data().as_slice()).is_some(),
@@ -457,31 +495,33 @@ impl EventBaserunningAdvances {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
-struct EventContext {
-    inning: u8,
-    batting_side: Side,
-    frame: InningFrame,
-    at_bat: LineupPosition,
-    outs: u8,
-    starting_base_state: Vec<EventStartingBaseState>
+pub struct EventContext {
+    pub inning: u8,
+    pub batting_side: Side,
+    pub frame: InningFrame,
+    pub at_bat: LineupPosition,
+    pub outs: u8,
+    pub starting_base_state: Vec<EventBaserunner>
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-struct EventResults {
-    count_at_event: Count,
-    pitch_sequence: Option<Vec<PitchSequenceItem>>,
-    plate_appearance: Option<EventPlateAppearance>,
-    plays_at_base: Option<Vec<EventBaserunningPlay>>,
-    fielding_plays: Vec<FieldersData>,
-    baserunning_advances: Vec<EventBaserunningAdvances>,
-    play_info: Vec<EventInfoType>,
-    comment: Option<String>
+pub struct EventResults {
+    pub count_at_event: Count,
+    pub pitch_sequence: Option<Vec<PitchSequenceItem>>,
+    pub plate_appearance: Option<EventPlateAppearance>,
+    pub plays_at_base: Option<Vec<EventBaserunningPlay>>,
+    pub fielding_plays: Vec<FieldersData>,
+    pub baserunning_advances: Vec<EventBaserunningAdvances>,
+    pub play_info: Vec<EventInfoType>,
+    pub comment: Option<String>
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct Event {
-    context: EventContext,
-    results: EventResults
+    pub game_id: GameId,
+    pub event_id: EventId,
+    pub context: EventContext,
+    pub results: EventResults
 }
 
 /// TODO: This tracks the more unusual/miscellaneous elements of the state of the game,,
@@ -500,6 +540,7 @@ pub struct WeirdGameState {
 /// and records their exits/entries.
 #[derive(Debug, Eq, PartialEq, Clone)]
 struct Personnel {
+    game_id: GameId,
     personnel_state: Matchup<(Lineup, Defense)>,
     // A player should only have one lineup position per game,
     // but can move freely from one defensive position to another.
@@ -515,6 +556,7 @@ struct Personnel {
 impl Default for Personnel {
     fn default() -> Self {
         Self {
+            game_id: GameId {id: tinystr16!("N/A") },
             personnel_state: Matchup::new((BiMap::with_capacity(15), BiMap::with_capacity(15)),
                                           (BiMap::with_capacity(15), BiMap::with_capacity(15))),
             lineup_appearances: HashMap::with_capacity(30),
@@ -525,18 +567,21 @@ impl Default for Personnel {
 
 impl Personnel {
 
-    fn new(record_vec: &RecordVec) -> Self {
+    fn new(record_vec: &RecordVec) -> Result<Self> {
+        let game_id = get_game_id(record_vec)?;
         let mut personnel = Self::default();
+        personnel.game_id = game_id;
+
         let start_iter = record_vec.iter()
             .filter_map(|rv|
                 if let MappedRecord::Start(sr) = rv {Some(sr)} else {None});
         for start in start_iter {
             let (lineup, defense) = personnel.personnel_state.get_mut(&start.side);
             let lineup_appearance = GameLineupAppearance::new_starter(
-                start.player.to_string(), start.lineup_position
+                start.player, start.lineup_position, start.side, game_id
             );
             let fielding_appearance = GameFieldingAppearance::new_starter(
-                start.player.to_string(), start.fielding_position
+                start.player, start.fielding_position, start.side, game_id
             );
             lineup.insert(Either::Left(start.lineup_position), start.player);
             defense.insert(Either::Right(start.fielding_position), start.player);
@@ -544,7 +589,7 @@ impl Personnel {
             personnel.defense_appearances.insert(start.player, vec![fielding_appearance]);
 
         }
-        personnel
+        Ok(personnel)
     }
 
     fn pitcher(&self, side: &Side) -> Result<Pitcher> {
@@ -587,23 +632,25 @@ impl Personnel {
             .with_context(|| format!("Player {:?} has an empty list of fielding appearances", player))
     }
 
-    fn update_lineup_on_substitution(&mut self, sub: &SubstitutionRecord, sequence: u16) -> Result<()> {
+    fn update_lineup_on_substitution(&mut self, sub: &SubstitutionRecord, event_id: EventId) -> Result<()> {
         // There should almost always be an original batter, but in
         // the extremely rare case of a courtesy runner, there might not be.
         let original_batter = self.get_at_position(&sub.side, &Either::Left(sub.lineup_position)).ok();
         if let Some(p) = original_batter {
             let original_lineup_appearance = self.get_current_lineup_appearance(&p)?;
-            original_lineup_appearance.end_event = Some(sequence);
+            original_lineup_appearance.end_event = Some(event_id);
         }
 
         let (lineup, _) = self.personnel_state.get_mut(&sub.side);
 
         let new_lineup_appearance = GameLineupAppearance {
-            player: sub.player.to_string(),
+            game_id: self.game_id,
+            player: sub.player,
             lineup_position: sub.lineup_position,
+            side: sub.side,
             // TODO: Fix
             entered_game_as: EnteredGameAs::Starter,
-            start_event: sequence,
+            start_event: event_id,
             end_event: None
         };
         lineup.insert(Either::Left(sub.lineup_position), sub.player);
@@ -616,7 +663,7 @@ impl Personnel {
 
     // The semantics of defensive substitutions are more complicated, because the new player
     // could already have been in the game, and the replaced player might not have left the game.
-    fn update_defense_on_substitution(&mut self, sub: &SubstitutionRecord, sequence: u16) -> Result<()> {
+    fn update_defense_on_substitution(&mut self, sub: &SubstitutionRecord, sequence: EventId) -> Result<()> {
         let original_fielder = self.get_at_position(&sub.side, &Either::Right(sub.fielding_position)).ok();
         if let Some(p) = original_fielder {
             self.get_current_fielding_appearance(&p)?.end_event = Some(sequence);
@@ -632,16 +679,18 @@ impl Personnel {
 
         self.defense_appearances.entry(sub.player)
             .or_insert_with(|| Vec::with_capacity(1))
-            .push(GameFieldingAppearance::new(sub.player.to_string(),
+            .push(GameFieldingAppearance::new(sub.player,
                                               sub.fielding_position,
+                                              sub.side,
+                                              self.game_id,
                                               sequence));
 
         Ok(())
     }
 
-    fn update_on_substitution(&mut self, sub: &SubstitutionRecord, sequence: u16) -> Result<()> {
-        if sub.lineup_position.bats_in_lineup() { self.update_lineup_on_substitution(sub, sequence)? };
-        if sub.fielding_position.plays_in_field() { self.update_defense_on_substitution(sub, sequence)? };
+    fn update_on_substitution(&mut self, sub: &SubstitutionRecord, event_id: EventId) -> Result<()> {
+        if sub.lineup_position.bats_in_lineup() { self.update_lineup_on_substitution(sub, event_id)? };
+        if sub.fielding_position.plays_in_field() { self.update_defense_on_substitution(sub, event_id)? };
 
         Ok(())
 
@@ -657,6 +706,8 @@ struct HandednessPair {
 /// Tracks the information necessary to populate each event.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct GameState {
+    game_id: GameId,
+    event_id: EventId,
     inning: Inning,
     frame: InningFrame,
     batting_side: Side,
@@ -671,13 +722,12 @@ impl GameState {
     pub fn create_events(record_vec: &RecordVec) -> Result<(Vec<Event>, Vec<GameLineupAppearance>, Vec<GameFieldingAppearance>)> {
         let mut events: Vec<Event> = Vec::with_capacity(100);
 
-        let mut sequence: u16 = 1;
-        let mut state = Self::new(record_vec);
+        let mut state = Self::new(record_vec)?;
         for record in record_vec {
             let (pr, cached_play) = if let MappedRecord::Play(pr) = record {
                 (Some(pr), Some(CachedPlay::try_from(pr)?))
             } else { (None, None) };
-            state.update(record, sequence, &cached_play)?;
+            state.update(record, &cached_play)?;
             if let (Some(pr), Some(play)) = (pr, cached_play) {
                 let context = EventContext {
                     inning: state.inning,
@@ -685,20 +735,20 @@ impl GameState {
                     frame: state.frame,
                     at_bat: state.at_bat,
                     outs: state.outs,
-                    starting_base_state: EventStartingBaseState::from_base_state(&state.bases)
+                    starting_base_state: EventBaserunner::from_base_state(&state.bases, state.game_id, state.event_id)
                 };
                 let results = EventResults {
                     count_at_event: pr.count,
                     pitch_sequence: pr.pitch_sequence.as_ref().map(|ps| ps.0.clone()),
-                    plate_appearance: EventPlateAppearance::from_play(&play),
-                    plays_at_base: EventBaserunningPlay::from_play(&play),
-                    baserunning_advances: EventBaserunningAdvances::from_play(&play),
+                    plate_appearance: EventPlateAppearance::from_play(&play, state.game_id, state.event_id),
+                    plays_at_base: EventBaserunningPlay::from_play(&play, state.game_id, state.event_id),
+                    baserunning_advances: EventBaserunningAdvances::from_play(&play, state.game_id, state.event_id),
                     play_info: EventInfoType::from_play(&play),
                     comment: None,
                     fielding_plays: play.fielders_data.clone(),
                 };
-                events.push(Event {context, results} );
-                sequence += 1;
+                events.push(Event { game_id: state.game_id, event_id: state.event_id, context, results });
+                state.event_id = NonZeroU16::new(state.event_id.get() + 1 as u16).unwrap();
             }
         }
         Ok((events,
@@ -718,22 +768,25 @@ impl GameState {
                 .collect_vec()))
     }
 
-    pub(crate) fn new(record_vec: &RecordVec) -> Self {
+    pub(crate) fn new(record_vec: &RecordVec) -> Result<Self> {
+        let game_id = get_game_id(record_vec)?;
         let batting_side = record_vec.iter()
             .find_map(|rv|
                             if let MappedRecord::Info(InfoRecord::HomeTeamBatsFirst(b)) = rv
                             { Some(if *b {Side::Home} else {Side::Away}) } else {None})
             .map_or(Side::Away, |s| s);
 
-        Self {
+        Ok(Self {
+            game_id,
+            event_id: NonZeroU16::new(1 as u16).unwrap(),
             inning: 1,
             frame: InningFrame::Top,
             batting_side,
             outs: 0,
             bases: Default::default(),
             at_bat: Default::default(),
-            personnel: Personnel::new(record_vec)
-        }
+            personnel: Personnel::new(record_vec)?
+        })
     }
 
     fn is_frame_flipped(&self, play: &CachedPlay) -> Result<bool> {
@@ -782,8 +835,8 @@ impl GameState {
 
     }
 
-    fn update_on_substitution(&mut self, record: &SubstitutionRecord, sequence: u16) -> Result<()> {
-        self.personnel.update_on_substitution(record, sequence)
+    fn update_on_substitution(&mut self, record: &SubstitutionRecord) -> Result<()> {
+        self.personnel.update_on_substitution(record, self.event_id)
     }
 
     fn update_on_bat_hand_adjustment(&mut self, _record: &BatHandAdjustment) {
@@ -821,13 +874,13 @@ impl GameState {
         // TODO
     }
 
-    pub fn update(&mut self, record: &MappedRecord, sequence: u16, cached_play: &Option<CachedPlay>) -> Result<()> {
+    pub fn update(&mut self, record: &MappedRecord, cached_play: &Option<CachedPlay>) -> Result<()> {
         Ok(match record {
             MappedRecord::Play(_) => {
                 if let Some(cp) = cached_play
                 { self.update_on_play(cp) } else { bail!("Expected cached play but got None") }
             }?,
-            MappedRecord::Substitution(r) => self.update_on_substitution(r, sequence)?,
+            MappedRecord::Substitution(r) => self.update_on_substitution(r)?,
             MappedRecord::BatHandAdjustment(r) => self.update_on_bat_hand_adjustment(r),
             MappedRecord::PitchHandAdjustment(r) => self.update_on_pitch_hand_adjustment(r),
             MappedRecord::LineupAdjustment(r) => self.update_on_lineup_adjustment(r),

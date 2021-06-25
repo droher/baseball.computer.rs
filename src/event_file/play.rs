@@ -179,7 +179,7 @@ impl BaseRunner {
 
 #[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize)]
 #[strum(serialize_all = "lowercase")]
-pub(crate) enum InningFrame {
+pub enum InningFrame {
     Top,
     Bottom,
 }
@@ -1379,7 +1379,7 @@ impl Play {
                         None
                     } else { Some(ra) }
                 }))
-            .filter_map(|ra| ra);
+            .flatten();
         Box::from(cleaned_advances.chain(implicit_advances))
     }
 
@@ -1613,7 +1613,7 @@ impl TryFrom<&PlayRecord> for CachedPlay {
 }
 
 #[derive(Debug, Default, Eq, PartialEq, Copy, Clone, Hash, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct Count { balls: Option<u8>, strikes: Option<u8> }
+pub struct Count { pub balls: Option<u8>, pub strikes: Option<u8> }
 
 impl Count {
     fn new(count_str: &str) -> Result<Count> {

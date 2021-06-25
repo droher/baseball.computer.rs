@@ -14,7 +14,23 @@ pub enum SequenceItemTypeGeneral {
     Ball,
     Strike,
     InPlay,
-    NoPitch
+    NoPitch,
+    Unknown
+}
+
+impl SequenceItemTypeGeneral {
+    pub fn is_pitch(&self) -> bool {
+        !([Self::NoPitch, Self::Unknown].contains(self))
+    }
+
+    pub fn is_strike(&self) -> bool {
+        [Self::Strike, Self::InPlay].contains(self)
+    }
+
+    pub fn is_in_play(&self) -> bool {
+        self == &Self::InPlay
+    }
+
 }
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize)]
@@ -68,21 +84,33 @@ pub enum PitchType {
 }
 
 impl PitchType {
-    fn is_pitch(&self) -> bool {
-        self.is_strike() || [Self::Ball, Self::HitBatter, Self::IntentionalBall].contains(&self)
-    }
 
-    fn is_strike(&self) -> bool {
-        self.is_in_play() || [
-            Self::CalledStrike, Self::Foul, Self::StrikeUnknownType, Self::FoulBunt,
-            Self::MissedBunt, Self::FoulTipBunt, Self::SwingingOnPitchout, Self::FoulOnPitchout,
-            Self::SwingingStrike, Self::FoulTip
-        ].contains(&self)
-
-    }
-
-    fn is_in_play(&self) -> bool {
-        [Self::InPlay, Self::InPlayOnPitchout].contains(&self)
+    pub fn get_sequence_general(&self) -> SequenceItemTypeGeneral {
+        match self {
+            PitchType::PickoffAttemptFirst => SequenceItemTypeGeneral::NoPitch,
+            PitchType::PickoffAttemptSecond => SequenceItemTypeGeneral::NoPitch,
+            PitchType::PickoffAttemptThird => SequenceItemTypeGeneral::NoPitch,
+            PitchType::PlayNotInvolvingBatter => SequenceItemTypeGeneral::NoPitch,
+            PitchType::Ball => SequenceItemTypeGeneral::Ball,
+            PitchType::CalledStrike => SequenceItemTypeGeneral::Strike,
+            PitchType::Foul => SequenceItemTypeGeneral::Strike,
+            PitchType::HitBatter => SequenceItemTypeGeneral::Ball,
+            PitchType::IntentionalBall => SequenceItemTypeGeneral::Ball,
+            PitchType::StrikeUnknownType => SequenceItemTypeGeneral::Strike,
+            PitchType::FoulBunt => SequenceItemTypeGeneral::Strike,
+            PitchType::MissedBunt => SequenceItemTypeGeneral::Strike,
+            PitchType::NoPitch => SequenceItemTypeGeneral::NoPitch,
+            PitchType::FoulTipBunt => SequenceItemTypeGeneral::Strike,
+            PitchType::Pitchout => SequenceItemTypeGeneral::Ball,
+            PitchType::SwingingOnPitchout => SequenceItemTypeGeneral::Strike,
+            PitchType::FoulOnPitchout => SequenceItemTypeGeneral::Strike,
+            PitchType::SwingingStrike => SequenceItemTypeGeneral::Strike,
+            PitchType::FoulTip => SequenceItemTypeGeneral::Strike,
+            PitchType::Unknown => SequenceItemTypeGeneral::Unknown,
+            PitchType::BallOnPitcherGoingToMouth => SequenceItemTypeGeneral::Ball,
+            PitchType::InPlay => SequenceItemTypeGeneral::InPlay,
+            PitchType::InPlayOnPitchout => SequenceItemTypeGeneral::InPlay,
+        }
     }
 }
 
@@ -93,10 +121,10 @@ impl Default for PitchType {
 
 #[derive(Debug, PartialEq, Eq, Default, Copy, Clone, Serialize, Deserialize)]
 pub struct PitchSequenceItem {
-    pitch_type: PitchType,
-    runners_going: bool,
-    blocked_by_catcher: bool,
-    catcher_pickoff_attempt: Option<Base>
+    pub pitch_type: PitchType,
+    pub runners_going: bool,
+    pub blocked_by_catcher: bool,
+    pub catcher_pickoff_attempt: Option<Base>
 }
 
 impl PitchSequenceItem {

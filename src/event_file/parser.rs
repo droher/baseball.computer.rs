@@ -5,13 +5,13 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Error, Result};
 use csv::{Reader, ReaderBuilder, StringRecord};
-use either::{Either};
+
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
-use crate::event_file::info::{InfoRecord, Team};
+use crate::event_file::info::{InfoRecord};
 use crate::event_file::misc::{BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment, StartRecord, SubstitutionRecord, RunnerAdjustment};
 use crate::event_file::play::PlayRecord;
-use crate::event_file::traits::{Matchup, RetrosheetEventRecord};
+use crate::event_file::traits::{RetrosheetEventRecord};
 
 
 pub type RecordVec = Vec<MappedRecord>;
