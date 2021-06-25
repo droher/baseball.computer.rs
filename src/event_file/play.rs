@@ -1179,7 +1179,8 @@ pub enum ContactType {
     #[strum(serialize = "P")]
     PopFly,
     #[strum(serialize = "")]
-    Unknown
+    Unknown,
+    None
 }
 
 #[derive(Debug, Eq, PartialEq, EnumString, Clone, Hash)]

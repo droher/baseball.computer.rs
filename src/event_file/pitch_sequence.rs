@@ -1,13 +1,13 @@
-use std::str::FromStr;
 use std::convert::TryFrom;
-use serde::{Serialize, Deserialize};
+use std::num::NonZeroU8;
+use std::str::FromStr;
 
-use anyhow::{Error, Result, Context};
+use anyhow::{Context, Error, Result};
+use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
 
 use crate::event_file::play::Base;
-use std::ops::Deref;
-
+use crate::event_file::traits::SequenceId;
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub enum SequenceItemTypeGeneral {
@@ -119,12 +119,25 @@ impl Default for PitchType {
     fn default() -> Self { PitchType::Unknown }
 }
 
-#[derive(Debug, PartialEq, Eq, Default, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize)]
 pub struct PitchSequenceItem {
+    pub sequence_id: SequenceId,
     pub pitch_type: PitchType,
     pub runners_going: bool,
     pub blocked_by_catcher: bool,
     pub catcher_pickoff_attempt: Option<Base>
+}
+
+impl PitchSequenceItem {
+    fn new(sequence_id: u8) -> Self {
+        Self {
+            sequence_id: NonZeroU8::new(sequence_id).unwrap(),
+            pitch_type: Default::default(),
+            runners_going: false,
+            blocked_by_catcher: false,
+            catcher_pickoff_attempt: None
+        }
+    }
 }
 
 impl PitchSequenceItem {
@@ -151,24 +164,20 @@ impl TryFrom<&str> for PitchSequence {
     fn try_from(str_sequence: &str) -> Result<Self> {
         let mut pitches= Vec::with_capacity(10);
         let mut char_iter = str_sequence.chars().peekable();
-        let mut pitch = PitchSequenceItem::default();
+        let mut pitch = PitchSequenceItem::new(1);
 
         let get_catcher_pickoff_base = { |c: Option<char>|
             Base::from_str(&c.unwrap_or('.').to_string()).ok()
         };
 
-        // TODO: Maybe try implementing in nom? Not a priority tho
-        loop {
-            let opt_c = char_iter.next();
-            if opt_c == None {break}
-            let c = opt_c.unwrap().to_string();
-            match c.deref() {
+        while let Some(c) = char_iter.next() {
+            match c {
                 // Tokens indicating info on the upcoming pitch
-                "*" =>  {pitch.update_blocked_by_catcher(); continue}
-                ">" => {pitch.update_runners_going(); continue}
+                '*' =>  {pitch.update_blocked_by_catcher(); continue}
+                '>' => {pitch.update_runners_going(); continue}
                 _ => {}
             }
-            let pitch_type: Result<PitchType> = PitchType::from_str(c.deref()).context("Bad pitch type");
+            let pitch_type: Result<PitchType> = PitchType::from_str(&c.to_string()).context("Bad pitch type");
             // TODO: Log this as a warning once I implement logging
             pitch_type.map(|p|{pitch.update_pitch_type(p)}).ok();
 
@@ -186,11 +195,13 @@ impl TryFrom<&str> for PitchSequence {
                         pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(2)))
                     }
                 }
-                Some('+') => {pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(1)))}
+                Some('+') => {
+                    pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(1)))
+                }
                 _ => {}
             }
             let final_pitch = pitch;
-            pitch = PitchSequenceItem::default();
+            pitch = PitchSequenceItem::new(final_pitch.sequence_id.get() + 1);
             pitches.push(final_pitch);
         }
         Ok(Self(pitches))

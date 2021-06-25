@@ -1,14 +1,14 @@
 use chrono::{NaiveDate, NaiveTime};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::event_file::box_score::PitchingLineStats;
-use crate::event_file::game_state::{EnteredGameAs, EventInfoType, GameContext, PlateAppearanceResultType, EventId};
+use crate::event_file::game_state::{EnteredGameAs, EventId, EventInfoType, GameContext, PlateAppearanceResultType, GameUmpire, EventStartingBaseState};
 use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Park, Precipitation, Sky, Team, UmpirePosition, WindDirection};
 use crate::event_file::misc::GameId;
 use crate::event_file::pitch_sequence::{PitchType, SequenceItemTypeGeneral};
 use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, ContactType, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame};
-use crate::event_file::traits::{Fielder, FieldingPlayType, FieldingPosition, GameType, Handedness, LineupPosition, Player, Side, Umpire, Inning};
-use itertools::Itertools;
+use crate::event_file::traits::{Fielder, FieldingPlayType, FieldingPosition, GameType, Handedness, Inning, LineupPosition, Player, SequenceId, Side, Umpire};
 
 trait ContextToVec {
     fn from_game_context(_: &GameContext) -> Vec<Self> where Self: Sized {
@@ -101,20 +101,13 @@ impl ContextToVec for GameTeams {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct GameUmpires {
-    game_id: GameId,
-    position: UmpirePosition,
-    umpire_id: Option<Umpire>,
-}
-
-impl ContextToVec for GameUmpires {
+impl ContextToVec for GameUmpire {
     fn from_game_context(gc: &GameContext) -> Vec<Self> {
         gc.umpires
             .iter()
             .map(|u| Self {
                 game_id: gc.game_id,
-                umpire_id: u.umpire,
+                umpire_id: u.umpire_id,
                 position: u.position
             })
             .collect_vec()
@@ -138,12 +131,12 @@ impl ContextToVec for GameLineupAppearance {
             .iter()
             .map(|a| Self {
                 game_id: gc.game_id,
-                player_id: a.player,
+                player_id: a.player_id,
                 side: a.side,
                 lineup_position: a.lineup_position,
                 entered_game_as: a.entered_game_as,
-                start_event_id: a.start_event,
-                end_event_id: a.end_event
+                start_event_id: a.start_event_id,
+                end_event_id: a.end_event_id
             })
             .collect_vec()
     }
@@ -165,11 +158,11 @@ impl ContextToVec for GameFieldingAppearance {
             .iter()
             .map(|a| Self {
                 game_id: gc.game_id,
-                player_id: a.player,
+                player_id: a.player_id,
                 side: a.side,
                 fielding_position: a.fielding_position,
-                start_event_id: a.start_event,
-                end_event_id: a.end_event
+                start_event_id: a.start_event_id,
+                end_event_id: a.end_event_id
             })
             .collect_vec()
     }
@@ -210,16 +203,6 @@ impl ContextToVec for Event {
     }
 }
 
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventStartingBaseState {
-    game_id: GameId,
-    event_id: EventId,
-    baserunner: BaseRunner,
-    runner_lineup_position: LineupPosition,
-    charged_to_pitcher_id: Player
-}
-
 impl ContextToVec for EventStartingBaseState {
     fn from_game_context(gc: &GameContext) -> Vec<Self> {
         gc.events
@@ -244,7 +227,7 @@ impl ContextToVec for EventStartingBaseState {
 pub struct EventPitches {
     game_id: GameId,
     event_id: EventId,
-    sequence_id: u8,
+    sequence_id: SequenceId,
     is_pitch: bool,
     is_strike: bool,
     sequence_item_general: SequenceItemTypeGeneral,
@@ -267,13 +250,12 @@ impl ContextToVec for EventPitches {
             .flat_map(|(event_id, pitches)| {
                 pitches
                     .iter()
-                    .enumerate()
-                    .map(move |(sequence_id, psi)| {
+                    .map(move |psi| {
                         let general = psi.pitch_type.get_sequence_general();
                         Self {
                             game_id: gc.game_id,
                             event_id,
-                            sequence_id: (sequence_id + 1) as u8,
+                            sequence_id: psi.sequence_id,
                             is_pitch: general.is_pitch(),
                             is_strike: general.is_strike(),
                             sequence_item_general: general,
@@ -294,14 +276,14 @@ pub struct EventPlateAppearance {
     game_id: GameId,
     event_id: EventId,
     plate_appearance_result: PlateAppearanceResultType,
-    contact: Option<ContactType>
+    contact: ContactType
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventFieldingPlays {
     game_id: GameId,
     event_id: EventId,
-    sequence_id: u8,
+    sequence_id: SequenceId,
     fielding_position: FieldingPosition,
     fielding_play: FieldingPlayType
 }
@@ -320,16 +302,16 @@ pub struct EventPlateAppearanceHitLocation {
 pub struct EventBaserunningPlays {
     game_id: GameId,
     event_id: EventId,
-    sequence_id: u8,
+    sequence_id: SequenceId,
     baserunning_play: BaserunningPlayType,
-    at_base: Option<Base>
+    at_base: Base
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventOuts {
     game_id: GameId,
     event_id: EventId,
-    sequence_id: u8,
+    sequence_id: SequenceId,
     baserunner_out: BaseRunner
 }
 
@@ -338,7 +320,7 @@ pub struct EventOuts {
 pub struct EventBaserunningAdvanceAttempts {
     game_id: GameId,
     event_id: EventId,
-    sequence_id: u8,
+    sequence_id: SequenceId,
     baserunner: BaseRunner,
     attempted_advance_to: Base,
     is_successful: bool,
@@ -351,78 +333,78 @@ pub struct EventBaserunningAdvanceAttempts {
 pub struct EventFlags<'a> {
     game_id: GameId,
     event_id: EventId,
-    sequence_id: u8,
+    sequence_id: SequenceId,
     flag: &'a str
 }
 
 // Box score stats
-pub struct BoxScoreLineScore {
-    game_id: GameId,
-    inning: Inning,
-    side: Side,
-    runs: u8
-}
-
-pub struct BoxScorePlayerHitting<'a> {
-    game_id: GameId,
-    player_id: &'a str,
-    side: Side,
-    lineup_position: LineupPosition,
-    nth_player_at_position: u8,
-    at_bats: u8,
-    runs: u8,
-    hits: u8,
-    doubles: Option<u8>,
-    triples: Option<u8>,
-    home_runs: Option<u8>,
-    rbi: Option<u8>,
-    sacrifice_hits: Option<u8>,
-    sacrifice_flies: Option<u8>,
-    hit_by_pitch: Option<u8>,
-    walks: Option<u8>,
-    intentional_walks: Option<u8>,
-    strikeouts: Option<u8>,
-    stolen_bases: Option<u8>,
-    caught_stealing: Option<u8>,
-    grounded_into_double_plays: Option<u8>,
-    reached_on_interference: Option<u8>
-}
-
-pub struct BoxScorePlayerFielding {
-    game_id: GameId,
-    fielder_id: Fielder,
-    side: Side,
-    fielding_position: FieldingPosition,
-    nth_position_played_by_player: u8,
-    outs_played: Option<u8>,
-    putouts: Option<u8>,
-    assists: Option<u8>,
-    errors: Option<u8>,
-    double_plays: Option<u8>,
-    triple_plays: Option<u8>,
-    passed_balls: Option<u8>
-}
-
-pub struct BoxScorePlayerPitching {
-    pitcher_id: Player,
-    side: Side,
-    nth_pitcher: u8,
-    pitching_stats: PitchingLineStats,
-    outs_recorded: u8,
-    no_out_batters: Option<u8>,
-    batters_faced: Option<u8>,
-    hits: u8,
-    doubles: Option<u8>,
-    triples: Option<u8>,
-    home_runs: Option<u8>,
-    runs: u8,
-    earned_runs: Option<u8>,
-    walks: Option<u8>,
-    intentional_walks: Option<u8>,
-    strikeouts: Option<u8>,
-    hit_batsmen: Option<u8>,
-    wild_pitches: Option<u8>,
-    balks: Option<u8>,
-    sacrifice_hits: Option<u8>,
-    sacrifice_flies: Option<u8>
-}
+// pub struct BoxScoreLineScore {
+//     game_id: GameId,
+//     inning: Inning,
+//     side: Side,
+//     runs: u8
+// }
+//
+// pub struct BoxScorePlayerHitting<'a> {
+//     game_id: GameId,
+//     player_id: &'a str,
+//     side: Side,
+//     lineup_position: LineupPosition,
+//     nth_player_at_position: u8,
+//     at_bats: u8,
+//     runs: u8,
+//     hits: u8,
+//     doubles: Option<u8>,
+//     triples: Option<u8>,
+//     home_runs: Option<u8>,
+//     rbi: Option<u8>,
+//     sacrifice_hits: Option<u8>,
+//     sacrifice_flies: Option<u8>,
+//     hit_by_pitch: Option<u8>,
+//     walks: Option<u8>,
+//     intentional_walks: Option<u8>,
+//     strikeouts: Option<u8>,
+//     stolen_bases: Option<u8>,
+//     caught_stealing: Option<u8>,
+//     grounded_into_double_plays: Option<u8>,
+//     reached_on_interference: Option<u8>
+// }
+//
+// pub struct BoxScorePlayerFielding {
+//     game_id: GameId,
+//     fielder_id: Fielder,
+//     side: Side,
+//     fielding_position: FieldingPosition,
+//     nth_position_played_by_player: u8,
+//     outs_played: Option<u8>,
+//     putouts: Option<u8>,
+//     assists: Option<u8>,
+//     errors: Option<u8>,
+//     double_plays: Option<u8>,
+//     triple_plays: Option<u8>,
+//     passed_balls: Option<u8>
+// }
+//
+// pub struct BoxScorePlayerPitching {
+//     pitcher_id: Player,
+//     side: Side,
+//     nth_pitcher: u8,
+//     pitching_stats: PitchingLineStats,
+//     outs_recorded: u8,
+//     no_out_batters: Option<u8>,
+//     batters_faced: Option<u8>,
+//     hits: u8,
+//     doubles: Option<u8>,
+//     triples: Option<u8>,
+//     home_runs: Option<u8>,
+//     runs: u8,
+//     earned_runs: Option<u8>,
+//     walks: Option<u8>,
+//     intentional_walks: Option<u8>,
+//     strikeouts: Option<u8>,
+//     hit_batsmen: Option<u8>,
+//     wild_pitches: Option<u8>,
+//     balks: Option<u8>,
+//     sacrifice_hits: Option<u8>,
+//     sacrifice_flies: Option<u8>
+// }

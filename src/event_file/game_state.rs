@@ -226,7 +226,7 @@ impl From<&RecordVec> for GameSetting {
 pub struct GameUmpire {
     pub game_id: GameId,
     pub position: UmpirePosition,
-    pub umpire: Option<Umpire>
+    pub umpire_id: Option<Umpire>
 }
 
 
@@ -240,10 +240,10 @@ impl GameUmpire {
         let position = ua.position;
         if NONE_STRINGS.contains(&umpire.as_str()) { None }
         else if UNKNOWN_STRINGS.contains(&umpire.as_str()) {
-            Some(Self { game_id, position, umpire: None})
+            Some(Self { game_id, position, umpire_id: None})
         }
         else {
-            Some(Self { game_id, position, umpire: Some(umpire)})
+            Some(Self { game_id, position, umpire_id: Some(umpire)})
         }
     }
 
@@ -292,24 +292,24 @@ impl From<&Vec<MappedRecord>> for GameResults {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct GameLineupAppearance {
     pub game_id: GameId,
-    pub player: Player,
+    pub player_id: Player,
     pub side: Side,
     pub lineup_position: LineupPosition,
     pub entered_game_as: EnteredGameAs,
-    pub start_event: EventId,
-    pub end_event: Option<EventId>
+    pub start_event_id: EventId,
+    pub end_event_id: Option<EventId>
 }
 
 impl GameLineupAppearance {
     fn new_starter(player: Player, lineup_position: LineupPosition, side: Side, game_id: GameId) -> Self {
         Self {
             game_id,
-            player,
+            player_id: player,
             lineup_position,
             side,
             entered_game_as: EnteredGameAs::Starter,
-            start_event: NonZeroU16::new(1 as u16).unwrap(),
-            end_event: None
+            start_event_id: NonZeroU16::new(1 as u16).unwrap(),
+            end_event_id: None
         }
     }
 }
@@ -317,33 +317,33 @@ impl GameLineupAppearance {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct GameFieldingAppearance {
     pub game_id: GameId,
-    pub player: Player,
+    pub player_id: Player,
     pub side: Side,
     pub fielding_position: FieldingPosition,
-    pub start_event: EventId,
-    pub end_event: Option<EventId>
+    pub start_event_id: EventId,
+    pub end_event_id: Option<EventId>
 }
 
 impl GameFieldingAppearance {
     fn new_starter(player: Player, fielding_position: FieldingPosition, side: Side, game_id: GameId) -> Self {
         Self {
             game_id,
-            player,
+            player_id: player,
             fielding_position,
             side,
-            start_event: NonZeroU16::new(1 as u16).unwrap(),
-            end_event: None
+            start_event_id: NonZeroU16::new(1 as u16).unwrap(),
+            end_event_id: None
         }
     }
 
     fn new(player: Player, fielding_position: FieldingPosition, side: Side, game_id: GameId, start_event: EventId) -> Self {
         Self {
             game_id,
-            player,
+            player_id: player,
             fielding_position,
             side,
-            start_event,
-            end_event: None
+            start_event_id: start_event,
+            end_event_id: None
         }
     }
 }
@@ -386,7 +386,7 @@ impl TryFrom<&RecordVec> for GameContext {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
-pub struct EventBaserunner {
+pub struct EventStartingBaseState {
     pub game_id: GameId,
     pub event_id: EventId,
     pub baserunner: BaseRunner,
@@ -394,7 +394,7 @@ pub struct EventBaserunner {
     pub charged_to_pitcher: Pitcher,
 }
 
-impl EventBaserunner {
+impl EventStartingBaseState {
     fn from_base_state(state: &BaseState, game_id: GameId, event_id: EventId) -> Vec<Self> {
         state.get_bases()
             .iter()
@@ -501,7 +501,7 @@ pub struct EventContext {
     pub frame: InningFrame,
     pub at_bat: LineupPosition,
     pub outs: u8,
-    pub starting_base_state: Vec<EventBaserunner>
+    pub starting_base_state: Vec<EventStartingBaseState>
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -638,20 +638,20 @@ impl Personnel {
         let original_batter = self.get_at_position(&sub.side, &Either::Left(sub.lineup_position)).ok();
         if let Some(p) = original_batter {
             let original_lineup_appearance = self.get_current_lineup_appearance(&p)?;
-            original_lineup_appearance.end_event = Some(event_id);
+            original_lineup_appearance.end_event_id = Some(event_id);
         }
 
         let (lineup, _) = self.personnel_state.get_mut(&sub.side);
 
         let new_lineup_appearance = GameLineupAppearance {
             game_id: self.game_id,
-            player: sub.player,
+            player_id: sub.player,
             lineup_position: sub.lineup_position,
             side: sub.side,
             // TODO: Fix
             entered_game_as: EnteredGameAs::Starter,
-            start_event: event_id,
-            end_event: None
+            start_event_id: event_id,
+            end_event_id: None
         };
         lineup.insert(Either::Left(sub.lineup_position), sub.player);
         self.lineup_appearances
@@ -666,7 +666,7 @@ impl Personnel {
     fn update_defense_on_substitution(&mut self, sub: &SubstitutionRecord, sequence: EventId) -> Result<()> {
         let original_fielder = self.get_at_position(&sub.side, &Either::Right(sub.fielding_position)).ok();
         if let Some(p) = original_fielder {
-            self.get_current_fielding_appearance(&p)?.end_event = Some(sequence);
+            self.get_current_fielding_appearance(&p)?.end_event_id = Some(sequence);
         }
         let (_, defense) = self.personnel_state.get_mut(&sub.side);
 
@@ -735,7 +735,7 @@ impl GameState {
                     frame: state.frame,
                     at_bat: state.at_bat,
                     outs: state.outs,
-                    starting_base_state: EventBaserunner::from_base_state(&state.bases, state.game_id, state.event_id)
+                    starting_base_state: EventStartingBaseState::from_base_state(&state.bases, state.game_id, state.event_id)
                 };
                 let results = EventResults {
                     count_at_event: pr.count,

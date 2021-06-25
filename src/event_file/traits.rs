@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::num::NonZeroU8;
 
 use anyhow::{anyhow, Context, Error, Result};
 use csv::StringRecord;
@@ -323,3 +324,5 @@ impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
         })
     }
 }
+
+pub type SequenceId = NonZeroU8;
