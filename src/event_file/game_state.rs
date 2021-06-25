@@ -19,7 +19,7 @@ use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay,
                               EarnedRunStatus, FieldersData, FieldingData, HitLocation, HitType,
                               ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType,
                               PlateAppearanceType, Play, PlayType, RunnerAdvance};
-use crate::event_file::traits::{Inning, Matchup, Pitcher, Player, Umpire};
+use crate::event_file::traits::{Inning, Matchup, Pitcher, Player, Umpire, SequenceId};
 use crate::event_file::traits::{FieldingPosition, GameType, Handedness, LineupPosition, Side};
 use std::num::NonZeroU16;
 
@@ -116,21 +116,30 @@ impl From<&PlateAppearanceType> for PlateAppearanceResultType {
 }
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct EventInfoType(String);
+pub struct EventFlag {
+    game_id: GameId,
+    event_id: EventId,
+    sequence_id: SequenceId,
+    flag: String
+}
 
-impl EventInfoType {
-    fn from_play(play: &CachedPlay) -> Vec<Self> {
+impl EventFlag {
+    fn from_play(play: &CachedPlay, game_id: GameId, event_id: EventId) -> Vec<Self> {
         play
             .play
             .modifiers
             .iter()
-            .filter_map(|pm| {
-                if pm.is_valid_event_type() {
-                    Some(EventInfoType(format!("{:?}", pm)))
-                } else {None}
-            })
+            .filter(|pm| pm.is_valid_event_type())
+            .enumerate()
+            .map(|(i, pm)|
+                Self {
+                    game_id,
+                    event_id,
+                    sequence_id: SequenceId::new((i+1) as u8).unwrap(),
+                    flag: format!("{:?}", pm)
+                    }
+            )
             .collect_vec()
-
     }
 }
 
@@ -391,7 +400,7 @@ pub struct EventStartingBaseState {
     pub event_id: EventId,
     pub baserunner: BaseRunner,
     pub runner_lineup_position: LineupPosition,
-    pub charged_to_pitcher: Pitcher,
+    pub charged_to_pitcher_id: Pitcher,
 }
 
 impl EventStartingBaseState {
@@ -403,7 +412,7 @@ impl EventStartingBaseState {
                 event_id,
                 baserunner: *baserunner,
                 runner_lineup_position: runner.lineup_position,
-                charged_to_pitcher: runner.charged_to
+                charged_to_pitcher_id: runner.charged_to
             })
             .collect_vec()
     }
@@ -413,8 +422,9 @@ impl EventStartingBaseState {
 pub struct EventBaserunningPlay {
     pub game_id: GameId,
     pub event_id: EventId,
+    pub sequence_id: SequenceId,
     pub baserunning_play_type: BaserunningPlayType,
-    pub base: Option<Base>
+    pub at_base: Option<Base>
 }
 
 impl EventBaserunningPlay {
@@ -422,12 +432,14 @@ impl EventBaserunningPlay {
         let vec = play.play
             .main_plays
             .iter()
-            .filter_map(|pt| if let PlayType::BaserunningPlay(br) = pt {
+            .enumerate()
+            .filter_map(|(i, pt)| if let PlayType::BaserunningPlay(br) = pt {
                 Some(Self {
                     game_id,
                     event_id,
+                    sequence_id: SequenceId::new((i+1) as u8).unwrap(),
                     baserunning_play_type: br.baserunning_play_type,
-                    base: br.at_base})
+                    at_base: br.at_base})
             } else {None})
             .collect_vec();
         if vec.is_empty() { None } else { Some(vec) }
@@ -438,10 +450,9 @@ impl EventBaserunningPlay {
 pub struct EventPlateAppearance {
     pub game_id: GameId,
     pub event_id: EventId,
-    pub batter_hand: Handedness,
-    pub pitcher_hand: Handedness,
-    pub plate_appearance_type: PlateAppearanceResultType,
-    pub contact_type: Option<ContactType>,
+    pub plate_appearance_result: PlateAppearanceResultType,
+    pub contact: Option<ContactType>,
+    #[serde(skip_serializing)]
     pub hit_location: Option<HitLocation>
 }
 
@@ -454,10 +465,8 @@ impl EventPlateAppearance {
                 Some(Self {
                     game_id,
                     event_id,
-                    batter_hand: Handedness::Unknown,
-                    pitcher_hand: Handedness::Unknown,
-                    plate_appearance_type: PlateAppearanceResultType::from(pa),
-                    contact_type: play.contact_description.map(|cd| cd.contact_type),
+                    plate_appearance_result: PlateAppearanceResultType::from(pa),
+                    contact: play.contact_description.map(|cd| cd.contact_type),
                     hit_location: play.contact_description.map(|cd| cd.location).flatten(),
                 })
             } else {None})
@@ -465,30 +474,33 @@ impl EventPlateAppearance {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct EventBaserunningAdvances {
+pub struct EventBaserunningAdvanceAttempt {
     pub game_id: GameId,
     pub event_id: EventId,
+    pub sequence_id: SequenceId,
     pub baserunner: BaseRunner,
     pub attempted_advance_to: Base,
-    pub is_out: bool,
-    pub advanced_on_error: bool,
-    pub rbi: bool,
-    pub team_unearned: bool
+    pub is_successful: bool,
+    pub advanced_on_error_flag: bool,
+    pub rbi_flag: bool,
+    pub team_unearned_flag: bool
 }
 
-impl EventBaserunningAdvances {
+impl EventBaserunningAdvanceAttempt {
     fn from_play(play: &CachedPlay, game_id: GameId, event_id: EventId) -> Vec<Self> {
         play.advances
             .iter()
-            .map(|ra| Self {
+            .enumerate()
+            .map(|(i, ra)| Self {
                 game_id,
                 event_id,
+                sequence_id: SequenceId::new((i+1) as u8).unwrap(),
                 baserunner: ra.baserunner,
                 attempted_advance_to: ra.to,
-                advanced_on_error: FieldersData::find_error(ra.fielders_data().as_slice()).is_some(),
-                is_out: ra.is_out(),
-                rbi: play.rbi.contains(&ra.baserunner),
-                team_unearned: ra.earned_run_status() == Some(EarnedRunStatus::TeamUnearned)
+                advanced_on_error_flag: FieldersData::find_error(ra.fielders_data().as_slice()).is_some(),
+                is_successful: !ra.is_out(),
+                rbi_flag: play.rbi.contains(&ra.baserunner),
+                team_unearned_flag: ra.earned_run_status() == Some(EarnedRunStatus::TeamUnearned)
             })
             .collect_vec()
     }
@@ -501,7 +513,9 @@ pub struct EventContext {
     pub frame: InningFrame,
     pub at_bat: LineupPosition,
     pub outs: u8,
-    pub starting_base_state: Vec<EventStartingBaseState>
+    pub starting_base_state: Vec<EventStartingBaseState>,
+    pub batter_hand: Handedness,
+    pub pitcher_hand: Handedness,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -510,9 +524,10 @@ pub struct EventResults {
     pub pitch_sequence: Option<Vec<PitchSequenceItem>>,
     pub plate_appearance: Option<EventPlateAppearance>,
     pub plays_at_base: Option<Vec<EventBaserunningPlay>>,
+    pub out_on_play: Vec<BaseRunner>,
     pub fielding_plays: Vec<FieldersData>,
-    pub baserunning_advances: Vec<EventBaserunningAdvances>,
-    pub play_info: Vec<EventInfoType>,
+    pub baserunning_advances: Vec<EventBaserunningAdvanceAttempt>,
+    pub play_info: Vec<EventFlag>,
     pub comment: Option<String>
 }
 
@@ -735,17 +750,21 @@ impl GameState {
                     frame: state.frame,
                     at_bat: state.at_bat,
                     outs: state.outs,
-                    starting_base_state: EventStartingBaseState::from_base_state(&state.bases, state.game_id, state.event_id)
+                    starting_base_state: EventStartingBaseState::from_base_state(&state.bases, state.game_id, state.event_id),
+                    // TODO: Fix
+                    batter_hand: Handedness::Unknown,
+                    pitcher_hand: Handedness::Unknown
                 };
                 let results = EventResults {
                     count_at_event: pr.count,
                     pitch_sequence: pr.pitch_sequence.as_ref().map(|ps| ps.0.clone()),
                     plate_appearance: EventPlateAppearance::from_play(&play, state.game_id, state.event_id),
                     plays_at_base: EventBaserunningPlay::from_play(&play, state.game_id, state.event_id),
-                    baserunning_advances: EventBaserunningAdvances::from_play(&play, state.game_id, state.event_id),
-                    play_info: EventInfoType::from_play(&play),
+                    baserunning_advances: EventBaserunningAdvanceAttempt::from_play(&play, state.game_id, state.event_id),
+                    play_info: EventFlag::from_play(&play, state.game_id, state.event_id),
                     comment: None,
                     fielding_plays: play.fielders_data.clone(),
+                    out_on_play: play.outs
                 };
                 events.push(Event { game_id: state.game_id, event_id: state.event_id, context, results });
                 state.event_id = NonZeroU16::new(state.event_id.get() + 1 as u16).unwrap();

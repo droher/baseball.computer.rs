@@ -1,17 +1,16 @@
 use chrono::{NaiveDate, NaiveTime};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::event_file::box_score::PitchingLineStats;
-use crate::event_file::game_state::{EnteredGameAs, EventId, EventInfoType, GameContext, PlateAppearanceResultType, GameUmpire, EventStartingBaseState};
-use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Park, Precipitation, Sky, Team, UmpirePosition, WindDirection};
+use crate::event_file::game_state::{EventId, EventFlag, GameContext, EventPlateAppearance};
+use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, Park, Precipitation, Sky, Team, WindDirection};
 use crate::event_file::misc::GameId;
 use crate::event_file::pitch_sequence::{PitchType, SequenceItemTypeGeneral};
-use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, ContactType, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame};
-use crate::event_file::traits::{Fielder, FieldingPlayType, FieldingPosition, GameType, Handedness, Inning, LineupPosition, Player, SequenceId, Side, Umpire};
+use crate::event_file::play::{Base, BaseRunner, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame};
+use crate::event_file::traits::{FieldingPlayType, FieldingPosition, GameType, Handedness, LineupPosition, Player, SequenceId, Side, Inning, Fielder};
+use crate::event_file::box_score::PitchingLineStats;
 
 trait ContextToVec {
-    fn from_game_context(_: &GameContext) -> Vec<Self> where Self: Sized {
+    fn from_game_context(_: &GameContext) -> Box<dyn Iterator<Item=Self> + '_> where Self: Sized {
         unimplemented!()
     }
 }
@@ -85,8 +84,8 @@ pub struct GameTeams {
 }
 
 impl ContextToVec for GameTeams {
-    fn from_game_context(gc: &GameContext) -> Vec<Self> {
-        vec![
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = GameTeams>> {
+        Box::from(vec![
             Self {
                 game_id: gc.game_id,
                 team_id: gc.teams.away,
@@ -98,75 +97,11 @@ impl ContextToVec for GameTeams {
                 side: Side::Home
             }
         ]
+            .into_iter()
+        )
     }
 }
 
-impl ContextToVec for GameUmpire {
-    fn from_game_context(gc: &GameContext) -> Vec<Self> {
-        gc.umpires
-            .iter()
-            .map(|u| Self {
-                game_id: gc.game_id,
-                umpire_id: u.umpire_id,
-                position: u.position
-            })
-            .collect_vec()
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct GameLineupAppearance {
-    game_id: GameId,
-    player_id: Player,
-    side: Side,
-    lineup_position: LineupPosition,
-    entered_game_as: EnteredGameAs,
-    start_event_id: EventId,
-    end_event_id: Option<EventId>
-}
-
-impl ContextToVec for GameLineupAppearance {
-    fn from_game_context(gc: &GameContext) -> Vec<Self> {
-        gc.lineup_appearances
-            .iter()
-            .map(|a| Self {
-                game_id: gc.game_id,
-                player_id: a.player_id,
-                side: a.side,
-                lineup_position: a.lineup_position,
-                entered_game_as: a.entered_game_as,
-                start_event_id: a.start_event_id,
-                end_event_id: a.end_event_id
-            })
-            .collect_vec()
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct GameFieldingAppearance {
-    game_id: GameId,
-    player_id: Player,
-    side: Side,
-    fielding_position: FieldingPosition,
-    start_event_id: EventId,
-    end_event_id: Option<EventId>
-}
-
-impl ContextToVec for GameFieldingAppearance {
-    fn from_game_context(gc: &GameContext) -> Vec<Self> {
-        gc.fielding_appearances
-            .iter()
-            .map(|a| Self {
-                game_id: gc.game_id,
-                player_id: a.player_id,
-                side: a.side,
-                fielding_position: a.fielding_position,
-                start_event_id: a.start_event_id,
-                end_event_id: a.end_event_id
-            })
-            .collect_vec()
-    }
-}
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Event {
@@ -183,10 +118,10 @@ pub struct Event {
 }
 
 impl ContextToVec for Event {
-    fn from_game_context(gc: &GameContext) -> Vec<Self> {
-        gc.events
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item=Event> + '_>{
+        Box::from(gc.events
             .iter()
-            .map(|e| Self {
+            .map(move |e| Self {
                 game_id: gc.game_id,
                 event_id: e.event_id,
                 batting_side: e.context.batting_side,
@@ -195,33 +130,12 @@ impl ContextToVec for Event {
                 outs: e.context.outs,
                 count_balls: e.results.count_at_event.balls,
                 count_strikes: e.results.count_at_event.strikes,
-                // TODO: Fix
-                batter_hand: Handedness::Left,
-                pitcher_hand: Handedness::Left,
-            })
-            .collect_vec()
+                batter_hand: e.context.batter_hand,
+                pitcher_hand: e.context.pitcher_hand,
+            }))
     }
 }
 
-impl ContextToVec for EventStartingBaseState {
-    fn from_game_context(gc: &GameContext) -> Vec<Self> {
-        gc.events
-            .iter()
-            .flat_map(|e| e
-                .context
-                .starting_base_state
-                .iter()
-                .map(move |sbs|
-                         Self {
-                             game_id: gc.game_id,
-                             event_id: e.event_id,
-                             baserunner: sbs.baserunner,
-                             runner_lineup_position: sbs.runner_lineup_position,
-                             charged_to_pitcher_id: sbs.charged_to_pitcher
-                }))
-            .collect_vec()
-    }
-}
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventPitches {
@@ -239,15 +153,15 @@ pub struct EventPitches {
 }
 
 impl ContextToVec for EventPitches {
-    fn from_game_context(gc: &GameContext) -> Vec<Self> {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = EventPitches> + '_> {
         let pitch_sequences = gc.events
             .iter()
             .filter_map(|e|
                 if let Some(psi) = &e.results.pitch_sequence { Some((e.event_id, psi)) }
                 else { None }
             );
-        pitch_sequences
-            .flat_map(|(event_id, pitches)| {
+        let pitch_iter = pitch_sequences
+            .flat_map(move |(event_id, pitches)| {
                 pitches
                     .iter()
                     .map(move |psi| {
@@ -266,17 +180,13 @@ impl ContextToVec for EventPitches {
                             catcher_pickoff_attempt_at_base: psi.catcher_pickoff_attempt
                         }
                     })
-            })
-            .collect_vec()
+            });
+        Box::from(pitch_iter)
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventPlateAppearance {
-    game_id: GameId,
-    event_id: EventId,
-    plate_appearance_result: PlateAppearanceResultType,
-    contact: ContactType
+impl ContextToVec for EventPlateAppearance {
+
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
@@ -299,112 +209,80 @@ pub struct EventPlateAppearanceHitLocation {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventBaserunningPlays {
-    game_id: GameId,
-    event_id: EventId,
-    sequence_id: SequenceId,
-    baserunning_play: BaserunningPlayType,
-    at_base: Base
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventOuts {
+pub struct EventOut {
     game_id: GameId,
     event_id: EventId,
     sequence_id: SequenceId,
     baserunner_out: BaseRunner
 }
 
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventBaserunningAdvanceAttempts {
-    game_id: GameId,
-    event_id: EventId,
-    sequence_id: SequenceId,
-    baserunner: BaseRunner,
-    attempted_advance_to: Base,
-    is_successful: bool,
-    advanced_on_error_flag: bool,
-    rbi_flag: bool,
-    team_unearned_run_flag: bool
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventFlags<'a> {
-    game_id: GameId,
-    event_id: EventId,
-    sequence_id: SequenceId,
-    flag: &'a str
-}
-
 // Box score stats
-// pub struct BoxScoreLineScore {
-//     game_id: GameId,
-//     inning: Inning,
-//     side: Side,
-//     runs: u8
-// }
-//
-// pub struct BoxScorePlayerHitting<'a> {
-//     game_id: GameId,
-//     player_id: &'a str,
-//     side: Side,
-//     lineup_position: LineupPosition,
-//     nth_player_at_position: u8,
-//     at_bats: u8,
-//     runs: u8,
-//     hits: u8,
-//     doubles: Option<u8>,
-//     triples: Option<u8>,
-//     home_runs: Option<u8>,
-//     rbi: Option<u8>,
-//     sacrifice_hits: Option<u8>,
-//     sacrifice_flies: Option<u8>,
-//     hit_by_pitch: Option<u8>,
-//     walks: Option<u8>,
-//     intentional_walks: Option<u8>,
-//     strikeouts: Option<u8>,
-//     stolen_bases: Option<u8>,
-//     caught_stealing: Option<u8>,
-//     grounded_into_double_plays: Option<u8>,
-//     reached_on_interference: Option<u8>
-// }
-//
-// pub struct BoxScorePlayerFielding {
-//     game_id: GameId,
-//     fielder_id: Fielder,
-//     side: Side,
-//     fielding_position: FieldingPosition,
-//     nth_position_played_by_player: u8,
-//     outs_played: Option<u8>,
-//     putouts: Option<u8>,
-//     assists: Option<u8>,
-//     errors: Option<u8>,
-//     double_plays: Option<u8>,
-//     triple_plays: Option<u8>,
-//     passed_balls: Option<u8>
-// }
-//
-// pub struct BoxScorePlayerPitching {
-//     pitcher_id: Player,
-//     side: Side,
-//     nth_pitcher: u8,
-//     pitching_stats: PitchingLineStats,
-//     outs_recorded: u8,
-//     no_out_batters: Option<u8>,
-//     batters_faced: Option<u8>,
-//     hits: u8,
-//     doubles: Option<u8>,
-//     triples: Option<u8>,
-//     home_runs: Option<u8>,
-//     runs: u8,
-//     earned_runs: Option<u8>,
-//     walks: Option<u8>,
-//     intentional_walks: Option<u8>,
-//     strikeouts: Option<u8>,
-//     hit_batsmen: Option<u8>,
-//     wild_pitches: Option<u8>,
-//     balks: Option<u8>,
-//     sacrifice_hits: Option<u8>,
-//     sacrifice_flies: Option<u8>
-// }
+pub struct BoxScoreLineScore {
+    game_id: GameId,
+    inning: Inning,
+    side: Side,
+    runs: u8
+}
+
+pub struct BoxScorePlayerHitting {
+    game_id: GameId,
+    player_id: Player,
+    side: Side,
+    lineup_position: LineupPosition,
+    nth_player_at_position: u8,
+    at_bats: u8,
+    runs: u8,
+    hits: u8,
+    doubles: Option<u8>,
+    triples: Option<u8>,
+    home_runs: Option<u8>,
+    rbi: Option<u8>,
+    sacrifice_hits: Option<u8>,
+    sacrifice_flies: Option<u8>,
+    hit_by_pitch: Option<u8>,
+    walks: Option<u8>,
+    intentional_walks: Option<u8>,
+    strikeouts: Option<u8>,
+    stolen_bases: Option<u8>,
+    caught_stealing: Option<u8>,
+    grounded_into_double_plays: Option<u8>,
+    reached_on_interference: Option<u8>
+}
+
+pub struct BoxScorePlayerFielding {
+    game_id: GameId,
+    fielder_id: Fielder,
+    side: Side,
+    fielding_position: FieldingPosition,
+    nth_position_played_by_player: u8,
+    outs_played: Option<u8>,
+    putouts: Option<u8>,
+    assists: Option<u8>,
+    errors: Option<u8>,
+    double_plays: Option<u8>,
+    triple_plays: Option<u8>,
+    passed_balls: Option<u8>
+}
+
+pub struct BoxScorePlayerPitching {
+    pitcher_id: Player,
+    side: Side,
+    nth_pitcher: u8,
+    outs_recorded: u8,
+    no_out_batters: Option<u8>,
+    batters_faced: Option<u8>,
+    hits: u8,
+    doubles: Option<u8>,
+    triples: Option<u8>,
+    home_runs: Option<u8>,
+    runs: u8,
+    earned_runs: Option<u8>,
+    walks: Option<u8>,
+    intentional_walks: Option<u8>,
+    strikeouts: Option<u8>,
+    hit_batsmen: Option<u8>,
+    wild_pitches: Option<u8>,
+    balks: Option<u8>,
+    sacrifice_hits: Option<u8>,
+    sacrifice_flies: Option<u8>
+}
