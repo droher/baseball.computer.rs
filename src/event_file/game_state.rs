@@ -7,7 +7,7 @@ use chrono::{NaiveDate, NaiveTime};
 use either::Either;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tinystr::{tinystr16, tinystr8};
+use tinystr::{tinystr16, tinystr8, TinyStr16};
 
 use crate::event_file::info::{DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord,
                               Park, Precipitation, Sky, Team, UmpireAssignment, UmpirePosition, WindDirection};
@@ -115,6 +115,7 @@ impl From<&PlateAppearanceType> for PlateAppearanceResultType {
     }
 }
 
+// TODO: Add weird game state info to flags
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventFlag {
     game_id: GameId,
@@ -233,7 +234,7 @@ impl From<&RecordVec> for GameSetting {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GameUmpire {
-    pub game_id: GameId,
+    pub game_id: TinyStr16,
     pub position: UmpirePosition,
     pub umpire_id: Option<Umpire>
 }
@@ -249,10 +250,10 @@ impl GameUmpire {
         let position = ua.position;
         if NONE_STRINGS.contains(&umpire.as_str()) { None }
         else if UNKNOWN_STRINGS.contains(&umpire.as_str()) {
-            Some(Self { game_id, position, umpire_id: None})
+            Some(Self { game_id: game_id.id, position, umpire_id: None})
         }
         else {
-            Some(Self { game_id, position, umpire_id: Some(umpire)})
+            Some(Self { game_id: game_id.id, position, umpire_id: Some(umpire)})
         }
     }
 
@@ -300,7 +301,7 @@ impl From<&Vec<MappedRecord>> for GameResults {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct GameLineupAppearance {
-    pub game_id: GameId,
+    pub game_id: TinyStr16,
     pub player_id: Player,
     pub side: Side,
     pub lineup_position: LineupPosition,
@@ -312,7 +313,7 @@ pub struct GameLineupAppearance {
 impl GameLineupAppearance {
     fn new_starter(player: Player, lineup_position: LineupPosition, side: Side, game_id: GameId) -> Self {
         Self {
-            game_id,
+            game_id: game_id.id,
             player_id: player,
             lineup_position,
             side,
@@ -325,7 +326,7 @@ impl GameLineupAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct GameFieldingAppearance {
-    pub game_id: GameId,
+    pub game_id: TinyStr16,
     pub player_id: Player,
     pub side: Side,
     pub fielding_position: FieldingPosition,
@@ -336,7 +337,7 @@ pub struct GameFieldingAppearance {
 impl GameFieldingAppearance {
     fn new_starter(player: Player, fielding_position: FieldingPosition, side: Side, game_id: GameId) -> Self {
         Self {
-            game_id,
+            game_id: game_id.id,
             player_id: player,
             fielding_position,
             side,
@@ -347,7 +348,7 @@ impl GameFieldingAppearance {
 
     fn new(player: Player, fielding_position: FieldingPosition, side: Side, game_id: GameId, start_event: EventId) -> Self {
         Self {
-            game_id,
+            game_id: game_id.id,
             player_id: player,
             fielding_position,
             side,
@@ -659,7 +660,7 @@ impl Personnel {
         let (lineup, _) = self.personnel_state.get_mut(&sub.side);
 
         let new_lineup_appearance = GameLineupAppearance {
-            game_id: self.game_id,
+            game_id: self.game_id.id,
             player_id: sub.player,
             lineup_position: sub.lineup_position,
             side: sub.side,

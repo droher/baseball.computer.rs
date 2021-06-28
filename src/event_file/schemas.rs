@@ -8,8 +8,9 @@ use crate::event_file::pitch_sequence::{PitchType, SequenceItemTypeGeneral};
 use crate::event_file::play::{Base, BaseRunner, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame};
 use crate::event_file::traits::{FieldingPlayType, FieldingPosition, GameType, Handedness, LineupPosition, Player, SequenceId, Side, Inning, Fielder};
 use crate::event_file::box_score::PitchingLineStats;
+use tinystr::TinyStr16;
 
-trait ContextToVec {
+pub trait ContextToVec {
     fn from_game_context(_: &GameContext) -> Box<dyn Iterator<Item=Self> + '_> where Self: Sized {
         unimplemented!()
     }
@@ -17,7 +18,7 @@ trait ContextToVec {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Game<'a> {
-    game_id: GameId,
+    game_id: TinyStr16,
     date: NaiveDate,
     start_time: Option<NaiveTime>,
     doubleheader_status: DoubleheaderStatus,
@@ -48,7 +49,7 @@ impl<'a> From<&'a GameContext> for Game<'a> {
         let setting = &gc.setting;
         let results = &gc.results;
         Self {
-            game_id: gc.game_id,
+            game_id: gc.game_id.id,
             date: setting.date,
             start_time: setting.start_time,
             doubleheader_status: setting.doubleheader_status,
@@ -77,22 +78,22 @@ impl<'a> From<&'a GameContext> for Game<'a> {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct GameTeams {
-    game_id: GameId,
+pub struct GameTeam {
+    game_id: TinyStr16,
     team_id: Team,
     side: Side
 }
 
-impl ContextToVec for GameTeams {
-    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = GameTeams>> {
+impl ContextToVec for GameTeam {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item =GameTeam>> {
         Box::from(vec![
             Self {
-                game_id: gc.game_id,
+                game_id: gc.game_id.id,
                 team_id: gc.teams.away,
                 side: Side::Away
             },
             Self {
-                game_id: gc.game_id,
+                game_id: gc.game_id.id,
                 team_id: gc.teams.home,
                 side: Side::Home
             }
@@ -105,7 +106,7 @@ impl ContextToVec for GameTeams {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Event {
-    game_id: GameId,
+    game_id: TinyStr16,
     event_id: EventId,
     batting_side: Side,
     frame: InningFrame,
@@ -113,8 +114,6 @@ pub struct Event {
     outs: u8,
     count_balls: Option<u8>,
     count_strikes: Option<u8>,
-    batter_hand: Handedness,
-    pitcher_hand: Handedness,
 }
 
 impl ContextToVec for Event {
@@ -122,7 +121,7 @@ impl ContextToVec for Event {
         Box::from(gc.events
             .iter()
             .map(move |e| Self {
-                game_id: gc.game_id,
+                game_id: gc.game_id.id,
                 event_id: e.event_id,
                 batting_side: e.context.batting_side,
                 frame: e.context.frame,
@@ -130,8 +129,6 @@ impl ContextToVec for Event {
                 outs: e.context.outs,
                 count_balls: e.results.count_at_event.balls,
                 count_strikes: e.results.count_at_event.strikes,
-                batter_hand: e.context.batter_hand,
-                pitcher_hand: e.context.pitcher_hand,
             }))
     }
 }

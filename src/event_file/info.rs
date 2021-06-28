@@ -190,7 +190,7 @@ pub enum InfoRecord {
 impl InfoRecord {
     fn parse_time(time_str: &str) -> InfoRecord {
         let padded_time = format!("{:0>4}", time_str);
-        let time = NaiveTime::parse_from_str(&padded_time, "%I%M");
+        let time = NaiveTime::parse_from_str(&padded_time, "%I:%M%p");
         match time {
             Ok(t) => InfoRecord::StartTime(Some(t)),
             Err(_) => InfoRecord::StartTime(None)

@@ -6,4 +6,4 @@ pub mod box_score;
 pub mod info;
 pub mod pitch_sequence;
 pub mod game_state;
-mod schemas;
+pub mod schemas;
