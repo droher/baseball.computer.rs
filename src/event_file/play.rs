@@ -1103,10 +1103,10 @@ pub enum HitLocationGeneral {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct HitLocation {
-    general_location: HitLocationGeneral,
-    depth: HitDepth,
-    angle: HitAngle,
-    strength: HitStrength
+    pub general_location: HitLocationGeneral,
+    pub depth: HitDepth,
+    pub angle: HitAngle,
+    pub strength: HitStrength
 }
 impl TryFrom<&str> for HitLocation {
     type Error = Error;
@@ -1305,16 +1305,18 @@ impl PlayModifier {
 
     fn parse_single_modifier(value: &str) -> Result<PlayModifier> {
         let (first, last) = regex_split(value, &MODIFIER_DIVIDER_REGEX);
+        if let Ok(cd) = ContactDescription::try_from((first, last.unwrap_or_default())) {
+            return Ok(PlayModifier::ContactDescription(cd))
+        }
         let last_as_int_vec = {|| FieldingPosition::fielding_vec(&last.unwrap_or_default()) };
         let play_modifier = match PlayModifier::from_str(first) {
-            // Fill in variants that have non-default cases
-            Err(_) => PlayModifier::Unrecognized(value.into()),
-            Ok(PlayModifier::ContactDescription(_)) => PlayModifier::ContactDescription(ContactDescription::try_from((first, last.unwrap_or_default()))?),
+            // Fill in other variants that have non-default cases
             Ok(PlayModifier::ErrorOn(_)) => PlayModifier::ErrorOn(*last_as_int_vec().first().context("Missing error position info")?),
             Ok(PlayModifier::RelayToFielderWithNoOutMade(_)) => PlayModifier::RelayToFielderWithNoOutMade(last_as_int_vec()),
             Ok(PlayModifier::ThrowToBase(_)) if first == "THH" => PlayModifier::ThrowToBase(Some(Base::Home)),
             Ok(PlayModifier::ThrowToBase(_)) => PlayModifier::ThrowToBase(Base::from_str(&last.unwrap_or_default()).ok()),
-            Ok(pm) => pm
+            Ok(pm) => pm,
+            Err(_) => PlayModifier::Unrecognized(value.into()),
         };
         Ok(play_modifier)
     }

@@ -15,7 +15,7 @@ use strum_macros::{Display, EnumIter};
 use event_file::parser::{MappedRecord, RetrosheetReader};
 use event_file::game_state::GameContext;
 use event_file::schemas::{Event, ContextToVec};
-use crate::event_file::schemas::{Game, GameTeam};
+use crate::event_file::schemas::{Game, GameTeam, EventOut, EventFieldingPlay, EventPitch, EventHitLocation};
 use std::fs::File;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -57,25 +57,92 @@ impl Schema {
             writer_map.get_mut(&Self::Game).unwrap()
                 .serialize(Game::from(&game_context))?;
             // Write GameTeam
-            let mut w = writer_map.get_mut(&Self::GameTeam).unwrap();
+            let w = writer_map.get_mut(&Self::GameTeam).unwrap();
             for row in GameTeam::from_game_context(&game_context) {
                 w.serialize(&row)?;
             }
             // Write GameUmpire
-            let mut w = writer_map.get_mut(&Self::GameUmpire).unwrap();
-            for row in game_context.umpires {
-                w.serialize(&row)?;
+            let w = writer_map.get_mut(&Self::GameUmpire).unwrap();
+            for row in &game_context.umpires {
+                w.serialize(row)?;
             }
             // Write GameLineupAppearance
-            let mut w = writer_map.get_mut(&Self::GameLineupAppearance).unwrap();
-            for row in game_context.lineup_appearances {
-                w.serialize(&row)?;
+            let w = writer_map.get_mut(&Self::GameLineupAppearance).unwrap();
+            for row in &game_context.lineup_appearances {
+                w.serialize(row)?;
             }
             // Write GameFieldingAppearance
-            let mut w = writer_map.get_mut(&Self::GameFieldingAppearance).unwrap();
-            for row in game_context.fielding_appearances {
+            let w = writer_map.get_mut(&Self::GameFieldingAppearance).unwrap();
+            for row in &game_context.fielding_appearances {
+                w.serialize(row)?;
+            }
+            // Write Event
+            let w = writer_map.get_mut(&Self::Event).unwrap();
+            for row in Event::from_game_context(&game_context) {
+                w.serialize(row)?;
+            }
+            // Write EventStartingBaseState
+            let w = writer_map.get_mut(&Self::EventStartingBaseState).unwrap();
+            let base_states = &game_context
+                .events
+                .iter()
+                .flat_map(|e| &e.context.starting_base_state)
+                .collect_vec();
+            for row in base_states {
+                w.serialize(row)?;
+            }
+            // Write EventPlateAppearance
+            let w = writer_map.get_mut(&Self::EventPlateAppearance).unwrap();
+            let pa = &game_context
+                .events
+                .iter()
+                .flat_map(|e| e.results.plate_appearance.as_ref())
+                .collect_vec();
+            for row in pa {
+                w.serialize(row)?;
+            }
+            // Write EventOut
+            let w = writer_map.get_mut(&Self::EventOut).unwrap();
+            for row in EventOut::from_game_context(&game_context) {
                 w.serialize(&row)?;
             }
+            // Write EventFieldingPlay
+            let w = writer_map.get_mut(&Self::EventFieldingPlay).unwrap();
+            for row in EventFieldingPlay::from_game_context(&game_context) {
+                w.serialize(&row)?;
+            }
+            // Write EventBaserunningAdvanceAttempt
+            let w = writer_map.get_mut(&Self::EventBaserunningAdvanceAttempt).unwrap();
+            let advance_attempts = &game_context
+                .events
+                .iter()
+                .flat_map(|e| &e.results.baserunning_advances)
+                .collect_vec();
+            for row in advance_attempts {
+                w.serialize(row)?;
+            }
+            // Write EventHitLocation
+            let w = writer_map.get_mut(&Self::EventHitLocation).unwrap();
+            for row in EventHitLocation::from_game_context(&game_context) {
+                w.serialize(&row)?;
+            }
+            // Write EventBaserunningPlay
+            let w = writer_map.get_mut(&Self::EventBaserunningPlay).unwrap();
+            let baserunning_plays = &game_context
+                .events
+                .iter()
+                .filter_map(|e| e.results.plays_at_base.as_ref())
+                .flatten()
+                .collect_vec();
+            for row in baserunning_plays {
+                w.serialize(row)?;
+            }
+            // Write EventPitch
+            let w = writer_map.get_mut(&Self::EventPitch).unwrap();
+            for row in EventPitch::from_game_context(&game_context) {
+                w.serialize(&row)?;
+            }
+            //Write EventFlag
         }
         Ok(())
     }

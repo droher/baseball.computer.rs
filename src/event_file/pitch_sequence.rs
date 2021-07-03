@@ -76,7 +76,7 @@ pub enum PitchType {
     #[strum(serialize = "U")]
     Unknown,
     #[strum(serialize = "V")]
-    BallOnPitcherGoingToMouth,
+    AutomaticBall,
     #[strum(serialize = "X")]
     InPlay,
     #[strum(serialize = "Y")]
@@ -107,7 +107,7 @@ impl PitchType {
             PitchType::SwingingStrike => SequenceItemTypeGeneral::Strike,
             PitchType::FoulTip => SequenceItemTypeGeneral::Strike,
             PitchType::Unknown => SequenceItemTypeGeneral::Unknown,
-            PitchType::BallOnPitcherGoingToMouth => SequenceItemTypeGeneral::Ball,
+            PitchType::AutomaticBall => SequenceItemTypeGeneral::Ball,
             PitchType::InPlay => SequenceItemTypeGeneral::InPlay,
             PitchType::InPlayOnPitchout => SequenceItemTypeGeneral::InPlay,
         }
@@ -163,7 +163,16 @@ impl TryFrom<&str> for PitchSequence {
 
     fn try_from(str_sequence: &str) -> Result<Self> {
         let mut pitches= Vec::with_capacity(10);
-        let mut char_iter = str_sequence.chars().peekable();
+
+        // If a single PA lasts multiple events (e.g. because of a stolen base or substitution),
+        // event rows will carry over the pitch sequence of all previous events in that PA.
+        // An interruption in the PA is indicated with "."
+        // To avoid double-counting, if there's a ".", we only take the sequence to the right of
+        // the right-most "." (Should I end that sentence with a period? How does that work)
+        let trimmed_sequence =
+            if let Some((_, s)) = str_sequence.rsplit_once(".") { s }
+            else { str_sequence };
+        let mut char_iter = trimmed_sequence.chars().peekable();
         let mut pitch = PitchSequenceItem::new(1);
 
         let get_catcher_pickoff_base = { |c: Option<char>|

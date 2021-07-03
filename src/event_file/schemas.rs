@@ -11,9 +11,7 @@ use crate::event_file::box_score::PitchingLineStats;
 use tinystr::TinyStr16;
 
 pub trait ContextToVec {
-    fn from_game_context(_: &GameContext) -> Box<dyn Iterator<Item=Self> + '_> where Self: Sized {
-        unimplemented!()
-    }
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item=Self> + '_> where Self: Sized;
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
@@ -135,8 +133,8 @@ impl ContextToVec for Event {
 
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventPitches {
-    game_id: GameId,
+pub struct EventPitch {
+    game_id: TinyStr16,
     event_id: EventId,
     sequence_id: SequenceId,
     is_pitch: bool,
@@ -149,8 +147,8 @@ pub struct EventPitches {
     catcher_pickoff_attempt_at_base: Option<Base>
 }
 
-impl ContextToVec for EventPitches {
-    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = EventPitches> + '_> {
+impl ContextToVec for EventPitch {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item =EventPitch> + '_> {
         let pitch_sequences = gc.events
             .iter()
             .filter_map(|e|
@@ -164,7 +162,7 @@ impl ContextToVec for EventPitches {
                     .map(move |psi| {
                         let general = psi.pitch_type.get_sequence_general();
                         Self {
-                            game_id: gc.game_id,
+                            game_id: gc.game_id.id,
                             event_id,
                             sequence_id: psi.sequence_id,
                             is_pitch: general.is_pitch(),
@@ -182,22 +180,39 @@ impl ContextToVec for EventPitches {
     }
 }
 
-impl ContextToVec for EventPlateAppearance {
-
-}
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventFieldingPlays {
-    game_id: GameId,
+pub struct EventFieldingPlay {
+    game_id: TinyStr16,
     event_id: EventId,
     sequence_id: SequenceId,
     fielding_position: FieldingPosition,
     fielding_play: FieldingPlayType
 }
 
+impl ContextToVec for EventFieldingPlay {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item=Self> + '_> {
+        Box::from(gc.events
+            .iter()
+            .flat_map(|e| e.results
+                .fielding_plays
+                .iter()
+                .enumerate()
+                .map(move |(i, fp)| Self {
+                    game_id: e.game_id.id,
+                    event_id: e.event_id,
+                    sequence_id: SequenceId::new((i+1) as u8).unwrap(),
+                    fielding_position: fp.fielding_position,
+                    fielding_play: fp.fielding_play_type
+                })
+            )
+        )
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventPlateAppearanceHitLocation {
-    game_id: GameId,
+pub struct EventHitLocation {
+    game_id: TinyStr16,
     event_id: EventId,
     general_location: HitLocationGeneral,
     depth: HitDepth,
@@ -205,12 +220,53 @@ pub struct EventPlateAppearanceHitLocation {
     strength: HitStrength
 }
 
+impl ContextToVec for EventHitLocation {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item=Self> + '_> {
+        Box::from(gc.events
+            .iter()
+            .filter_map(|e|
+                if let Some(Some(hl)) = e.results
+                    .plate_appearance.as_ref()
+                    .map(|pa| pa.hit_location) {
+                    Some(Self {
+                        game_id: e.game_id.id,
+                        event_id: e.event_id,
+                        general_location: hl.general_location,
+                        depth: hl.depth,
+                        angle: hl.angle,
+                        strength: hl.strength
+                    })
+                } else { None }
+            )
+        )
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventOut {
-    game_id: GameId,
+    game_id: TinyStr16,
     event_id: EventId,
     sequence_id: SequenceId,
     baserunner_out: BaseRunner
+}
+
+impl ContextToVec for EventOut {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item=Self> + '_> {
+        Box::from(gc.events
+            .iter()
+            .flat_map(|e| e.results
+                .out_on_play
+                .iter()
+                .enumerate()
+                .map(move |(i, br)| Self {
+                    game_id: e.game_id.id,
+                    event_id: e.event_id,
+                    sequence_id: SequenceId::new((i+1) as u8).unwrap(),
+                    baserunner_out: *br
+                })
+            )
+        )
+    }
 }
 
 // Box score stats

@@ -358,7 +358,7 @@ impl GameFieldingAppearance {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct GameContext {
     pub game_id: GameId,
     pub teams: Matchup<Team>,
@@ -397,7 +397,7 @@ impl TryFrom<&RecordVec> for GameContext {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct EventStartingBaseState {
-    pub game_id: GameId,
+    pub game_id: TinyStr16,
     pub event_id: EventId,
     pub baserunner: BaseRunner,
     pub runner_lineup_position: LineupPosition,
@@ -409,7 +409,7 @@ impl EventStartingBaseState {
         state.get_bases()
             .iter()
             .map(|(baserunner, runner)| Self {
-                game_id,
+                game_id: game_id.id,
                 event_id,
                 baserunner: *baserunner,
                 runner_lineup_position: runner.lineup_position,
@@ -421,7 +421,7 @@ impl EventStartingBaseState {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningPlay {
-    pub game_id: GameId,
+    pub game_id: TinyStr16,
     pub event_id: EventId,
     pub sequence_id: SequenceId,
     pub baserunning_play_type: BaserunningPlayType,
@@ -436,7 +436,7 @@ impl EventBaserunningPlay {
             .enumerate()
             .filter_map(|(i, pt)| if let PlayType::BaserunningPlay(br) = pt {
                 Some(Self {
-                    game_id,
+                    game_id: game_id.id,
                     event_id,
                     sequence_id: SequenceId::new((i+1) as u8).unwrap(),
                     baserunning_play_type: br.baserunning_play_type,
@@ -449,7 +449,7 @@ impl EventBaserunningPlay {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventPlateAppearance {
-    pub game_id: GameId,
+    pub game_id: TinyStr16,
     pub event_id: EventId,
     pub plate_appearance_result: PlateAppearanceResultType,
     pub contact: Option<ContactType>,
@@ -464,7 +464,7 @@ impl EventPlateAppearance {
             .iter()
             .find_map(|pt| if let PlayType::PlateAppearance(pa) = pt {
                 Some(Self {
-                    game_id,
+                    game_id: game_id.id,
                     event_id,
                     plate_appearance_result: PlateAppearanceResultType::from(pa),
                     contact: play.contact_description.map(|cd| cd.contact_type),
@@ -476,7 +476,7 @@ impl EventPlateAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningAdvanceAttempt {
-    pub game_id: GameId,
+    pub game_id: TinyStr16,
     pub event_id: EventId,
     pub sequence_id: SequenceId,
     pub baserunner: BaseRunner,
@@ -493,7 +493,7 @@ impl EventBaserunningAdvanceAttempt {
             .iter()
             .enumerate()
             .map(|(i, ra)| Self {
-                game_id,
+                game_id: game_id.id,
                 event_id,
                 sequence_id: SequenceId::new((i+1) as u8).unwrap(),
                 baserunner: ra.baserunner,
@@ -532,7 +532,7 @@ pub struct EventResults {
     pub comment: Option<String>
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Event {
     pub game_id: GameId,
     pub event_id: EventId,
