@@ -1,12 +1,14 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use anyhow::{Context, Error, Result, bail};
+use anyhow::{bail, Context, Error, Result};
 use arrayref::array_ref;
 
-use crate::event_file::traits::{RetrosheetEventRecord, Batter, LineupPosition, Inning, Fielder, FieldingPosition, Pitcher, Side};
+use crate::event_file::misc::{Defense, Lineup};
+use crate::event_file::traits::{
+    Batter, Fielder, FieldingPosition, Inning, LineupPosition, Pitcher, RetrosheetEventRecord, Side,
+};
 use crate::util::{parse_positive_int, str_to_tinystr};
-use crate::event_file::misc::{Lineup, Defense};
 use tinystr::TinyStr8;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
@@ -27,20 +29,29 @@ pub struct BattingLineStats {
     pub stolen_bases: Option<u8>,
     pub caught_stealing: Option<u8>,
     pub grounded_into_double_plays: Option<u8>,
-    pub reached_on_interference: Option<u8>
+    pub reached_on_interference: Option<u8>,
 }
 
 impl Into<Vec<u8>> for BattingLineStats {
     fn into(self) -> Vec<u8> {
         vec![
-            self.at_bats, self.runs, self.hits, self.doubles.unwrap_or_default(),
-            self.triples.unwrap_or_default(), self.home_runs.unwrap_or_default(),
-            self.rbi.unwrap_or_default(), self.sacrifice_hits.unwrap_or_default(), self.sacrifice_flies.unwrap_or_default(),
-            self.hit_by_pitch.unwrap_or_default(), self.walks.unwrap_or_default(),
-            self.intentional_walks.unwrap_or_default(), self.strikeouts.unwrap_or_default(),
-            self.stolen_bases.unwrap_or_default(), self.caught_stealing.unwrap_or_default(),
+            self.at_bats,
+            self.runs,
+            self.hits,
+            self.doubles.unwrap_or_default(),
+            self.triples.unwrap_or_default(),
+            self.home_runs.unwrap_or_default(),
+            self.rbi.unwrap_or_default(),
+            self.sacrifice_hits.unwrap_or_default(),
+            self.sacrifice_flies.unwrap_or_default(),
+            self.hit_by_pitch.unwrap_or_default(),
+            self.walks.unwrap_or_default(),
+            self.intentional_walks.unwrap_or_default(),
+            self.strikeouts.unwrap_or_default(),
+            self.stolen_bases.unwrap_or_default(),
+            self.caught_stealing.unwrap_or_default(),
             self.grounded_into_double_plays.unwrap_or_default(),
-            self.reached_on_interference.unwrap_or_default()
+            self.reached_on_interference.unwrap_or_default(),
         ]
     }
 }
@@ -49,9 +60,13 @@ impl TryFrom<&[&str; 17]> for BattingLineStats {
     type Error = Error;
 
     fn try_from(value: &[&str; 17]) -> Result<BattingLineStats> {
-        let o = {|i: usize| value[i].parse::<u8>().ok()};
-        let u = {|i: usize|
-            value[i].parse::<u8>().context("Bad value for batting line stat")
+        let o = { |i: usize| value[i].parse::<u8>().ok() };
+        let u = {
+            |i: usize| {
+                value[i]
+                    .parse::<u8>()
+                    .context("Bad value for batting line stat")
+            }
         };
         Ok(BattingLineStats {
             at_bats: u(0)?,
@@ -70,11 +85,10 @@ impl TryFrom<&[&str; 17]> for BattingLineStats {
             stolen_bases: o(13),
             caught_stealing: o(14),
             grounded_into_double_plays: o(15),
-            reached_on_interference: o(16)
+            reached_on_interference: o(16),
         })
     }
 }
-
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct BattingLine {
@@ -87,45 +101,45 @@ pub struct BattingLine {
 
 impl BattingLine {
     pub fn from_lineup(side: Side, lineup: &Lineup) -> Vec<Self> {
-        lineup.iter()
-            .map(|(lineup_position, batter_id)|
-                Self::new(*batter_id, side, *lineup_position, 1)
-            )
+        lineup
+            .iter()
+            .map(|(lineup_position, batter_id)| Self::new(*batter_id, side, *lineup_position, 1))
             .collect()
     }
 
-    pub fn new(batter_id: Batter,
-               side: Side,
-               lineup_position: LineupPosition,
-               nth_player_at_position: u8) -> Self {
+    pub fn new(
+        batter_id: Batter,
+        side: Side,
+        lineup_position: LineupPosition,
+        nth_player_at_position: u8,
+    ) -> Self {
         Self {
             batter_id,
             side,
             lineup_position,
             nth_player_at_position,
-            batting_stats: BattingLineStats::default()
+            batting_stats: BattingLineStats::default(),
         }
     }
 }
 
-impl TryFrom<&RetrosheetEventRecord>for BattingLine {
+impl TryFrom<&RetrosheetEventRecord> for BattingLine {
     type Error = Error;
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<BattingLine> {
         let arr = record.deserialize::<[&str; 23]>(None)?;
         let p = parse_positive_int::<u8>;
-        Ok(BattingLine{
+        Ok(BattingLine {
             batter_id: str_to_tinystr(arr[2])?,
             side: Side::from_str(arr[3])?,
             lineup_position: LineupPosition::try_from(arr[4])?,
             nth_player_at_position: p(arr[5]).context("Invalid batting sequence position")?,
-            batting_stats: BattingLineStats::try_from(array_ref![arr,6,17])?
+            batting_stats: BattingLineStats::try_from(array_ref![arr, 6, 17])?,
         })
     }
 }
 
 impl From<BattingLine> for RetrosheetEventRecord {
-
     fn from(line: BattingLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(200, 24);
         record.push_field("stat");
@@ -151,20 +165,17 @@ pub struct PinchHittingLine {
 }
 
 impl PinchHittingLine {
-    pub fn new(pinch_hitter_id: Batter,
-               inning: Option<Inning>,
-               side: Side) -> Self {
+    pub fn new(pinch_hitter_id: Batter, inning: Option<Inning>, side: Side) -> Self {
         Self {
             pinch_hitter_id,
             side,
             inning,
-            batting_stats: Some(BattingLineStats::default())
+            batting_stats: Some(BattingLineStats::default()),
         }
     }
 }
 
 impl From<PinchHittingLine> for RetrosheetEventRecord {
-
     //noinspection RsTypeCheck
     fn from(line: PinchHittingLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(200, 24);
@@ -181,21 +192,20 @@ impl From<PinchHittingLine> for RetrosheetEventRecord {
     }
 }
 
-impl TryFrom<&RetrosheetEventRecord>for PinchHittingLine {
+impl TryFrom<&RetrosheetEventRecord> for PinchHittingLine {
     type Error = Error;
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<PinchHittingLine> {
         let arr = record.deserialize::<[&str; 22]>(None)?;
         let p = parse_positive_int::<u8>;
-        Ok(PinchHittingLine{
+        Ok(PinchHittingLine {
             pinch_hitter_id: str_to_tinystr(arr[2])?,
             inning: p(arr[3]),
             side: Side::from_str(arr[4])?,
-            batting_stats: BattingLineStats::try_from(array_ref![arr,5,17]).ok()
+            batting_stats: BattingLineStats::try_from(array_ref![arr, 5, 17]).ok(),
         })
     }
 }
-
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct PinchRunningLine {
@@ -204,26 +214,23 @@ pub struct PinchRunningLine {
     side: Side,
     pub runs: Option<u8>,
     pub stolen_bases: Option<u8>,
-    pub caught_stealing: Option<u8>
+    pub caught_stealing: Option<u8>,
 }
 
 impl PinchRunningLine {
-    pub fn new(pinch_runner_id: Batter,
-               inning: Option<Inning>,
-               side: Side) -> Self {
+    pub fn new(pinch_runner_id: Batter, inning: Option<Inning>, side: Side) -> Self {
         Self {
             pinch_runner_id,
             inning,
             side,
             runs: Some(0),
             stolen_bases: Some(0),
-            caught_stealing: Some(0)
+            caught_stealing: Some(0),
         }
     }
 }
 
 impl From<PinchRunningLine> for RetrosheetEventRecord {
-
     //noinspection RsTypeCheck
     //noinspection RsTypeCheck
     fn from(line: PinchRunningLine) -> RetrosheetEventRecord {
@@ -231,29 +238,29 @@ impl From<PinchRunningLine> for RetrosheetEventRecord {
         record.push_field("stat");
         record.push_field("prline");
         record.push_field(line.pinch_runner_id.as_str());
-        record.push_field( &line.inning.map_or("".to_string(), |u| u.to_string()));
+        record.push_field(&line.inning.map_or("".to_string(), |u| u.to_string()));
         record.push_field(line.side.retrosheet_str());
-        record.push_field( &line.runs.unwrap_or_default().to_string());
-        record.push_field( &line.stolen_bases.unwrap_or_default().to_string());
-        record.push_field( &line.caught_stealing.unwrap_or_default().to_string());
+        record.push_field(&line.runs.unwrap_or_default().to_string());
+        record.push_field(&line.stolen_bases.unwrap_or_default().to_string());
+        record.push_field(&line.caught_stealing.unwrap_or_default().to_string());
 
         record
     }
 }
 
-impl TryFrom<&RetrosheetEventRecord>for PinchRunningLine {
+impl TryFrom<&RetrosheetEventRecord> for PinchRunningLine {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<PinchRunningLine>{
+    fn try_from(record: &RetrosheetEventRecord) -> Result<PinchRunningLine> {
         let arr = record.deserialize::<[&str; 8]>(None)?;
-        let p = {|i: usize| arr[i].parse::<u8>().ok()};
-        Ok(PinchRunningLine{
+        let p = { |i: usize| arr[i].parse::<u8>().ok() };
+        Ok(PinchRunningLine {
             pinch_runner_id: str_to_tinystr(arr[2])?,
             inning: p(3),
             side: Side::from_str(arr[4])?,
             runs: p(5),
             stolen_bases: p(6),
-            caught_stealing: p(7)
+            caught_stealing: p(7),
         })
     }
 }
@@ -266,16 +273,19 @@ pub struct DefenseLineStats {
     pub errors: Option<u8>,
     pub double_plays: Option<u8>,
     pub triple_plays: Option<u8>,
-    pub passed_balls: Option<u8>
+    pub passed_balls: Option<u8>,
 }
 
 impl Into<Vec<u8>> for DefenseLineStats {
     fn into(self) -> Vec<u8> {
         vec![
-            self.outs_played.unwrap_or_default(), self.putouts.unwrap_or_default(),
-            self.assists.unwrap_or_default(), self.errors.unwrap_or_default(),
-            self.double_plays.unwrap_or_default(), self.triple_plays.unwrap_or_default(),
-            self.passed_balls.unwrap_or_default()
+            self.outs_played.unwrap_or_default(),
+            self.putouts.unwrap_or_default(),
+            self.assists.unwrap_or_default(),
+            self.errors.unwrap_or_default(),
+            self.double_plays.unwrap_or_default(),
+            self.triple_plays.unwrap_or_default(),
+            self.passed_balls.unwrap_or_default(),
         ]
     }
 }
@@ -284,7 +294,7 @@ impl TryFrom<&[&str; 7]> for DefenseLineStats {
     type Error = Error;
 
     fn try_from(value: &[&str; 7]) -> Result<DefenseLineStats> {
-        let o = {|i: usize| value[i].parse::<u8>().ok()};
+        let o = { |i: usize| value[i].parse::<u8>().ok() };
         Ok(DefenseLineStats {
             outs_played: o(0),
             putouts: o(1),
@@ -292,7 +302,7 @@ impl TryFrom<&[&str; 7]> for DefenseLineStats {
             errors: o(3),
             double_plays: o(4),
             triple_plays: o(5),
-            passed_balls: o(6)
+            passed_balls: o(6),
         })
     }
 }
@@ -303,50 +313,53 @@ pub struct DefenseLine {
     pub side: Side,
     pub fielding_position: FieldingPosition,
     pub nth_position_played_by_player: u8,
-    pub defensive_stats: Option<DefenseLineStats>
+    pub defensive_stats: Option<DefenseLineStats>,
 }
 
 impl DefenseLine {
     pub fn from_defense(side: Side, defense: &Defense) -> Vec<Self> {
-        defense.iter()
-            .map(|(fielding_position, fielder_id)|
+        defense
+            .iter()
+            .map(|(fielding_position, fielder_id)| {
                 Self::new(*fielder_id, side, *fielding_position, 1)
-            )
+            })
             .collect()
     }
 
-    pub fn new(fielder_id: Fielder,
-               side: Side,
-               fielding_position: FieldingPosition,
-               nth_position_played_by_player: u8) -> Self {
+    pub fn new(
+        fielder_id: Fielder,
+        side: Side,
+        fielding_position: FieldingPosition,
+        nth_position_played_by_player: u8,
+    ) -> Self {
         Self {
             fielder_id,
             side,
             fielding_position,
             nth_position_played_by_player,
-            defensive_stats: Some(DefenseLineStats::default())
+            defensive_stats: Some(DefenseLineStats::default()),
         }
     }
 }
 
-impl TryFrom<&RetrosheetEventRecord>for DefenseLine {
+impl TryFrom<&RetrosheetEventRecord> for DefenseLine {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<DefenseLine>{
+    fn try_from(record: &RetrosheetEventRecord) -> Result<DefenseLine> {
         let arr = record.deserialize::<[&str; 13]>(None)?;
         let p = parse_positive_int::<u8>;
-        Ok(DefenseLine{
+        Ok(DefenseLine {
             fielder_id: str_to_tinystr(arr[2])?,
             side: Side::from_str(arr[3])?,
-            nth_position_played_by_player: p(arr[4]).context("Invalid fielding sequence position")?,
+            nth_position_played_by_player: p(arr[4])
+                .context("Invalid fielding sequence position")?,
             fielding_position: FieldingPosition::try_from(arr[5])?,
-            defensive_stats: DefenseLineStats::try_from(array_ref![arr,6,7]).ok(),
+            defensive_stats: DefenseLineStats::try_from(array_ref![arr, 6, 7]).ok(),
         })
     }
 }
 
 impl From<DefenseLine> for RetrosheetEventRecord {
-
     fn from(line: DefenseLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(50, 13);
 
@@ -383,20 +396,29 @@ pub struct PitchingLineStats {
     pub wild_pitches: Option<u8>,
     pub balks: Option<u8>,
     pub sacrifice_hits: Option<u8>,
-    pub sacrifice_flies: Option<u8>
+    pub sacrifice_flies: Option<u8>,
 }
 
 impl Into<Vec<u8>> for PitchingLineStats {
     fn into(self) -> Vec<u8> {
         vec![
-            self.outs_recorded, self.no_out_batters.unwrap_or_default(),
-            self.batters_faced.unwrap_or_default(), self.hits,
-            self.doubles.unwrap_or_default(), self.triples.unwrap_or_default(),
-            self.home_runs.unwrap_or_default(), self.runs, self.earned_runs.unwrap_or_default(),
-            self.walks.unwrap_or_default(), self.intentional_walks.unwrap_or_default(),
-            self.strikeouts.unwrap_or_default(), self.hit_batsmen.unwrap_or_default(),
-            self.wild_pitches.unwrap_or_default(), self.balks.unwrap_or_default(),
-            self.sacrifice_hits.unwrap_or_default(), self.sacrifice_flies.unwrap_or_default()
+            self.outs_recorded,
+            self.no_out_batters.unwrap_or_default(),
+            self.batters_faced.unwrap_or_default(),
+            self.hits,
+            self.doubles.unwrap_or_default(),
+            self.triples.unwrap_or_default(),
+            self.home_runs.unwrap_or_default(),
+            self.runs,
+            self.earned_runs.unwrap_or_default(),
+            self.walks.unwrap_or_default(),
+            self.intentional_walks.unwrap_or_default(),
+            self.strikeouts.unwrap_or_default(),
+            self.hit_batsmen.unwrap_or_default(),
+            self.wild_pitches.unwrap_or_default(),
+            self.balks.unwrap_or_default(),
+            self.sacrifice_hits.unwrap_or_default(),
+            self.sacrifice_flies.unwrap_or_default(),
         ]
     }
 }
@@ -405,16 +427,20 @@ impl TryFrom<&[&str; 17]> for PitchingLineStats {
     type Error = Error;
 
     fn try_from(value: &[&str; 17]) -> Result<PitchingLineStats> {
-        let o = {|i: usize| value[i].parse::<u8>().ok()};
-        let u = {|i: usize|
-            value[i].parse::<u8>().context("Bad value for pitching line stat")
+        let o = { |i: usize| value[i].parse::<u8>().ok() };
+        let u = {
+            |i: usize| {
+                value[i]
+                    .parse::<u8>()
+                    .context("Bad value for pitching line stat")
+            }
         };
         Ok(PitchingLineStats {
             outs_recorded: u(0)?,
             no_out_batters: o(1),
             batters_faced: o(2),
             hits: u(3)?,
-            doubles:o(4),
+            doubles: o(4),
             triples: o(5),
             home_runs: o(6),
             runs: u(7)?,
@@ -426,7 +452,7 @@ impl TryFrom<&[&str; 17]> for PitchingLineStats {
             wild_pitches: o(13),
             balks: o(14),
             sacrifice_hits: o(15),
-            sacrifice_flies: o(16)
+            sacrifice_flies: o(16),
         })
     }
 }
@@ -436,45 +462,43 @@ pub struct PitchingLine {
     pub pitcher_id: Pitcher,
     pub side: Side,
     nth_pitcher: u8,
-    pub pitching_stats: PitchingLineStats
+    pub pitching_stats: PitchingLineStats,
 }
 
 impl PitchingLine {
-
     pub fn from_defense(side: Side, defense: &Defense) -> Result<Vec<Self>> {
-        let pitcher_id = defense.get_by_left(&FieldingPosition::Pitcher).context("No pitcher in defense provided")?;
+        let pitcher_id = defense
+            .get_by_left(&FieldingPosition::Pitcher)
+            .context("No pitcher in defense provided")?;
         Ok(vec![Self::new(*pitcher_id, side, 1)])
     }
 
-    pub fn new(pitcher_id: Pitcher,
-               side: Side,
-               nth_pitcher: u8) -> Self {
+    pub fn new(pitcher_id: Pitcher, side: Side, nth_pitcher: u8) -> Self {
         Self {
             pitcher_id,
             side,
             nth_pitcher,
-            pitching_stats: PitchingLineStats::default()
+            pitching_stats: PitchingLineStats::default(),
         }
     }
 }
 
-impl TryFrom<&RetrosheetEventRecord>for PitchingLine {
+impl TryFrom<&RetrosheetEventRecord> for PitchingLine {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<PitchingLine>{
+    fn try_from(record: &RetrosheetEventRecord) -> Result<PitchingLine> {
         let arr = record.deserialize::<[&str; 22]>(None)?;
         let p = parse_positive_int::<u8>;
-        Ok(PitchingLine{
+        Ok(PitchingLine {
             pitcher_id: str_to_tinystr(arr[2])?,
             side: Side::from_str(arr[3])?,
             nth_pitcher: p(arr[4]).context("Invalid fielding sequence position")?,
-            pitching_stats: PitchingLineStats::try_from(array_ref![arr,5,17])?,
+            pitching_stats: PitchingLineStats::try_from(array_ref![arr, 5, 17])?,
         })
     }
 }
 
-impl From<PitchingLine>for RetrosheetEventRecord {
-
+impl From<PitchingLine> for RetrosheetEventRecord {
     fn from(line: PitchingLine) -> RetrosheetEventRecord {
         let mut record = RetrosheetEventRecord::with_capacity(200, 24);
 
@@ -492,15 +516,13 @@ impl From<PitchingLine>for RetrosheetEventRecord {
     }
 }
 
-
-
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct TeamMiscellaneousLine {
     pub side: Side,
     pub left_on_base: u8,
     pub team_earned_runs: Option<u8>,
     pub double_plays_turned: Option<u8>,
-    pub triple_plays_turned: u8
+    pub triple_plays_turned: u8,
 }
 
 impl TeamMiscellaneousLine {
@@ -510,42 +532,42 @@ impl TeamMiscellaneousLine {
             left_on_base: 0,
             team_earned_runs: Some(0),
             double_plays_turned: Some(0),
-            triple_plays_turned: 0
+            triple_plays_turned: 0,
         }
     }
 }
 
 impl From<TeamMiscellaneousLine> for RetrosheetEventRecord {
-
     fn from(line: TeamMiscellaneousLine) -> RetrosheetEventRecord {
         let info = vec![
             "stat".to_string(),
             "tline".to_string(),
             line.side.retrosheet_str().to_string(),
             line.left_on_base.to_string(),
-            line.team_earned_runs.map_or("".to_string(), |u| u.to_string()),
-            line.double_plays_turned.map_or("".to_string(), |u| u.to_string()),
-            line.triple_plays_turned.to_string()
+            line.team_earned_runs
+                .map_or("".to_string(), |u| u.to_string()),
+            line.double_plays_turned
+                .map_or("".to_string(), |u| u.to_string()),
+            line.triple_plays_turned.to_string(),
         ];
         RetrosheetEventRecord::from(info)
     }
 }
 
-
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct TeamBattingLine {
     side: Side,
-    batting_stats: BattingLineStats
+    batting_stats: BattingLineStats,
 }
 
-impl TryFrom<&RetrosheetEventRecord>for TeamBattingLine {
+impl TryFrom<&RetrosheetEventRecord> for TeamBattingLine {
     type Error = Error;
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<TeamBattingLine> {
         let arr = record.deserialize::<[&str; 20]>(None)?;
         Ok(TeamBattingLine {
             side: Side::from_str(arr[2])?,
-            batting_stats: BattingLineStats::try_from(array_ref![arr,3,17])?
+            batting_stats: BattingLineStats::try_from(array_ref![arr, 3, 17])?,
         })
     }
 }
@@ -553,37 +575,34 @@ impl TryFrom<&RetrosheetEventRecord>for TeamBattingLine {
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct TeamDefenseLine {
     pub side: Side,
-    pub defensive_stats: DefenseLineStats
+    pub defensive_stats: DefenseLineStats,
 }
 
-impl TryFrom<&RetrosheetEventRecord>for TeamDefenseLine {
+impl TryFrom<&RetrosheetEventRecord> for TeamDefenseLine {
     type Error = Error;
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<TeamDefenseLine> {
         let arr = record.deserialize::<[&str; 10]>(None)?;
         Ok(TeamDefenseLine {
             side: Side::from_str(arr[2])?,
-            defensive_stats: DefenseLineStats::try_from(array_ref![arr,3, 7])?
+            defensive_stats: DefenseLineStats::try_from(array_ref![arr, 3, 7])?,
         })
     }
 }
 
-
-impl TryFrom<&RetrosheetEventRecord>for TeamMiscellaneousLine {
+impl TryFrom<&RetrosheetEventRecord> for TeamMiscellaneousLine {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<TeamMiscellaneousLine>{
+    fn try_from(record: &RetrosheetEventRecord) -> Result<TeamMiscellaneousLine> {
         let arr = record.deserialize::<[&str; 7]>(None)?;
-        let o = {|i: usize| arr[i].parse::<u8>().ok()};
-        let u = {|i: usize|
-            arr[i].parse::<u8>().context("Bad value for team line stat")
-        };
+        let o = { |i: usize| arr[i].parse::<u8>().ok() };
+        let u = { |i: usize| arr[i].parse::<u8>().context("Bad value for team line stat") };
         Ok(TeamMiscellaneousLine {
             side: Side::from_str(arr[2])?,
             left_on_base: u(3)?,
             team_earned_runs: o(4),
             double_plays_turned: o(5),
-            triple_plays_turned: u(6)?
+            triple_plays_turned: u(6)?,
         })
     }
 }
@@ -598,28 +617,30 @@ pub enum BoxScoreLine {
     TeamMiscellaneousLine(Option<TeamMiscellaneousLine>),
     TeamBattingLine(TeamBattingLine),
     TeamDefenseLine(TeamDefenseLine),
-    Unrecognized
+    Unrecognized,
 }
 
-impl TryFrom<&RetrosheetEventRecord>for BoxScoreLine {
+impl TryFrom<&RetrosheetEventRecord> for BoxScoreLine {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<BoxScoreLine>{
+    fn try_from(record: &RetrosheetEventRecord) -> Result<BoxScoreLine> {
         let stat_line_type = record.get(1).context("No stat line type")?;
-        let mapped= match stat_line_type {
+        let mapped = match stat_line_type {
             "bline" => BoxScoreLine::BattingLine(BattingLine::try_from(record)?),
             "phline" => BoxScoreLine::PinchHittingLine(PinchHittingLine::try_from(record)?),
             "prline" => BoxScoreLine::PinchRunningLine(PinchRunningLine::try_from(record)?),
             "pline" => BoxScoreLine::PitchingLine(PitchingLine::try_from(record)?),
             "dline" => BoxScoreLine::DefenseLine(DefenseLine::try_from(record)?),
-            "tline" => BoxScoreLine::TeamMiscellaneousLine(TeamMiscellaneousLine::try_from(record).ok()),
+            "tline" => {
+                BoxScoreLine::TeamMiscellaneousLine(TeamMiscellaneousLine::try_from(record).ok())
+            }
             "btline" => BoxScoreLine::TeamBattingLine(TeamBattingLine::try_from(record)?),
             "dtline" => BoxScoreLine::TeamDefenseLine(TeamDefenseLine::try_from(record)?),
-            _ => BoxScoreLine::Unrecognized
+            _ => BoxScoreLine::Unrecognized,
         };
         match mapped {
             BoxScoreLine::Unrecognized => bail!("Unrecognized box score line type {:?}", record),
-            _ => Ok(mapped)
+            _ => Ok(mapped),
         }
     }
 }
@@ -627,21 +648,23 @@ impl TryFrom<&RetrosheetEventRecord>for BoxScoreLine {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct LineScore {
     pub side: Side,
-    pub line_score: Vec<u8>
+    pub line_score: Vec<u8>,
 }
 
-impl TryFrom<&RetrosheetEventRecord>for LineScore {
+impl TryFrom<&RetrosheetEventRecord> for LineScore {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<LineScore>{
+    fn try_from(record: &RetrosheetEventRecord) -> Result<LineScore> {
         let mut iter = record.iter();
-        Ok(LineScore{
+        Ok(LineScore {
             side: Side::from_str(iter.nth(1).context("Missing team side")?)?,
             line_score: {
                 let mut vec = Vec::with_capacity(9);
-                for s in iter {vec.push(s.parse::<u8>()?)}
-            vec
-            }
+                for s in iter {
+                    vec.push(s.parse::<u8>()?)
+                }
+                vec
+            },
         })
     }
 }
@@ -649,14 +672,14 @@ impl TryFrom<&RetrosheetEventRecord>for LineScore {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct FieldingPlayLine {
     defense_side: Side,
-    fielders: Vec<Fielder>
+    fielders: Vec<Fielder>,
 }
 
 impl FieldingPlayLine {
     pub fn new(defense_side: Side, fielders: Vec<Fielder>) -> Self {
         Self {
             defense_side,
-            fielders
+            fielders,
         }
     }
 }
@@ -664,51 +687,49 @@ impl FieldingPlayLine {
 pub type DoublePlayLine = FieldingPlayLine;
 pub type TriplePlayLine = FieldingPlayLine;
 
-impl TryFrom<&RetrosheetEventRecord>for FieldingPlayLine {
+impl TryFrom<&RetrosheetEventRecord> for FieldingPlayLine {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<FieldingPlayLine>{
+    fn try_from(record: &RetrosheetEventRecord) -> Result<FieldingPlayLine> {
         let mut iter = record.iter();
-        Ok(FieldingPlayLine{
+        Ok(FieldingPlayLine {
             defense_side: Side::from_str(iter.nth(2).context("Missing team side")?)?,
-            fielders: iter.filter_map(|f| str_to_tinystr(f).ok()).collect::<Vec<Fielder>>()
+            fielders: iter
+                .filter_map(|f| str_to_tinystr(f).ok())
+                .collect::<Vec<Fielder>>(),
         })
     }
 }
-
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct HitByPitchLine {
     pitching_side: Side,
     pitcher_id: Option<Pitcher>,
-    batter_id: Batter
+    batter_id: Batter,
 }
 
 impl HitByPitchLine {
-    pub fn new(pitching_side: Side,
-               pitcher_id: Option<Pitcher>,
-               batter_id: Batter) -> Self {
+    pub fn new(pitching_side: Side, pitcher_id: Option<Pitcher>, batter_id: Batter) -> Self {
         Self {
             pitching_side,
             pitcher_id,
-            batter_id
+            batter_id,
         }
     }
 }
 
-impl TryFrom<&RetrosheetEventRecord>for HitByPitchLine {
+impl TryFrom<&RetrosheetEventRecord> for HitByPitchLine {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<HitByPitchLine>{
+    fn try_from(record: &RetrosheetEventRecord) -> Result<HitByPitchLine> {
         let arr = record.deserialize::<[&str; 5]>(None)?;
-        Ok(HitByPitchLine{
+        Ok(HitByPitchLine {
             pitching_side: Side::from_str(arr[2])?,
             pitcher_id: str_to_tinystr(arr[3]).ok(),
-            batter_id: str_to_tinystr(arr[4])?
+            batter_id: str_to_tinystr(arr[4])?,
         })
     }
 }
-
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct HomeRunLine {
@@ -717,40 +738,42 @@ pub struct HomeRunLine {
     pitcher_id: Pitcher,
     inning: Option<Inning>,
     runners_on: Option<u8>,
-    outs: Option<u8>
+    outs: Option<u8>,
 }
 
 impl HomeRunLine {
-    pub fn new(batting_side: Side,
-               batter_id: Batter,
-               pitcher_id: Pitcher,
-               inning: Option<Inning>,
-               runners_on: Option<u8>,
-               outs: Option<u8>) -> Self {
+    pub fn new(
+        batting_side: Side,
+        batter_id: Batter,
+        pitcher_id: Pitcher,
+        inning: Option<Inning>,
+        runners_on: Option<u8>,
+        outs: Option<u8>,
+    ) -> Self {
         Self {
             batting_side,
             batter_id,
             pitcher_id,
             inning,
             runners_on,
-            outs
+            outs,
         }
     }
 }
 
-impl TryFrom<&RetrosheetEventRecord>for HomeRunLine {
+impl TryFrom<&RetrosheetEventRecord> for HomeRunLine {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<HomeRunLine>{
+    fn try_from(record: &RetrosheetEventRecord) -> Result<HomeRunLine> {
         let arr = record.deserialize::<[&str; 8]>(None)?;
-        let p = {|i: usize| arr[i].parse::<u8>().ok()};
-        Ok(HomeRunLine{
+        let p = { |i: usize| arr[i].parse::<u8>().ok() };
+        Ok(HomeRunLine {
             batting_side: Side::from_str(arr[2])?,
             batter_id: str_to_tinystr(arr[3])?,
             pitcher_id: str_to_tinystr(arr[4])?,
             inning: p(5),
             runners_on: p(6),
-            outs: p(7)
+            outs: p(7),
         })
     }
 }
@@ -761,41 +784,41 @@ pub struct StolenBaseAttemptLine {
     runner_id: Batter,
     pitcher_id: Option<Pitcher>,
     catcher_id: Option<Fielder>,
-    inning: Option<Inning>
+    inning: Option<Inning>,
 }
 
 impl StolenBaseAttemptLine {
-    pub fn new(running_side: Side,
-               runner_id: Batter,
-               pitcher_id: Option<Pitcher>,
-               catcher_id: Option<Fielder>,
-               inning: Option<Inning>) -> Self {
+    pub fn new(
+        running_side: Side,
+        runner_id: Batter,
+        pitcher_id: Option<Pitcher>,
+        catcher_id: Option<Fielder>,
+        inning: Option<Inning>,
+    ) -> Self {
         Self {
             running_side,
             runner_id,
             pitcher_id,
             catcher_id,
-            inning
+            inning,
         }
     }
 }
 
-
 pub type StolenBaseLine = StolenBaseAttemptLine;
 pub type CaughtStealingLine = StolenBaseAttemptLine;
 
-impl TryFrom<&RetrosheetEventRecord>for StolenBaseAttemptLine {
+impl TryFrom<&RetrosheetEventRecord> for StolenBaseAttemptLine {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<StolenBaseAttemptLine>{
+    fn try_from(record: &RetrosheetEventRecord) -> Result<StolenBaseAttemptLine> {
         let arr = record.deserialize::<[&str; 7]>(None)?;
-        Ok(StolenBaseAttemptLine{
+        Ok(StolenBaseAttemptLine {
             running_side: Side::from_str(arr[2])?,
             runner_id: str_to_tinystr(arr[3])?,
             pitcher_id: str_to_tinystr(arr[4]).ok(),
             catcher_id: str_to_tinystr(arr[5]).ok(),
-            inning: arr[6].parse::<u8>().ok()
-
+            inning: arr[6].parse::<u8>().ok(),
         })
     }
 }
@@ -808,14 +831,12 @@ pub enum BoxScoreEvent {
     HomeRun(HomeRunLine),
     StolenBase(StolenBaseLine),
     CaughtStealing(CaughtStealingLine),
-    Unrecognized
+    Unrecognized,
 }
 
 impl From<BoxScoreEvent> for RetrosheetEventRecord {
     fn from(event: BoxScoreEvent) -> RetrosheetEventRecord {
-        let opt_str = |o: Option<TinyStr8>| {
-            o.map(|s| s.to_string()).unwrap_or_default()
-        };
+        let opt_str = |o: Option<TinyStr8>| o.map(|s| s.to_string()).unwrap_or_default();
         let mut record = RetrosheetEventRecord::with_capacity(64, 8);
         record.push_field("event");
         match event {
@@ -863,16 +884,16 @@ impl From<BoxScoreEvent> for RetrosheetEventRecord {
                 record.push_field(&opt_str(cs.catcher_id));
                 record.push_field(&cs.inning.unwrap_or_default().to_string());
             }
-            _ => ()
+            _ => (),
         };
         record
     }
 }
 
-impl TryFrom<&RetrosheetEventRecord>for BoxScoreEvent {
+impl TryFrom<&RetrosheetEventRecord> for BoxScoreEvent {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<BoxScoreEvent>{
+    fn try_from(record: &RetrosheetEventRecord) -> Result<BoxScoreEvent> {
         let event_line_type = record.get(1).context("No event type")?;
         let mapped = match event_line_type {
             "dpline" => BoxScoreEvent::DoublePlay(DoublePlayLine::try_from(record)?),
@@ -882,14 +903,10 @@ impl TryFrom<&RetrosheetEventRecord>for BoxScoreEvent {
             "sbline" => BoxScoreEvent::StolenBase(StolenBaseLine::try_from(record)?),
             "csline" => BoxScoreEvent::CaughtStealing(CaughtStealingLine::try_from(record)?),
             _ => BoxScoreEvent::Unrecognized,
-
         };
         match mapped {
             BoxScoreEvent::Unrecognized => bail!("Unrecognized box score event type"),
-            _ => Ok(mapped)
+            _ => Ok(mapped),
         }
     }
 }
-
-
-

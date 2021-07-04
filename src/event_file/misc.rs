@@ -1,38 +1,52 @@
+use std::convert::TryFrom;
 use std::str::FromStr;
 
-use anyhow::{Result, Error, anyhow};
-use strum_macros::EnumString;
-
-use crate::event_file::traits::{RetrosheetEventRecord, LineupPosition, Player, FieldingPosition, Pitcher, Side, Batter, Fielder};
-use std::convert::TryFrom;
-use tinystr::{TinyStr16};
-use crate::util::str_to_tinystr;
+use anyhow::{anyhow, Error, Result};
 use bimap::BiMap;
+use serde::{Deserialize, Serialize};
+use strum_macros::EnumString;
+use tinystr::TinyStr16;
+
 use crate::event_file::play::Base;
+use crate::event_file::traits::{
+    Batter, Fielder, FieldingPosition, LineupPosition, Pitcher, Player, RetrosheetEventRecord, Side,
+};
+use crate::util::str_to_tinystr;
 
 pub type Comment = String;
 
 #[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
-enum Hand {L, R, S, B}
+enum Hand {
+    L,
+    R,
+    S,
+    B,
+}
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct GameId {pub id: TinyStr16}
-impl TryFrom<&RetrosheetEventRecord>for GameId {
+#[derive(Ord, PartialOrd, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GameId {
+    pub id: TinyStr16,
+}
+impl TryFrom<&RetrosheetEventRecord> for GameId {
     type Error = Error;
-
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<GameId> {
         let record = record.deserialize::<[&str; 2]>(None)?;
-        Ok(GameId { id: str_to_tinystr(record[1])? })
+        Ok(GameId {
+            id: str_to_tinystr(record[1])?,
+        })
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub struct HandAdjustment {player_id: Player, hand: Hand}
+pub struct HandAdjustment {
+    player_id: Player,
+    hand: Hand,
+}
 pub type BatHandAdjustment = HandAdjustment;
 pub type PitchHandAdjustment = HandAdjustment;
 
-impl TryFrom<&RetrosheetEventRecord>for HandAdjustment {
+impl TryFrom<&RetrosheetEventRecord> for HandAdjustment {
     type Error = Error;
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<HandAdjustment> {
@@ -40,15 +54,18 @@ impl TryFrom<&RetrosheetEventRecord>for HandAdjustment {
 
         Ok(HandAdjustment {
             player_id: str_to_tinystr(record[1])?,
-            hand: Hand::from_str(record[2])?
+            hand: Hand::from_str(record[2])?,
         })
     }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct LineupAdjustment { side: Side, lineup_position: LineupPosition}
+pub struct LineupAdjustment {
+    side: Side,
+    lineup_position: LineupPosition,
+}
 
-impl TryFrom<&RetrosheetEventRecord>for LineupAdjustment {
+impl TryFrom<&RetrosheetEventRecord> for LineupAdjustment {
     type Error = Error;
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<LineupAdjustment> {
@@ -67,10 +84,10 @@ pub struct AppearanceRecord {
     pub player_name: String,
     pub side: Side,
     pub lineup_position: LineupPosition,
-    pub fielding_position: FieldingPosition
+    pub fielding_position: FieldingPosition,
 }
 
-impl TryFrom<&RetrosheetEventRecord>for AppearanceRecord {
+impl TryFrom<&RetrosheetEventRecord> for AppearanceRecord {
     type Error = Error;
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<AppearanceRecord> {
@@ -80,7 +97,7 @@ impl TryFrom<&RetrosheetEventRecord>for AppearanceRecord {
             player_name: record[2].to_string(),
             side: Side::from_str(record[3])?,
             lineup_position: LineupPosition::try_from(record[4])?,
-            fielding_position:  FieldingPosition::try_from(record[5].trim_end())?
+            fielding_position: FieldingPosition::try_from(record[5].trim_end())?,
         })
     }
 }
@@ -91,10 +108,10 @@ pub type SubstitutionRecord = AppearanceRecord;
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct EarnedRunRecord {
     pub pitcher_id: Pitcher,
-    pub earned_runs: u8
+    pub earned_runs: u8,
 }
 
-impl TryFrom<&RetrosheetEventRecord>for EarnedRunRecord {
+impl TryFrom<&RetrosheetEventRecord> for EarnedRunRecord {
     type Error = Error;
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<EarnedRunRecord> {
@@ -102,9 +119,9 @@ impl TryFrom<&RetrosheetEventRecord>for EarnedRunRecord {
         match arr[1] {
             "er" => Ok(EarnedRunRecord {
                 pitcher_id: str_to_tinystr(arr[2])?,
-                earned_runs: arr[3].trim_end().parse::<u8>()?
+                earned_runs: arr[3].trim_end().parse::<u8>()?,
             }),
-            _ => Err(anyhow!("Unexpected `data` type value {:?}", record))
+            _ => Err(anyhow!("Unexpected `data` type value {:?}", record)),
         }
     }
 }
@@ -113,10 +130,10 @@ impl TryFrom<&RetrosheetEventRecord>for EarnedRunRecord {
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct RunnerAdjustment {
     pub runner_id: Batter,
-    pub base: Base
+    pub base: Base,
 }
 
-impl TryFrom<&RetrosheetEventRecord>for RunnerAdjustment {
+impl TryFrom<&RetrosheetEventRecord> for RunnerAdjustment {
     type Error = Error;
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
@@ -124,7 +141,7 @@ impl TryFrom<&RetrosheetEventRecord>for RunnerAdjustment {
 
         Ok(Self {
             runner_id: str_to_tinystr(record[1])?,
-            base: Base::from_str(record[2])?
+            base: Base::from_str(record[2])?,
         })
     }
 }

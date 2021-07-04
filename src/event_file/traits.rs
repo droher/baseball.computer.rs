@@ -1,20 +1,34 @@
-use anyhow::{anyhow, Error, Result, Context};
+use std::convert::TryFrom;
+use std::num::NonZeroU8;
+
+use anyhow::{anyhow, Context, Error, Result};
 use csv::StringRecord;
-use strum_macros::{EnumString, EnumIter, Display};
-use num_enum::{TryFromPrimitive, IntoPrimitive};
-use std::convert::{TryFrom};
-use tinystr::{TinyStr8, TinyStr16};
-use serde::{Serialize, Deserialize, Serializer};
-
-use crate::util::digit_vec;
-use crate::event_file::info::{InfoRecord, Team};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::ser::SerializeStruct;
-use crate::event_file::parser::{RecordVec, MappedRecord};
+use serde::{Deserialize, Serialize, Serializer};
+use strum_macros::{Display, EnumIter, EnumString};
+use tinystr::{TinyStr16, TinyStr8};
 
+use crate::event_file::info::{InfoRecord, Team};
+use crate::event_file::parser::{MappedRecord, RecordVec};
+use crate::util::digit_vec;
 
 pub type RetrosheetEventRecord = StringRecord;
 
-#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(
+    Ord,
+    PartialOrd,
+    Debug,
+    Eq,
+    PartialEq,
+    TryFromPrimitive,
+    IntoPrimitive,
+    Copy,
+    Clone,
+    Hash,
+    Serialize,
+    Deserialize,
+)]
 #[repr(u8)]
 pub enum LineupPosition {
     PitcherWithDh = 0,
@@ -26,10 +40,12 @@ pub enum LineupPosition {
     Sixth,
     Seventh,
     Eighth,
-    Ninth
+    Ninth,
 }
 impl Default for LineupPosition {
-    fn default() -> Self {Self::First}
+    fn default() -> Self {
+        Self::First
+    }
 }
 
 impl LineupPosition {
@@ -37,9 +53,11 @@ impl LineupPosition {
     pub fn next(self) -> Result<Self> {
         let as_u8: u8 = self.into();
         match self {
-            Self::PitcherWithDh => Err(anyhow!("Pitcher has no lineup position with DH in the game")),
+            Self::PitcherWithDh => Err(anyhow!(
+                "Pitcher has no lineup position with DH in the game"
+            )),
             Self::Ninth => Ok(Self::First),
-            _ => Ok(Self::try_from(as_u8 + 1)?)
+            _ => Ok(Self::try_from(as_u8 + 1)?),
         }
     }
 
@@ -58,11 +76,26 @@ impl TryFrom<&str> for LineupPosition {
 
     //noinspection RsTypeCheck
     fn try_from(value: &str) -> Result<Self> {
-        LineupPosition::try_from(value.parse::<u8>()?).context("Unable to convert to lineup position")
+        LineupPosition::try_from(value.parse::<u8>()?)
+            .context("Unable to convert to lineup position")
     }
 }
 
-#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive, Copy, Clone, Hash, EnumIter, Serialize, Deserialize)]
+#[derive(
+    Ord,
+    PartialOrd,
+    Debug,
+    Eq,
+    PartialEq,
+    TryFromPrimitive,
+    IntoPrimitive,
+    Copy,
+    Clone,
+    Hash,
+    EnumIter,
+    Serialize,
+    Deserialize,
+)]
 #[repr(u8)]
 pub enum FieldingPosition {
     Unknown = 0,
@@ -77,12 +110,15 @@ pub enum FieldingPosition {
     RightFielder,
     DesignatedHitter,
     PinchHitter,
-    PinchRunner
+    PinchRunner,
 }
 impl FieldingPosition {
     //noinspection RsTypeCheck
     pub fn fielding_vec(int_str: &str) -> Vec<Self> {
-        digit_vec(int_str).iter().map(|d|Self::try_from(*d).unwrap_or(Self::Unknown)).collect()
+        digit_vec(int_str)
+            .iter()
+            .map(|d| Self::try_from(*d).unwrap_or(Self::Unknown))
+            .collect()
     }
 
     /// Indicates whether the position is actually a true fielding position, as opposed
@@ -98,7 +134,9 @@ impl FieldingPosition {
     }
 }
 impl Default for FieldingPosition {
-    fn default() -> Self { Self::Unknown }
+    fn default() -> Self {
+        Self::Unknown
+    }
 }
 
 impl TryFrom<&str> for FieldingPosition {
@@ -106,7 +144,8 @@ impl TryFrom<&str> for FieldingPosition {
 
     //noinspection RsTypeCheck
     fn try_from(value: &str) -> Result<Self> {
-        FieldingPosition::try_from(value.parse::<u8>()?).context("Unable to convert to fielding position")
+        FieldingPosition::try_from(value.parse::<u8>()?)
+            .context("Unable to convert to fielding position")
     }
 }
 
@@ -115,7 +154,7 @@ pub enum Handedness {
     Left,
     Right,
     Switch,
-    Unknown
+    Unknown,
 }
 
 #[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
@@ -127,15 +166,7 @@ pub enum GameType {
     DivisionSeries,
     LeagueChampionshipSeries,
     WorldSeries,
-    Other
-}
-
-#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
-pub enum GameFileStatus {
-    Event,
-    DerivedAndBoxScore,
-    BoxScoreOnly,
-    GameLogOnly
+    Other,
 }
 
 #[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
@@ -143,16 +174,13 @@ pub enum FieldingPlayType {
     FieldersChoice,
     Putout,
     Assist,
-    Error
+    Error,
 }
-
-
 
 pub type Inning = u8;
 
 pub(crate) type Person = TinyStr8;
 pub type MiscInfoString = TinyStr16;
-
 
 pub type Player = Person;
 pub type Umpire = Person;
@@ -164,30 +192,44 @@ pub type Fielder = Player;
 pub type RetrosheetVolunteer = MiscInfoString;
 pub type Scorer = MiscInfoString;
 
-#[derive(Debug, Eq, PartialEq, EnumString, Hash, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Debug, Eq, PartialEq, EnumString, Hash, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize,
+)]
 pub enum Side {
     #[strum(serialize = "0")]
     Away,
     #[strum(serialize = "1")]
-    Home
+    Home,
 }
 
 impl Side {
     pub fn flip(&self) -> Self {
         match self {
             Self::Away => Self::Home,
-            Self::Home => Self::Away
+            Self::Home => Self::Away,
         }
     }
     pub fn retrosheet_str(&self) -> &str {
         match self {
             Self::Away => "0",
-            Self::Home => "1"
+            Self::Home => "1",
         }
     }
 }
 
-#[derive(Display, Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString, EnumIter, IntoPrimitive)]
+#[derive(
+    Display,
+    Debug,
+    Eq,
+    PartialOrd,
+    PartialEq,
+    Copy,
+    Clone,
+    Hash,
+    EnumString,
+    EnumIter,
+    IntoPrimitive,
+)]
 #[repr(u8)]
 pub enum BattingStats {
     AtBats,
@@ -206,10 +248,22 @@ pub enum BattingStats {
     StolenBases,
     CaughtStealing,
     GroundedIntoDoublePlays,
-    ReachedOnInterference
+    ReachedOnInterference,
 }
 
-#[derive(Display, Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString, EnumIter, IntoPrimitive)]
+#[derive(
+    Display,
+    Debug,
+    Eq,
+    PartialOrd,
+    PartialEq,
+    Copy,
+    Clone,
+    Hash,
+    EnumString,
+    EnumIter,
+    IntoPrimitive,
+)]
 #[repr(u8)]
 pub enum DefenseStats {
     OutsPlayed,
@@ -218,10 +272,22 @@ pub enum DefenseStats {
     Errors,
     DoublePlays,
     TriplePlays,
-    PassedBalls
+    PassedBalls,
 }
 
-#[derive(Display, Debug, Eq, PartialOrd, PartialEq, Copy, Clone, Hash, EnumString, EnumIter, IntoPrimitive)]
+#[derive(
+    Display,
+    Debug,
+    Eq,
+    PartialOrd,
+    PartialEq,
+    Copy,
+    Clone,
+    Hash,
+    EnumString,
+    EnumIter,
+    IntoPrimitive,
+)]
 #[repr(u8)]
 pub enum PitchingStats {
     OutsRecorded,
@@ -240,54 +306,62 @@ pub enum PitchingStats {
     WildPitches,
     Balks,
     SacrificeHits,
-    SacrificeFlies
+    SacrificeFlies,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Matchup<T> {pub away: T, pub home: T}
+pub struct Matchup<T> {
+    pub away: T,
+    pub home: T,
+}
 
 impl<T> Matchup<T> {
     pub fn new(away: T, home: T) -> Self {
-        Self {away, home}
+        Self { away, home }
     }
 
     pub fn get(&self, side: &Side) -> &T {
         match side {
             Side::Away => &self.away,
-            Side::Home => &self.home
+            Side::Home => &self.home,
         }
     }
 
     pub fn get_mut(&mut self, side: &Side) -> &mut T {
         match side {
             Side::Away => &mut self.away,
-            Side::Home => &mut self.home
+            Side::Home => &mut self.home,
         }
     }
 
     pub fn get_both_mut(&mut self) -> (&mut T, &mut T) {
         (&mut self.away, &mut self.home)
     }
-
 }
 
 impl<T: Default> Default for Matchup<T> {
     fn default() -> Self {
-        Self {away: T::default(), home: T::default() }
+        Self {
+            away: T::default(),
+            home: T::default(),
+        }
     }
 }
 
-impl <T: Sized + Clone> Matchup<T> {
+impl<T: Sized + Clone> Matchup<T> {
     pub fn apply_both<F, U: Sized>(self, func: F) -> (U, U)
-        where F: Copy + FnOnce(T) -> U
+    where
+        F: Copy + FnOnce(T) -> U,
     {
         (func(self.away), func(self.home))
     }
 }
 
-impl <T: Serialize> Serialize for Matchup<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error> where
-        S: Serializer {
+impl<T: Serialize> Serialize for Matchup<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
         let mut state = serializer.serialize_struct("Matchup", 2)?;
         state.serialize_field("away", &self.away)?;
         state.serialize_field("home", &self.home)?;
@@ -300,7 +374,10 @@ impl<T: Copy> Copy for Matchup<T> {}
 
 impl<T> From<(T, T)> for Matchup<T> {
     fn from(tup: (T, T)) -> Self {
-        Matchup {away: tup.0, home: tup.1}
+        Matchup {
+            away: tup.0,
+            home: tup.1,
+        }
     }
 }
 
@@ -308,13 +385,23 @@ impl TryFrom<&RecordVec> for Matchup<Team> {
     type Error = Error;
 
     fn try_from(records: &RecordVec) -> Result<Self> {
-        let home_team = records.iter().find_map(|m|
-            if let MappedRecord::Info(InfoRecord::HomeTeam(t)) = m {Some(t)} else {None});
-        let away_team = records.iter().find_map(|m|
-            if let MappedRecord::Info(InfoRecord::VisitingTeam(t)) = m {Some(t)} else {None});
+        let home_team = records.iter().find_map(|m| {
+            if let MappedRecord::Info(InfoRecord::HomeTeam(t)) = m {
+                Some(t)
+            } else {
+                None
+            }
+        });
+        let away_team = records.iter().find_map(|m| {
+            if let MappedRecord::Info(InfoRecord::VisitingTeam(t)) = m {
+                Some(t)
+            } else {
+                None
+            }
+        });
         Ok(Self {
             away: *away_team.context("Could not find away team info in records")?,
-            home: *home_team.context("Could not find home team info in records")?
+            home: *home_team.context("Could not find home team info in records")?,
         })
     }
 }
@@ -323,11 +410,25 @@ impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
     type Error = Error;
 
     fn try_from(infos: &Vec<InfoRecord>) -> Result<Self> {
-        let home_team = infos.iter().find_map(|m| if let InfoRecord::HomeTeam(t) = m {Some(t)} else {None});
-        let away_team = infos.iter().find_map(|m| if let InfoRecord::VisitingTeam(t) = m {Some(t)} else {None});
+        let home_team = infos.iter().find_map(|m| {
+            if let InfoRecord::HomeTeam(t) = m {
+                Some(t)
+            } else {
+                None
+            }
+        });
+        let away_team = infos.iter().find_map(|m| {
+            if let InfoRecord::VisitingTeam(t) = m {
+                Some(t)
+            } else {
+                None
+            }
+        });
         Ok(Self {
             away: *away_team.context("Could not find away team info in records")?,
-            home: *home_team.context("Could not find home team info in records")?
+            home: *home_team.context("Could not find home team info in records")?,
         })
     }
 }
+
+pub type SequenceId = NonZeroU8;
