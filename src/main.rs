@@ -1,29 +1,31 @@
 #![forbid(unsafe_code)]
 #![allow(dead_code)]
 
-use std::convert::{TryFrom};
+use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::time::Instant;
 
 use anyhow::{Context, Result};
-use csv::{WriterBuilder, QuoteStyle, Writer};
+use csv::{QuoteStyle, Writer, WriterBuilder};
+use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
-use serde::{Serialize, Deserialize};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 
-use event_file::parser::{MappedRecord, RetrosheetReader};
+use crate::event_file::game_state::GameUmpire;
+use crate::event_file::parser::RecordVec;
+use crate::event_file::schemas::{
+    EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam,
+};
 use event_file::game_state::GameContext;
-use event_file::schemas::{Event, ContextToVec};
-use crate::event_file::schemas::{Game, GameTeam, EventOut, EventFieldingPlay, EventPitch, EventHitLocation};
-use std::fs::File;
+use event_file::parser::{MappedRecord, RetrosheetReader};
+use event_file::schemas::{ContextToVec, Event};
 use itertools::Itertools;
 use std::collections::HashMap;
-use crate::event_file::parser::RecordVec;
-use crate::event_file::game_state::GameUmpire;
+use std::fs::File;
 
-mod util;
 mod event_file;
+mod util;
 
 const ABOUT: &str = "Transforms Retrosheet .EV* files (play-by-play) into .EB* files (box score).";
 
@@ -44,7 +46,7 @@ enum Schema {
     EventHitLocation,
     EventBaserunningPlay,
     EventPitch,
-    EventFlag
+    EventFlag,
 }
 
 impl Schema {
@@ -54,7 +56,9 @@ impl Schema {
         for record_vec_result in reader {
             let game_context = GameContext::try_from(&record_vec_result?)?;
             // Write Game
-            writer_map.get_mut(&Self::Game).unwrap()
+            writer_map
+                .get_mut(&Self::Game)
+                .unwrap()
                 .serialize(Game::from(&game_context))?;
             // Write GameTeam
             let w = writer_map.get_mut(&Self::GameTeam).unwrap();
@@ -112,7 +116,9 @@ impl Schema {
                 w.serialize(&row)?;
             }
             // Write EventBaserunningAdvanceAttempt
-            let w = writer_map.get_mut(&Self::EventBaserunningAdvanceAttempt).unwrap();
+            let w = writer_map
+                .get_mut(&Self::EventBaserunningAdvanceAttempt)
+                .unwrap();
             let advance_attempts = &game_context
                 .events
                 .iter()
@@ -143,10 +149,18 @@ impl Schema {
                 w.serialize(&row)?;
             }
             //Write EventFlag
+            let w = writer_map.get_mut(&Self::EventFlag).unwrap();
+            let event_flags = &game_context
+                .events
+                .iter()
+                .flat_map(|e| &e.results.play_info)
+                .collect_vec();
+            for row in event_flags {
+                w.serialize(row)?;
+            }
         }
         Ok(())
     }
-
 
     fn get_writer_map() -> HashMap<Self, Writer<File>> {
         let mut map = HashMap::new();
@@ -160,12 +174,9 @@ impl Schema {
         let mut opt: Opt = Opt::from_args();
         opt.output_dir.push(filename);
         opt.output_dir.set_extension("csv");
-        WriterBuilder::new()
-            .from_path(&opt.output_dir)
-            .unwrap()
+        WriterBuilder::new().from_path(&opt.output_dir).unwrap()
     }
 }
-
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "pbp-to-box", about = ABOUT)]
@@ -174,12 +185,10 @@ struct Opt {
     input: PathBuf,
 
     #[structopt(short, long, parse(from_os_str))]
-    output_dir: PathBuf
+    output_dir: PathBuf,
 }
 
-impl Opt {
-}
-
+impl Opt {}
 
 fn main() {
     let start = Instant::now();

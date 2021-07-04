@@ -15,7 +15,7 @@ pub enum SequenceItemTypeGeneral {
     Strike,
     InPlay,
     NoPitch,
-    Unknown
+    Unknown,
 }
 
 impl SequenceItemTypeGeneral {
@@ -30,10 +30,11 @@ impl SequenceItemTypeGeneral {
     pub fn is_in_play(&self) -> bool {
         self == &Self::InPlay
     }
-
 }
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize,
+)]
 pub enum PitchType {
     #[strum(serialize = "1")]
     PickoffAttemptFirst,
@@ -80,11 +81,10 @@ pub enum PitchType {
     #[strum(serialize = "X")]
     InPlay,
     #[strum(serialize = "Y")]
-    InPlayOnPitchout
+    InPlayOnPitchout,
 }
 
 impl PitchType {
-
     pub fn get_sequence_general(&self) -> SequenceItemTypeGeneral {
         match self {
             PitchType::PickoffAttemptFirst => SequenceItemTypeGeneral::NoPitch,
@@ -114,9 +114,10 @@ impl PitchType {
     }
 }
 
-
 impl Default for PitchType {
-    fn default() -> Self { PitchType::Unknown }
+    fn default() -> Self {
+        PitchType::Unknown
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize)]
@@ -125,7 +126,7 @@ pub struct PitchSequenceItem {
     pub pitch_type: PitchType,
     pub runners_going: bool,
     pub blocked_by_catcher: bool,
-    pub catcher_pickoff_attempt: Option<Base>
+    pub catcher_pickoff_attempt: Option<Base>,
 }
 
 impl PitchSequenceItem {
@@ -135,7 +136,7 @@ impl PitchSequenceItem {
             pitch_type: Default::default(),
             runners_going: false,
             blocked_by_catcher: false,
-            catcher_pickoff_attempt: None
+            catcher_pickoff_attempt: None,
         }
     }
 }
@@ -162,33 +163,41 @@ impl TryFrom<&str> for PitchSequence {
     type Error = Error;
 
     fn try_from(str_sequence: &str) -> Result<Self> {
-        let mut pitches= Vec::with_capacity(10);
+        let mut pitches = Vec::with_capacity(10);
 
         // If a single PA lasts multiple events (e.g. because of a stolen base or substitution),
         // event rows will carry over the pitch sequence of all previous events in that PA.
         // An interruption in the PA is indicated with "."
         // To avoid double-counting, if there's a ".", we only take the sequence to the right of
         // the right-most "." (Should I end that sentence with a period? How does that work)
-        let trimmed_sequence =
-            if let Some((_, s)) = str_sequence.rsplit_once(".") { s }
-            else { str_sequence };
+        let trimmed_sequence = if let Some((_, s)) = str_sequence.rsplit_once(".") {
+            s
+        } else {
+            str_sequence
+        };
         let mut char_iter = trimmed_sequence.chars().peekable();
         let mut pitch = PitchSequenceItem::new(1);
 
-        let get_catcher_pickoff_base = { |c: Option<char>|
-            Base::from_str(&c.unwrap_or('.').to_string()).ok()
-        };
+        let get_catcher_pickoff_base =
+            { |c: Option<char>| Base::from_str(&c.unwrap_or('.').to_string()).ok() };
 
         while let Some(c) = char_iter.next() {
             match c {
                 // Tokens indicating info on the upcoming pitch
-                '*' =>  {pitch.update_blocked_by_catcher(); continue}
-                '>' => {pitch.update_runners_going(); continue}
+                '*' => {
+                    pitch.update_blocked_by_catcher();
+                    continue;
+                }
+                '>' => {
+                    pitch.update_runners_going();
+                    continue;
+                }
                 _ => {}
             }
-            let pitch_type: Result<PitchType> = PitchType::from_str(&c.to_string()).context("Bad pitch type");
+            let pitch_type: Result<PitchType> =
+                PitchType::from_str(&c.to_string()).context("Bad pitch type");
             // TODO: Log this as a warning once I implement logging
-            pitch_type.map(|p|{pitch.update_pitch_type(p)}).ok();
+            pitch_type.map(|p| pitch.update_pitch_type(p)).ok();
 
             match char_iter.peek() {
                 // Tokens indicating info on the previous pitch
@@ -216,5 +225,3 @@ impl TryFrom<&str> for PitchSequence {
         Ok(Self(pitches))
     }
 }
-
-
