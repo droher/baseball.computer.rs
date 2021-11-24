@@ -5,9 +5,8 @@ use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use csv::{Writer, WriterBuilder};
-use serde::{Serialize};
 use structopt::StructOpt;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};

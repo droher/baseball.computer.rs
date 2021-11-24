@@ -1,7 +1,7 @@
 use anyhow::{bail, Error, Result};
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
-use strum_macros::{EnumString, ToString};
+use strum_macros::{EnumString, Display};
 
 use crate::event_file::traits::{
     Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire,
@@ -12,7 +12,7 @@ use std::str::FromStr;
 use tinystr::{TinyStr16, TinyStr8};
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString, Ord, PartialOrd, Serialize, Deserialize,
+    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum HowScored {
@@ -28,7 +28,7 @@ impl Default for HowScored {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString, Ord, PartialOrd, Serialize, Deserialize,
+    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum FieldCondition {
@@ -45,7 +45,7 @@ impl Default for FieldCondition {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString, Ord, PartialOrd, Serialize, Deserialize,
+    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum Precipitation {
@@ -63,7 +63,7 @@ impl Default for Precipitation {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString, Ord, PartialOrd, Serialize, Deserialize,
+    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum Sky {
@@ -81,7 +81,7 @@ impl Default for Sky {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString, Ord, PartialOrd, Serialize, Deserialize,
+    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum WindDirection {
@@ -107,7 +107,7 @@ pub type Team = TinyStr8;
 pub type Park = TinyStr8;
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString, Ord, PartialOrd, Serialize, Deserialize,
+    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum DayNight {
@@ -122,7 +122,7 @@ impl Default for DayNight {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, Ord, PartialOrd, EnumString, Copy, Clone, ToString, Serialize, Deserialize,
+    Debug, Eq, PartialEq, Ord, PartialOrd, EnumString, Copy, Clone, Display, Serialize, Deserialize,
 )]
 pub enum DoubleheaderStatus {
     #[strum(serialize = "0")]
@@ -143,7 +143,7 @@ impl Default for DoubleheaderStatus {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, ToString, Ord, PartialOrd, Serialize, Deserialize,
+    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum PitchDetail {
@@ -166,7 +166,7 @@ impl Default for PitchDetail {
     Hash,
     Copy,
     Clone,
-    ToString,
+    Display,
     Ord,
     PartialOrd,
     Serialize,
