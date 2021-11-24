@@ -1,8 +1,7 @@
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 
-use crate::event_file::box_score::PitchingLineStats;
-use crate::event_file::game_state::{EventFlag, EventId, EventPlateAppearance, GameContext};
+use crate::event_file::game_state::{EventId, GameContext};
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, Park, Precipitation, Sky, Team,
     WindDirection,
@@ -13,7 +12,7 @@ use crate::event_file::play::{
     Base, BaseRunner, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame,
 };
 use crate::event_file::traits::{
-    Fielder, FieldingPlayType, FieldingPosition, GameType, Handedness, Inning, LineupPosition,
+    Fielder, FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition,
     Player, SequenceId, Side,
 };
 use tinystr::TinyStr16;

@@ -6,19 +6,17 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use anyhow::{Context, Result};
-use csv::{QuoteStyle, Writer, WriterBuilder};
-use serde::{Deserialize, Serialize};
+use csv::{Writer, WriterBuilder};
+use serde::{Serialize};
 use structopt::StructOpt;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 
-use crate::event_file::game_state::GameUmpire;
-use crate::event_file::parser::RecordVec;
 use crate::event_file::schemas::{
     EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam,
 };
 use event_file::game_state::GameContext;
-use event_file::parser::{MappedRecord, RetrosheetReader};
+use event_file::parser::{RetrosheetReader};
 use event_file::schemas::{ContextToVec, Event};
 use itertools::Itertools;
 use std::collections::HashMap;
