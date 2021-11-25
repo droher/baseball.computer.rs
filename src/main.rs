@@ -5,20 +5,17 @@ use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use anyhow::{Context, Result};
-use csv::{QuoteStyle, Writer, WriterBuilder};
-use serde::{Deserialize, Serialize};
+use anyhow::Result;
+use csv::{Writer, WriterBuilder};
 use structopt::StructOpt;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 
-use crate::event_file::game_state::GameUmpire;
-use crate::event_file::parser::RecordVec;
 use crate::event_file::schemas::{
     EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam,
 };
 use event_file::game_state::GameContext;
-use event_file::parser::{MappedRecord, RetrosheetReader};
+use event_file::parser::RetrosheetReader;
 use event_file::schemas::{ContextToVec, Event};
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -54,7 +51,7 @@ impl Schema {
         let mut writer_map = Self::get_writer_map();
 
         for record_vec_result in reader {
-            let game_context = GameContext::try_from(&record_vec_result?)?;
+            let game_context = GameContext::try_from(record_vec_result?.as_slice())?;
             // Write Game
             writer_map
                 .get_mut(&Self::Game)

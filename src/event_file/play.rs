@@ -45,7 +45,7 @@ const GROUP_OUT_AT_BASE2: &str = concatcp!(GROUP_OUT_AT_BASE_PREFIX, "2", GROUP_
 //noinspection RsTypeCheck
 const GROUP_OUT_AT_BASE3: &str = concatcp!(GROUP_OUT_AT_BASE_PREFIX, "3", GROUP_OUT_AT_BASE_SUFFIX);
 
-const OUT: &str = &formatcp!(
+const OUT: &str = formatcp!(
     r"^{}{}{}({}{}{})?({}{}{})?$",
     GROUP_ASSISTS1,
     GROUP_PUTOUT1,
@@ -58,7 +58,7 @@ const OUT: &str = &formatcp!(
     GROUP_OUT_AT_BASE3
 );
 
-const REACH_ON_ERROR: &str = &formatcp!(r"{}E(?P<e>[0-9])$", GROUP_ASSISTS1);
+const REACH_ON_ERROR: &str = formatcp!(r"{}E(?P<e>[0-9])$", GROUP_ASSISTS1);
 const BASERUNNING_FIELDING_INFO: &str =
     r"(?P<base>[123H])(?:\((?P<fielders>[0-9]*)(?P<error>E[0-9])?\)?)?(?P<unearned_run>\(T?UR\))?$";
 
@@ -929,7 +929,7 @@ impl PlayType {
             return Ok(Self::parse_main_play(first)?
                 .into_iter()
                 .chain(
-                    Self::parse_main_play(&last.unwrap().get(1..).unwrap_or_default())?.into_iter(),
+                    Self::parse_main_play(last.unwrap().get(1..).unwrap_or_default())?.into_iter(),
                 )
                 .collect::<Vec<PlayType>>());
         }
@@ -1463,9 +1463,9 @@ impl PlayModifier {
     }
 
     fn multi_out_play(&self) -> Option<u8> {
-        if Self::double_plays().contains(&self) {
+        if Self::double_plays().contains(self) {
             Some(2)
-        } else if Self::triple_plays().contains(&self) {
+        } else if Self::triple_plays().contains(self) {
             Some(3)
         } else {
             None
@@ -1485,7 +1485,7 @@ impl PlayModifier {
         if let Ok(cd) = ContactDescription::try_from((first, last.unwrap_or_default())) {
             return Ok(PlayModifier::ContactDescription(cd));
         }
-        let last_as_int_vec = { || FieldingPosition::fielding_vec(&last.unwrap_or_default()) };
+        let last_as_int_vec = { || FieldingPosition::fielding_vec(last.unwrap_or_default()) };
         let play_modifier = match PlayModifier::from_str(first) {
             // Fill in other variants that have non-default cases
             Ok(PlayModifier::ErrorOn(_)) => PlayModifier::ErrorOn(
@@ -1500,7 +1500,7 @@ impl PlayModifier {
                 PlayModifier::ThrowToBase(Some(Base::Home))
             }
             Ok(PlayModifier::ThrowToBase(_)) => {
-                PlayModifier::ThrowToBase(Base::from_str(&last.unwrap_or_default()).ok())
+                PlayModifier::ThrowToBase(Base::from_str(last.unwrap_or_default()).ok())
             }
             Ok(pm) => pm,
             Err(_) => PlayModifier::Unrecognized(value.into()),

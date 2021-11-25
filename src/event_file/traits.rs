@@ -10,7 +10,7 @@ use strum_macros::{Display, EnumIter, EnumString};
 use tinystr::{TinyStr16, TinyStr8};
 
 use crate::event_file::info::{InfoRecord, Team};
-use crate::event_file::parser::{MappedRecord, RecordVec};
+use crate::event_file::parser::{MappedRecord, RecordSlice};
 use crate::util::digit_vec;
 
 pub type RetrosheetEventRecord = StringRecord;
@@ -381,10 +381,10 @@ impl<T> From<(T, T)> for Matchup<T> {
     }
 }
 
-impl TryFrom<&RecordVec> for Matchup<Team> {
+impl TryFrom<&RecordSlice> for Matchup<Team> {
     type Error = Error;
 
-    fn try_from(records: &RecordVec) -> Result<Self> {
+    fn try_from(records: &RecordSlice) -> Result<Self> {
         let home_team = records.iter().find_map(|m| {
             if let MappedRecord::Info(InfoRecord::HomeTeam(t)) = m {
                 Some(t)
