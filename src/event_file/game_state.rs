@@ -778,8 +778,7 @@ impl Personnel {
             player_id: sub.player,
             lineup_position: sub.lineup_position,
             side: sub.side,
-            // TODO: Fix
-            entered_game_as: EnteredGameAs::Starter,
+            entered_game_as: EnteredGameAs::get_substitution_type(sub),
             start_event_id: event_id,
             end_event_id: None,
         };
