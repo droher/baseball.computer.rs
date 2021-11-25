@@ -51,7 +51,7 @@ impl Schema {
         let mut writer_map = Self::get_writer_map();
 
         for record_vec_result in reader {
-            let game_context = GameContext::try_from(&record_vec_result?)?;
+            let game_context = GameContext::try_from(record_vec_result?.as_slice())?;
             // Write Game
             writer_map
                 .get_mut(&Self::Game)

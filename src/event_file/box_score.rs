@@ -32,26 +32,26 @@ pub struct BattingLineStats {
     pub reached_on_interference: Option<u8>,
 }
 
-impl Into<Vec<u8>> for BattingLineStats {
-    fn into(self) -> Vec<u8> {
+impl From<BattingLineStats> for Vec<u8> {
+    fn from(stats: BattingLineStats) -> Vec<u8> {
         vec![
-            self.at_bats,
-            self.runs,
-            self.hits,
-            self.doubles.unwrap_or_default(),
-            self.triples.unwrap_or_default(),
-            self.home_runs.unwrap_or_default(),
-            self.rbi.unwrap_or_default(),
-            self.sacrifice_hits.unwrap_or_default(),
-            self.sacrifice_flies.unwrap_or_default(),
-            self.hit_by_pitch.unwrap_or_default(),
-            self.walks.unwrap_or_default(),
-            self.intentional_walks.unwrap_or_default(),
-            self.strikeouts.unwrap_or_default(),
-            self.stolen_bases.unwrap_or_default(),
-            self.caught_stealing.unwrap_or_default(),
-            self.grounded_into_double_plays.unwrap_or_default(),
-            self.reached_on_interference.unwrap_or_default(),
+            stats.at_bats,
+            stats.runs,
+            stats.hits,
+            stats.doubles.unwrap_or_default(),
+            stats.triples.unwrap_or_default(),
+            stats.home_runs.unwrap_or_default(),
+            stats.rbi.unwrap_or_default(),
+            stats.sacrifice_hits.unwrap_or_default(),
+            stats.sacrifice_flies.unwrap_or_default(),
+            stats.hit_by_pitch.unwrap_or_default(),
+            stats.walks.unwrap_or_default(),
+            stats.intentional_walks.unwrap_or_default(),
+            stats.strikeouts.unwrap_or_default(),
+            stats.stolen_bases.unwrap_or_default(),
+            stats.caught_stealing.unwrap_or_default(),
+            stats.grounded_into_double_plays.unwrap_or_default(),
+            stats.reached_on_interference.unwrap_or_default(),
         ]
     }
 }
@@ -276,16 +276,16 @@ pub struct DefenseLineStats {
     pub passed_balls: Option<u8>,
 }
 
-impl Into<Vec<u8>> for DefenseLineStats {
-    fn into(self) -> Vec<u8> {
+impl From<DefenseLineStats> for Vec<u8> {
+    fn from(stats: DefenseLineStats) -> Vec<u8> {
         vec![
-            self.outs_played.unwrap_or_default(),
-            self.putouts.unwrap_or_default(),
-            self.assists.unwrap_or_default(),
-            self.errors.unwrap_or_default(),
-            self.double_plays.unwrap_or_default(),
-            self.triple_plays.unwrap_or_default(),
-            self.passed_balls.unwrap_or_default(),
+            stats.outs_played.unwrap_or_default(),
+            stats.putouts.unwrap_or_default(),
+            stats.assists.unwrap_or_default(),
+            stats.errors.unwrap_or_default(),
+            stats.double_plays.unwrap_or_default(),
+            stats.triple_plays.unwrap_or_default(),
+            stats.passed_balls.unwrap_or_default(),
         ]
     }
 }
@@ -399,26 +399,26 @@ pub struct PitchingLineStats {
     pub sacrifice_flies: Option<u8>,
 }
 
-impl Into<Vec<u8>> for PitchingLineStats {
-    fn into(self) -> Vec<u8> {
+impl From<PitchingLineStats> for Vec<u8> {
+    fn from(stats: PitchingLineStats) -> Vec<u8> {
         vec![
-            self.outs_recorded,
-            self.no_out_batters.unwrap_or_default(),
-            self.batters_faced.unwrap_or_default(),
-            self.hits,
-            self.doubles.unwrap_or_default(),
-            self.triples.unwrap_or_default(),
-            self.home_runs.unwrap_or_default(),
-            self.runs,
-            self.earned_runs.unwrap_or_default(),
-            self.walks.unwrap_or_default(),
-            self.intentional_walks.unwrap_or_default(),
-            self.strikeouts.unwrap_or_default(),
-            self.hit_batsmen.unwrap_or_default(),
-            self.wild_pitches.unwrap_or_default(),
-            self.balks.unwrap_or_default(),
-            self.sacrifice_hits.unwrap_or_default(),
-            self.sacrifice_flies.unwrap_or_default(),
+            stats.outs_recorded,
+            stats.no_out_batters.unwrap_or_default(),
+            stats.batters_faced.unwrap_or_default(),
+            stats.hits,
+            stats.doubles.unwrap_or_default(),
+            stats.triples.unwrap_or_default(),
+            stats.home_runs.unwrap_or_default(),
+            stats.runs,
+            stats.earned_runs.unwrap_or_default(),
+            stats.walks.unwrap_or_default(),
+            stats.intentional_walks.unwrap_or_default(),
+            stats.strikeouts.unwrap_or_default(),
+            stats.hit_batsmen.unwrap_or_default(),
+            stats.wild_pitches.unwrap_or_default(),
+            stats.balks.unwrap_or_default(),
+            stats.sacrifice_hits.unwrap_or_default(),
+            stats.sacrifice_flies.unwrap_or_default(),
         ]
     }
 }

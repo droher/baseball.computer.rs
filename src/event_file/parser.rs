@@ -16,6 +16,7 @@ use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::RetrosheetEventRecord;
 
 pub type RecordVec = Vec<MappedRecord>;
+pub type RecordSlice = [MappedRecord];
 
 pub struct RetrosheetReader {
     reader: Reader<BufReader<File>>,

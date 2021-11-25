@@ -14,10 +14,10 @@ use crate::event_file::info::{
     Team, UmpireAssignment, UmpirePosition, WindDirection,
 };
 use crate::event_file::misc::{
-    BatHandAdjustment, Comment, GameId, LineupAdjustment, PitchHandAdjustment, RunnerAdjustment,
+    BatHandAdjustment, GameId, LineupAdjustment, PitchHandAdjustment, RunnerAdjustment,
     SubstitutionRecord,
 };
-use crate::event_file::parser::{MappedRecord, RecordVec};
+use crate::event_file::parser::{MappedRecord, RecordSlice};
 use crate::event_file::pitch_sequence::PitchSequenceItem;
 use crate::event_file::play::{
     Base, BaseRunner, BaserunningPlayType, CachedPlay, ContactType, Count, EarnedRunStatus,
@@ -37,7 +37,7 @@ type Lineup = PersonnelState;
 type Defense = PersonnelState;
 pub type EventId = NonZeroU16;
 
-fn get_game_id(rv: &RecordVec) -> Result<GameId> {
+fn get_game_id(rv: &RecordSlice) -> Result<GameId> {
     rv.iter()
         .find_map(|mr| {
             if let MappedRecord::GameId(g) = *mr {
@@ -200,8 +200,8 @@ impl Default for GameSetting {
     }
 }
 
-impl From<&RecordVec> for GameSetting {
-    fn from(vec: &RecordVec) -> Self {
+impl From<&RecordSlice> for GameSetting {
+    fn from(vec: &RecordSlice) -> Self {
         let infos = vec.iter().filter_map(|rv| {
             if let MappedRecord::Info(i) = rv {
                 Some(i)
@@ -271,7 +271,7 @@ impl GameUmpire {
         }
     }
 
-    fn from_record_vec(vec: &RecordVec) -> Result<Vec<Self>> {
+    fn from_record_vec(vec: &RecordSlice) -> Result<Vec<Self>> {
         let game_id = get_game_id(vec)?;
         Ok(vec
             .iter()
@@ -297,8 +297,8 @@ pub struct GameResults {
     pub completion_info: Option<String>,
 }
 
-impl From<&Vec<MappedRecord>> for GameResults {
-    fn from(vec: &Vec<MappedRecord>) -> Self {
+impl From<&[MappedRecord]> for GameResults {
+    fn from(vec: &[MappedRecord]) -> Self {
         let mut results = Self::default();
         vec.iter()
             .filter_map(|rv| {
@@ -344,7 +344,7 @@ impl GameLineupAppearance {
             lineup_position,
             side,
             entered_game_as: EnteredGameAs::Starter,
-            start_event_id: NonZeroU16::new(1 as u16).unwrap(),
+            start_event_id: NonZeroU16::new(1 ).unwrap(),
             end_event_id: None,
         }
     }
@@ -372,7 +372,7 @@ impl GameFieldingAppearance {
             player_id: player,
             fielding_position,
             side,
-            start_event_id: NonZeroU16::new(1 as u16).unwrap(),
+            start_event_id: NonZeroU16::new(1).unwrap(),
             end_event_id: None,
         }
     }
@@ -407,10 +407,10 @@ pub struct GameContext {
     pub events: Vec<Event>,
 }
 
-impl TryFrom<&RecordVec> for GameContext {
+impl TryFrom<&RecordSlice> for GameContext {
     type Error = Error;
 
-    fn try_from(record_vec: &RecordVec) -> Result<Self> {
+    fn try_from(record_vec: &RecordSlice) -> Result<Self> {
         let game_id = get_game_id(record_vec)?;
         let teams: Matchup<Team> = Matchup::try_from(record_vec)?;
         let setting = GameSetting::try_from(record_vec)?;
@@ -636,10 +636,9 @@ impl Default for Personnel {
 }
 
 impl Personnel {
-    fn new(record_vec: &RecordVec) -> Result<Self> {
+    fn new(record_vec: &RecordSlice) -> Result<Self> {
         let game_id = get_game_id(record_vec)?;
-        let mut personnel = Self::default();
-        personnel.game_id = game_id;
+        let mut personnel = Personnel {game_id, ..Default::default()};
 
         let start_iter = record_vec.iter().filter_map(|rv| {
             if let MappedRecord::Start(sr) = rv {
@@ -862,7 +861,7 @@ pub struct GameState {
 
 impl GameState {
     pub fn create_events(
-        record_vec: &RecordVec,
+        record_vec: &RecordSlice,
     ) -> Result<(
         Vec<Event>,
         Vec<GameLineupAppearance>,
@@ -923,7 +922,7 @@ impl GameState {
                     context,
                     results,
                 });
-                state.event_id = NonZeroU16::new(state.event_id.get() + 1 as u16).unwrap();
+                state.event_id = NonZeroU16::new(state.event_id.get() + 1_u16).unwrap();
             }
         }
         Ok((
@@ -945,7 +944,7 @@ impl GameState {
         ))
     }
 
-    pub(crate) fn new(record_vec: &RecordVec) -> Result<Self> {
+    pub(crate) fn new(record_vec: &RecordSlice) -> Result<Self> {
         let game_id = get_game_id(record_vec)?;
         let batting_side = record_vec
             .iter()
@@ -960,7 +959,7 @@ impl GameState {
 
         Ok(Self {
             game_id,
-            event_id: NonZeroU16::new(1 as u16).unwrap(),
+            event_id: NonZeroU16::new(1_u16).unwrap(),
             inning: 1,
             frame: InningFrame::Top,
             batting_side,
@@ -1007,16 +1006,16 @@ impl GameState {
         if play.play.no_play() {
             return Ok(());
         }
-        let new_frame = self.get_new_frame(&play)?;
-        let new_outs = self.outs_after_play(&play)?;
+        let new_frame = self.get_new_frame(play)?;
+        let new_outs = self.outs_after_play(play)?;
 
         let pitcher = self.personnel.pitcher(&play.batting_side.flip())?;
-        let batter_lineup_position = self.personnel.at_bat(&play)?;
+        let batter_lineup_position = self.personnel.at_bat(play)?;
 
         let new_base_state = self.bases.new_base_state(
-            self.is_frame_flipped(&play)?,
+            self.is_frame_flipped(play)?,
             new_outs == 3,
-            &play,
+            play,
             batter_lineup_position,
             pitcher,
         )?;
@@ -1067,7 +1066,7 @@ impl GameState {
         Ok(())
     }
 
-    fn update_on_comment(&mut self, _record: &Comment) {
+    fn update_on_comment(&mut self, _record: &str) {
         // TODO
     }
 
@@ -1076,7 +1075,7 @@ impl GameState {
         record: &MappedRecord,
         cached_play: &Option<CachedPlay>,
     ) -> Result<()> {
-        Ok(match record {
+        match record {
             MappedRecord::Play(_) => {
                 if let Some(cp) = cached_play {
                     self.update_on_play(cp)
@@ -1090,8 +1089,9 @@ impl GameState {
             MappedRecord::LineupAdjustment(r) => self.update_on_lineup_adjustment(r),
             MappedRecord::RunnerAdjustment(r) => self.update_on_runner_adjustment(r)?,
             MappedRecord::Comment(r) => self.update_on_comment(r),
-            _ => (),
-        })
+            _ => {},
+        };
+        Ok(())
     }
 }
 
@@ -1213,19 +1213,19 @@ impl BaseState {
             new_state.clear_baserunner(out);
         }
 
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, &cached_play) {
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, cached_play) {
             new_state.clear_baserunner(&BaseRunner::Third);
             if a.is_out() {
-            } else if let Err(e) = Self::check_integrity(&self, &new_state, &a) {
+            } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
                 return Err(e);
             } else if let Some(r) = self.get_third() {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, &cached_play) {
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, cached_play) {
             new_state.clear_baserunner(&BaseRunner::Second);
             if a.is_out() {
-            } else if let Err(e) = Self::check_integrity(&self, &new_state, &a) {
+            } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
                 return Err(e);
             } else if let (Ok(true), Some(r)) = (
                 a.is_this_that_one_time_jean_segura_ran_in_reverse(),
@@ -1238,10 +1238,10 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, &cached_play) {
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, cached_play) {
             new_state.clear_baserunner(&BaseRunner::First);
             if a.is_out() {
-            } else if let Err(e) = Self::check_integrity(&self, &new_state, &a) {
+            } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
                 return Err(e);
             } else if let (Base::Second, Some(r)) = (&a.to, self.get_first()) {
                 new_state.set_runner(BaseRunner::Second, *r)
@@ -1251,21 +1251,21 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Batter, &cached_play) {
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Batter, cached_play) {
             let new_runner = Runner {
                 lineup_position: batter_lineup_position,
                 charged_to: pitcher,
             };
             match a.to {
                 _ if a.is_out() || end_inning => {}
-                _ if new_state.target_base_occupied(&a)? => {
+                _ if new_state.target_base_occupied(a)? => {
                     return Err(anyhow!("Batter advanced to an occupied base"))
                 }
                 Base::Home => new_state.scored.push(new_runner),
                 b => new_state.set_runner(BaseRunner::from_current_base(&b)?, new_runner),
             }
         }
-        Ok(new_state.update_runner_charges(&play))
+        Ok(new_state.update_runner_charges(play))
     }
 }
 

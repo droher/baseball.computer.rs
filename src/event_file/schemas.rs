@@ -156,11 +156,7 @@ pub struct EventPitch {
 impl ContextToVec for EventPitch {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = EventPitch> + '_> {
         let pitch_sequences = gc.events.iter().filter_map(|e| {
-            if let Some(psi) = &e.results.pitch_sequence {
-                Some((e.event_id, psi))
-            } else {
-                None
-            }
+            e.results.pitch_sequence.as_ref().map(|psi| (e.event_id, psi))
         });
         let pitch_iter = pitch_sequences.flat_map(move |(event_id, pitches)| {
             pitches.iter().map(move |psi| {
