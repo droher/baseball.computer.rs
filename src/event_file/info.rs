@@ -1,7 +1,7 @@
 use anyhow::{bail, Error, Result};
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
-use strum_macros::{EnumString, Display};
+use strum_macros::{Display, EnumString};
 
 use crate::event_file::traits::{
     Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire,

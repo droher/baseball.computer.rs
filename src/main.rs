@@ -15,7 +15,7 @@ use crate::event_file::schemas::{
     EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam,
 };
 use event_file::game_state::GameContext;
-use event_file::parser::{RetrosheetReader};
+use event_file::parser::RetrosheetReader;
 use event_file::schemas::{ContextToVec, Event};
 use itertools::Itertools;
 use std::collections::HashMap;

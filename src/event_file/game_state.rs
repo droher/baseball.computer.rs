@@ -344,7 +344,7 @@ impl GameLineupAppearance {
             lineup_position,
             side,
             entered_game_as: EnteredGameAs::Starter,
-            start_event_id: NonZeroU16::new(1 ).unwrap(),
+            start_event_id: NonZeroU16::new(1).unwrap(),
             end_event_id: None,
         }
     }
@@ -638,7 +638,10 @@ impl Default for Personnel {
 impl Personnel {
     fn new(record_vec: &RecordSlice) -> Result<Self> {
         let game_id = get_game_id(record_vec)?;
-        let mut personnel = Personnel {game_id, ..Default::default()};
+        let mut personnel = Personnel {
+            game_id,
+            ..Default::default()
+        };
 
         let start_iter = record_vec.iter().filter_map(|rv| {
             if let MappedRecord::Start(sr) = rv {
@@ -1089,7 +1092,7 @@ impl GameState {
             MappedRecord::LineupAdjustment(r) => self.update_on_lineup_adjustment(r),
             MappedRecord::RunnerAdjustment(r) => self.update_on_runner_adjustment(r)?,
             MappedRecord::Comment(r) => self.update_on_comment(r),
-            _ => {},
+            _ => {}
         };
         Ok(())
     }
