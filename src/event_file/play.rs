@@ -439,7 +439,7 @@ impl TryFrom<&str> for FieldingPlay {
 
             let runners_out = to_str_vec(runner_matches)
                 .into_iter()
-                .map(|s| BaseRunner::from_str(s))
+                .map(BaseRunner::from_str)
                 .collect::<Result<Vec<BaseRunner>, ParseError>>()?;
             return Ok(Self {
                 fielders_data,
@@ -1114,7 +1114,7 @@ impl RunnerAdvanceModifier {
         value
             .split(')')
             .filter(|s| !s.is_empty())
-            .map(|s| Self::parse_single_advance_modifier(s))
+            .map(Self::parse_single_advance_modifier)
             .collect()
     }
 
@@ -1478,7 +1478,7 @@ impl PlayModifier {
         value
             .split('/')
             .filter(|s| !s.is_empty())
-            .map(|s| Self::parse_single_modifier(s))
+            .map(Self::parse_single_modifier)
             .collect::<Result<Vec<Self>>>()
     }
 
