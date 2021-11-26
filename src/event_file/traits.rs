@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use anyhow::{anyhow, Context, Error, Result};
-use bounded_integer::{BoundedUsize};
+use bounded_integer::BoundedUsize;
 use csv::StringRecord;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::ser::SerializeStruct;

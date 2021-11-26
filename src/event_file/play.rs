@@ -89,7 +89,10 @@ pub struct FieldersData {
     pub fielding_play_type: FieldingPlayType,
 }
 impl FieldersData {
-    const fn new(fielding_position: FieldingPosition, fielding_play_type: FieldingPlayType) -> Self {
+    const fn new(
+        fielding_position: FieldingPosition,
+        fielding_play_type: FieldingPlayType,
+    ) -> Self {
         Self {
             fielding_position,
             fielding_play_type,
@@ -759,8 +762,10 @@ impl ImplicitPlayResults for BaserunningPlay {
         }
 
         match (self.at_base, self.baserunning_play_type) {
-            (Some(b), BaserunningPlayType::CaughtStealing
-            | BaserunningPlayType::PickedOffCaughtStealing) => {
+            (
+                Some(b),
+                BaserunningPlayType::CaughtStealing | BaserunningPlayType::PickedOffCaughtStealing,
+            ) => {
                 vec![BaseRunner::from_target_base(b).unwrap()]
             }
             (Some(b), BaserunningPlayType::PickedOff) => {
@@ -1005,13 +1010,17 @@ impl RunnerAdvance {
     /// no RBI is awarded. As a result, the final RBI logic determination must occur at the Play
     /// level.
     pub fn explicit_rbi_status(&self) -> Option<RbiStatus> {
-        self.modifiers.iter().find_map(RunnerAdvanceModifier::rbi_status)
+        self.modifiers
+            .iter()
+            .find_map(RunnerAdvanceModifier::rbi_status)
     }
 
     /// Following Chadwick's lead, I currently make no effort to determine earned/unearned run
     /// status on a given play unless it is specified explicitly.
     pub fn earned_run_status(&self) -> Option<EarnedRunStatus> {
-        self.modifiers.iter().find_map(RunnerAdvanceModifier::unearned_status)
+        self.modifiers
+            .iter()
+            .find_map(RunnerAdvanceModifier::unearned_status)
     }
 
     fn parse_advances(value: &str) -> Result<Vec<RunnerAdvance>> {
@@ -1498,9 +1507,7 @@ impl PlayModifier {
             Ok(Self::RelayToFielderWithNoOutMade(_)) => {
                 Self::RelayToFielderWithNoOutMade(last_as_int_vec())
             }
-            Ok(Self::ThrowToBase(_)) if first == "THH" => {
-                Self::ThrowToBase(Some(Base::Home))
-            }
+            Ok(Self::ThrowToBase(_)) if first == "THH" => Self::ThrowToBase(Some(Base::Home)),
             Ok(Self::ThrowToBase(_)) => {
                 Self::ThrowToBase(Base::from_str(last.unwrap_or_default()).ok())
             }
@@ -1621,8 +1628,7 @@ impl Play {
     }
 
     pub fn runs(&self) -> Vec<BaseRunner> {
-        self.filtered_baserunners(RunnerAdvance::scored)
-            .collect()
+        self.filtered_baserunners(RunnerAdvance::scored).collect()
     }
 
     pub fn team_unearned_runs(&self) -> Vec<BaseRunner> {
@@ -1644,7 +1650,11 @@ impl Play {
 
     fn default_rbi_status(&self) -> RbiStatus {
         let has_rbi_eligible_play = self.main_plays.iter().any(PlayType::is_rbi_eligible);
-        if has_rbi_eligible_play && !self.is_gidp() { RbiStatus::Rbi } else { RbiStatus::NoRbi }
+        if has_rbi_eligible_play && !self.is_gidp() {
+            RbiStatus::Rbi
+        } else {
+            RbiStatus::NoRbi
+        }
     }
 
     pub fn rbi(&self) -> Vec<BaseRunner> {
@@ -1822,7 +1832,9 @@ pub struct Count {
 
 impl Count {
     fn new(count_str: &str) -> Result<Self> {
-        let mut ints = count_str.chars().map(|c| c.to_digit(10).map(|i| i.try_into().unwrap()));
+        let mut ints = count_str
+            .chars()
+            .map(|c| c.to_digit(10).map(|i| i.try_into().unwrap()));
 
         Ok(Self {
             balls: ints.next().flatten(),

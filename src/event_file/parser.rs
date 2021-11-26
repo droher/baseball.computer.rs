@@ -83,8 +83,8 @@ impl TryFrom<&PathBuf> for RetrosheetReader {
         loop {
             reader.read_record(&mut current_record)?;
             match MappedRecord::try_from(&current_record)? {
-                MappedRecord::Comment(_) => {},
-                _ => break
+                MappedRecord::Comment(_) => {}
+                _ => break,
             }
         }
         let current_game_id = match MappedRecord::try_from(&current_record)? {

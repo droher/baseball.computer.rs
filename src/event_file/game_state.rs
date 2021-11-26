@@ -26,8 +26,8 @@ use crate::event_file::play::{
 };
 use crate::event_file::traits::{FieldingPosition, GameType, Handedness, LineupPosition, Side};
 use crate::event_file::traits::{Inning, Matchup, Pitcher, Player, SequenceId, Umpire};
-use std::num::{NonZeroU16};
 use bounded_integer::BoundedUsize;
+use std::num::NonZeroU16;
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
@@ -978,8 +978,10 @@ impl GameState {
         if self.batting_side == play.batting_side {
             Ok(false)
         } else if self.outs < 3 {
-                bail!("New frame without 3 outs recorded")
-        } else { Ok(true) }
+            bail!("New frame without 3 outs recorded")
+        } else {
+            Ok(true)
+        }
     }
 
     fn get_new_frame(&self, play: &CachedPlay) -> Result<InningFrame> {
