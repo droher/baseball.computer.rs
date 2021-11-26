@@ -1,6 +1,4 @@
-#![warn(clippy::pedantic)]
-#![warn(clippy::nursery)]
-#![warn(clippy::cargo)]
+#![allow(dead_code)]
 #![forbid(unsafe_code)]
 
 use std::convert::TryFrom;
