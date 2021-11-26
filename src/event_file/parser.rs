@@ -77,7 +77,15 @@ impl TryFrom<&PathBuf> for RetrosheetReader {
             .flexible(true)
             .from_reader(BufReader::new(File::open(path)?));
         let mut current_record = StringRecord::new();
-        reader.read_record(&mut current_record)?;
+        // Skip comments at top of 1991 files
+        // TODO: Unmess
+        loop {
+            reader.read_record(&mut current_record)?;
+            match MappedRecord::try_from(&current_record)? {
+                MappedRecord::Comment(_) => {},
+                _ => break
+            }
+        }
         let current_game_id = match MappedRecord::try_from(&current_record)? {
             MappedRecord::GameId(g) => Ok(g),
             _ => Err(anyhow!("First record was not a game ID, cannot read file.")),

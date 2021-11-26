@@ -707,7 +707,8 @@ impl Personnel {
             Ok(lp)
         } else {
             bail!(
-                "Cannot find lineup position of player currently at bat {:?}.\nFull state: {:?}",
+                "Fatal error parsing {}: Cannot find lineup position of player currently at bat {:?}.\nFull state: {:?}",
+                self.game_id.id,
                 &play.batter,
                 self.personnel_state
             )
@@ -778,8 +779,7 @@ impl Personnel {
             player_id: sub.player,
             lineup_position: sub.lineup_position,
             side: sub.side,
-            // TODO: Fix
-            entered_game_as: EnteredGameAs::Starter,
+            entered_game_as: EnteredGameAs::get_substitution_type(sub),
             start_event_id: event_id,
             end_event_id: None,
         };
