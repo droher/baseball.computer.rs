@@ -53,7 +53,7 @@ impl LineupPosition {
     pub fn next(self) -> Result<Self> {
         let as_u8: u8 = self.into();
         match self {
-            Self::PitcherWithDh => Err(anyhow!(
+            Self::PitcherWithDh => return Err(anyhow!(
                 "Pitcher has no lineup position with DH in the game"
             )),
             Self::Ninth => Ok(Self::First),
@@ -77,7 +77,7 @@ impl TryFrom<&str> for LineupPosition {
 
     //noinspection RsTypeCheck
     fn try_from(value: &str) -> Result<Self> {
-        LineupPosition::try_from(value.parse::<u8>()?)
+        return Self::try_from(value.parse::<u8>()?)
             .context("Unable to convert to lineup position")
     }
 }
@@ -145,7 +145,7 @@ impl TryFrom<&str> for FieldingPosition {
 
     //noinspection RsTypeCheck
     fn try_from(value: &str) -> Result<Self> {
-        FieldingPosition::try_from(value.parse::<u8>()?)
+        return Self::try_from(value.parse::<u8>()?)
             .context("Unable to convert to fielding position")
     }
 }
@@ -180,7 +180,7 @@ pub enum FieldingPlayType {
 
 pub type Inning = u8;
 
-pub(crate) type Person = TinyStr8;
+pub type Person = TinyStr8;
 pub type MiscInfoString = TinyStr16;
 
 pub type Player = Person;
@@ -375,7 +375,7 @@ impl<T: Copy> Copy for Matchup<T> {}
 
 impl<T> From<(T, T)> for Matchup<T> {
     fn from(tup: (T, T)) -> Self {
-        Matchup {
+        return Self {
             away: tup.0,
             home: tup.1,
         }

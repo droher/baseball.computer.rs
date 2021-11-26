@@ -30,9 +30,9 @@ pub struct GameId {
 impl TryFrom<&RetrosheetEventRecord> for GameId {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<GameId> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let record = record.deserialize::<[&str; 2]>(None)?;
-        Ok(GameId {
+        return Ok(Self {
             id: str_to_tinystr(record[1])?,
         })
     }
@@ -49,10 +49,10 @@ pub type PitchHandAdjustment = HandAdjustment;
 impl TryFrom<&RetrosheetEventRecord> for HandAdjustment {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<HandAdjustment> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let record = record.deserialize::<[&str; 3]>(None)?;
 
-        Ok(HandAdjustment {
+        return Ok(Self {
             player_id: str_to_tinystr(record[1])?,
             hand: Hand::from_str(record[2])?,
         })
@@ -68,10 +68,10 @@ pub struct LineupAdjustment {
 impl TryFrom<&RetrosheetEventRecord> for LineupAdjustment {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<LineupAdjustment> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let record = record.deserialize::<[&str; 3]>(None)?;
 
-        Ok(LineupAdjustment {
+        return Ok(Self {
             side: Side::from_str(record[1])?,
             lineup_position: LineupPosition::try_from(record[2])?,
         })
@@ -90,9 +90,9 @@ pub struct AppearanceRecord {
 impl TryFrom<&RetrosheetEventRecord> for AppearanceRecord {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<AppearanceRecord> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let record = record.deserialize::<[&str; 6]>(None)?;
-        Ok(AppearanceRecord {
+        return Ok(Self {
             player: str_to_tinystr(record[1])?,
             player_name: record[2].to_string(),
             side: Side::from_str(record[3])?,
@@ -114,14 +114,14 @@ pub struct EarnedRunRecord {
 impl TryFrom<&RetrosheetEventRecord> for EarnedRunRecord {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<EarnedRunRecord> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let arr = record.deserialize::<[&str; 4]>(None)?;
         match arr[1] {
-            "er" => Ok(EarnedRunRecord {
+            "er" => return Ok(Self {
                 pitcher_id: str_to_tinystr(arr[2])?,
                 earned_runs: arr[3].trim_end().parse::<u8>()?,
             }),
-            _ => Err(anyhow!("Unexpected `data` type value {:?}", record)),
+            _ => return Err(anyhow!("Unexpected `data` type value {:?}", record)),
         }
     }
 }

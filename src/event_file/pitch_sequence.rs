@@ -115,7 +115,7 @@ impl PitchType {
 
 impl Default for PitchType {
     fn default() -> Self {
-        PitchType::Unknown
+        return Self::Unknown
     }
 }
 
@@ -208,7 +208,7 @@ impl TryFrom<&str> for PitchSequence {
                     // not apply the advance attempt info to the pitch.
                     // TODO: Figure out what's going on here and fix if needed or delete the todo
                     let mut speculative_iter = char_iter.clone();
-                    if let Some('+') = speculative_iter.nth(1) {
+                    if speculative_iter.nth(1) == Some('+') {
                         pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(2)))
                     }
                 }

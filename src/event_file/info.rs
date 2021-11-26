@@ -235,12 +235,12 @@ pub enum InfoRecord {
 }
 
 impl InfoRecord {
-    fn parse_time(time_str: &str) -> InfoRecord {
+    fn parse_time(time_str: &str) -> Self {
         let padded_time = format!("{:0>4}", time_str);
         let time = NaiveTime::parse_from_str(&padded_time, "%I:%M%p");
         match time {
-            Ok(t) => InfoRecord::StartTime(Some(t)),
-            Err(_) => InfoRecord::StartTime(None),
+            Ok(t) => return Self::StartTime(Some(t)),
+            Err(_) => return Self::StartTime(None),
         }
     }
 }
@@ -248,7 +248,7 @@ impl InfoRecord {
 impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<InfoRecord> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         type I = InfoRecord;
         let record = record.deserialize::<[&str; 3]>(None)?;
 
@@ -259,55 +259,55 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
         let t16 = { || str_to_tinystr::<TinyStr16>(value) };
 
         let info = match info_type {
-            "visteam" => I::VisitingTeam(str_to_tinystr(value)?),
-            "hometeam" => I::HomeTeam(str_to_tinystr(value)?),
-            "site" => I::Park(str_to_tinystr(value)?),
-            "oscorer" => I::OriginalScorer(str_to_tinystr(value)?),
+            "visteam" => Self::VisitingTeam(str_to_tinystr(value)?),
+            "hometeam" => Self::HomeTeam(str_to_tinystr(value)?),
+            "site" => Self::Park(str_to_tinystr(value)?),
+            "oscorer" => Self::OriginalScorer(str_to_tinystr(value)?),
 
             "umphome" | "ump1b" | "ump2b" | "ump3b" | "umplf" | "umprf" => {
-                I::UmpireAssignment(UmpireAssignment {
+                Self::UmpireAssignment(UmpireAssignment {
                     position: UmpirePosition::from_str(info_type)?,
                     umpire: t8().ok(),
                 })
             }
 
-            "number" => I::DoubleheaderStatus(DoubleheaderStatus::from_str(value)?),
-            "daynight" => I::DayNight(DayNight::from_str(value)?),
-            "pitches" => I::PitchDetail(PitchDetail::from_str(value)?),
-            "fieldcond" | "fieldcon" => I::FieldCondition(FieldCondition::from_str(value)?),
-            "precip" => I::Precipitation(Precipitation::from_str(value)?),
-            "sky" => I::Sky(Sky::from_str(value)?),
-            "winddir" => I::WindDirection(WindDirection::from_str(value)?),
-            "howscored" => I::HowScored(HowScored::from_str(value)?),
+            "number" => Self::DoubleheaderStatus(DoubleheaderStatus::from_str(value)?),
+            "daynight" => Self::DayNight(DayNight::from_str(value)?),
+            "pitches" => Self::PitchDetail(PitchDetail::from_str(value)?),
+            "fieldcond" | "fieldcon" => Self::FieldCondition(FieldCondition::from_str(value)?),
+            "precip" => Self::Precipitation(Precipitation::from_str(value)?),
+            "sky" => Self::Sky(Sky::from_str(value)?),
+            "winddir" => Self::WindDirection(WindDirection::from_str(value)?),
+            "howscored" => Self::HowScored(HowScored::from_str(value)?),
 
-            "windspeed" => I::WindSpeed(parse_positive_int::<u8>(value)),
-            "timeofgame" => I::TimeOfGameMinutes(parse_positive_int::<u16>(value)),
-            "attendance" => I::Attendance(parse_positive_int::<u32>(value)),
-            "temp" => I::Temp(parse_positive_int::<u8>(value)),
-            "innings" => I::Innings(parse_positive_int::<u8>(value)),
+            "windspeed" => Self::WindSpeed(parse_positive_int::<u8>(value)),
+            "timeofgame" => Self::TimeOfGameMinutes(parse_positive_int::<u16>(value)),
+            "attendance" => Self::Attendance(parse_positive_int::<u32>(value)),
+            "temp" => Self::Temp(parse_positive_int::<u8>(value)),
+            "innings" => Self::Innings(parse_positive_int::<u8>(value)),
 
-            "usedh" => I::UseDh(bool::from_str(value)?),
-            "htbf" => I::HomeTeamBatsFirst(bool::from_str(value)?),
-            "date" => I::GameDate(NaiveDate::parse_from_str(value, "%Y/%m/%d")?),
-            "starttime" => I::parse_time(value),
+            "usedh" => Self::UseDh(bool::from_str(value)?),
+            "htbf" => Self::HomeTeamBatsFirst(bool::from_str(value)?),
+            "date" => Self::GameDate(NaiveDate::parse_from_str(value, "%Y/%m/%d")?),
+            "starttime" => Self::parse_time(value),
 
             // # TODO: Add error correction for optional fields rather than passing in None
-            "wp" => I::WinningPitcher(t8().ok()),
-            "lp" => I::LosingPitcher(t8().ok()),
-            "save" => I::SavePitcher(t8().ok()),
-            "gwrbi" => I::GameWinningRbi(t8().ok()),
-            "scorer" => I::Scorer(t16().ok()),
-            "inputter" => I::Inputter(t16().ok()),
-            "translator" => I::Translator(t16().ok()),
-            "tiebreaker" => I::Tiebreaker,
-            "inputprogvers" => I::InputProgramVersion,
-            "umpchange" => I::UmpireChange,
-            "inputtime" => I::InputTime,
-            "edittime" => I::EditTime,
-            _ => I::Unrecognized,
+            "wp" => Self::WinningPitcher(t8().ok()),
+            "lp" => Self::LosingPitcher(t8().ok()),
+            "save" => Self::SavePitcher(t8().ok()),
+            "gwrbi" => Self::GameWinningRbi(t8().ok()),
+            "scorer" => Self::Scorer(t16().ok()),
+            "inputter" => Self::Inputter(t16().ok()),
+            "translator" => Self::Translator(t16().ok()),
+            "tiebreaker" => Self::Tiebreaker,
+            "inputprogvers" => Self::InputProgramVersion,
+            "umpchange" => Self::UmpireChange,
+            "inputtime" => Self::InputTime,
+            "edittime" => Self::EditTime,
+            _ => Self::Unrecognized,
         };
         match info {
-            I::Unrecognized => bail!("Unrecognized info type"),
+            Self::Unrecognized => bail!("Unrecognized info type"),
             _ => Ok(info),
         }
     }

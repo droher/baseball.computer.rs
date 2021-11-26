@@ -140,7 +140,7 @@ impl EventFlag {
             .iter()
             .filter(|pm| pm.is_valid_event_type())
             .enumerate()
-            .map(|(i, pm)| Self {
+            .map(|(i, pm)| return Self {
                 game_id: game_id.id,
                 event_id,
                 sequence_id: SequenceId::new(i + 1).unwrap(),
@@ -539,10 +539,10 @@ pub struct EventBaserunningAdvanceAttempt {
 
 impl EventBaserunningAdvanceAttempt {
     fn from_play(play: &CachedPlay, game_id: GameId, event_id: EventId) -> Vec<Self> {
-        play.advances
+        return play.advances
             .iter()
             .enumerate()
-            .map(|(i, ra)| Self {
+            .map(|(i, ra)| return Self {
                 game_id: game_id.id,
                 event_id,
                 sequence_id: SequenceId::new(i + 1).unwrap(),
@@ -639,7 +639,7 @@ impl Default for Personnel {
 impl Personnel {
     fn new(record_vec: &RecordSlice) -> Result<Self> {
         let game_id = get_game_id(record_vec)?;
-        let mut personnel = Personnel {
+        let mut personnel = Self {
             game_id,
             ..Default::default()
         };
@@ -688,8 +688,8 @@ impl Personnel {
         } else {
             &map_tup.1
         };
-        map.get_by_left(position).copied().with_context(|| {
-            format!(
+        return map.get_by_left(position).copied().with_context(|| {
+            return format!(
                 "Position {:?} for side {:?} missing from current game state: {:?}",
                 position, side, map
             )
@@ -720,17 +720,17 @@ impl Personnel {
         &mut self,
         player: &Player,
     ) -> Result<&mut GameLineupAppearance> {
-        self.lineup_appearances
+        return self.lineup_appearances
             .get_mut(player)
             .with_context(|| {
-                format!(
+                return format!(
                     "Cannot find existing player {:?} in appearance records",
                     player
                 )
             })?
             .last_mut()
             .with_context(|| {
-                format!(
+                return format!(
                     "Player {:?} has an empty list of lineup appearances",
                     player
                 )
@@ -741,17 +741,17 @@ impl Personnel {
         &mut self,
         player: &Player,
     ) -> Result<&mut GameFieldingAppearance> {
-        self.defense_appearances
+        return self.defense_appearances
             .get_mut(player)
             .with_context(|| {
-                format!(
+                return format!(
                     "Cannot find existing player {:?} in appearance records",
                     player
                 )
             })?
             .last_mut()
             .with_context(|| {
-                format!(
+                return format!(
                     "Player {:?} has an empty list of fielding appearances",
                     player
                 )
@@ -929,7 +929,7 @@ impl GameState {
                 state.event_id = NonZeroU16::new(state.event_id.get() + 1_u16).unwrap();
             }
         }
-        Ok((
+        return Ok((
             events,
             state
                 .personnel
@@ -1155,12 +1155,12 @@ impl BaseState {
     }
 
     fn current_base_occupied(&self, advance: &RunnerAdvance) -> bool {
-        self.get_runner(&advance.baserunner).is_some()
+        return self.get_runner(&advance.baserunner).is_some()
     }
 
     fn target_base_occupied(&self, advance: &RunnerAdvance) -> Result<bool> {
         let br = BaseRunner::from_target_base(advance.to);
-        Ok(self.get_runner(&br?).is_some())
+        return Ok(self.get_runner(&br?).is_some())
     }
 
     fn check_integrity(old_state: &Self, new_state: &Self, advance: &RunnerAdvance) -> Result<()> {
@@ -1211,7 +1211,7 @@ impl BaseState {
             new_state.clear_baserunner(out);
         }
 
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, cached_play) {
+        if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Third, cached_play) {
             new_state.clear_baserunner(&BaseRunner::Third);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
@@ -1220,7 +1220,7 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, cached_play) {
+        if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Second, cached_play) {
             new_state.clear_baserunner(&BaseRunner::Second);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
@@ -1236,7 +1236,7 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, cached_play) {
+        if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::First, cached_play) {
             new_state.clear_baserunner(&BaseRunner::First);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
@@ -1249,7 +1249,7 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Batter, cached_play) {
+        if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Batter, cached_play) {
             let new_runner = Runner {
                 lineup_position: batter_lineup_position,
                 charged_to: pitcher,

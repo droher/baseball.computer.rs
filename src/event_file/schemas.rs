@@ -55,7 +55,7 @@ impl<'a> From<&'a GameContext> for Game<'a> {
     fn from(gc: &'a GameContext) -> Self {
         let setting = &gc.setting;
         let results = &gc.results;
-        Self {
+        return Self {
             game_id: gc.game_id.id,
             date: setting.date,
             start_time: setting.start_time,
