@@ -707,7 +707,8 @@ impl Personnel {
             Ok(lp)
         } else {
             bail!(
-                "Cannot find lineup position of player currently at bat {:?}.\nFull state: {:?}",
+                "Fatal error parsing {}: Cannot find lineup position of player currently at bat {:?}.\nFull state: {:?}",
+                self.game_id.id,
                 &play.batter,
                 self.personnel_state
             )
