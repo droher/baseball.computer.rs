@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Error, Result};
 use csv::{Reader, ReaderBuilder, StringRecord};
+use tracing::error;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::InfoRecord;
@@ -59,7 +60,7 @@ impl RetrosheetReader {
                     return Ok(true);
                 }
                 Ok(m) => self.current_record_vec.push(m),
-                _ => println!(
+                _ => error!(
                     "Error during game {} -- Error reading record: {:?}",
                     &self.current_game_id.id, &self.current_record
                 ),
@@ -82,8 +83,8 @@ impl TryFrom<&PathBuf> for RetrosheetReader {
         loop {
             reader.read_record(&mut current_record)?;
             match MappedRecord::try_from(&current_record)? {
-                MappedRecord::Comment(_) => {},
-                _ => break
+                MappedRecord::Comment(_) => {}
+                _ => break,
             }
         }
         let current_game_id = match MappedRecord::try_from(&current_record)? {

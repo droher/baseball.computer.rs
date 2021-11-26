@@ -249,6 +249,7 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
     type Error = Error;
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<InfoRecord> {
+        type I = InfoRecord;
         let record = record.deserialize::<[&str; 3]>(None)?;
 
         let info_type = record[1];
@@ -257,7 +258,6 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
         let t8 = { || str_to_tinystr::<TinyStr8>(value) };
         let t16 = { || str_to_tinystr::<TinyStr16>(value) };
 
-        type I = InfoRecord;
         let info = match info_type {
             "visteam" => I::VisitingTeam(str_to_tinystr(value)?),
             "hometeam" => I::HomeTeam(str_to_tinystr(value)?),

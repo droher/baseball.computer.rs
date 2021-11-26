@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
-use std::num::NonZeroU8;
 
 use anyhow::{anyhow, Context, Error, Result};
+use bounded_integer::BoundedUsize;
 use csv::StringRecord;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::ser::SerializeStruct;
@@ -62,7 +62,8 @@ impl LineupPosition {
     }
 
     pub fn bats_in_lineup(&self) -> bool {
-        *self as u8 > 0
+        let as_u8: u8 = (*self).into();
+        as_u8 > 0
     }
 
     pub fn retrosheet_string(self) -> String {
@@ -431,4 +432,4 @@ impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
     }
 }
 
-pub type SequenceId = NonZeroU8;
+pub type SequenceId = BoundedUsize<1, 255>;

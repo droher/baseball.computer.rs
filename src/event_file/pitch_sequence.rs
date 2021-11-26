@@ -1,5 +1,4 @@
 use std::convert::TryFrom;
-use std::num::NonZeroU8;
 use std::str::FromStr;
 
 use anyhow::{Context, Error, Result};
@@ -130,9 +129,9 @@ pub struct PitchSequenceItem {
 }
 
 impl PitchSequenceItem {
-    fn new(sequence_id: u8) -> Self {
+    fn new(sequence_id: usize) -> Self {
         Self {
-            sequence_id: NonZeroU8::new(sequence_id).unwrap(),
+            sequence_id: SequenceId::new(sequence_id).unwrap(),
             pitch_type: Default::default(),
             runners_going: false,
             blocked_by_catcher: false,

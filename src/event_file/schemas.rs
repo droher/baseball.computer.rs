@@ -1,7 +1,7 @@
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 
-use crate::event_file::game_state::{EventId, GameContext};
+use crate::event_file::game_state::{EventId, GameContext, Outs};
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, Park, Precipitation, Sky, Team,
     WindDirection,
@@ -92,7 +92,7 @@ pub struct GameTeam {
 }
 
 impl ContextToVec for GameTeam {
-    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = GameTeam>> {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self>> {
         Box::from(
             vec![
                 Self {
@@ -118,13 +118,13 @@ pub struct Event {
     batting_side: Side,
     frame: InningFrame,
     at_bat: LineupPosition,
-    outs: u8,
+    outs: Outs,
     count_balls: Option<u8>,
     count_strikes: Option<u8>,
 }
 
 impl ContextToVec for Event {
-    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Event> + '_> {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().map(move |e| Self {
             game_id: gc.game_id.id,
             event_id: e.event_id,
@@ -154,7 +154,7 @@ pub struct EventPitch {
 }
 
 impl ContextToVec for EventPitch {
-    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = EventPitch> + '_> {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         let pitch_sequences = gc.events.iter().filter_map(|e| {
             e.results
                 .pitch_sequence
@@ -202,7 +202,7 @@ impl ContextToVec for EventFieldingPlay {
                 .map(move |(i, fp)| Self {
                     game_id: e.game_id.id,
                     event_id: e.event_id,
-                    sequence_id: SequenceId::new((i + 1) as u8).unwrap(),
+                    sequence_id: SequenceId::new(i + 1).unwrap(),
                     fielding_position: fp.fielding_position,
                     fielding_play: fp.fielding_play_type,
                 })
@@ -262,7 +262,7 @@ impl ContextToVec for EventOut {
                 .map(move |(i, br)| Self {
                     game_id: e.game_id.id,
                     event_id: e.event_id,
-                    sequence_id: SequenceId::new((i + 1) as u8).unwrap(),
+                    sequence_id: SequenceId::new(i + 1).unwrap(),
                     baserunner_out: *br,
                 })
         }))
