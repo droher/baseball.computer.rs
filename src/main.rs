@@ -22,6 +22,8 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::fs::File;
 use rayon::prelude::*;
+use tracing::{info, Level};
+use tracing_subscriber::FmtSubscriber;
 
 mod event_file;
 mod util;
@@ -99,7 +101,7 @@ impl Schema {
             let pa = &game_context
                 .events
                 .iter()
-                .flat_map(|e| e.results.plate_appearance.as_ref())
+                .filter_map(|e| e.results.plate_appearance.as_ref())
                 .collect_vec();
             for row in pa {
                 w.serialize(row)?;
@@ -197,6 +199,11 @@ fn process_file(glob_result: GlobResult, output_root: &Path) -> Result<()> {
 }
 
 fn main() {
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
     let start = Instant::now();
     let opt: Opt = Opt::from_args();
     let full_path_pattern = opt
@@ -217,5 +224,5 @@ fn main() {
     results.unwrap();
 
     let end = start.elapsed();
-    println!("Elapsed: {:?}", end);
+    info!("Elapsed: {:?}", end);
 }

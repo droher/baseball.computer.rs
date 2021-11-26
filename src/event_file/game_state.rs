@@ -26,7 +26,8 @@ use crate::event_file::play::{
 };
 use crate::event_file::traits::{FieldingPosition, GameType, Handedness, LineupPosition, Side};
 use crate::event_file::traits::{Inning, Matchup, Pitcher, Player, SequenceId, Umpire};
-use std::num::NonZeroU16;
+use std::num::{NonZeroU16};
+use bounded_integer::BoundedUsize;
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
@@ -58,7 +59,7 @@ pub enum EnteredGameAs {
 }
 
 impl EnteredGameAs {
-    fn get_substitution_type(sub: &SubstitutionRecord) -> Self {
+    const fn get_substitution_type(sub: &SubstitutionRecord) -> Self {
         match sub.fielding_position {
             FieldingPosition::PinchHitter => Self::PinchHitter,
             FieldingPosition::PinchRunner => Self::PinchRunner,
@@ -142,7 +143,7 @@ impl EventFlag {
             .map(|(i, pm)| Self {
                 game_id: game_id.id,
                 event_id,
-                sequence_id: SequenceId::new((i + 1) as u8).unwrap(),
+                sequence_id: SequenceId::new(i + 1).unwrap(),
                 flag: format!("{:?}", pm),
             })
             .collect_vec()
@@ -350,7 +351,7 @@ impl GameLineupAppearance {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Copy)]
 pub struct GameFieldingAppearance {
     pub game_id: TinyStr16,
     pub player_id: Player,
@@ -377,7 +378,7 @@ impl GameFieldingAppearance {
         }
     }
 
-    fn new(
+    const fn new(
         player: Player,
         fielding_position: FieldingPosition,
         side: Side,
@@ -478,7 +479,7 @@ impl EventBaserunningPlay {
                     Some(Self {
                         game_id: game_id.id,
                         event_id,
-                        sequence_id: SequenceId::new((i + 1) as u8).unwrap(),
+                        sequence_id: SequenceId::new(i + 1).unwrap(),
                         baserunning_play_type: br.baserunning_play_type,
                         at_base: br.at_base,
                     })
@@ -514,7 +515,7 @@ impl EventPlateAppearance {
                     event_id,
                     plate_appearance_result: PlateAppearanceResultType::from(pa),
                     contact: play.contact_description.map(|cd| cd.contact_type),
-                    hit_location: play.contact_description.map(|cd| cd.location).flatten(),
+                    hit_location: play.contact_description.and_then(|cd| cd.location),
                 })
             } else {
                 None
@@ -544,7 +545,7 @@ impl EventBaserunningAdvanceAttempt {
             .map(|(i, ra)| Self {
                 game_id: game_id.id,
                 event_id,
-                sequence_id: SequenceId::new((i + 1) as u8).unwrap(),
+                sequence_id: SequenceId::new(i + 1).unwrap(),
                 baserunner: ra.baserunner,
                 attempted_advance_to: ra.to,
                 advanced_on_error_flag: FieldersData::find_error(ra.fielders_data().as_slice())
@@ -563,7 +564,7 @@ pub struct EventContext {
     pub batting_side: Side,
     pub frame: InningFrame,
     pub at_bat: LineupPosition,
-    pub outs: u8,
+    pub outs: Outs,
     pub starting_base_state: Vec<EventStartingBaseState>,
     pub batter_hand: Handedness,
     pub pitcher_hand: Handedness,
@@ -935,14 +936,14 @@ impl GameState {
                 .lineup_appearances
                 .values()
                 .flatten()
-                .cloned()
+                .copied()
                 .collect_vec(),
             state
                 .personnel
                 .defense_appearances
                 .values()
                 .flatten()
-                .cloned()
+                .copied()
                 .collect_vec(),
         ))
     }
@@ -966,7 +967,7 @@ impl GameState {
             inning: 1,
             frame: InningFrame::Top,
             batting_side,
-            outs: 0,
+            outs: Outs::new(0).unwrap(),
             bases: Default::default(),
             at_bat: Default::default(),
             personnel: Personnel::new(record_vec)?,
@@ -974,15 +975,11 @@ impl GameState {
     }
 
     fn is_frame_flipped(&self, play: &CachedPlay) -> Result<bool> {
-        if self.batting_side != play.batting_side {
-            if self.outs < 3 {
-                bail!("New frame without 3 outs recorded")
-            } else {
-                Ok(true)
-            }
-        } else {
+        if self.batting_side == play.batting_side {
             Ok(false)
-        }
+        } else if self.outs < 3 {
+                bail!("New frame without 3 outs recorded")
+        } else { Ok(true) }
     }
 
     fn get_new_frame(&self, play: &CachedPlay) -> Result<InningFrame> {
@@ -993,16 +990,14 @@ impl GameState {
         })
     }
 
-    fn outs_after_play(&self, play: &CachedPlay) -> Result<u8> {
-        let play_outs = play.outs.len() as u8;
-        match if self.is_frame_flipped(play)? {
+    fn outs_after_play(&self, play: &CachedPlay) -> Result<Outs> {
+        let play_outs = play.outs.len();
+        let new_outs = if self.is_frame_flipped(play)? {
             play_outs
         } else {
-            self.outs + play_outs
-        } {
-            o if o > 3 => bail!("Illegal state, more than 3 outs recorded"),
-            o => Ok(o),
-        }
+            self.outs.get() + play_outs
+        };
+        Outs::new(new_outs).context("Illegal state, more than 3 outs recorded")
     }
 
     fn update_on_play(&mut self, play: &CachedPlay) -> Result<()> {
@@ -1056,7 +1051,7 @@ impl GameState {
         if self.outs == 3 {
             self.frame = self.frame.flip();
             self.batting_side = self.batting_side.flip();
-            self.outs = 0;
+            self.outs = Outs::new(0).unwrap();
         }
 
         let runner_pos = self
@@ -1098,7 +1093,7 @@ impl GameState {
     }
 }
 
-pub type Outs = u8;
+pub type Outs = BoundedUsize<0, 3>;
 
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct BaseState {
@@ -1117,12 +1112,12 @@ impl BaseState {
         state
     }
 
-    pub fn get_bases(&self) -> &HashMap<BaseRunner, Runner> {
+    pub const fn get_bases(&self) -> &HashMap<BaseRunner, Runner> {
         &self.bases
     }
 
-    fn num_runners_on_base(&self) -> u8 {
-        self.bases.len() as u8
+    fn num_runners_on_base(&self) -> usize {
+        self.bases.len()
     }
 
     fn get_runner(&self, baserunner: &BaseRunner) -> Option<&Runner> {
@@ -1164,14 +1159,16 @@ impl BaseState {
     }
 
     fn target_base_occupied(&self, advance: &RunnerAdvance) -> Result<bool> {
-        let br = BaseRunner::from_target_base(&advance.to);
+        let br = BaseRunner::from_target_base(advance.to);
         Ok(self.get_runner(&br?).is_some())
     }
 
     fn check_integrity(old_state: &Self, new_state: &Self, advance: &RunnerAdvance) -> Result<()> {
         if new_state.target_base_occupied(advance)? {
             bail!("Runner is listed as moving to a base that is occupied by another runner")
-        } else if !old_state.current_base_occupied(advance) {
+        } else if old_state.current_base_occupied(advance) {
+            Ok(())
+        } else {
             bail!(
                 "Advancement from a base that had no runner on it.\n\
             Old state: {:?}\n\
@@ -1181,8 +1178,6 @@ impl BaseState {
                 new_state,
                 advance
             )
-        } else {
-            Ok(())
         }
     }
 
@@ -1265,7 +1260,7 @@ impl BaseState {
                     return Err(anyhow!("Batter advanced to an occupied base"))
                 }
                 Base::Home => new_state.scored.push(new_runner),
-                b => new_state.set_runner(BaseRunner::from_current_base(&b)?, new_runner),
+                b => new_state.set_runner(BaseRunner::from_current_base(b)?, new_runner),
             }
         }
         Ok(new_state.update_runner_charges(play))
