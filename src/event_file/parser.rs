@@ -32,9 +32,9 @@ impl Iterator for RetrosheetReader {
     fn next(&mut self) -> Option<Self::Item> {
         match self.next_game() {
             Err(e) => Some(Err(e)),
-            Ok(true) => return Some(Ok(self.current_record_vec.drain(..).collect())),
+            Ok(true) => Some(Ok(self.current_record_vec.drain(..).collect())),
             _ if !&self.current_record_vec.is_empty() => {
-                return Some(Ok(self.current_record_vec.drain(..).collect()))
+                Some(Ok(self.current_record_vec.drain(..).collect()))
             }
             _ => None,
         }
@@ -124,28 +124,28 @@ pub enum MappedRecord {
 impl TryFrom<&RetrosheetEventRecord> for MappedRecord {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<MappedRecord> {
         let line_type = record.get(0).context("No record")?;
         let mapped = match line_type {
-            "id" => Self::GameId(GameId::try_from(record)?),
-            "version" => Self::Version,
-            "info" => Self::Info(InfoRecord::try_from(record)?),
-            "start" => Self::Start(StartRecord::try_from(record)?),
-            "sub" => Self::Substitution(SubstitutionRecord::try_from(record)?),
-            "play" => Self::Play(PlayRecord::try_from(record)?),
-            "badj" => Self::BatHandAdjustment(BatHandAdjustment::try_from(record)?),
-            "padj" => Self::PitchHandAdjustment(PitchHandAdjustment::try_from(record)?),
-            "ladj" => Self::LineupAdjustment(LineupAdjustment::try_from(record)?),
-            "radj" => Self::RunnerAdjustment(RunnerAdjustment::try_from(record)?),
-            "com" => Self::Comment(String::from(record.get(1).unwrap())),
-            "data" => Self::EarnedRun(EarnedRunRecord::try_from(record)?),
-            "stat" => Self::BoxScoreLine(BoxScoreLine::try_from(record)?),
-            "line" => Self::LineScore(LineScore::try_from(record)?),
-            "event" => Self::BoxScoreEvent(BoxScoreEvent::try_from(record)?),
-            _ => Self::Unrecognized,
+            "id" => MappedRecord::GameId(GameId::try_from(record)?),
+            "version" => MappedRecord::Version,
+            "info" => MappedRecord::Info(InfoRecord::try_from(record)?),
+            "start" => MappedRecord::Start(StartRecord::try_from(record)?),
+            "sub" => MappedRecord::Substitution(SubstitutionRecord::try_from(record)?),
+            "play" => MappedRecord::Play(PlayRecord::try_from(record)?),
+            "badj" => MappedRecord::BatHandAdjustment(BatHandAdjustment::try_from(record)?),
+            "padj" => MappedRecord::PitchHandAdjustment(PitchHandAdjustment::try_from(record)?),
+            "ladj" => MappedRecord::LineupAdjustment(LineupAdjustment::try_from(record)?),
+            "radj" => MappedRecord::RunnerAdjustment(RunnerAdjustment::try_from(record)?),
+            "com" => MappedRecord::Comment(String::from(record.get(1).unwrap())),
+            "data" => MappedRecord::EarnedRun(EarnedRunRecord::try_from(record)?),
+            "stat" => MappedRecord::BoxScoreLine(BoxScoreLine::try_from(record)?),
+            "line" => MappedRecord::LineScore(LineScore::try_from(record)?),
+            "event" => MappedRecord::BoxScoreEvent(BoxScoreEvent::try_from(record)?),
+            _ => MappedRecord::Unrecognized,
         };
         match mapped {
-            MappedRecord::Unrecognized => return Err(anyhow!("Unrecognized record type {:?}", record)),
+            MappedRecord::Unrecognized => Err(anyhow!("Unrecognized record type {:?}", record)),
             _ => Ok(mapped),
         }
     }
