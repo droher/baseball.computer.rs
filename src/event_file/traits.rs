@@ -96,6 +96,7 @@ impl TryFrom<&str> for LineupPosition {
     EnumIter,
     Serialize,
     Deserialize,
+    Display
 )]
 #[repr(u8)]
 pub enum FieldingPosition {
@@ -122,11 +123,11 @@ impl FieldingPosition {
             .collect()
     }
 
-    /// Indicates whether the position is actually a true fielding position, as opposed
-    /// to a player who does not appear in the field but is given a mock position
-    pub fn plays_in_field(&self) -> bool {
+    /// Indicates whether the position is actually a true position in the lineup, as opposed
+    /// to a pinch-hitter/runner placeholder. DH counts as a position for these purposes
+    pub fn is_true_position(&self) -> bool {
         let numeric_position: u8 = (*self).into();
-        (1..10).contains(&numeric_position)
+        (1..11).contains(&numeric_position)
     }
 
     pub fn retrosheet_string(self) -> String {

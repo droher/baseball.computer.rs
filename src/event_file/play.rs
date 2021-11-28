@@ -19,6 +19,7 @@ use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::mem::discriminant;
+use bounded_integer::BoundedU8;
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
@@ -267,7 +268,9 @@ pub enum RbiStatus {
     NoRbi,
 }
 
-type PositionVec = Vec<FieldingPosition>;
+pub type PositionVec = Vec<FieldingPosition>;
+pub type Balls = BoundedU8<0, 3>;
+pub type Strikes = BoundedU8<0, 2>;
 
 impl Default for BaserunningFieldingInfo {
     fn default() -> Self {
@@ -1435,6 +1438,17 @@ pub enum PlayModifier {
     Unrecognized(String),
 }
 
+impl From<&PlayModifier> for String {
+    fn from(pm: &PlayModifier) -> Self {
+        match pm {
+            PlayModifier::ErrorOn(f) => format!("ErrorOn({})", f.to_string()),
+            PlayModifier::RelayToFielderWithNoOutMade(pv) => format!("RelayToFielderWithNoOutMade({:?})", pv),
+            PlayModifier::ThrowToBase(Some(b)) => format!("ThrowToBase({:?})", b),
+            _ => format!("{:?}", pm)
+        }
+    }
+}
+
 impl FieldingData for PlayModifier {
     // No putout or assist data in modifiers
     fn fielders_data(&self) -> Vec<FieldersData> {
@@ -1826,19 +1840,19 @@ impl TryFrom<&PlayRecord> for CachedPlay {
     Debug, Default, Eq, PartialEq, Copy, Clone, Hash, Ord, PartialOrd, Serialize, Deserialize,
 )]
 pub struct Count {
-    pub balls: Option<u8>,
-    pub strikes: Option<u8>,
+    pub balls: Option<Balls>,
+    pub strikes: Option<Strikes>,
 }
 
 impl Count {
     fn new(count_str: &str) -> Result<Self> {
         let mut ints = count_str
             .chars()
-            .map(|c| c.to_digit(10).map(|i| i.try_into().unwrap()));
+            .map(|c| c.to_digit(10));
 
         Ok(Self {
-            balls: ints.next().flatten(),
-            strikes: ints.next().flatten(),
+            balls: ints.next().flatten().and_then(|b| Balls::new(b as u8)),
+            strikes: ints.next().flatten().and_then(|s|Strikes::new(s as u8)),
         })
     }
 }

@@ -1,3 +1,4 @@
+use bounded_integer::BoundedU8;
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 
@@ -132,8 +133,8 @@ impl ContextToVec for Event {
             frame: e.context.frame,
             at_bat: e.context.at_bat,
             outs: e.context.outs,
-            count_balls: e.results.count_at_event.balls,
-            count_strikes: e.results.count_at_event.strikes,
+            count_balls: e.results.count_at_event.balls.map(BoundedU8::get),
+            count_strikes: e.results.count_at_event.strikes.map(BoundedU8::get),
         }))
     }
 }
