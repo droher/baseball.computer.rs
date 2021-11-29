@@ -22,7 +22,7 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fs::File;
-use tracing::{info, Level};
+use tracing::{debug, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 mod event_file;
@@ -52,6 +52,8 @@ enum Schema {
 
 impl Schema {
     fn write(reader: RetrosheetReader, output_prefix: &Path) -> Result<()> {
+        debug!("Processing file {}", output_prefix.to_str().unwrap_or_default());
+
         let mut writer_map = Self::writer_map(output_prefix);
 
         for record_vec_result in reader {
