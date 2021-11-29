@@ -206,6 +206,7 @@ fn main() {
 
     let start = Instant::now();
     let opt: Opt = Opt::from_args();
+    std::fs::create_dir_all(&opt.output_dir).unwrap();
     let full_path_pattern = opt
         .input
         .canonicalize()
@@ -215,6 +216,7 @@ fn main() {
         .output_dir
         .canonicalize()
         .expect("Invalid output directory");
+
 
     let results: Result<Vec<()>> = glob(full_path_pattern.to_str().unwrap())
         .unwrap()
