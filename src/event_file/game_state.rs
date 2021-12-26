@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
 use bimap::BiMap;
@@ -13,10 +14,7 @@ use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
     Team, UmpireAssignment, UmpirePosition, WindDirection,
 };
-use crate::event_file::misc::{
-    BatHandAdjustment, GameId, LineupAdjustment, PitchHandAdjustment, RunnerAdjustment,
-    SubstitutionRecord,
-};
+use crate::event_file::misc::{BatHandAdjustment, GameId, Hand, LineupAdjustment, PitchHandAdjustment, RunnerAdjustment, StartRecord, SubstitutionRecord};
 use crate::event_file::parser::{MappedRecord, RecordSlice};
 use crate::event_file::pitch_sequence::PitchSequenceItem;
 use crate::event_file::play::{
@@ -24,12 +22,15 @@ use crate::event_file::play::{
     FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame,
     OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayType, RunnerAdvance,
 };
-use crate::event_file::traits::{FieldingPosition, GameType, Handedness, LineupPosition, Side};
-use crate::event_file::traits::{Inning, Matchup, Pitcher, Player, SequenceId, Umpire};
+use crate::event_file::traits::{Inning, Matchup, Pitcher, Player, SequenceId, Umpire, FieldingPosition, GameType, LineupPosition, Side};
 use bounded_integer::BoundedUsize;
+use lazy_static::lazy_static;
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
+const OHTANI: &str = "ohtas001";
+const OHTANI_ALL_STAR_GAME: &str = "NLS202107130";
+lazy_static! { static ref FAKE_OHTANI: Player = Player::from_str("ohtas999").unwrap(); }
 
 type Position = Either<LineupPosition, FieldingPosition>;
 type PersonnelState = BiMap<Position, Player>;
@@ -418,7 +419,8 @@ impl TryFrom<&RecordSlice> for GameContext {
         let results = GameResults::try_from(record_vec)?;
 
         let (events, lineup_appearances, fielding_appearances) =
-            GameState::create_events(record_vec)?;
+            GameState::create_events(record_vec)
+                .with_context(|| format!("Could not parse game {}", game_id.id))?;
         Ok(Self {
             game_id,
             teams,
@@ -565,8 +567,8 @@ pub struct EventContext {
     pub at_bat: LineupPosition,
     pub outs: Outs,
     pub starting_base_state: Vec<EventStartingBaseState>,
-    pub batter_hand: Handedness,
-    pub pitcher_hand: Handedness,
+    pub batter_hand: Hand,
+    pub pitcher_hand: Hand,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -590,16 +592,44 @@ pub struct Event {
     pub results: EventResults,
 }
 
-/// TODO: This tracks the more unusual/miscellaneous elements of the state of the game,,
-///     such as batters batting from an unexpected side or a substitution in the middle of
-///     an at-bat. Further exceptions should go here as they come up.
+impl Event {
+    pub fn summary(&self) -> String {
+        format!(
+            r#"
+        Event: {event_id}
+        Inning: {frame:?} {inning}
+        Outs at event: {outs_at_event}
+        Batter: {ab:?}
+        Plate appearance result: {pa:?}
+        Baserunning: {ba:?}
+        Out on play: {out:?}
+        "#,
+            event_id = self.event_id.to_string(),
+            frame = self.context.frame,
+            inning = self.context.inning,
+            outs_at_event = self.context.outs,
+            ab = self.context.at_bat,
+            pa = self
+                .results
+                .plate_appearance
+                .as_ref()
+                .map(|pa| pa.plate_appearance_result),
+            ba = self.results.baserunning_advances,
+            out = self.results.out_on_play,
+        )
+    }
+}
+
+/// This tracks the more unusual/miscellaneous elements of the state of the game,
+/// such as batters batting from an unexpected side or a substitution in the middle of
+/// an at-bat. Further exceptions should go here as they come up.
 #[derive(Default, Debug, Eq, PartialEq, Clone)]
 pub struct WeirdGameState {
-    batter_hand: Option<Handedness>,
-    pitcher_hand: Option<Handedness>,
-    responsible_batter: Option<String>,
-    responsible_pitcher: Option<String>,
-    mid_at_bat_interruption_flag: bool,
+    batter_hand: Option<Hand>,
+    pitcher_hand: Option<Hand>,
+    // TODO
+    responsible_batter: Option<Player>,
+    responsible_pitcher: Option<Player>
 }
 
 /// Keeps track of the current players on the field at any given point
@@ -636,13 +666,25 @@ impl Default for Personnel {
 }
 
 impl Personnel {
+    /// In the 2021 All-Star Game, Shohei Ohtani was both the starting pitcher
+    /// and the DH, which to date is the only time a player has ever
+    /// started at two different positions.
+    /// We love Shohei but this is really annoying, so we just pretend
+    /// they're two different people in the game.
+    fn handle_2021_asg(game_id: GameId, start: &StartRecord) -> Player {
+        if game_id.id == OHTANI_ALL_STAR_GAME
+            && start.player == OHTANI
+            && start.fielding_position == FieldingPosition::Pitcher {
+            *FAKE_OHTANI
+        } else {start.player}
+    }
+
     fn new(record_vec: &RecordSlice) -> Result<Self> {
         let game_id = get_game_id(record_vec)?;
         let mut personnel = Personnel {
             game_id,
             ..Default::default()
         };
-
         let start_iter = record_vec.iter().filter_map(|rv| {
             if let MappedRecord::Start(sr) = rv {
                 Some(sr)
@@ -664,14 +706,15 @@ impl Personnel {
                 start.side,
                 game_id,
             );
-            lineup.insert(Either::Left(start.lineup_position), start.player);
-            defense.insert(Either::Right(start.fielding_position), start.player);
+            let player = Self::handle_2021_asg(game_id, start);
+            lineup.insert(Either::Left(start.lineup_position), player);
+            defense.insert(Either::Right(start.fielding_position), player);
             personnel
                 .lineup_appearances
-                .insert(start.player, vec![lineup_appearance]);
+                .insert(player, vec![lineup_appearance]);
             personnel
                 .defense_appearances
-                .insert(start.player, vec![fielding_appearance]);
+                .insert(player, vec![fielding_appearance]);
         }
         Ok(personnel)
     }
@@ -762,15 +805,11 @@ impl Personnel {
         sub: &SubstitutionRecord,
         event_id: EventId,
     ) -> Result<()> {
-
-        let original_batter = self
-            .get_at_position(&sub.side, &Either::Left(sub.lineup_position));
+        let original_batter = self.get_at_position(&sub.side, &Either::Left(sub.lineup_position));
         match original_batter {
             // If this substitution is the DH/PH/PR being brought in to field, no substitution takes place
             Ok(p) if p == sub.player => return Ok(()),
-            Ok(p) => {
-                self.get_current_lineup_appearance(&p)?.end_event_id = Some(event_id - 1)
-            },
+            Ok(p) => self.get_current_lineup_appearance(&p)?.end_event_id = Some(event_id - 1),
             // There should almost always be an original batter, but in
             // the extremely rare case of a courtesy runner, there might not be.
             Err(_) => {}
@@ -802,8 +841,8 @@ impl Personnel {
         sub: &SubstitutionRecord,
         event_id: EventId,
     ) -> Result<()> {
-        let original_fielder = self
-            .get_at_position(&sub.side, &Either::Right(sub.fielding_position));
+        let original_fielder =
+            self.get_at_position(&sub.side, &Either::Right(sub.fielding_position));
         match original_fielder {
             Ok(p) if p == sub.player => return Ok(()),
             Ok(p) => self.get_current_fielding_appearance(&p)?.end_event_id = Some(event_id - 1),
@@ -818,7 +857,6 @@ impl Personnel {
         // and cannot exist at the start of a play.
         defense.remove_by_right(&sub.player);
         defense.insert(Either::Right(sub.fielding_position), sub.player);
-
 
         self.defense_appearances
             .entry(sub.player)
@@ -838,8 +876,12 @@ impl Personnel {
     /// into the field or the pitcher into a non-pitching position.
     /// This will be a safe no-op if the game in question isn't using a DH.
     fn update_on_dh_vacancy(&mut self, sub: &SubstitutionRecord, event_id: EventId) -> Result<()> {
-        let non_batting_pitcher = self.get_at_position(&sub.side, &Either::Left(LineupPosition::PitcherWithDh));
-        let dh = self.get_at_position(&sub.side,&Either::Right(FieldingPosition::DesignatedHitter));
+        let non_batting_pitcher =
+            self.get_at_position(&sub.side, &Either::Left(LineupPosition::PitcherWithDh));
+        let dh = self.get_at_position(
+            &sub.side,
+            &Either::Right(FieldingPosition::DesignatedHitter),
+        );
         if let Ok(p) = non_batting_pitcher {
             self.get_current_lineup_appearance(&p)?.end_event_id = Some(event_id - 1);
         }
@@ -858,16 +900,13 @@ impl Personnel {
         if sub.fielding_position.is_true_position() {
             self.update_defense_on_substitution(sub, event_id)?
         };
-        if sub.fielding_position == FieldingPosition::Pitcher && sub.lineup_position != LineupPosition::PitcherWithDh {
+        if sub.fielding_position == FieldingPosition::Pitcher
+            && sub.lineup_position != LineupPosition::PitcherWithDh
+        {
             self.update_on_dh_vacancy(sub, event_id)?
         };
         Ok(())
     }
-}
-
-struct HandednessPair {
-    batter: Option<Handedness>,
-    pitcher: Option<Handedness>,
 }
 
 /// Tracks the information necessary to populate each event.
@@ -882,6 +921,7 @@ pub struct GameState {
     bases: BaseState,
     at_bat: LineupPosition,
     personnel: Personnel,
+    weird_state: WeirdGameState
 }
 
 impl GameState {
@@ -914,9 +954,8 @@ impl GameState {
                         state.game_id,
                         state.event_id,
                     ),
-                    // TODO: Fix
-                    batter_hand: Handedness::Unknown,
-                    pitcher_hand: Handedness::Unknown,
+                    batter_hand: state.weird_state.batter_hand.unwrap_or_default(),
+                    pitcher_hand: state.weird_state.pitcher_hand.unwrap_or_default()
                 };
                 let results = EventResults {
                     count_at_event: pr.count,
@@ -952,8 +991,20 @@ impl GameState {
         }
         // Set all remaining blank end_event_ids to final event
         let max_event_id = Some(EventId::new(events.len()).unwrap());
-        let mut lineup_appearances = state.personnel.lineup_appearances.values().flatten().copied().collect_vec();
-        let mut defense_appearances = state.personnel.defense_appearances.values().flatten().copied().collect_vec();
+        let mut lineup_appearances = state
+            .personnel
+            .lineup_appearances
+            .values()
+            .flatten()
+            .copied()
+            .collect_vec();
+        let mut defense_appearances = state
+            .personnel
+            .defense_appearances
+            .values()
+            .flatten()
+            .copied()
+            .collect_vec();
         for la in &mut lineup_appearances {
             la.end_event_id = la.end_event_id.or(max_event_id)
         }
@@ -963,11 +1014,7 @@ impl GameState {
         lineup_appearances.sort_by_key(|la| (la.side, la.lineup_position, la.start_event_id));
         defense_appearances.sort_by_key(|da| (da.side, da.fielding_position, da.start_event_id));
 
-        Ok((
-            events,
-            lineup_appearances,
-            defense_appearances
-           ))
+        Ok((events, lineup_appearances, defense_appearances))
     }
 
     pub(crate) fn new(record_vec: &RecordSlice) -> Result<Self> {
@@ -993,6 +1040,7 @@ impl GameState {
             bases: Default::default(),
             at_bat: Default::default(),
             personnel: Personnel::new(record_vec)?,
+            weird_state: Default::default()
         })
     }
 
@@ -1048,6 +1096,7 @@ impl GameState {
         self.outs = new_outs;
         self.bases = new_base_state;
         self.at_bat = batter_lineup_position;
+        self.weird_state = Default::default();
 
         Ok(())
     }
@@ -1056,12 +1105,12 @@ impl GameState {
         self.personnel.update_on_substitution(record, self.event_id)
     }
 
-    fn update_on_bat_hand_adjustment(&mut self, _record: &BatHandAdjustment) {
-        // TODO
+    fn update_on_bat_hand_adjustment(&mut self, record: &BatHandAdjustment) {
+        self.weird_state.batter_hand = Some(record.hand)
     }
 
-    fn update_on_pitch_hand_adjustment(&mut self, _record: &PitchHandAdjustment) {
-        // TODO
+    fn update_on_pitch_hand_adjustment(&mut self, record: &PitchHandAdjustment) {
+        self.weird_state.batter_hand = Some(record.hand)
     }
 
     fn update_on_lineup_adjustment(&mut self, _record: &LineupAdjustment) {
@@ -1069,7 +1118,7 @@ impl GameState {
     }
 
     fn update_on_runner_adjustment(&mut self, record: &RunnerAdjustment) -> Result<()> {
-        // The 2020 tiebreaker runner record can appear before or after the first record of the next
+        // The 2020/2021 tiebreaker runner record can appear before or after the first record of the next
         // inning, and it doesn't have a side associated with it, so we have to do some messy
         // state changes to get it right.
         if self.outs == 3 {
@@ -1101,6 +1150,7 @@ impl GameState {
             MappedRecord::Play(_) => {
                 if let Some(cp) = cached_play {
                     self.update_on_play(cp)
+                        .with_context(|| format!("Failed to parse play {:?}", cp))
                 } else {
                     bail!("Expected cached play but got None")
                 }

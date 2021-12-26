@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, bail, Context, Error, Result};
 use csv::{Reader, ReaderBuilder, StringRecord};
 use tracing::error;
 
@@ -60,10 +60,12 @@ impl RetrosheetReader {
                     return Ok(true);
                 }
                 Ok(m) => self.current_record_vec.push(m),
-                _ => error!(
-                    "Error during game {} -- Error reading record: {:?}",
-                    &self.current_game_id.id, &self.current_record
-                ),
+                Err(e) => {
+                    return Err(e.context(format!(
+                        "Error during game {} -- Error reading record: {:?}",
+                        &self.current_game_id.id, &self.current_record
+                    )))
+                }
             }
         }
     }
@@ -75,6 +77,7 @@ impl TryFrom<&PathBuf> for RetrosheetReader {
     fn try_from(path: &PathBuf) -> Result<Self> {
         let mut reader = ReaderBuilder::new()
             .has_headers(false)
+            .double_quote(false)
             .flexible(true)
             .from_reader(BufReader::new(File::open(path)?));
         let mut current_record = StringRecord::new();

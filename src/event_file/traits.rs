@@ -96,7 +96,7 @@ impl TryFrom<&str> for LineupPosition {
     EnumIter,
     Serialize,
     Deserialize,
-    Display
+    Display,
 )]
 #[repr(u8)]
 pub enum FieldingPosition {
@@ -149,14 +149,6 @@ impl TryFrom<&str> for FieldingPosition {
         FieldingPosition::try_from(value.parse::<u8>()?)
             .context("Unable to convert to fielding position")
     }
-}
-
-#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
-pub enum Handedness {
-    Left,
-    Right,
-    Switch,
-    Unknown,
 }
 
 #[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]

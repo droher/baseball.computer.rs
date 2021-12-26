@@ -15,12 +15,22 @@ use crate::util::str_to_tinystr;
 
 pub type Comment = String;
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone)]
-enum Hand {
-    L,
-    R,
-    S,
-    B,
+/// Indicates the hands that the batter/pitcher are using. For the most part, this is not given
+/// explicitly, but occasionally the batter bats from a different side than his roster data
+/// indicates, and under very rare circumstances the pitcher can switch.
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize)]
+pub enum Hand {
+    #[strum(serialize = "L")]
+    Left,
+    #[strum(serialize = "R")]
+    Right,
+    Default,
+}
+
+impl Default for Hand {
+    fn default() -> Self {
+        Self::Default
+    }
 }
 
 #[derive(Ord, PartialOrd, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -40,8 +50,8 @@ impl TryFrom<&RetrosheetEventRecord> for GameId {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct HandAdjustment {
-    player_id: Player,
-    hand: Hand,
+    pub player_id: Player,
+    pub hand: Hand,
 }
 pub type BatHandAdjustment = HandAdjustment;
 pub type PitchHandAdjustment = HandAdjustment;
