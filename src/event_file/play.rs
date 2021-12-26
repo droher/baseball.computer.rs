@@ -15,11 +15,11 @@ use crate::event_file::traits::{
     Batter, FieldingPlayType, FieldingPosition, Inning, RetrosheetEventRecord, Side,
 };
 use crate::util::{regex_split, str_to_tinystr, to_str_vec};
+use bounded_integer::BoundedU8;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::mem::discriminant;
-use bounded_integer::BoundedU8;
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
@@ -1442,9 +1442,11 @@ impl From<&PlayModifier> for String {
     fn from(pm: &PlayModifier) -> Self {
         match pm {
             PlayModifier::ErrorOn(f) => format!("ErrorOn({})", f.to_string()),
-            PlayModifier::RelayToFielderWithNoOutMade(pv) => format!("RelayToFielderWithNoOutMade({:?})", pv),
+            PlayModifier::RelayToFielderWithNoOutMade(pv) => {
+                format!("RelayToFielderWithNoOutMade({:?})", pv)
+            }
             PlayModifier::ThrowToBase(Some(b)) => format!("ThrowToBase({:?})", b),
-            _ => format!("{:?}", pm)
+            _ => format!("{:?}", pm),
         }
     }
 }
@@ -1846,13 +1848,11 @@ pub struct Count {
 
 impl Count {
     fn new(count_str: &str) -> Result<Self> {
-        let mut ints = count_str
-            .chars()
-            .map(|c| c.to_digit(10));
+        let mut ints = count_str.chars().map(|c| c.to_digit(10));
 
         Ok(Self {
             balls: ints.next().flatten().and_then(|b| Balls::new(b as u8)),
-            strikes: ints.next().flatten().and_then(|s|Strikes::new(s as u8)),
+            strikes: ints.next().flatten().and_then(|s| Strikes::new(s as u8)),
         })
     }
 }

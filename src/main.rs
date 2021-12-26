@@ -1,34 +1,40 @@
 #![allow(dead_code)]
 #![forbid(unsafe_code)]
 
+use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+use async_std::io::Cursor;
+use async_std::prelude::*;
 use csv::{Writer, WriterBuilder};
 use glob::{glob, GlobResult};
+use itertools::Itertools;
+use rayon::prelude::*;
 use structopt::StructOpt;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
+use surf;
+use tracing::{debug, error, info, Level};
+use tracing_subscriber::FmtSubscriber;
+
+use event_file::game_state::GameContext;
+use event_file::parser::RetrosheetReader;
+use event_file::schemas::{ContextToVec, Event};
 
 use crate::event_file::schemas::{
     EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam,
 };
-use event_file::game_state::GameContext;
-use event_file::parser::RetrosheetReader;
-use event_file::schemas::{ContextToVec, Event};
-use itertools::Itertools;
-use rayon::prelude::*;
-use std::collections::HashMap;
-use std::fs::File;
-use tracing::{debug, info, Level};
-use tracing_subscriber::FmtSubscriber;
 
 mod event_file;
 mod util;
 
 const ABOUT: &str = "Transforms Retrosheet .EV* files (play-by-play) into .EB* files (box score).";
+const GLOB_PATTERN: &str = "**/*.E[VD]*";
+const RETROSHEET_URL: &str = "https://github.com/droher/retrosheet/archive/refs/heads/master.zip";
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash, Display, EnumIter)]
 #[strum(serialize_all = "snake_case")]
@@ -52,7 +58,10 @@ enum Schema {
 
 impl Schema {
     fn write(reader: RetrosheetReader, output_prefix: &Path) -> Result<()> {
-        debug!("Processing file {}", output_prefix.to_str().unwrap_or_default());
+        debug!(
+            "Processing file {}",
+            output_prefix.to_str().unwrap_or_default()
+        );
 
         let mut writer_map = Self::writer_map(output_prefix);
 
@@ -191,8 +200,6 @@ struct Opt {
     output_dir: PathBuf,
 }
 
-const GLOB_PATTERN: &str = "**/*.E[VD]*";
-
 fn process_file(glob_result: GlobResult, output_root: &Path) -> Result<()> {
     let input_path = glob_result?;
     let output_prefix = output_root.join(input_path.file_name().unwrap());
@@ -202,7 +209,7 @@ fn process_file(glob_result: GlobResult, output_root: &Path) -> Result<()> {
 
 fn main() {
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::DEBUG)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
@@ -219,13 +226,18 @@ fn main() {
         .canonicalize()
         .expect("Invalid output directory");
 
-
-    let results: Result<Vec<()>> = glob(full_path_pattern.to_str().unwrap())
+    let errors: Vec<Result<()>> = glob(full_path_pattern.to_str().unwrap())
         .unwrap()
         .par_bridge()
-        .map(|f| process_file(f, &output_root))
+        .filter_map(|f| {
+            if let Err(e) = process_file(f, &output_root) {
+                Some(Err(e))
+            } else {
+                None
+            }
+        })
         .collect();
-    results.unwrap();
+    errors.into_iter().for_each(|r| error!("{:?}", r));
 
     let end = start.elapsed();
     info!("Elapsed: {:?}", end);
