@@ -6,10 +6,10 @@ use strum_macros::{Display, EnumString};
 use crate::event_file::traits::{
     Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire,
 };
-use crate::util::{parse_positive_int, str_to_tinystr};
 use std::convert::TryFrom;
 use std::str::FromStr;
 use tinystr::{TinyStr16, TinyStr8};
+use crate::event_file::misc::{parse_positive_int, str_to_tinystr};
 
 #[derive(
     Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,

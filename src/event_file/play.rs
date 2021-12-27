@@ -14,12 +14,12 @@ use crate::event_file::pitch_sequence::PitchSequence;
 use crate::event_file::traits::{
     Batter, FieldingPlayType, FieldingPosition, Inning, RetrosheetEventRecord, Side,
 };
-use crate::util::{regex_split, str_to_tinystr, to_str_vec};
 use bounded_integer::BoundedU8;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::mem::discriminant;
+use crate::event_file::misc::{regex_split, str_to_tinystr, to_str_vec};
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";

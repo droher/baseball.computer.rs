@@ -4,11 +4,10 @@ use std::str::FromStr;
 use anyhow::{bail, Context, Error, Result};
 use arrayref::array_ref;
 
-use crate::event_file::misc::{Defense, Lineup};
+use crate::event_file::misc::{Defense, Lineup, parse_positive_int, str_to_tinystr};
 use crate::event_file::traits::{
     Batter, Fielder, FieldingPosition, Inning, LineupPosition, Pitcher, RetrosheetEventRecord, Side,
 };
-use crate::util::{parse_positive_int, str_to_tinystr};
 use tinystr::TinyStr8;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]

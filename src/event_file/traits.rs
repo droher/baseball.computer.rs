@@ -11,7 +11,7 @@ use tinystr::{TinyStr16, TinyStr8};
 
 use crate::event_file::info::{InfoRecord, Team};
 use crate::event_file::parser::{MappedRecord, RecordSlice};
-use crate::util::digit_vec;
+use crate::event_file::misc::digit_vec;
 
 pub type RetrosheetEventRecord = StringRecord;
 

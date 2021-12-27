@@ -22,19 +22,16 @@ use tracing_subscriber::FmtSubscriber;
 use event_file::game_state::GameContext;
 use event_file::parser::RetrosheetReader;
 use event_file::schemas::{ContextToVec, Event};
+
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::AccountType;
-
 use crate::event_file::schemas::{
     EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam,
 };
 
 mod event_file;
-mod util;
 
 const ABOUT: &str = "Transforms Retrosheet .EV* files (play-by-play) into .EB* files (box score).";
-const GLOB_PATTERN: &str = "**/*.E[VD]*";
-const RETROSHEET_URL: &str = "https://github.com/droher/retrosheet/archive/refs/heads/master.zip";
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash, Display, EnumIter)]
 #[strum(serialize_all = "snake_case")]
