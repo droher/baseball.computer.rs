@@ -176,7 +176,7 @@ impl Schema {
         let mut map = HashMap::new();
         for schema in Self::iter() {
             let file_name = format!(
-                "{}_{}.csv",
+                "{}__{}.csv",
                 schema,
                 output_prefix.file_name().unwrap().to_str().unwrap()
             );
@@ -189,22 +189,22 @@ impl Schema {
 
     pub fn concat(output_root: &str) {
         for schema in Schema::iter() {
-            let new_file = format!("{}/_{}.csv", output_root, schema);
+            let new_file = format!("{}/{}.csv", output_root, schema);
             let mut exists = false;
-            let mut file = OpenOptions::new()
+            let file = OpenOptions::new()
                 .create(true)
                 .write(true)
                 .open(new_file)
                 .unwrap();
             let mut writer = BufWriter::new(file);
 
-            let pattern = format!("{}/{}_*.csv", output_root, schema);
+            let pattern = format!("{}/{}__*.csv", output_root, schema);
             let glob = glob(&*pattern).unwrap();
             for g in glob {
                 let path = g.unwrap();
                 let mut reader = BufReader::new(File::open(&path).unwrap());
                 if exists { reader.read_line(&mut String::new()).unwrap(); }
-                copy(&mut reader, &mut writer);
+                copy(&mut reader, &mut writer).unwrap();
                 remove_file(&path).unwrap();
                 exists = true;
             }

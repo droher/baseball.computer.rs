@@ -160,6 +160,7 @@ pub enum GameType {
     DivisionSeries,
     LeagueChampionshipSeries,
     WorldSeries,
+    NegroLeagues,
     Other,
 }
 
