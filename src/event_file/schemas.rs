@@ -319,6 +319,7 @@ pub struct BoxScorePlayerFielding {
 }
 
 pub struct BoxScorePlayerPitching {
+    game_id: GameId,
     pitcher_id: Player,
     side: Side,
     nth_pitcher: u8,
@@ -339,4 +340,50 @@ pub struct BoxScorePlayerPitching {
     balks: Option<u8>,
     sacrifice_hits: Option<u8>,
     sacrifice_flies: Option<u8>,
+}
+
+pub struct BoxScoreTeamMisc {
+    game_id: GameId,
+    side: Side,
+    left_on_base: u8,
+    team_earned_runs: Option<u8>,
+    double_plays_turned: Option<u8>,
+    triple_plays_turned: u8
+}
+
+pub struct BoxScoreTeamHitting {
+    game_id: GameId,
+    side: Side,
+    at_bats: u8,
+    runs: u8,
+    hits: u8,
+    doubles: Option<u8>,
+    triples: Option<u8>,
+    home_runs: Option<u8>,
+    rbi: Option<u8>,
+    sacrifice_hits: Option<u8>,
+    sacrifice_flies: Option<u8>,
+    hit_by_pitch: Option<u8>,
+    walks: Option<u8>,
+    intentional_walks: Option<u8>,
+    strikeouts: Option<u8>,
+    stolen_bases: Option<u8>,
+    caught_stealing: Option<u8>,
+    grounded_into_double_plays: Option<u8>,
+    reached_on_interference: Option<u8>,
+}
+
+pub struct BoxScoreTeamDefense {
+    game_id: GameId,
+    fielder_id: Fielder,
+    side: Side,
+    fielding_position: FieldingPosition,
+    nth_position_played_by_player: u8,
+    outs_played: Option<u8>,
+    putouts: Option<u8>,
+    assists: Option<u8>,
+    errors: Option<u8>,
+    double_plays: Option<u8>,
+    triple_plays: Option<u8>,
+    passed_balls: Option<u8>,
 }

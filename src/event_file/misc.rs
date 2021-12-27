@@ -33,7 +33,7 @@ impl Default for Hand {
     }
 }
 
-#[derive(Ord, PartialOrd, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Ord, PartialOrd, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct GameId {
     pub id: TinyStr16,
 }
