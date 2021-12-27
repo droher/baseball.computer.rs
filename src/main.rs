@@ -3,21 +3,19 @@
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::fs::File;
+use std::fs::{File, OpenOptions, remove_file};
+use std::io::{BufRead, BufReader, BufWriter, copy};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{Context, Result};
-use async_std::io::Cursor;
-use async_std::prelude::*;
 use csv::{Writer, WriterBuilder};
-use glob::{glob, GlobResult};
+use glob::{glob, GlobResult, Paths};
 use itertools::Itertools;
 use rayon::prelude::*;
 use structopt::StructOpt;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-use surf;
 use tracing::{debug, error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
@@ -179,8 +177,8 @@ impl Schema {
         for schema in Self::iter() {
             let file_name = format!(
                 "{}_{}.csv",
-                output_prefix.file_name().unwrap().to_str().unwrap(),
-                schema
+                schema,
+                output_prefix.file_name().unwrap().to_str().unwrap()
             );
             let output_path = output_prefix.with_file_name(file_name);
             let writer = WriterBuilder::new().from_path(output_path).unwrap();
@@ -188,6 +186,31 @@ impl Schema {
         }
         map
     }
+
+    pub fn concat(output_root: &str) {
+        for schema in Schema::iter() {
+            let new_file = format!("{}/_{}.csv", output_root, schema);
+            let mut exists = false;
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(new_file)
+                .unwrap();
+            let mut writer = BufWriter::new(file);
+
+            let pattern = format!("{}/{}_*.csv", output_root, schema);
+            let glob = glob(&*pattern).unwrap();
+            for g in glob {
+                let path = g.unwrap();
+                let mut reader = BufReader::new(File::open(&path).unwrap());
+                if exists { reader.read_line(&mut String::new()).unwrap(); }
+                copy(&mut reader, &mut writer);
+                remove_file(&path).unwrap();
+                exists = true;
+            }
+        }
+    }
+
 }
 
 #[derive(StructOpt, Debug)]
@@ -207,6 +230,16 @@ fn process_file(glob_result: GlobResult, output_root: &Path) -> Result<()> {
     Schema::write(reader, &output_prefix)
 }
 
+fn get_input_glob(opt: Opt) -> Result<Paths> {
+    let full_path_pattern = opt
+        .input
+        .canonicalize()
+        .expect("Invalid input path")
+        .join(Path::new(GLOB_PATTERN));
+    glob(full_path_pattern.to_str().unwrap()).context("Unable to read input path")
+}
+
+
 fn main() {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::DEBUG)
@@ -216,17 +249,13 @@ fn main() {
     let start = Instant::now();
     let opt: Opt = Opt::from_args();
     std::fs::create_dir_all(&opt.output_dir).unwrap();
-    let full_path_pattern = opt
-        .input
-        .canonicalize()
-        .expect("Invalid input path")
-        .join(Path::new(GLOB_PATTERN));
+
     let output_root = opt
         .output_dir
         .canonicalize()
         .expect("Invalid output directory");
 
-    let errors: Vec<Result<()>> = glob(full_path_pattern.to_str().unwrap())
+    let errors: Vec<Result<()>> = get_input_glob(opt)
         .unwrap()
         .par_bridge()
         .filter_map(|f| {
@@ -239,6 +268,7 @@ fn main() {
         .collect();
     errors.into_iter().for_each(|r| error!("{:?}", r));
 
+    Schema::concat(output_root.to_str().unwrap());
     let end = start.elapsed();
     info!("Elapsed: {:?}", end);
 }
