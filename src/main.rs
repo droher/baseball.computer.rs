@@ -55,6 +55,7 @@ enum Schema {
 
 impl Schema {
     fn write(reader: RetrosheetReader, output_prefix: &Path, parsed_games: Option<&HashSet<GameId>>) -> Vec<GameId> {
+        let file_info = (&reader).file_info.clone();
         let output_prefix_display = output_prefix.to_str().unwrap_or_default();
         debug!("Processing file {}", output_prefix_display);
 
@@ -66,7 +67,7 @@ impl Schema {
                 error!("{:?}", e);
                 continue
             }
-            let game_context_result = GameContext::try_from(record_vec_result.unwrap().as_slice());
+            let game_context_result = GameContext::try_from((record_vec_result.unwrap().as_slice(), file_info.clone()));
             if let Err(e) = game_context_result {
                 error!("{:?}", e);
                 continue
@@ -77,6 +78,9 @@ impl Schema {
                 warn!("File {} contains already-processed game {}, ignoring",
                     output_prefix_display,
                     &game_context.game_id.id);
+                continue
+            }
+            if game_context.file_info.account_type == AccountType::BoxScore {
                 continue
             }
             Self::write_individual_files(&mut writer_map, &game_context).unwrap()
@@ -259,7 +263,7 @@ fn par_process_files(opt: &Opt, account_type: AccountType, parsed_games: Option<
 }
 
 fn get_output_root(opt: &Opt) -> Result<PathBuf> {
-    std::fs::create_dir_all(&opt.output_dir).context("Error occurred on output dir check");
+    std::fs::create_dir_all(&opt.output_dir).context("Error occurred on output dir check")?;
     opt
         .output_dir
         .canonicalize()
@@ -281,8 +285,10 @@ fn main() {
     parsed_game_ids.extend(event_files.drain(..));
 
     info!("Parsing derived play-by-play files");
-    let mut derived_files = par_process_files(&opt, AccountType::Derived, Some(&parsed_game_ids));
-    parsed_game_ids.extend(derived_files.drain(..));
+    par_process_files(&opt, AccountType::Derived, Some(&parsed_game_ids));
+
+    info!("Parsing box score files");
+    par_process_files(&opt, AccountType::BoxScore, None);
 
     let output_root = get_output_root(&opt).unwrap();
 

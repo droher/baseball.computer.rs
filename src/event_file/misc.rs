@@ -1,13 +1,13 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Context, Error, Result};
 use bimap::BiMap;
+use num_traits::PrimInt;
+use regex::{Match, Regex};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
 use tinystr::TinyStr16;
-use num_traits::{PrimInt, Zero};
-use regex::{Match, Regex};
 
 use crate::event_file::play::Base;
 use crate::event_file::traits::{

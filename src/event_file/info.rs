@@ -221,7 +221,7 @@ pub enum InfoRecord {
     HowScored(HowScored),
     Inputter(Option<RetrosheetVolunteer>),
     Scorer(Option<Scorer>),
-    OriginalScorer(Scorer),
+    OriginalScorer(Option<Scorer>),
     Translator(Option<RetrosheetVolunteer>),
     Innings(Option<u8>),
     Tiebreaker,
@@ -262,7 +262,6 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
             "visteam" => I::VisitingTeam(str_to_tinystr(value)?),
             "hometeam" => I::HomeTeam(str_to_tinystr(value)?),
             "site" => I::Park(str_to_tinystr(value)?),
-            "oscorer" => I::OriginalScorer(str_to_tinystr(value)?),
 
             "umphome" | "ump1b" | "ump2b" | "ump3b" | "umplf" | "umprf" => {
                 I::UmpireAssignment(UmpireAssignment {
@@ -286,7 +285,7 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
             "temp" => I::Temp(parse_positive_int::<u8>(value)),
             "innings" => I::Innings(parse_positive_int::<u8>(value)),
 
-            "usedh" => I::UseDh(bool::from_str(value)?),
+            "usedh" => I::UseDh(bool::from_str(&*value.to_lowercase())?),
             "htbf" => I::HomeTeamBatsFirst(bool::from_str(value)?),
             "date" => I::GameDate(NaiveDate::parse_from_str(value, "%Y/%m/%d")?),
             "starttime" => I::parse_time(value),
@@ -296,6 +295,7 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
             "lp" => I::LosingPitcher(t8().ok()),
             "save" => I::SavePitcher(t8().ok()),
             "gwrbi" => I::GameWinningRbi(t8().ok()),
+            "oscorer" => I::OriginalScorer(t16().ok()),
             "scorer" => I::Scorer(t16().ok()),
             "inputter" => I::Inputter(t16().ok()),
             "translator" => I::Translator(t16().ok()),

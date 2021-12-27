@@ -38,6 +38,7 @@ lazy_static! {
 
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum AccountType {
     PlayByPlay,
     Derived,
@@ -56,10 +57,11 @@ impl AccountType {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct FileInfo {
-    filename: String,
-    game_type: GameType,
-    account_type: AccountType
+    pub filename: String,
+    pub game_type: GameType,
+    pub account_type: AccountType
 }
 
 impl From<&PathBuf> for FileInfo {
