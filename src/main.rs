@@ -13,7 +13,6 @@ use csv::{Writer, WriterBuilder};
 use glob::{glob, GlobResult, Paths};
 use itertools::Itertools;
 use rayon::prelude::*;
-use serde::Serialize;
 use structopt::StructOpt;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -26,9 +25,7 @@ use event_file::schemas::{ContextToVec, Event};
 
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::AccountType;
-use crate::event_file::schemas::{
-    EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam,
-};
+use crate::event_file::schemas::{EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam};
 
 mod event_file;
 
@@ -119,6 +116,7 @@ impl EventFileSchema {
         let info = game_context.box_score_info
             .as_ref()
             .context("No box score data for box score write routine")?;
+        let game_id = game_context.game_id;
         writer_map
             .get_mut(&Self::BoxScoreGame)
             .unwrap()
@@ -131,28 +129,8 @@ impl EventFileSchema {
         for row in &game_context.umpires {
             w.serialize(row)?;
         }
-        // for (schema, writer) in writer_map {
-        //     let write_vec: Vec<impl Serialize> = match schema {
-        //         EventFileSchema::BoxScoreLineScore => info.line_score.clone(),
-        //         EventFileSchema::BoxScoreStarters => {}
-        //         EventFileSchema::BoxScoreBattingLines => {}
-        //         EventFileSchema::BoxScorePitchingLines => {}
-        //         EventFileSchema::BoxScoreFieldingLines => {}
-        //         EventFileSchema::BoxScorePinchHittingLines => {}
-        //         EventFileSchema::BoxScorePinchRunningLines => {}
-        //         EventFileSchema::BoxScoreTeamMiscellaneousLines => {}
-        //         EventFileSchema::BoxScoreTeamBattingLines => {}
-        //         EventFileSchema::BoxScoreTeamFieldingLines => {}
-        //         EventFileSchema::BoxScoreDoublePlays => {}
-        //         EventFileSchema::BoxScoreTriplePlays => {}
-        //         EventFileSchema::BoxScoreHitByPitches => {}
-        //         EventFileSchema::BoxScoreHomeRuns => {}
-        //         EventFileSchema::BoxScoreStolenBases => {}
-        //         EventFileSchema::BoxScoreCaughtStealing => {}
-        //         _ => vec![]
-        //     };
-        // }
         Ok(())
+        // TODO: The other box score stuff (maybe have to create full flat schemas ugh )
     }
 
     fn write_play_by_play_files(writer_map: &mut HashMap<Self, Writer<File>>, game_context: &GameContext) -> Result<()> {

@@ -28,7 +28,6 @@ use lazy_static::lazy_static;
 use regex::bytes::Match;
 use crate::AccountType;
 use crate::event_file::box_score::{BattingLine, BoxScoreEvent, BoxScoreLine, CaughtStealingLine, DefenseLine, DoublePlayLine, HitByPitchLine, HomeRunLine, LineScore, PinchHittingLine, PinchRunningLine, PitchingLine, StolenBaseLine, TeamBattingLine, TeamDefenseLine, TeamMiscellaneousLine, TriplePlayLine};
-use crate::event_file::schemas::{BoxScoreLineScore, BoxScorePlayerFielding, BoxScorePlayerHitting, BoxScorePlayerPitching};
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
