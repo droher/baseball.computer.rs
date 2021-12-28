@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use anyhow::{bail, Context, Error, Result};
 use arrayref::array_ref;
+use serde::{Serialize, Deserialize};
 
 use crate::event_file::misc::{Defense, Lineup, parse_positive_int, str_to_tinystr};
 use crate::event_file::traits::{
@@ -10,7 +11,7 @@ use crate::event_file::traits::{
 };
 use tinystr::TinyStr8;
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct BattingLineStats {
     pub at_bats: u8,
     pub runs: u8,
@@ -89,12 +90,13 @@ impl TryFrom<&[&str; 17]> for BattingLineStats {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub struct BattingLine {
     pub batter_id: Batter,
     pub side: Side,
     pub lineup_position: LineupPosition,
     pub nth_player_at_position: u8,
+    #[serde(flatten)]
     pub batting_stats: BattingLineStats,
 }
 
@@ -155,11 +157,12 @@ impl From<BattingLine> for RetrosheetEventRecord {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub struct PinchHittingLine {
     pub pinch_hitter_id: Batter,
     inning: Option<Inning>,
     side: Side,
+    #[serde(flatten)]
     pub batting_stats: Option<BattingLineStats>,
 }
 
@@ -206,7 +209,7 @@ impl TryFrom<&RetrosheetEventRecord> for PinchHittingLine {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub struct PinchRunningLine {
     pub pinch_runner_id: Batter,
     inning: Option<Inning>,
@@ -264,7 +267,7 @@ impl TryFrom<&RetrosheetEventRecord> for PinchRunningLine {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct DefenseLineStats {
     pub outs_played: Option<u8>,
     pub putouts: Option<u8>,
@@ -306,12 +309,13 @@ impl TryFrom<&[&str; 7]> for DefenseLineStats {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct DefenseLine {
     pub fielder_id: Fielder,
     pub side: Side,
     pub fielding_position: FieldingPosition,
     pub nth_position_played_by_player: u8,
+    #[serde(flatten)]
     pub defensive_stats: Option<DefenseLineStats>,
 }
 
@@ -377,7 +381,7 @@ impl From<DefenseLine> for RetrosheetEventRecord {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct PitchingLineStats {
     pub outs_recorded: u8,
     pub no_out_batters: Option<u8>,
@@ -456,11 +460,12 @@ impl TryFrom<&[&str; 17]> for PitchingLineStats {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub struct PitchingLine {
     pub pitcher_id: Pitcher,
     pub side: Side,
     nth_pitcher: u8,
+    #[serde(flatten)]
     pub pitching_stats: PitchingLineStats,
 }
 
@@ -515,7 +520,7 @@ impl From<PitchingLine> for RetrosheetEventRecord {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct TeamMiscellaneousLine {
     pub side: Side,
     pub left_on_base: u8,
@@ -553,9 +558,10 @@ impl From<TeamMiscellaneousLine> for RetrosheetEventRecord {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct TeamBattingLine {
     side: Side,
+    #[serde(flatten)]
     batting_stats: BattingLineStats,
 }
 
@@ -571,9 +577,10 @@ impl TryFrom<&RetrosheetEventRecord> for TeamBattingLine {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct TeamDefenseLine {
     pub side: Side,
+    #[serde(flatten)]
     pub defensive_stats: DefenseLineStats,
 }
 
@@ -644,7 +651,7 @@ impl TryFrom<&RetrosheetEventRecord> for BoxScoreLine {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct LineScore {
     pub side: Side,
     pub line_score: Vec<u8>,
@@ -668,7 +675,7 @@ impl TryFrom<&RetrosheetEventRecord> for LineScore {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct FieldingPlayLine {
     defense_side: Side,
     fielders: Vec<Fielder>,
@@ -700,7 +707,7 @@ impl TryFrom<&RetrosheetEventRecord> for FieldingPlayLine {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct HitByPitchLine {
     pitching_side: Side,
     pitcher_id: Option<Pitcher>,
@@ -730,7 +737,7 @@ impl TryFrom<&RetrosheetEventRecord> for HitByPitchLine {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct HomeRunLine {
     batting_side: Side,
     batter_id: Batter,

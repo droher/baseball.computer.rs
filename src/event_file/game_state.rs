@@ -198,7 +198,7 @@ impl Default for GameSetting {
             how_scored: Default::default(),
             wind_speed_mph: Default::default(),
             attendance: None,
-            park_id: tinystr8!("testpark"),
+            park_id: tinystr8!("unknown"),
             game_type: GameType::RegularSeason,
             season: Season(0),
         }
@@ -402,22 +402,22 @@ impl GameFieldingAppearance {
 
 #[derive(Default, Eq, PartialEq, Debug, Clone)]
 pub struct BoxScoreInfo {
-    line_score: Vec<LineScore>,
-    starters: Vec<StartRecord>,
-    batting_lines: Vec<BattingLine>,
-    pitching_lines: Vec<PitchingLine>,
-    fielding_lines: Vec<DefenseLine>,
-    pinch_hitting_lines: Vec<PinchHittingLine>,
-    pinch_running_lines: Vec<PinchRunningLine>,
-    team_miscellaneous_lines: Vec<TeamMiscellaneousLine>,
-    team_batting_lines: Vec<TeamBattingLine>,
-    team_defense_lines: Vec<TeamDefenseLine>,
-    double_plays: Vec<DoublePlayLine>,
-    triple_plays: Vec<TriplePlayLine>,
-    hit_by_pitches: Vec<HitByPitchLine>,
-    home_runs: Vec<HomeRunLine>,
-    stolen_bases: Vec<StolenBaseLine>,
-    caught_stealing: Vec<CaughtStealingLine>
+    pub line_score: Vec<LineScore>,
+    pub starters: Vec<StartRecord>,
+    pub batting_lines: Vec<BattingLine>,
+    pub pitching_lines: Vec<PitchingLine>,
+    pub fielding_lines: Vec<DefenseLine>,
+    pub pinch_hitting_lines: Vec<PinchHittingLine>,
+    pub pinch_running_lines: Vec<PinchRunningLine>,
+    pub team_miscellaneous_lines: Vec<TeamMiscellaneousLine>,
+    pub team_batting_lines: Vec<TeamBattingLine>,
+    pub team_fielding_lines: Vec<TeamDefenseLine>,
+    pub double_plays: Vec<DoublePlayLine>,
+    pub triple_plays: Vec<TriplePlayLine>,
+    pub hit_by_pitches: Vec<HitByPitchLine>,
+    pub home_runs: Vec<HomeRunLine>,
+    pub stolen_bases: Vec<StolenBaseLine>,
+    pub caught_stealing: Vec<CaughtStealingLine>
 }
 
 impl TryFrom<&RecordSlice> for BoxScoreInfo {
@@ -438,7 +438,7 @@ impl TryFrom<&RecordSlice> for BoxScoreInfo {
                         BoxScoreLine::TeamMiscellaneousLine(Some(d)) => info.team_miscellaneous_lines.push(d.clone()),
                         BoxScoreLine::TeamMiscellaneousLine(None) => {},
                         BoxScoreLine::TeamBattingLine(d) => info.team_batting_lines.push(d.clone()),
-                        BoxScoreLine::TeamDefenseLine(d) => info.team_defense_lines.push(d.clone()),
+                        BoxScoreLine::TeamDefenseLine(d) => info.team_fielding_lines.push(d.clone()),
                         _ => bail!("Unrecognized box score line: {:?}", bsl)
                     }
                 },

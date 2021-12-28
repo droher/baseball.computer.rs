@@ -176,7 +176,7 @@ pub fn digit_vec(int_str: &str) -> Vec<u8> {
 
 #[inline]
 pub fn str_to_tinystr<T: FromStr>(s: &str) -> Result<T> {
-    T::from_str(s).map_err(|_| anyhow!("Tinystr not formatted properly"))
+    T::from_str(s).map_err(|_| anyhow!("TinyStr not formatted properly"))
 }
 
 #[inline]

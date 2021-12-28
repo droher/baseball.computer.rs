@@ -13,6 +13,7 @@ use csv::{Writer, WriterBuilder};
 use glob::{glob, GlobResult, Paths};
 use itertools::Itertools;
 use rayon::prelude::*;
+use serde::Serialize;
 use structopt::StructOpt;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -35,7 +36,7 @@ const ABOUT: &str = "Transforms Retrosheet .EV* files (play-by-play) into .EB* f
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash, Display, EnumIter)]
 #[strum(serialize_all = "snake_case")]
-enum Schema {
+enum EventFileSchema {
     Game,
     GameTeam,
     GameUmpire,
@@ -51,16 +52,35 @@ enum Schema {
     EventBaserunningPlay,
     EventPitch,
     EventFlag,
+    BoxScoreGame,
+    BoxScoreTeam,
+    BoxScoreUmpire,
+    BoxScoreLineScore,
+    BoxScoreStarters,
+    BoxScoreBattingLines,
+    BoxScorePitchingLines,
+    BoxScoreFieldingLines,
+    BoxScorePinchHittingLines,
+    BoxScorePinchRunningLines,
+    BoxScoreTeamMiscellaneousLines,
+    BoxScoreTeamBattingLines,
+    BoxScoreTeamFieldingLines,
+    BoxScoreDoublePlays,
+    BoxScoreTriplePlays,
+    BoxScoreHitByPitches,
+    BoxScoreHomeRuns,
+    BoxScoreStolenBases,
+    BoxScoreCaughtStealing
 }
 
-impl Schema {
+impl EventFileSchema {
     fn write(reader: RetrosheetReader, output_prefix: &Path, parsed_games: Option<&HashSet<GameId>>) -> Vec<GameId> {
         let file_info = (&reader).file_info.clone();
         let output_prefix_display = output_prefix.to_str().unwrap_or_default();
         debug!("Processing file {}", output_prefix_display);
 
         let mut game_ids = Vec::with_capacity(81);
-        let mut writer_map = Self::writer_map(output_prefix);
+        let mut writer_map = Self::writer_map(output_prefix, file_info.account_type);
 
         for record_vec_result in reader {
             if let Err(e) = record_vec_result {
@@ -80,15 +100,62 @@ impl Schema {
                     &game_context.game_id.id);
                 continue
             }
-            if game_context.file_info.account_type == AccountType::BoxScore {
-                continue
-            }
             Self::write_individual_files(&mut writer_map, &game_context).unwrap()
         }
         game_ids
     }
 
     fn write_individual_files(writer_map: &mut HashMap<Self, Writer<File>>, game_context: &GameContext) -> Result<()> {
+        if game_context.file_info.account_type == AccountType::BoxScore {
+            Self::write_box_score_files(writer_map, game_context)
+        }
+        else {
+            Self::write_play_by_play_files(writer_map, game_context)
+        }
+    }
+
+    fn write_box_score_files(writer_map: &mut HashMap<Self, Writer<File>>, game_context: &GameContext) -> Result<()> {
+
+        let info = game_context.box_score_info
+            .as_ref()
+            .context("No box score data for box score write routine")?;
+        writer_map
+            .get_mut(&Self::BoxScoreGame)
+            .unwrap()
+            .serialize(Game::from(game_context))?;
+        let w = writer_map.get_mut(&Self::BoxScoreTeam).unwrap();
+        for row in GameTeam::from_game_context(game_context) {
+            w.serialize(&row)?;
+        }
+        let w = writer_map.get_mut(&Self::BoxScoreUmpire).unwrap();
+        for row in &game_context.umpires {
+            w.serialize(row)?;
+        }
+        // for (schema, writer) in writer_map {
+        //     let write_vec: Vec<impl Serialize> = match schema {
+        //         EventFileSchema::BoxScoreLineScore => info.line_score.clone(),
+        //         EventFileSchema::BoxScoreStarters => {}
+        //         EventFileSchema::BoxScoreBattingLines => {}
+        //         EventFileSchema::BoxScorePitchingLines => {}
+        //         EventFileSchema::BoxScoreFieldingLines => {}
+        //         EventFileSchema::BoxScorePinchHittingLines => {}
+        //         EventFileSchema::BoxScorePinchRunningLines => {}
+        //         EventFileSchema::BoxScoreTeamMiscellaneousLines => {}
+        //         EventFileSchema::BoxScoreTeamBattingLines => {}
+        //         EventFileSchema::BoxScoreTeamFieldingLines => {}
+        //         EventFileSchema::BoxScoreDoublePlays => {}
+        //         EventFileSchema::BoxScoreTriplePlays => {}
+        //         EventFileSchema::BoxScoreHitByPitches => {}
+        //         EventFileSchema::BoxScoreHomeRuns => {}
+        //         EventFileSchema::BoxScoreStolenBases => {}
+        //         EventFileSchema::BoxScoreCaughtStealing => {}
+        //         _ => vec![]
+        //     };
+        // }
+        Ok(())
+    }
+
+    fn write_play_by_play_files(writer_map: &mut HashMap<Self, Writer<File>>, game_context: &GameContext) -> Result<()> {
         // Write Game
         writer_map
             .get_mut(&Self::Game)
@@ -195,12 +262,14 @@ impl Schema {
         Ok(())
     }
 
-    fn writer_map(output_prefix: &Path) -> HashMap<Self, Writer<File>> {
+    fn writer_map(output_prefix: &Path, account_type: AccountType) -> HashMap<Self, Writer<File>> {
+        let (box_score, event): (Vec<Self>, Vec<Self>) = Self::iter().partition(|s| s.to_string().starts_with("box_score"));
+        let schema_iter = if account_type == AccountType::BoxScore { box_score } else { event };
         let mut map = HashMap::new();
-        for schema in Self::iter() {
+        for schema in schema_iter {
             let file_name = format!(
                 "{}__{}.csv",
-                schema,
+                schema.to_string(),
                 output_prefix.file_name().unwrap().to_str().unwrap()
             );
             let output_path = output_prefix.with_file_name(file_name);
@@ -211,7 +280,7 @@ impl Schema {
     }
 
     pub fn concat(output_root: &str) {
-        for schema in Schema::iter() {
+        for schema in EventFileSchema::iter() {
             let new_file = format!("{}/{}.csv", output_root, schema);
             let mut exists = false;
             let file = OpenOptions::new()
@@ -250,7 +319,7 @@ fn process_file(glob_result: GlobResult, output_root: &Path, parsed_games: Optio
     let input_path = glob_result.unwrap();
     let output_prefix = output_root.join(input_path.file_name().unwrap());
     let reader = RetrosheetReader::try_from(&input_path).unwrap();
-    Schema::write(reader, &output_prefix, parsed_games)
+    EventFileSchema::write(reader, &output_prefix, parsed_games)
 }
 
 fn par_process_files(opt: &Opt, account_type: AccountType, parsed_games: Option<&HashSet<GameId>>) -> Vec<GameId> {
@@ -279,6 +348,7 @@ fn main() {
 
     let start = Instant::now();
     let opt: Opt = Opt::from_args();
+    let output_root = get_output_root(&opt).unwrap();
 
     info!("Parsing conventional play-by-play files");
     let mut event_files = par_process_files(&opt, AccountType::PlayByPlay, Some(&parsed_game_ids));
@@ -290,10 +360,9 @@ fn main() {
     info!("Parsing box score files");
     par_process_files(&opt, AccountType::BoxScore, None);
 
-    let output_root = get_output_root(&opt).unwrap();
 
     info!("Merging files by schema");
-    Schema::concat(output_root.to_str().unwrap());
+    EventFileSchema::concat(output_root.to_str().unwrap());
     let end = start.elapsed();
     info!("Elapsed: {:?}", end);
 }

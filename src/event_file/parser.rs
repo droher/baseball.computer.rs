@@ -18,7 +18,7 @@ use crate::event_file::misc::{
 };
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{GameType, RetrosheetEventRecord};
-use crate::Schema::Game;
+use crate::EventFileSchema::Game;
 
 pub type RecordVec = Vec<MappedRecord>;
 pub type RecordSlice = [MappedRecord];
