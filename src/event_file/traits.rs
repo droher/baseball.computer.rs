@@ -10,8 +10,8 @@ use strum_macros::{Display, EnumIter, EnumString};
 use tinystr::{TinyStr16, TinyStr8};
 
 use crate::event_file::info::{InfoRecord, Team};
-use crate::event_file::parser::{MappedRecord, RecordSlice};
 use crate::event_file::misc::digit_vec;
+use crate::event_file::parser::{MappedRecord, RecordSlice};
 
 pub type RetrosheetEventRecord = StringRecord;
 

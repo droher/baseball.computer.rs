@@ -1,6 +1,6 @@
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::AccountType;
-use crate::event_file::traits::{GameType, Side};
+use crate::event_file::traits::GameType;
 
 /// Full: All data is present.
 /// Partial: At least one data point is present *and* at least one data point is missing.
@@ -12,7 +12,7 @@ pub enum Completeness {
     Partial,
     TeamOnly,
     Missing,
-    Indeterminate
+    Indeterminate,
 }
 
 /// Metadata about the completeness of an account for a given game.
@@ -29,5 +29,5 @@ pub struct GameMetadata {
     sacrifice_fly: Completeness,
     sacrifice_hit: Completeness,
     stolen_base: Completeness,
-    caught_stealing: Completeness
+    caught_stealing: Completeness,
 }

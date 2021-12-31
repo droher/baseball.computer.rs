@@ -1,7 +1,12 @@
 use std::cmp::min;
+use std::collections::HashSet;
+use std::convert::TryFrom;
+use std::iter::FromIterator;
+use std::mem::discriminant;
 use std::str::FromStr;
 
 use anyhow::{bail, Context, Error, Result};
+use bounded_integer::BoundedU8;
 use const_format::{concatcp, formatcp};
 use lazy_static::lazy_static;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -10,16 +15,11 @@ use serde::{Deserialize, Serialize};
 use strum::ParseError;
 use strum_macros::{Display, EnumDiscriminants, EnumIter, EnumString};
 
+use crate::event_file::misc::{regex_split, str_to_tinystr, to_str_vec};
 use crate::event_file::pitch_sequence::PitchSequence;
 use crate::event_file::traits::{
     Batter, FieldingPlayType, FieldingPosition, Inning, RetrosheetEventRecord, Side,
 };
-use bounded_integer::BoundedU8;
-use std::collections::HashSet;
-use std::convert::TryFrom;
-use std::iter::FromIterator;
-use std::mem::discriminant;
-use crate::event_file::misc::{regex_split, str_to_tinystr, to_str_vec};
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
@@ -271,15 +271,6 @@ pub enum RbiStatus {
 pub type PositionVec = Vec<FieldingPosition>;
 pub type Balls = BoundedU8<0, 3>;
 pub type Strikes = BoundedU8<0, 2>;
-
-impl Default for BaserunningFieldingInfo {
-    fn default() -> Self {
-        Self {
-            fielders_data: vec![],
-            unearned_run: None,
-        }
-    }
-}
 
 /// Movement on the bases is not always explicitly given in the advances section.
 /// The batter's advance is usually implied by the play type (e.g. a double means ending up
@@ -633,7 +624,7 @@ impl TryFrom<(&str, &str)> for PlateAppearanceType {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub struct BaserunningFieldingInfo {
     fielders_data: Vec<FieldersData>,
     unearned_run: Option<EarnedRunStatus>,

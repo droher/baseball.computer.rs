@@ -3,13 +3,13 @@ use std::str::FromStr;
 
 use anyhow::{bail, Context, Error, Result};
 use arrayref::array_ref;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use tinystr::TinyStr8;
 
-use crate::event_file::misc::{Defense, Lineup, parse_positive_int, str_to_tinystr};
+use crate::event_file::misc::{parse_positive_int, str_to_tinystr, Defense, Lineup};
 use crate::event_file::traits::{
     Batter, Fielder, FieldingPosition, Inning, LineupPosition, Pitcher, RetrosheetEventRecord, Side,
 };
-use tinystr::TinyStr8;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct BattingLineStats {
@@ -202,7 +202,9 @@ impl TryFrom<&RetrosheetEventRecord> for PinchHittingLine {
             pinch_hitter_id: str_to_tinystr(arr[2])?,
             inning: p(arr[3]),
             side: Side::from_str(arr[4])?,
-            batting_stats: BattingLineStats::try_from(array_ref![arr, 5, 17]).ok().unwrap_or_default(),
+            batting_stats: BattingLineStats::try_from(array_ref![arr, 5, 17])
+                .ok()
+                .unwrap_or_default(),
         })
     }
 }
@@ -686,9 +688,7 @@ impl TryFrom<&RetrosheetEventRecord> for FieldingPlayLine {
         let mut iter = record.iter();
         Ok(FieldingPlayLine {
             defense_side: Side::from_str(iter.nth(2).context("Missing team side")?)?,
-            fielders: iter
-                .collect::<Vec<&str>>()
-                .join("-"),
+            fielders: iter.collect::<Vec<&str>>().join("-"),
         })
     }
 }
@@ -836,14 +836,14 @@ impl From<BoxScoreEvent> for RetrosheetEventRecord {
             BoxScoreEvent::DoublePlay(dp) => {
                 record.push_field("dpline");
                 record.push_field(dp.defense_side.retrosheet_str());
-                for fielder in dp.fielders.split("-") {
+                for fielder in dp.fielders.split('-') {
                     record.push_field(fielder)
                 }
             }
             BoxScoreEvent::TriplePlay(tp) => {
                 record.push_field("tpline");
                 record.push_field(tp.defense_side.retrosheet_str());
-                for fielder in tp.fielders.split("-") {
+                for fielder in tp.fielders.split('-') {
                     record.push_field(fielder)
                 }
             }

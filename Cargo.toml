@@ -16,7 +16,7 @@ num-traits = "0.2.14"
 arrayref = "0.3.6"
 lazy_static = "1.4.0"
 const_format = "0.2.22"
-either = "1.6.1"
+either = {version = "1.6.1", features = ["serde", "use_std"]}
 num_enum = "0.5.4"
 tinystr = {version = "0.4.12", features = ["serde"]}
 bimap = "0.6.1"

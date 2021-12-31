@@ -1,15 +1,16 @@
+use std::convert::TryFrom;
+use std::str::FromStr;
+
 use anyhow::{bail, Error, Result};
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
+use tinystr::{TinyStr16, TinyStr8};
 
+use crate::event_file::misc::{parse_positive_int, str_to_tinystr};
 use crate::event_file::traits::{
     Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire,
 };
-use std::convert::TryFrom;
-use std::str::FromStr;
-use tinystr::{TinyStr16, TinyStr8};
-use crate::event_file::misc::{parse_positive_int, str_to_tinystr};
 
 #[derive(
     Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,

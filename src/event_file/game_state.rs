@@ -9,18 +9,17 @@ use chrono::{NaiveDate, NaiveTime};
 use either::Either;
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use regex::bytes::Match;
 use serde::{Deserialize, Serialize};
-use tinystr::{tinystr16, TinyStr16, tinystr8};
+use tinystr::{tinystr16, tinystr8, TinyStr16};
 
-use crate::AccountType;
-use crate::AccountType::BoxScore;
-use crate::event_file::box_score::{BattingLine, BoxScoreEvent, BoxScoreLine, CaughtStealingLine, DefenseLine, DoublePlayLine, HitByPitchLine, HomeRunLine, LineScore, PinchHittingLine, PinchRunningLine, PitchingLine, StolenBaseLine, TeamBattingLine, TeamDefenseLine, TeamMiscellaneousLine, TriplePlayLine};
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
     Team, UmpireAssignment, UmpirePosition, WindDirection,
 };
-use crate::event_file::misc::{BatHandAdjustment, GameId, Hand, LineupAdjustment, PitchHandAdjustment, RunnerAdjustment, StartRecord, SubstitutionRecord};
+use crate::event_file::misc::{
+    BatHandAdjustment, GameId, Hand, LineupAdjustment, PitchHandAdjustment, RunnerAdjustment,
+    StartRecord, SubstitutionRecord,
+};
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::pitch_sequence::PitchSequenceItem;
 use crate::event_file::play::{
@@ -28,13 +27,19 @@ use crate::event_file::play::{
     FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame,
     OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayType, RunnerAdvance,
 };
-use crate::event_file::traits::{FieldingPosition, GameType, Inning, LineupPosition, Matchup, Pitcher, Player, SequenceId, Side, Umpire};
+use crate::event_file::traits::{
+    FieldingPosition, GameType, Inning, LineupPosition, Matchup, Pitcher, Player, SequenceId, Side,
+    Umpire,
+};
+use crate::AccountType;
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
 const OHTANI: &str = "ohtas001";
 const OHTANI_ALL_STAR_GAME: &str = "NLS202107130";
-lazy_static! { static ref FAKE_OHTANI: Player = Player::from_str("ohtas999").unwrap(); }
+lazy_static! {
+    static ref FAKE_OHTANI: Player = Player::from_str("ohtas999").unwrap();
+}
 
 type Position = Either<LineupPosition, FieldingPosition>;
 type PersonnelState = BiMap<Position, Player>;
@@ -410,9 +415,8 @@ pub struct GameContext {
     pub results: GameResults,
     pub lineup_appearances: Vec<GameLineupAppearance>,
     pub fielding_appearances: Vec<GameFieldingAppearance>,
-    pub events: Vec<Event>
+    pub events: Vec<Event>,
 }
-
 
 impl TryFrom<(&RecordSlice, FileInfo)> for GameContext {
     type Error = Error;
@@ -426,12 +430,12 @@ impl TryFrom<(&RecordSlice, FileInfo)> for GameContext {
         let results = GameResults::try_from(record_vec)?;
 
         let (events, lineup_appearances, fielding_appearances) =
-            if file_info.account_type == BoxScore { (vec![], vec![], vec![]) }
-            else {
+            if file_info.account_type == AccountType::BoxScore {
+                (vec![], vec![], vec![])
+            } else {
                 GameState::create_events(record_vec)
                     .with_context(|| format!("Could not parse game {}", game_id.id))?
             };
-
 
         Ok(Self {
             game_id,
@@ -642,7 +646,7 @@ pub struct WeirdGameState {
     pitcher_hand: Option<Hand>,
     // TODO
     responsible_batter: Option<Player>,
-    responsible_pitcher: Option<Player>
+    responsible_pitcher: Option<Player>,
 }
 
 /// Keeps track of the current players on the field at any given point
@@ -687,9 +691,12 @@ impl Personnel {
     fn handle_2021_asg(game_id: GameId, start: &StartRecord) -> Player {
         if game_id.id == OHTANI_ALL_STAR_GAME
             && start.player == OHTANI
-            && start.fielding_position == FieldingPosition::Pitcher {
+            && start.fielding_position == FieldingPosition::Pitcher
+        {
             *FAKE_OHTANI
-        } else {start.player}
+        } else {
+            start.player
+        }
     }
 
     fn new(record_vec: &RecordSlice) -> Result<Self> {
@@ -934,7 +941,7 @@ pub struct GameState {
     bases: BaseState,
     at_bat: LineupPosition,
     personnel: Personnel,
-    weird_state: WeirdGameState
+    weird_state: WeirdGameState,
 }
 
 impl GameState {
@@ -968,7 +975,7 @@ impl GameState {
                         state.event_id,
                     ),
                     batter_hand: state.weird_state.batter_hand.unwrap_or_default(),
-                    pitcher_hand: state.weird_state.pitcher_hand.unwrap_or_default()
+                    pitcher_hand: state.weird_state.pitcher_hand.unwrap_or_default(),
                 };
                 let results = EventResults {
                     count_at_event: pr.count,
@@ -1053,7 +1060,7 @@ impl GameState {
             bases: Default::default(),
             at_bat: Default::default(),
             personnel: Personnel::new(record_vec)?,
-            weird_state: Default::default()
+            weird_state: Default::default(),
         })
     }
 
