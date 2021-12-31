@@ -89,7 +89,7 @@ impl TryFrom<&RetrosheetEventRecord> for LineupAdjustment {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct AppearanceRecord {
     pub player: Player,
     pub player_name: String,

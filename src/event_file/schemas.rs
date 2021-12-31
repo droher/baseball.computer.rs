@@ -1,5 +1,7 @@
+use anyhow::{anyhow, Result, Error};
 use bounded_integer::BoundedU8;
 use chrono::{NaiveDate, NaiveTime};
+use either::Either;
 use serde::{Deserialize, Serialize};
 
 use crate::event_file::game_state::{EventId, GameContext, Outs};
@@ -7,7 +9,7 @@ use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, Park, Precipitation, Sky, Team,
     WindDirection,
 };
-use crate::event_file::misc::GameId;
+use crate::event_file::misc::{AppearanceRecord, GameId};
 use crate::event_file::pitch_sequence::{PitchType, SequenceItemTypeGeneral};
 use crate::event_file::play::{
     Base, BaseRunner, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame,
@@ -17,6 +19,8 @@ use crate::event_file::traits::{
     SequenceId, Side,
 };
 use tinystr::TinyStr16;
+use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
+use crate::event_file::parser::MappedRecord;
 
 pub trait ContextToVec {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_>
@@ -270,19 +274,23 @@ impl ContextToVec for EventOut {
     }
 }
 
-pub struct BoxScoreLineScore {}
-pub struct BoxScoreStarters {}
-pub struct BoxScoreBattingStats {}
-pub struct BoxScorePitchingStats {}
-pub struct BoxScoreFieldingStats {}
-pub struct BoxScorePinchHitters {}
-pub struct BoxScorePinchRunners {}
-pub struct BoxScoreTeamMiscellaneousLine {}
-pub struct BoxScoreTeamBattingStats {}
-pub struct BoxScoreTeamFieldingStats {}
-pub struct BoxScoreEventDoublePlays {}
-pub struct BoxScoreEventTriplePlays {}
-pub struct BoxScoreEventHitByPitch {}
-pub struct BoxScoreEventHomeRun {}
-pub struct BoxScoreEventStolenBase {}
-pub struct BoxScoreEventCaughtStealing {}
+#[derive(Debug, Serialize, Clone)]
+pub struct BoxScoreWritableRecord<'a> {
+    pub game_id: TinyStr16,
+    #[serde(with = "either::serde_untagged")]
+    pub record: Either<&'a BoxScoreLine, &'a BoxScoreEvent>
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct BoxScoreLineScore {
+    pub game_id: TinyStr16,
+    pub side: Side,
+    pub inning: Inning,
+    pub runs: u8
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct BoxScoreStarters {
+    pub game_id: TinyStr16,
+    pub record: AppearanceRecord
+}

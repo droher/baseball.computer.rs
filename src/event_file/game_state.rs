@@ -4,12 +4,18 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
 use bimap::BiMap;
+use bounded_integer::BoundedUsize;
 use chrono::{NaiveDate, NaiveTime};
 use either::Either;
 use itertools::Itertools;
+use lazy_static::lazy_static;
+use regex::bytes::Match;
 use serde::{Deserialize, Serialize};
-use tinystr::{tinystr16, tinystr8, TinyStr16};
+use tinystr::{tinystr16, TinyStr16, tinystr8};
 
+use crate::AccountType;
+use crate::AccountType::BoxScore;
+use crate::event_file::box_score::{BattingLine, BoxScoreEvent, BoxScoreLine, CaughtStealingLine, DefenseLine, DoublePlayLine, HitByPitchLine, HomeRunLine, LineScore, PinchHittingLine, PinchRunningLine, PitchingLine, StolenBaseLine, TeamBattingLine, TeamDefenseLine, TeamMiscellaneousLine, TriplePlayLine};
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
     Team, UmpireAssignment, UmpirePosition, WindDirection,
@@ -22,12 +28,7 @@ use crate::event_file::play::{
     FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame,
     OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayType, RunnerAdvance,
 };
-use crate::event_file::traits::{Inning, Matchup, Pitcher, Player, SequenceId, Umpire, FieldingPosition, GameType, LineupPosition, Side};
-use bounded_integer::BoundedUsize;
-use lazy_static::lazy_static;
-use regex::bytes::Match;
-use crate::AccountType;
-use crate::event_file::box_score::{BattingLine, BoxScoreEvent, BoxScoreLine, CaughtStealingLine, DefenseLine, DoublePlayLine, HitByPitchLine, HomeRunLine, LineScore, PinchHittingLine, PinchRunningLine, PitchingLine, StolenBaseLine, TeamBattingLine, TeamDefenseLine, TeamMiscellaneousLine, TriplePlayLine};
+use crate::event_file::traits::{FieldingPosition, GameType, Inning, LineupPosition, Matchup, Pitcher, Player, SequenceId, Side, Umpire};
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
@@ -399,70 +400,6 @@ impl GameFieldingAppearance {
     }
 }
 
-#[derive(Default, Eq, PartialEq, Debug, Clone)]
-pub struct BoxScoreInfo {
-    pub line_score: Vec<LineScore>,
-    pub starters: Vec<StartRecord>,
-    pub batting_lines: Vec<BattingLine>,
-    pub pitching_lines: Vec<PitchingLine>,
-    pub fielding_lines: Vec<DefenseLine>,
-    pub pinch_hitting_lines: Vec<PinchHittingLine>,
-    pub pinch_running_lines: Vec<PinchRunningLine>,
-    pub team_miscellaneous_lines: Vec<TeamMiscellaneousLine>,
-    pub team_batting_lines: Vec<TeamBattingLine>,
-    pub team_fielding_lines: Vec<TeamDefenseLine>,
-    pub double_plays: Vec<DoublePlayLine>,
-    pub triple_plays: Vec<TriplePlayLine>,
-    pub hit_by_pitches: Vec<HitByPitchLine>,
-    pub home_runs: Vec<HomeRunLine>,
-    pub stolen_bases: Vec<StolenBaseLine>,
-    pub caught_stealing: Vec<CaughtStealingLine>
-}
-
-impl TryFrom<&RecordSlice> for BoxScoreInfo {
-    type Error = Error;
-
-    fn try_from(record_vec: &RecordSlice) -> Result<Self> {
-        let mut info = BoxScoreInfo::default();
-
-        for mr in record_vec {
-            match mr {
-                MappedRecord::BoxScoreLine(bsl) => {
-                    match bsl {
-                        BoxScoreLine::BattingLine(d) => info.batting_lines.push(d.clone()),
-                        BoxScoreLine::PinchHittingLine(d) => info.pinch_hitting_lines.push(d.clone()),
-                        BoxScoreLine::PinchRunningLine(d) => info.pinch_running_lines.push(d.clone()),
-                        BoxScoreLine::PitchingLine(d) => info.pitching_lines.push(d.clone()),
-                        BoxScoreLine::DefenseLine(d) => info.fielding_lines.push(d.clone()),
-                        BoxScoreLine::TeamMiscellaneousLine(Some(d)) => info.team_miscellaneous_lines.push(d.clone()),
-                        BoxScoreLine::TeamMiscellaneousLine(None) => {},
-                        BoxScoreLine::TeamBattingLine(d) => info.team_batting_lines.push(d.clone()),
-                        BoxScoreLine::TeamDefenseLine(d) => info.team_fielding_lines.push(d.clone()),
-                        _ => bail!("Unrecognized box score line: {:?}", bsl)
-                    }
-                },
-                MappedRecord::BoxScoreEvent(bse) => {
-                    match bse {
-                        BoxScoreEvent::DoublePlay(d) => info.double_plays.push(d.clone()),
-                        BoxScoreEvent::TriplePlay(d) => info.triple_plays.push(d.clone()),
-                        BoxScoreEvent::HitByPitch(d) => info.hit_by_pitches.push(d.clone()),
-                        BoxScoreEvent::HomeRun(d) => info.home_runs.push(d.clone()),
-                        BoxScoreEvent::StolenBase(d) => info.stolen_bases.push(d.clone()),
-                        BoxScoreEvent::CaughtStealing(d) => info.caught_stealing.push(d.clone()),
-                        _ => bail!("Unrecognized box score event: {:?}", bse)
-                    }
-                }
-                MappedRecord::LineScore(ls) => info.line_score.push(ls.clone()),
-                MappedRecord::Start(sr) => info.starters.push(sr.clone()),
-                _ => ()
-            }
-        }
-        Ok(info)
-
-    }
-}
-
-
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct GameContext {
     pub game_id: GameId,
@@ -473,8 +410,7 @@ pub struct GameContext {
     pub results: GameResults,
     pub lineup_appearances: Vec<GameLineupAppearance>,
     pub fielding_appearances: Vec<GameFieldingAppearance>,
-    pub events: Vec<Event>,
-    pub box_score_info: Option<BoxScoreInfo>
+    pub events: Vec<Event>
 }
 
 
@@ -489,17 +425,13 @@ impl TryFrom<(&RecordSlice, FileInfo)> for GameContext {
         let umpires = GameUmpire::from_record_vec(record_vec)?;
         let results = GameResults::try_from(record_vec)?;
 
-        let (events, lineup_appearances, fielding_appearances, box_score_info) = {
-            if file_info.account_type == AccountType::BoxScore {
-                (vec![], vec![], vec![], Some(BoxScoreInfo::try_from(record_vec)?))
-            }
+        let (events, lineup_appearances, fielding_appearances) =
+            if file_info.account_type == BoxScore { (vec![], vec![], vec![]) }
             else {
-                let (events, lineup_appearances, fielding_appearances) =
-                    GameState::create_events(record_vec)
-                        .with_context(|| format!("Could not parse game {}", game_id.id))?;
-                (events, lineup_appearances, fielding_appearances, None)
-            }
-        };
+                GameState::create_events(record_vec)
+                    .with_context(|| format!("Could not parse game {}", game_id.id))?
+            };
+
 
         Ok(Self {
             game_id,
@@ -511,7 +443,6 @@ impl TryFrom<(&RecordSlice, FileInfo)> for GameContext {
             lineup_appearances,
             fielding_appearances,
             events,
-            box_score_info
         })
     }
 }

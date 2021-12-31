@@ -8,8 +8,9 @@ use std::io::{BufRead, BufReader, BufWriter, copy};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use csv::{Writer, WriterBuilder};
+use either::Either;
 use glob::{glob, GlobResult, Paths};
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -22,10 +23,12 @@ use tracing_subscriber::FmtSubscriber;
 use event_file::game_state::GameContext;
 use event_file::parser::RetrosheetReader;
 use event_file::schemas::{ContextToVec, Event};
+use crate::AccountType::BoxScore;
+use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 
 use crate::event_file::misc::GameId;
-use crate::event_file::parser::AccountType;
-use crate::event_file::schemas::{EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam};
+use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
+use crate::event_file::schemas::{BoxScoreWritableRecord, EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam};
 
 mod event_file;
 
@@ -72,7 +75,7 @@ enum EventFileSchema {
 
 impl EventFileSchema {
     fn write(reader: RetrosheetReader, output_prefix: &Path, parsed_games: Option<&HashSet<GameId>>) -> Vec<GameId> {
-        let file_info = (&reader).file_info.clone();
+        let file_info = (&reader).file_info;
         let output_prefix_display = output_prefix.to_str().unwrap_or_default();
         debug!("Processing file {}", output_prefix_display);
 
@@ -80,11 +83,12 @@ impl EventFileSchema {
         let mut writer_map = Self::writer_map(output_prefix, file_info.account_type);
 
         for record_vec_result in reader {
+            let record_vec = record_vec_result.as_ref().unwrap();
             if let Err(e) = record_vec_result {
                 error!("{:?}", e);
                 continue
             }
-            let game_context_result = GameContext::try_from((record_vec_result.unwrap().as_slice(), file_info.clone()));
+            let game_context_result = GameContext::try_from((record_vec.as_slice(), file_info));
             if let Err(e) = game_context_result {
                 error!("{:?}", e);
                 continue
@@ -97,40 +101,76 @@ impl EventFileSchema {
                     &game_context.game_id.id);
                 continue
             }
-            Self::write_individual_files(&mut writer_map, &game_context).unwrap()
+            if game_context.file_info.account_type == AccountType::BoxScore {
+                Self::write_box_score_files(&mut writer_map, &game_context, record_vec.as_slice()).unwrap();
+            }
+            else {
+                Self::write_play_by_play_files(&mut writer_map, &game_context).unwrap();
+            }
         }
         game_ids
     }
 
-    fn write_individual_files(writer_map: &mut HashMap<Self, Writer<File>>, game_context: &GameContext) -> Result<()> {
-        if game_context.file_info.account_type == AccountType::BoxScore {
-            Self::write_box_score_files(writer_map, game_context)
-        }
-        else {
-            Self::write_play_by_play_files(writer_map, game_context)
-        }
+    fn box_score_schema(line: &BoxScoreWritableRecord) -> Result<Self> {
+        Ok(match line.record {
+            Either::Left(bsl) => {
+                match bsl {
+                    BoxScoreLine::BattingLine(_) => Self::BoxScoreBattingLines,
+                    BoxScoreLine::PinchHittingLine(_) => Self::BoxScorePinchHittingLines,
+                    BoxScoreLine::PinchRunningLine(_) => Self::BoxScorePinchRunningLines,
+                    BoxScoreLine::PitchingLine(_) => Self::BoxScorePitchingLines,
+                    BoxScoreLine::DefenseLine(_) => Self::BoxScoreFieldingLines,
+                    BoxScoreLine::TeamMiscellaneousLine(_) => Self::BoxScoreTeamMiscellaneousLines,
+                    BoxScoreLine::TeamBattingLine(_) => Self::BoxScoreTeamBattingLines,
+                    BoxScoreLine::TeamDefenseLine(_) => Self::BoxScoreTeamFieldingLines,
+                    BoxScoreLine::Unrecognized => bail!("Unrecognized box score line")
+                }
+            }
+            Either::Right(bse) => {
+                match bse {
+                    BoxScoreEvent::DoublePlay(_) => Self::BoxScoreDoublePlays,
+                    BoxScoreEvent::TriplePlay(_) => Self::BoxScoreTriplePlays,
+                    BoxScoreEvent::HitByPitch(_) => Self::BoxScoreHitByPitches,
+                    BoxScoreEvent::HomeRun(_) => Self::BoxScoreHomeRuns,
+                    BoxScoreEvent::StolenBase(_) => Self::BoxScoreStolenBases,
+                    BoxScoreEvent::CaughtStealing(_) => Self::BoxScoreCaughtStealing,
+                    BoxScoreEvent::Unrecognized => bail!("Unrecognized box score event")
+                }
+            }
+        })
     }
 
-    fn write_box_score_files(writer_map: &mut HashMap<Self, Writer<File>>, game_context: &GameContext) -> Result<()> {
-
-        let info = game_context.box_score_info
-            .as_ref()
-            .context("No box score data for box score write routine")?;
-        let game_id = game_context.game_id;
+    fn write_box_score_files(writer_map: &mut HashMap<Self, Writer<File>>, game_context: &GameContext, record_vec: &RecordSlice) -> Result<()> {
+        // Write Game
         writer_map
             .get_mut(&Self::BoxScoreGame)
             .unwrap()
             .serialize(Game::from(game_context))?;
+        // Write GameTeam
         let w = writer_map.get_mut(&Self::BoxScoreTeam).unwrap();
         for row in GameTeam::from_game_context(game_context) {
             w.serialize(&row)?;
         }
+        // Write GameUmpire
         let w = writer_map.get_mut(&Self::BoxScoreUmpire).unwrap();
         for row in &game_context.umpires {
             w.serialize(row)?;
         }
-        Ok(())
+        let game_id = game_context.game_id.id;
+        let box_score_lines = record_vec.iter()
+            .filter_map(|mr| match mr {
+                MappedRecord::BoxScoreLine(bsl) => Some(Either::Left(bsl)),
+                MappedRecord::BoxScoreEvent(bse) => Some(Either::Right(bse)),
+                _ => None
+            }).map(|record| BoxScoreWritableRecord { game_id, record });
+        for line in box_score_lines {
+            let schema = Self::box_score_schema(&line)?;
+            let w = writer_map.get_mut(&schema).unwrap();
+            println!("{:?}", line);
+            w.serialize(line)?;
+        }
         // TODO: The other box score stuff (maybe have to create full flat schemas ugh )
+        Ok(())
     }
 
     fn write_play_by_play_files(writer_map: &mut HashMap<Self, Writer<File>>, game_context: &GameContext) -> Result<()> {
@@ -251,7 +291,10 @@ impl EventFileSchema {
                 output_prefix.file_name().unwrap().to_str().unwrap()
             );
             let output_path = output_prefix.with_file_name(file_name);
-            let writer = WriterBuilder::new().from_path(output_path).unwrap();
+            let writer = WriterBuilder::new()
+                .has_headers(account_type != BoxScore)
+                .from_path(output_path)
+                .unwrap();
             map.insert(schema, writer);
         }
         map
@@ -318,7 +361,7 @@ fn get_output_root(opt: &Opt) -> Result<PathBuf> {
 }
 
 fn main() {
-    let mut parsed_game_ids = HashSet::with_capacity(200000);
+    //let mut parsed_game_ids = HashSet::with_capacity(200000);
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .finish();
@@ -329,11 +372,11 @@ fn main() {
     let output_root = get_output_root(&opt).unwrap();
 
     info!("Parsing conventional play-by-play files");
-    let mut event_files = par_process_files(&opt, AccountType::PlayByPlay, Some(&parsed_game_ids));
-    parsed_game_ids.extend(event_files.drain(..));
+    //let mut event_files = par_process_files(&opt, AccountType::PlayByPlay, Some(&parsed_game_ids));
+    //parsed_game_ids.extend(event_files.drain(..));
 
     info!("Parsing derived play-by-play files");
-    par_process_files(&opt, AccountType::Derived, Some(&parsed_game_ids));
+    //par_process_files(&opt, AccountType::Derived, Some(&parsed_game_ids));
 
     info!("Parsing box score files");
     par_process_files(&opt, AccountType::BoxScore, None);

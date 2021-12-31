@@ -96,7 +96,6 @@ pub struct BattingLine {
     pub side: Side,
     pub lineup_position: LineupPosition,
     pub nth_player_at_position: u8,
-    #[serde(flatten)]
     pub batting_stats: BattingLineStats,
 }
 
@@ -162,8 +161,7 @@ pub struct PinchHittingLine {
     pub pinch_hitter_id: Batter,
     inning: Option<Inning>,
     side: Side,
-    #[serde(flatten)]
-    pub batting_stats: Option<BattingLineStats>,
+    pub batting_stats: BattingLineStats,
 }
 
 impl PinchHittingLine {
@@ -172,7 +170,7 @@ impl PinchHittingLine {
             pinch_hitter_id,
             side,
             inning,
-            batting_stats: Some(BattingLineStats::default()),
+            batting_stats: BattingLineStats::default(),
         }
     }
 }
@@ -186,7 +184,7 @@ impl From<PinchHittingLine> for RetrosheetEventRecord {
         record.push_field(line.pinch_hitter_id.as_str());
         record.push_field(&line.inning.map_or("".to_string(), |u| u.to_string()));
         record.push_field(line.side.retrosheet_str());
-        let stats: Vec<u8> = line.batting_stats.unwrap_or_default().into();
+        let stats: Vec<u8> = line.batting_stats.into();
         for stat in stats {
             record.push_field(&stat.to_string())
         }
@@ -204,7 +202,7 @@ impl TryFrom<&RetrosheetEventRecord> for PinchHittingLine {
             pinch_hitter_id: str_to_tinystr(arr[2])?,
             inning: p(arr[3]),
             side: Side::from_str(arr[4])?,
-            batting_stats: BattingLineStats::try_from(array_ref![arr, 5, 17]).ok(),
+            batting_stats: BattingLineStats::try_from(array_ref![arr, 5, 17]).ok().unwrap_or_default(),
         })
     }
 }
@@ -315,7 +313,6 @@ pub struct DefenseLine {
     pub side: Side,
     pub fielding_position: FieldingPosition,
     pub nth_position_played_by_player: u8,
-    #[serde(flatten)]
     pub defensive_stats: Option<DefenseLineStats>,
 }
 
@@ -465,7 +462,6 @@ pub struct PitchingLine {
     pub pitcher_id: Pitcher,
     pub side: Side,
     nth_pitcher: u8,
-    #[serde(flatten)]
     pub pitching_stats: PitchingLineStats,
 }
 
@@ -561,7 +557,6 @@ impl From<TeamMiscellaneousLine> for RetrosheetEventRecord {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct TeamBattingLine {
     side: Side,
-    #[serde(flatten)]
     batting_stats: BattingLineStats,
 }
 
@@ -580,7 +575,6 @@ impl TryFrom<&RetrosheetEventRecord> for TeamBattingLine {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct TeamDefenseLine {
     pub side: Side,
-    #[serde(flatten)]
     pub defensive_stats: DefenseLineStats,
 }
 
@@ -613,7 +607,7 @@ impl TryFrom<&RetrosheetEventRecord> for TeamMiscellaneousLine {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub enum BoxScoreLine {
     BattingLine(BattingLine),
     PinchHittingLine(PinchHittingLine),
@@ -677,17 +671,9 @@ impl TryFrom<&RetrosheetEventRecord> for LineScore {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct FieldingPlayLine {
-    defense_side: Side,
-    fielders: Vec<Fielder>,
-}
-
-impl FieldingPlayLine {
-    pub fn new(defense_side: Side, fielders: Vec<Fielder>) -> Self {
-        Self {
-            defense_side,
-            fielders,
-        }
-    }
+    pub defense_side: Side,
+    // Dashed sequence of numeric positions
+    fielders: String,
 }
 
 pub type DoublePlayLine = FieldingPlayLine;
@@ -701,8 +687,8 @@ impl TryFrom<&RetrosheetEventRecord> for FieldingPlayLine {
         Ok(FieldingPlayLine {
             defense_side: Side::from_str(iter.nth(2).context("Missing team side")?)?,
             fielders: iter
-                .filter_map(|f| str_to_tinystr(f).ok())
-                .collect::<Vec<Fielder>>(),
+                .collect::<Vec<&str>>()
+                .join("-"),
         })
     }
 }
@@ -784,7 +770,7 @@ impl TryFrom<&RetrosheetEventRecord> for HomeRunLine {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct StolenBaseAttemptLine {
     running_side: Side,
     runner_id: Batter,
@@ -829,7 +815,8 @@ impl TryFrom<&RetrosheetEventRecord> for StolenBaseAttemptLine {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
+#[serde(untagged)]
 pub enum BoxScoreEvent {
     DoublePlay(DoublePlayLine),
     TriplePlay(TriplePlayLine),
@@ -849,15 +836,15 @@ impl From<BoxScoreEvent> for RetrosheetEventRecord {
             BoxScoreEvent::DoublePlay(dp) => {
                 record.push_field("dpline");
                 record.push_field(dp.defense_side.retrosheet_str());
-                for fielder in dp.fielders {
-                    record.push_field(fielder.as_str())
+                for fielder in dp.fielders.split("-") {
+                    record.push_field(fielder)
                 }
             }
             BoxScoreEvent::TriplePlay(tp) => {
                 record.push_field("tpline");
                 record.push_field(tp.defense_side.retrosheet_str());
-                for fielder in tp.fielders {
-                    record.push_field(fielder.as_str())
+                for fielder in tp.fielders.split("-") {
+                    record.push_field(fielder)
                 }
             }
             BoxScoreEvent::HitByPitch(hbp) => {

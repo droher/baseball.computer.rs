@@ -8,6 +8,7 @@ use csv::{Reader, ReaderBuilder, StringRecord};
 use glob::{Paths, glob, PatternError};
 use lazy_static::lazy_static;
 use regex::Regex;
+use tinystr::TinyStr16;
 use tracing::error;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
@@ -57,9 +58,8 @@ impl AccountType {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct FileInfo {
-    pub filename: String,
     pub game_type: GameType,
     pub account_type: AccountType
 }
@@ -73,7 +73,6 @@ impl From<&PathBuf> for FileInfo {
             .unwrap_or_default()
             .to_string();
         Self {
-            filename: filename.clone(),
             game_type: Self::game_type(&filename),
             account_type: Self::account_type(&filename)
         }
