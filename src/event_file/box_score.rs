@@ -521,20 +521,20 @@ impl From<PitchingLine> for RetrosheetEventRecord {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct TeamMiscellaneousLine {
     pub side: Side,
-    pub left_on_base: u8,
+    pub left_on_base: Option<u8>,
     pub team_earned_runs: Option<u8>,
     pub double_plays_turned: Option<u8>,
-    pub triple_plays_turned: u8,
+    pub triple_plays_turned: Option<u8>,
 }
 
 impl TeamMiscellaneousLine {
     pub fn new(side: Side) -> Self {
         Self {
             side,
-            left_on_base: 0,
+            left_on_base: Some(0),
             team_earned_runs: Some(0),
             double_plays_turned: Some(0),
-            triple_plays_turned: 0,
+            triple_plays_turned: Some(0),
         }
     }
 }
@@ -545,12 +545,13 @@ impl From<TeamMiscellaneousLine> for RetrosheetEventRecord {
             "stat".to_string(),
             "tline".to_string(),
             line.side.retrosheet_str().to_string(),
-            line.left_on_base.to_string(),
+            line.left_on_base.map_or("".to_string(), |u| u.to_string()),
             line.team_earned_runs
                 .map_or("".to_string(), |u| u.to_string()),
             line.double_plays_turned
                 .map_or("".to_string(), |u| u.to_string()),
-            line.triple_plays_turned.to_string(),
+            line.triple_plays_turned
+                .map_or("".to_string(), |u| u.to_string()),
         ];
         RetrosheetEventRecord::from(info)
     }
@@ -598,13 +599,12 @@ impl TryFrom<&RetrosheetEventRecord> for TeamMiscellaneousLine {
     fn try_from(record: &RetrosheetEventRecord) -> Result<TeamMiscellaneousLine> {
         let arr = record.deserialize::<[&str; 7]>(None)?;
         let o = { |i: usize| arr[i].parse::<u8>().ok() };
-        let u = { |i: usize| arr[i].parse::<u8>().context("Bad value for team line stat") };
         Ok(TeamMiscellaneousLine {
             side: Side::from_str(arr[2])?,
-            left_on_base: u(3)?,
+            left_on_base: o(3),
             team_earned_runs: o(4),
             double_plays_turned: o(5),
-            triple_plays_turned: u(6)?,
+            triple_plays_turned: o(6),
         })
     }
 }
@@ -616,7 +616,7 @@ pub enum BoxScoreLine {
     PinchRunningLine(PinchRunningLine),
     PitchingLine(PitchingLine),
     DefenseLine(DefenseLine),
-    TeamMiscellaneousLine(Option<TeamMiscellaneousLine>),
+    TeamMiscellaneousLine(TeamMiscellaneousLine),
     TeamBattingLine(TeamBattingLine),
     TeamDefenseLine(TeamDefenseLine),
     Unrecognized,
@@ -634,7 +634,7 @@ impl TryFrom<&RetrosheetEventRecord> for BoxScoreLine {
             "pline" => BoxScoreLine::PitchingLine(PitchingLine::try_from(record)?),
             "dline" => BoxScoreLine::DefenseLine(DefenseLine::try_from(record)?),
             "tline" => {
-                BoxScoreLine::TeamMiscellaneousLine(TeamMiscellaneousLine::try_from(record).ok())
+                BoxScoreLine::TeamMiscellaneousLine(TeamMiscellaneousLine::try_from(record)?)
             }
             "btline" => BoxScoreLine::TeamBattingLine(TeamBattingLine::try_from(record)?),
             "dtline" => BoxScoreLine::TeamDefenseLine(TeamDefenseLine::try_from(record)?),

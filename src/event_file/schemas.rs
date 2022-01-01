@@ -1,7 +1,9 @@
+use anyhow::{bail, Context, Result};
 use bounded_integer::BoundedU8;
 use chrono::{NaiveDate, NaiveTime};
 use either::Either;
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use tinystr::TinyStr16;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
@@ -282,6 +284,30 @@ pub struct BoxScoreWritableRecord<'a> {
     pub game_id: TinyStr16,
     #[serde(with = "either::serde_untagged")]
     pub record: Either<&'a BoxScoreLine, &'a BoxScoreEvent>,
+}
+
+impl BoxScoreWritableRecord<'_> {
+    fn map_to_header(map: &Map<String, Value>) -> Result<Vec<String>> {
+        let mut header = vec![];
+        for (k, v) in map {
+            match v {
+                Value::Object(m) => {
+                    header.extend(Self::map_to_header(m)?);
+                }
+                Value::Array(_) => bail!("Cannot make header out of struct with vec"),
+                _ => header.push(k.clone()),
+            }
+        }
+        Ok(header)
+    }
+
+    pub fn generate_header(&self) -> Result<Vec<String>> {
+        let map = serde_json::to_value(self)?
+            .as_object()
+            .context("Unable to generate object")?
+            .clone();
+        Self::map_to_header(&map)
+    }
 }
 
 #[derive(Debug, Serialize, Clone)]

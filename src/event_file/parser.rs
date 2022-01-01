@@ -38,7 +38,7 @@ lazy_static! {
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum AccountType {
     PlayByPlay,
-    Derived,
+    Deduced,
     BoxScore,
 }
 
@@ -46,7 +46,7 @@ impl AccountType {
     pub fn glob(&self, input_prefix: &Path) -> Result<Paths, PatternError> {
         let pattern = match self {
             Self::PlayByPlay => "**/*.EV*",
-            Self::Derived => "**/*.ED*",
+            Self::Deduced => "**/*.ED*",
             Self::BoxScore => "**/*.EB*",
         };
         let input = input_prefix
@@ -106,7 +106,7 @@ impl FileInfo {
         } else if BOX_SCORE.is_match(s) {
             AccountType::BoxScore
         } else if DERIVED.is_match(s) {
-            AccountType::Derived
+            AccountType::Deduced
         } else {
             panic!("Unexpected file naming convention: {}", s)
         }
