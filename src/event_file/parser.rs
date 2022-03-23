@@ -3,11 +3,10 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 
-use anyhow::{anyhow, bail, Context, Error, Result};
+use anyhow::{anyhow, Context, Error, Result};
 use csv::{Reader, ReaderBuilder, StringRecord};
 use lazy_static::lazy_static;
 use regex::Regex;
-use tracing::error;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::InfoRecord;
@@ -17,7 +16,6 @@ use crate::event_file::misc::{
 };
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{GameType, RetrosheetEventRecord};
-use crate::Schema::Game;
 
 pub type RecordVec = Vec<MappedRecord>;
 pub type RecordSlice = [MappedRecord];

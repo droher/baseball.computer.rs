@@ -604,7 +604,7 @@ impl Event {
         Baserunning: {ba:?}
         Out on play: {out:?}
         "#,
-            event_id = self.event_id.to_string(),
+            event_id = self.event_id,
             frame = self.context.frame,
             inning = self.context.inning,
             outs_at_event = self.context.outs,

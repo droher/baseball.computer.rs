@@ -272,15 +272,6 @@ pub type PositionVec = Vec<FieldingPosition>;
 pub type Balls = BoundedU8<0, 3>;
 pub type Strikes = BoundedU8<0, 2>;
 
-impl Default for BaserunningFieldingInfo {
-    fn default() -> Self {
-        Self {
-            fielders_data: vec![],
-            unearned_run: None,
-        }
-    }
-}
-
 /// Movement on the bases is not always explicitly given in the advances section.
 /// The batter's advance is usually implied by the play type (e.g. a double means ending up
 /// at second unless otherwise specified). This gives the implied advance for those play types,
@@ -633,7 +624,7 @@ impl TryFrom<(&str, &str)> for PlateAppearanceType {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub struct BaserunningFieldingInfo {
     fielders_data: Vec<FieldersData>,
     unearned_run: Option<EarnedRunStatus>,
@@ -1441,7 +1432,7 @@ pub enum PlayModifier {
 impl From<&PlayModifier> for String {
     fn from(pm: &PlayModifier) -> Self {
         match pm {
-            PlayModifier::ErrorOn(f) => format!("ErrorOn({})", f.to_string()),
+            PlayModifier::ErrorOn(f) => format!("ErrorOn({f})"),
             PlayModifier::RelayToFielderWithNoOutMade(pv) => {
                 format!("RelayToFielderWithNoOutMade({:?})", pv)
             }
@@ -1766,8 +1757,8 @@ impl TryFrom<&str> for Play {
             return Ok(Self::default());
         }
 
-        let modifiers_boundary = value.find('/').unwrap_or_else(|| value.len());
-        let advances_boundary = value.find('.').unwrap_or_else(|| value.len());
+        let modifiers_boundary = value.find('/').unwrap_or(value.len());
+        let advances_boundary = value.find('.').unwrap_or(value.len());
         let first_boundary = min(modifiers_boundary, advances_boundary);
 
         let main_plays = PlayType::parse_main_play(&value[..first_boundary])?;
