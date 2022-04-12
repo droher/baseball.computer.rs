@@ -1729,6 +1729,31 @@ impl Play {
             }
         })
     }
+
+    // Primary fielder of a ball in play. For outs, this is the first fielder in the play string.
+    // For hits, this is the first fielder after the hit type indicator, e.g. the `8` in `S8`.
+    // This data point is particularly important as it's very well populated historically and
+    // serves as a good fallback for hit location, which is usually not present.
+    // Some hit strings clearly indicate a deflection e.g. `S17`, but others may be
+    // an irregular recording of a hit location, e.g. `S48` to mean shallow center.
+    // We take the first fielder regardless, but may be worth another look.
+    // TODO: Investigate possible irregular hit location storage
+    pub fn hit_to_fielder(&self) -> Option<FieldingPosition> {
+        self.main_plays.iter().find_map(|pt| {
+            match pt {
+                PlayType::PlateAppearance(PlateAppearanceType::Hit(h)) => {
+                    h.positions_hit_to.get(0).copied()
+                }
+                PlayType::PlateAppearance(PlateAppearanceType::BattingOut(bo)) => {
+                    bo.fielding_play.as_ref()
+                        .and_then(|fp| {
+                            fp.fielders_data.get(0).map(|fd| fd.fielding_position)
+                        })
+                }
+                _ => None
+            }
+        })
+    }
 }
 
 impl FieldingData for Play {
@@ -1801,6 +1826,7 @@ pub struct CachedPlay {
     pub rbi: Vec<BaseRunner>,
     pub plate_appearance: Option<PlateAppearanceType>,
     pub contact_description: Option<ContactDescription>,
+    pub hit_to_fielder: Option<FieldingPosition>
 }
 
 impl TryFrom<&PlayRecord> for CachedPlay {
@@ -1824,6 +1850,7 @@ impl TryFrom<&PlayRecord> for CachedPlay {
             rbi: play.rbi(),
             plate_appearance: play.plate_appearance().cloned(),
             contact_description: play.contact_description().copied(),
+            hit_to_fielder: play.hit_to_fielder(),
             play,
         })
     }

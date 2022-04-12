@@ -68,7 +68,7 @@ impl<'a> From<&'a GameContext> for Game<'a> {
             start_time,
             doubleheader_status: setting.doubleheader_status,
             time_of_day: setting.time_of_day,
-            game_type: setting.game_type,
+            game_type: gc.file_info.game_type,
             bat_first_side: setting.bat_first_side,
             sky: setting.sky,
             field_condition: setting.field_condition,

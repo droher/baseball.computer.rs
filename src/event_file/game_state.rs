@@ -27,10 +27,7 @@ use crate::event_file::play::{
     FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame,
     OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayType, RunnerAdvance,
 };
-use crate::event_file::traits::{
-    FieldingPosition, GameType, Inning, LineupPosition, Matchup, Pitcher, Player, SequenceId, Side,
-    Umpire,
-};
+use crate::event_file::traits::{FieldingPosition, Inning, LineupPosition, Matchup, Pitcher, Player, SequenceId, Side, Umpire};
 use crate::AccountType;
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
@@ -171,7 +168,6 @@ pub struct GameSetting {
     pub start_time: Option<NaiveTime>,
     pub doubleheader_status: DoubleheaderStatus,
     pub time_of_day: DayNight,
-    pub game_type: GameType,
     pub bat_first_side: Side,
     pub sky: Sky,
     pub field_condition: FieldCondition,
@@ -204,7 +200,6 @@ impl Default for GameSetting {
             wind_speed_mph: Default::default(),
             attendance: None,
             park_id: tinystr8!("unknown"),
-            game_type: GameType::RegularSeason,
             season: Season(0),
         }
     }
@@ -520,6 +515,7 @@ pub struct EventPlateAppearance {
     pub event_id: EventId,
     pub plate_appearance_result: PlateAppearanceResultType,
     pub contact: Option<ContactType>,
+    pub hit_to_fielder: Option<FieldingPosition>,
     #[serde(skip_serializing)]
     pub hit_location: Option<HitLocation>,
 }
@@ -533,6 +529,7 @@ impl EventPlateAppearance {
                     event_id,
                     plate_appearance_result: PlateAppearanceResultType::from(pa),
                     contact: play.contact_description.map(|cd| cd.contact_type),
+                    hit_to_fielder: play.hit_to_fielder,
                     hit_location: play.contact_description.and_then(|cd| cd.location),
                 })
             } else {
