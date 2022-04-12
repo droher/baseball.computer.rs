@@ -27,10 +27,7 @@ use event_file::schemas::{ContextToVec, Event};
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
-use crate::event_file::schemas::{
-    BoxScoreWritableRecord, EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game,
-    GameTeam,
-};
+use crate::event_file::schemas::{BoxScoreLineScore, BoxScoreWritableRecord, EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam};
 
 mod event_file;
 
@@ -54,7 +51,7 @@ impl WriterMap {
     pub fn get_mut(&mut self, schema: &EventFileSchema) -> &mut Writer<File> {
         self.map
             .entry(*schema)
-            .or_insert_with(|| Self::new_writer(&self.output_prefix, self.account_type, schema))
+            .or_insert_with(|| Self::new_writer(&self.output_prefix, true, schema))
     }
     pub fn get_mut_write_header(
         &mut self,
@@ -62,7 +59,7 @@ impl WriterMap {
         header_template: &BoxScoreWritableRecord,
     ) -> &mut Writer<File> {
         self.map.entry(*schema).or_insert_with(|| {
-            let mut w = Self::new_writer(&self.output_prefix, self.account_type, schema);
+            let mut w = Self::new_writer(&self.output_prefix, false, schema);
             let header = header_template.generate_header().unwrap();
             w.serialize(header).unwrap();
             w
@@ -71,17 +68,14 @@ impl WriterMap {
 
     fn new_writer(
         output_prefix: &Path,
-        account_type: AccountType,
+        has_headers: bool,
         schema: &EventFileSchema,
     ) -> Writer<File> {
-        let file_name = format!(
-            "{}__{}.csv",
-            schema.to_string(),
-            output_prefix.file_name().unwrap().to_str().unwrap()
-        );
+        let suffix = output_prefix.file_name().unwrap().to_str().unwrap();
+        let file_name = format!("{schema}__{suffix}.csv");
         let output_path = output_prefix.with_file_name(file_name);
         WriterBuilder::new()
-            .has_headers(account_type != AccountType::BoxScore)
+            .has_headers(has_headers)
             .from_path(output_path)
             .unwrap()
     }
@@ -216,6 +210,18 @@ impl EventFileSchema {
         for row in &game_context.umpires {
             w.serialize(row)?;
         }
+        // Write Linescores
+        let line_scores = record_vec.iter()
+            .filter_map(|mr| match mr {
+                MappedRecord::LineScore(ls) => Some(ls),
+                _ => None
+            })
+            .flat_map(|ls| BoxScoreLineScore::transform_line_score(game_context.game_id.id, ls));
+        let w = writer_map.get_mut(&Self::BoxScoreLineScore);
+        for row in line_scores {
+            w.serialize(row)?;
+        }
+        // Write Lines/Events
         let game_id = game_context.game_id.id;
         let box_score_lines = record_vec
             .iter()
@@ -233,7 +239,7 @@ impl EventFileSchema {
                 error!("{}", e);
             }
         }
-        // TODO: The other box score stuff
+        // TODO: Starters
         Ok(())
     }
 

@@ -1,12 +1,13 @@
 use anyhow::{bail, Context, Result};
 use bounded_integer::BoundedU8;
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{NaiveDate, NaiveDateTime};
 use either::Either;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tinystr::TinyStr16;
 
-use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
+use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::game_state::{EventId, GameContext, Outs};
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, Park, Precipitation, Sky, Team,
@@ -20,6 +21,7 @@ use crate::event_file::play::{
 use crate::event_file::traits::{
     FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Player, SequenceId, Side,
 };
+use crate::RecordSlice;
 
 pub trait ContextToVec {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_>
@@ -31,7 +33,7 @@ pub trait ContextToVec {
 pub struct Game<'a> {
     game_id: TinyStr16,
     date: NaiveDate,
-    start_time: Option<NaiveTime>,
+    start_time: Option<NaiveDateTime>,
     doubleheader_status: DoubleheaderStatus,
     time_of_day: DayNight,
     game_type: GameType,
@@ -59,10 +61,13 @@ impl<'a> From<&'a GameContext> for Game<'a> {
     fn from(gc: &'a GameContext) -> Self {
         let setting = &gc.setting;
         let results = &gc.results;
+        let start_time = setting.start_time.map(|time|
+            NaiveDateTime::new(setting.date, time)
+            );
         Self {
             game_id: gc.game_id.id,
             date: setting.date,
-            start_time: setting.start_time,
+            start_time,
             doubleheader_status: setting.doubleheader_status,
             time_of_day: setting.time_of_day,
             game_type: setting.game_type,
@@ -316,6 +321,21 @@ pub struct BoxScoreLineScore {
     pub side: Side,
     pub inning: Inning,
     pub runs: u8,
+}
+
+impl BoxScoreLineScore {
+    pub fn transform_line_score(game_id: TinyStr16, raw_line: &LineScore) -> Vec<Self> {
+        raw_line.line_score
+            .iter()
+            .enumerate()
+            .map(|(index, runs)| Self {
+                game_id,
+                side: raw_line.side,
+                inning: (index + 1) as Inning,
+                runs: *runs
+            } )
+            .collect_vec()
+    }
 }
 
 #[derive(Debug, Serialize, Clone)]

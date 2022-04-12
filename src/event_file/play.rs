@@ -1432,7 +1432,7 @@ pub enum PlayModifier {
 impl From<&PlayModifier> for String {
     fn from(pm: &PlayModifier) -> Self {
         match pm {
-            PlayModifier::ErrorOn(f) => format!("ErrorOn({})", f.to_string()),
+            PlayModifier::ErrorOn(f) => format!("ErrorOn({f})"),
             PlayModifier::RelayToFielderWithNoOutMade(pv) => {
                 format!("RelayToFielderWithNoOutMade({:?})", pv)
             }
@@ -1757,8 +1757,8 @@ impl TryFrom<&str> for Play {
             return Ok(Self::default());
         }
 
-        let modifiers_boundary = value.find('/').unwrap_or_else(|| value.len());
-        let advances_boundary = value.find('.').unwrap_or_else(|| value.len());
+        let modifiers_boundary = value.find('/').unwrap_or(value.len());
+        let advances_boundary = value.find('.').unwrap_or(value.len());
         let first_boundary = min(modifiers_boundary, advances_boundary);
 
         let main_plays = PlayType::parse_main_play(&value[..first_boundary])?;
