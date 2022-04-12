@@ -13,7 +13,6 @@ use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, Park, Precipitation, Sky, Team,
     WindDirection,
 };
-use crate::event_file::misc::AppearanceRecord;
 use crate::event_file::pitch_sequence::{PitchType, SequenceItemTypeGeneral};
 use crate::event_file::play::{
     Base, BaseRunner, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame,
@@ -21,7 +20,6 @@ use crate::event_file::play::{
 use crate::event_file::traits::{
     FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Player, SequenceId, Side,
 };
-use crate::RecordSlice;
 
 pub trait ContextToVec {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_>
@@ -336,10 +334,4 @@ impl BoxScoreLineScore {
             } )
             .collect_vec()
     }
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct BoxScoreStarters {
-    pub game_id: TinyStr16,
-    pub record: AppearanceRecord,
 }

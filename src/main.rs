@@ -31,7 +31,7 @@ use crate::event_file::schemas::{BoxScoreLineScore, BoxScoreWritableRecord, Even
 
 mod event_file;
 
-const ABOUT: &str = "Transforms Retrosheet .EV* files (play-by-play) into .EB* files (box score).";
+const ABOUT: &str = "Creates structured datasets from raw Retrosheet files.";
 
 struct WriterMap {
     output_prefix: PathBuf,
@@ -103,7 +103,6 @@ enum EventFileSchema {
     BoxScoreTeam,
     BoxScoreUmpire,
     BoxScoreLineScore,
-    BoxScoreStarters,
     BoxScoreBattingLines,
     BoxScorePitchingLines,
     BoxScoreFieldingLines,
@@ -236,10 +235,9 @@ impl EventFileSchema {
             let schema = Self::box_score_schema(&line)?;
             let w = writer_map.get_mut_write_header(&schema, &line);
             if let Err(e) = w.serialize(&line) {
-                error!("{}", e);
+                error!("{e}");
             }
         }
-        // TODO: Starters
         Ok(())
     }
 
