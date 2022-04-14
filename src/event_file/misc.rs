@@ -166,6 +166,11 @@ pub fn parse_positive_int<T: PrimInt + FromStr>(int_str: &str) -> Option<T> {
 }
 
 #[inline]
+pub fn parse_non_negative_int<T: PrimInt + FromStr>(int_str: &str) -> Option<T> {
+    int_str.parse::<T>().ok()
+}
+
+#[inline]
 pub fn digit_vec(int_str: &str) -> Vec<u8> {
     int_str
         .chars()

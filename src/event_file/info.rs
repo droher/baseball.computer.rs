@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
 use tinystr::{TinyStr16, TinyStr8};
 
-use crate::event_file::misc::{parse_positive_int, str_to_tinystr};
+use crate::event_file::misc::{parse_non_negative_int, parse_positive_int, str_to_tinystr};
 use crate::event_file::traits::{
     Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire,
 };
@@ -282,7 +282,7 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
 
             "windspeed" => I::WindSpeed(parse_positive_int::<u8>(value)),
             "timeofgame" => I::TimeOfGameMinutes(parse_positive_int::<u16>(value)),
-            "attendance" => I::Attendance(parse_positive_int::<u32>(value)),
+            "attendance" => I::Attendance(parse_non_negative_int::<u32>(value)),
             "temp" => I::Temp(parse_positive_int::<u8>(value)),
             "innings" => I::Innings(parse_positive_int::<u8>(value)),
 
