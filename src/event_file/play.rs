@@ -1,7 +1,12 @@
 use std::cmp::min;
+use std::collections::HashSet;
+use std::convert::TryFrom;
+use std::iter::FromIterator;
+use std::mem::discriminant;
 use std::str::FromStr;
 
 use anyhow::{bail, Context, Error, Result};
+use bounded_integer::BoundedU8;
 use const_format::{concatcp, formatcp};
 use lazy_static::lazy_static;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -10,16 +15,11 @@ use serde::{Deserialize, Serialize};
 use strum::ParseError;
 use strum_macros::{Display, EnumDiscriminants, EnumIter, EnumString};
 
+use crate::event_file::misc::{regex_split, str_to_tinystr, to_str_vec};
 use crate::event_file::pitch_sequence::PitchSequence;
 use crate::event_file::traits::{
     Batter, FieldingPlayType, FieldingPosition, Inning, RetrosheetEventRecord, Side,
 };
-use crate::util::{regex_split, str_to_tinystr, to_str_vec};
-use bounded_integer::BoundedU8;
-use std::collections::HashSet;
-use std::convert::TryFrom;
-use std::iter::FromIterator;
-use std::mem::discriminant;
 
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
@@ -89,6 +89,7 @@ pub struct FieldersData {
     pub fielding_position: FieldingPosition,
     pub fielding_play_type: FieldingPlayType,
 }
+
 impl FieldersData {
     const fn new(
         fielding_position: FieldingPosition,
@@ -161,20 +162,20 @@ pub trait FieldingData {
 }
 
 #[derive(
-    Display,
-    Debug,
-    Eq,
-    PartialEq,
-    EnumString,
-    Copy,
-    Clone,
-    Hash,
-    IntoPrimitive,
-    EnumIter,
-    Serialize,
-    Deserialize,
-    Ord,
-    PartialOrd,
+Display,
+Debug,
+Eq,
+PartialEq,
+EnumString,
+Copy,
+Clone,
+Hash,
+IntoPrimitive,
+EnumIter,
+Serialize,
+Deserialize,
+Ord,
+PartialOrd,
 )]
 #[repr(u8)]
 pub enum Base {
@@ -189,21 +190,21 @@ pub enum Base {
 }
 
 #[derive(
-    Display,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    PartialOrd,
-    Ord,
-    EnumString,
-    Copy,
-    Clone,
-    TryFromPrimitive,
-    IntoPrimitive,
-    EnumIter,
-    Serialize,
-    Deserialize,
+Display,
+Debug,
+Eq,
+PartialEq,
+Hash,
+PartialOrd,
+Ord,
+EnumString,
+Copy,
+Clone,
+TryFromPrimitive,
+IntoPrimitive,
+EnumIter,
+Serialize,
+Deserialize,
 )]
 #[repr(u8)]
 pub enum BaseRunner {
@@ -216,6 +217,7 @@ pub enum BaseRunner {
     #[strum(serialize = "3")]
     Third,
 }
+
 impl BaseRunner {
     pub fn from_target_base(base: Base) -> Result<Self> {
         let base_int: u8 = base.into();
@@ -231,7 +233,7 @@ impl BaseRunner {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize,
+Debug, Eq, PartialEq, EnumString, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum InningFrame {
@@ -272,15 +274,6 @@ pub type PositionVec = Vec<FieldingPosition>;
 pub type Balls = BoundedU8<0, 3>;
 pub type Strikes = BoundedU8<0, 2>;
 
-impl Default for BaserunningFieldingInfo {
-    fn default() -> Self {
-        Self {
-            fielders_data: vec![],
-            unearned_run: None,
-        }
-    }
-}
-
 /// Movement on the bases is not always explicitly given in the advances section.
 /// The batter's advance is usually implied by the play type (e.g. a double means ending up
 /// at second unless otherwise specified). This gives the implied advance for those play types,
@@ -298,7 +291,7 @@ pub trait ImplicitPlayResults {
 }
 
 #[derive(
-    Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize,
+Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize,
 )]
 pub enum HitType {
     #[strum(serialize = "S")]
@@ -441,7 +434,7 @@ impl TryFrom<&str> for FieldingPlay {
                 to_fielding_data(assist_matches, FieldingPlayType::Assist),
                 to_fielding_data(putout_matches, FieldingPlayType::Putout),
             ]
-            .concat();
+                .concat();
 
             let runners_out = to_str_vec(runner_matches)
                 .into_iter()
@@ -456,7 +449,7 @@ impl TryFrom<&str> for FieldingPlay {
                 to_fielding_data(vec![captures.name("a1")], FieldingPlayType::Assist),
                 to_fielding_data(vec![captures.name("e")], FieldingPlayType::Error),
             ]
-            .concat();
+                .concat();
 
             return Ok(Self {
                 fielders_data,
@@ -633,7 +626,7 @@ impl TryFrom<(&str, &str)> for PlateAppearanceType {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub struct BaserunningFieldingInfo {
     fielders_data: Vec<FieldersData>,
     unearned_run: Option<EarnedRunStatus>,
@@ -674,18 +667,18 @@ impl From<Captures<'_>> for BaserunningFieldingInfo {
 }
 
 #[derive(
-    Display,
-    Debug,
-    EnumString,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Hash,
-    IntoPrimitive,
-    EnumIter,
-    Serialize,
-    Deserialize,
+Display,
+Debug,
+EnumString,
+Copy,
+Clone,
+Eq,
+PartialEq,
+Hash,
+IntoPrimitive,
+EnumIter,
+Serialize,
+Deserialize,
 )]
 #[repr(u8)]
 pub enum BaserunningPlayType {
@@ -738,14 +731,14 @@ impl BaserunningPlay {
             BaserunningPlayType::CaughtStealing,
             BaserunningPlayType::PickedOffCaughtStealing,
         ]
-        .contains(&self.baserunning_play_type)
+            .contains(&self.baserunning_play_type)
     }
 }
 
 impl ImplicitPlayResults for BaserunningPlay {
     fn implicit_advance(&self) -> Option<RunnerAdvance> {
         if let (Some(b), BaserunningPlayType::StolenBase) =
-            (self.at_base, self.baserunning_play_type)
+        (self.at_base, self.baserunning_play_type)
         {
             Some(RunnerAdvance::runner_advance_to(b).unwrap())
         } else if let (true, true, Some(b)) = (
@@ -814,6 +807,7 @@ pub enum NoPlayType {
     #[strum(serialize = "FLE")]
     ErrorOnFoul,
 }
+
 impl ImplicitPlayResults for NoPlayType {}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -821,6 +815,7 @@ pub struct NoPlay {
     no_play_type: NoPlayType,
     error: Option<FieldingPosition>,
 }
+
 impl TryFrom<(&str, &str)> for NoPlay {
     type Error = Error;
 
@@ -1085,6 +1080,7 @@ pub enum RunnerAdvanceModifier {
     },
     Unrecognized(String),
 }
+
 impl RunnerAdvanceModifier {
     const fn unearned_status(&self) -> Option<EarnedRunStatus> {
         match self {
@@ -1110,12 +1106,12 @@ impl FieldingData for RunnerAdvanceModifier {
                 vec![FieldersData::new(*putout, FieldingPlayType::Putout)],
                 FieldersData::from_vec(assists, FieldingPlayType::Assist),
             ]
-            .concat(),
+                .concat(),
             Self::AdvancedOnError { assists, error } => [
                 FieldersData::from_vec(assists, FieldingPlayType::Assist),
                 vec![FieldersData::new(*error, FieldingPlayType::Error)],
             ]
-            .concat(),
+                .concat(),
             _ => vec![],
         }
     }
@@ -1196,6 +1192,7 @@ pub enum HitStrength {
     Soft,
     Default,
 }
+
 impl Default for HitStrength {
     fn default() -> Self {
         Self::Default
@@ -1212,6 +1209,7 @@ pub enum HitDepth {
     ExtraDeep,
     Default,
 }
+
 impl Default for HitDepth {
     fn default() -> Self {
         Self::Default
@@ -1228,6 +1226,7 @@ pub enum HitAngle {
     FoulLine,
     Default,
 }
+
 impl Default for HitAngle {
     fn default() -> Self {
         Self::Default
@@ -1235,7 +1234,7 @@ impl Default for HitAngle {
 }
 
 #[derive(
-    Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize,
+Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize,
 )]
 pub enum HitLocationGeneral {
     #[strum(serialize = "1")]
@@ -1283,6 +1282,7 @@ pub struct HitLocation {
     pub angle: HitAngle,
     pub strength: HitStrength,
 }
+
 impl TryFrom<&str> for HitLocation {
     type Error = Error;
 
@@ -1309,6 +1309,7 @@ pub struct ContactDescription {
     pub contact_type: ContactType,
     pub location: Option<HitLocation>,
 }
+
 impl Default for ContactDescription {
     fn default() -> Self {
         Self {
@@ -1317,6 +1318,7 @@ impl Default for ContactDescription {
         }
     }
 }
+
 impl TryFrom<(&str, &str)> for ContactDescription {
     type Error = Error;
 
@@ -1332,7 +1334,7 @@ impl TryFrom<(&str, &str)> for ContactDescription {
 }
 
 #[derive(
-    Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, EnumString, Hash, Serialize, Deserialize,
+Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, EnumString, Hash, Serialize, Deserialize,
 )]
 pub enum ContactType {
     #[strum(serialize = "B")]
@@ -1441,7 +1443,7 @@ pub enum PlayModifier {
 impl From<&PlayModifier> for String {
     fn from(pm: &PlayModifier) -> Self {
         match pm {
-            PlayModifier::ErrorOn(f) => format!("ErrorOn({})", f.to_string()),
+            PlayModifier::ErrorOn(f) => format!("ErrorOn({f})"),
             PlayModifier::RelayToFielderWithNoOutMade(pv) => {
                 format!("RelayToFielderWithNoOutMade({:?})", pv)
             }
@@ -1550,7 +1552,7 @@ impl Play {
         self.main_plays.iter().all(PlayType::no_play)
     }
 
-    fn explicit_baserunners(&self) -> Box<dyn Iterator<Item = BaseRunner> + '_> {
+    fn explicit_baserunners(&self) -> Box<dyn Iterator<Item=BaseRunner> + '_> {
         Box::from(self.explicit_advances.iter().map(|ra| ra.baserunner))
     }
 
@@ -1568,11 +1570,11 @@ impl Play {
             .collect()
     }
 
-    fn implicit_outs(&self) -> Box<dyn Iterator<Item = BaseRunner> + '_> {
+    fn implicit_outs(&self) -> Box<dyn Iterator<Item=BaseRunner> + '_> {
         Box::from(self.main_plays.iter().flat_map(|pt| pt.implicit_out()))
     }
 
-    pub fn advances(&self) -> Box<dyn Iterator<Item = RunnerAdvance> + '_> {
+    pub fn advances(&self) -> Box<dyn Iterator<Item=RunnerAdvance> + '_> {
         let cleaned_advances = self
             .explicit_advances
             .iter()
@@ -1604,7 +1606,7 @@ impl Play {
     fn filtered_baserunners(
         &self,
         filter: fn(&RunnerAdvance) -> bool,
-    ) -> Box<dyn Iterator<Item = BaseRunner> + '_> {
+    ) -> Box<dyn Iterator<Item=BaseRunner> + '_> {
         Box::from(self.advances().filter_map(move |ra| {
             if filter(&ra) {
                 Some(ra.baserunner)
@@ -1651,7 +1653,7 @@ impl Play {
         self.filtered_baserunners(|ra: &RunnerAdvance| {
             ra.scored() && ra.earned_run_status() == Some(EarnedRunStatus::TeamUnearned)
         })
-        .collect()
+            .collect()
     }
 
     pub fn is_gidp(&self) -> bool {
@@ -1660,7 +1662,7 @@ impl Play {
                 PlayModifier::GroundBallDoublePlay,
                 PlayModifier::BuntGroundIntoDoublePlay,
             ]
-            .contains(m)
+                .contains(m)
         })
     }
 
@@ -1738,6 +1740,32 @@ impl Play {
             }
         })
     }
+
+    // Primary fielder of a ball in play. For outs, this is the first fielder in the play string.
+    // For hits, this is the first fielder after the hit type indicator, e.g. the `8` in `S8`.
+    // This data point is particularly important as it's very well populated historically and
+    // serves as a good fallback for hit location, which is usually not present.
+    // Some hit strings clearly indicate a deflection e.g. `S17`, but others may be
+    // an irregular recording of a hit location, e.g. `S48` to mean shallow center.
+    // We take the first fielder regardless, but may be worth another look.
+    // TODO: Investigate possible irregular hit location storage
+    pub fn hit_to_fielder(&self) -> Option<FieldingPosition> {
+        self.main_plays.iter().find_map(|pt| {
+            match pt {
+                PlayType::PlateAppearance(PlateAppearanceType::Hit(h)) => {
+                    h.positions_hit_to.get(0).copied()
+                }
+                PlayType::PlateAppearance(PlateAppearanceType::BattingOut(bo))
+                if bo.out_type != OutAtBatType::StrikeOut => {
+                    bo.fielding_play.as_ref()
+                        .and_then(|fp| {
+                            fp.fielders_data.get(0).map(|fd| fd.fielding_position)
+                        })
+                }
+                _ => None
+            }
+        })
+    }
 }
 
 impl FieldingData for Play {
@@ -1766,8 +1794,8 @@ impl TryFrom<&str> for Play {
             return Ok(Self::default());
         }
 
-        let modifiers_boundary = value.find('/').unwrap_or_else(|| value.len());
-        let advances_boundary = value.find('.').unwrap_or_else(|| value.len());
+        let modifiers_boundary = value.find('/').unwrap_or(value.len());
+        let advances_boundary = value.find('.').unwrap_or(value.len());
         let first_boundary = min(modifiers_boundary, advances_boundary);
 
         let main_plays = PlayType::parse_main_play(&value[..first_boundary])?;
@@ -1810,6 +1838,7 @@ pub struct CachedPlay {
     pub rbi: Vec<BaseRunner>,
     pub plate_appearance: Option<PlateAppearanceType>,
     pub contact_description: Option<ContactDescription>,
+    pub hit_to_fielder: Option<FieldingPosition>,
 }
 
 impl TryFrom<&PlayRecord> for CachedPlay {
@@ -1833,13 +1862,14 @@ impl TryFrom<&PlayRecord> for CachedPlay {
             rbi: play.rbi(),
             plate_appearance: play.plate_appearance().cloned(),
             contact_description: play.contact_description().copied(),
+            hit_to_fielder: play.hit_to_fielder(),
             play,
         })
     }
 }
 
 #[derive(
-    Debug, Default, Eq, PartialEq, Copy, Clone, Hash, Ord, PartialOrd, Serialize, Deserialize,
+Debug, Default, Eq, PartialEq, Copy, Clone, Hash, Ord, PartialOrd, Serialize, Deserialize,
 )]
 pub struct Count {
     pub balls: Option<Balls>,

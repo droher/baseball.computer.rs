@@ -1,22 +1,25 @@
+use anyhow::{bail, Context, Result};
 use bounded_integer::BoundedU8;
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{NaiveDate, NaiveDateTime};
+use either::Either;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use tinystr::TinyStr16;
 
+use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::game_state::{EventId, GameContext, Outs};
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, Park, Precipitation, Sky, Team,
     WindDirection,
 };
-use crate::event_file::misc::GameId;
 use crate::event_file::pitch_sequence::{PitchType, SequenceItemTypeGeneral};
 use crate::event_file::play::{
     Base, BaseRunner, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame,
 };
 use crate::event_file::traits::{
-    Fielder, FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Player,
-    SequenceId, Side,
+    FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Player, SequenceId, Side,
 };
-use tinystr::TinyStr16;
 
 pub trait ContextToVec {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_>
@@ -28,7 +31,7 @@ pub trait ContextToVec {
 pub struct Game<'a> {
     game_id: TinyStr16,
     date: NaiveDate,
-    start_time: Option<NaiveTime>,
+    start_time: Option<NaiveDateTime>,
     doubleheader_status: DoubleheaderStatus,
     time_of_day: DayNight,
     game_type: GameType,
@@ -56,13 +59,16 @@ impl<'a> From<&'a GameContext> for Game<'a> {
     fn from(gc: &'a GameContext) -> Self {
         let setting = &gc.setting;
         let results = &gc.results;
+        let start_time = setting.start_time.map(|time|
+            NaiveDateTime::new(setting.date, time)
+            );
         Self {
             game_id: gc.game_id.id,
             date: setting.date,
-            start_time: setting.start_time,
+            start_time,
             doubleheader_status: setting.doubleheader_status,
             time_of_day: setting.time_of_day,
-            game_type: setting.game_type,
+            game_type: gc.file_info.game_type,
             bat_first_side: setting.bat_first_side,
             sky: setting.sky,
             field_condition: setting.field_condition,
@@ -93,6 +99,7 @@ pub struct GameTeam {
 }
 
 impl ContextToVec for GameTeam {
+    //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self>> {
         Box::from(
             vec![
@@ -125,6 +132,7 @@ pub struct Event {
 }
 
 impl ContextToVec for Event {
+    //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().map(move |e| Self {
             game_id: gc.game_id.id,
@@ -155,6 +163,7 @@ pub struct EventPitch {
 }
 
 impl ContextToVec for EventPitch {
+    //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         let pitch_sequences = gc.events.iter().filter_map(|e| {
             e.results
@@ -194,6 +203,7 @@ pub struct EventFieldingPlay {
 }
 
 impl ContextToVec for EventFieldingPlay {
+    //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().flat_map(|e| {
             e.results
@@ -222,6 +232,7 @@ pub struct EventHitLocation {
 }
 
 impl ContextToVec for EventHitLocation {
+    //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().filter_map(|e| {
             if let Some(Some(hl)) = e
@@ -254,6 +265,7 @@ pub struct EventOut {
 }
 
 impl ContextToVec for EventOut {
+    //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().flat_map(|e| {
             e.results
@@ -270,73 +282,56 @@ impl ContextToVec for EventOut {
     }
 }
 
-// Box score stats
+#[derive(Debug, Serialize, Clone)]
+pub struct BoxScoreWritableRecord<'a> {
+    pub game_id: TinyStr16,
+    #[serde(with = "either::serde_untagged")]
+    pub record: Either<&'a BoxScoreLine, &'a BoxScoreEvent>,
+}
+
+impl BoxScoreWritableRecord<'_> {
+    fn map_to_header(map: &Map<String, Value>) -> Result<Vec<String>> {
+        let mut header = vec![];
+        for (k, v) in map {
+            match v {
+                Value::Object(m) => {
+                    header.extend(Self::map_to_header(m)?);
+                }
+                Value::Array(_) => bail!("Cannot make header out of struct with vec"),
+                _ => header.push(k.clone()),
+            }
+        }
+        Ok(header)
+    }
+
+    pub fn generate_header(&self) -> Result<Vec<String>> {
+        let map = serde_json::to_value(self)?
+            .as_object()
+            .context("Unable to generate object")?
+            .clone();
+        Self::map_to_header(&map)
+    }
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct BoxScoreLineScore {
-    game_id: GameId,
-    inning: Inning,
-    side: Side,
-    runs: u8,
+    pub game_id: TinyStr16,
+    pub side: Side,
+    pub inning: Inning,
+    pub runs: u8,
 }
 
-pub struct BoxScorePlayerHitting {
-    game_id: GameId,
-    player_id: Player,
-    side: Side,
-    lineup_position: LineupPosition,
-    nth_player_at_position: u8,
-    at_bats: u8,
-    runs: u8,
-    hits: u8,
-    doubles: Option<u8>,
-    triples: Option<u8>,
-    home_runs: Option<u8>,
-    rbi: Option<u8>,
-    sacrifice_hits: Option<u8>,
-    sacrifice_flies: Option<u8>,
-    hit_by_pitch: Option<u8>,
-    walks: Option<u8>,
-    intentional_walks: Option<u8>,
-    strikeouts: Option<u8>,
-    stolen_bases: Option<u8>,
-    caught_stealing: Option<u8>,
-    grounded_into_double_plays: Option<u8>,
-    reached_on_interference: Option<u8>,
-}
-
-pub struct BoxScorePlayerFielding {
-    game_id: GameId,
-    fielder_id: Fielder,
-    side: Side,
-    fielding_position: FieldingPosition,
-    nth_position_played_by_player: u8,
-    outs_played: Option<u8>,
-    putouts: Option<u8>,
-    assists: Option<u8>,
-    errors: Option<u8>,
-    double_plays: Option<u8>,
-    triple_plays: Option<u8>,
-    passed_balls: Option<u8>,
-}
-
-pub struct BoxScorePlayerPitching {
-    pitcher_id: Player,
-    side: Side,
-    nth_pitcher: u8,
-    outs_recorded: u8,
-    no_out_batters: Option<u8>,
-    batters_faced: Option<u8>,
-    hits: u8,
-    doubles: Option<u8>,
-    triples: Option<u8>,
-    home_runs: Option<u8>,
-    runs: u8,
-    earned_runs: Option<u8>,
-    walks: Option<u8>,
-    intentional_walks: Option<u8>,
-    strikeouts: Option<u8>,
-    hit_batsmen: Option<u8>,
-    wild_pitches: Option<u8>,
-    balks: Option<u8>,
-    sacrifice_hits: Option<u8>,
-    sacrifice_flies: Option<u8>,
+impl BoxScoreLineScore {
+    pub fn transform_line_score(game_id: TinyStr16, raw_line: &LineScore) -> Vec<Self> {
+        raw_line.line_score
+            .iter()
+            .enumerate()
+            .map(|(index, runs)| Self {
+                game_id,
+                side: raw_line.side,
+                inning: (index + 1) as Inning,
+                runs: *runs
+            } )
+            .collect_vec()
+    }
 }

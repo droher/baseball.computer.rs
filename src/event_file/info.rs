@@ -1,15 +1,16 @@
+use std::convert::TryFrom;
+use std::str::FromStr;
+
 use anyhow::{bail, Error, Result};
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
+use tinystr::{TinyStr16, TinyStr8};
 
+use crate::event_file::misc::{parse_non_negative_int, parse_positive_int, str_to_tinystr};
 use crate::event_file::traits::{
     Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire,
 };
-use crate::util::{parse_positive_int, str_to_tinystr};
-use std::convert::TryFrom;
-use std::str::FromStr;
-use tinystr::{TinyStr16, TinyStr8};
 
 #[derive(
     Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
@@ -221,7 +222,7 @@ pub enum InfoRecord {
     HowScored(HowScored),
     Inputter(Option<RetrosheetVolunteer>),
     Scorer(Option<Scorer>),
-    OriginalScorer(Scorer),
+    OriginalScorer(Option<Scorer>),
     Translator(Option<RetrosheetVolunteer>),
     Innings(Option<u8>),
     Tiebreaker,
@@ -262,7 +263,6 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
             "visteam" => I::VisitingTeam(str_to_tinystr(value)?),
             "hometeam" => I::HomeTeam(str_to_tinystr(value)?),
             "site" => I::Park(str_to_tinystr(value)?),
-            "oscorer" => I::OriginalScorer(str_to_tinystr(value)?),
 
             "umphome" | "ump1b" | "ump2b" | "ump3b" | "umplf" | "umprf" => {
                 I::UmpireAssignment(UmpireAssignment {
@@ -282,11 +282,11 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
 
             "windspeed" => I::WindSpeed(parse_positive_int::<u8>(value)),
             "timeofgame" => I::TimeOfGameMinutes(parse_positive_int::<u16>(value)),
-            "attendance" => I::Attendance(parse_positive_int::<u32>(value)),
+            "attendance" => I::Attendance(parse_non_negative_int::<u32>(value)),
             "temp" => I::Temp(parse_positive_int::<u8>(value)),
             "innings" => I::Innings(parse_positive_int::<u8>(value)),
 
-            "usedh" => I::UseDh(bool::from_str(value)?),
+            "usedh" => I::UseDh(bool::from_str(&*value.to_lowercase())?),
             "htbf" => I::HomeTeamBatsFirst(bool::from_str(value)?),
             "date" => I::GameDate(NaiveDate::parse_from_str(value, "%Y/%m/%d")?),
             "starttime" => I::parse_time(value),
@@ -296,6 +296,7 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
             "lp" => I::LosingPitcher(t8().ok()),
             "save" => I::SavePitcher(t8().ok()),
             "gwrbi" => I::GameWinningRbi(t8().ok()),
+            "oscorer" => I::OriginalScorer(t16().ok()),
             "scorer" => I::Scorer(t16().ok()),
             "inputter" => I::Inputter(t16().ok()),
             "translator" => I::Translator(t16().ok()),

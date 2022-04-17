@@ -169,7 +169,7 @@ impl TryFrom<&str> for PitchSequence {
         // An interruption in the PA is indicated with "."
         // To avoid double-counting, if there's a ".", we only take the sequence to the right of
         // the right-most "." (Should I end that sentence with a period? How does that work)
-        let trimmed_sequence = if let Some((_, s)) = str_sequence.rsplit_once(".") {
+        let trimmed_sequence = if let Some((_, s)) = str_sequence.rsplit_once('.') {
             s
         } else {
             str_sequence
