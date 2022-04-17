@@ -1,4 +1,5 @@
 pub mod box_score;
+pub mod game_metadata;
 pub mod game_state;
 pub mod info;
 pub mod misc;
@@ -7,4 +8,3 @@ pub mod pitch_sequence;
 pub mod play;
 pub mod schemas;
 pub mod traits;
-pub mod game_metadata;

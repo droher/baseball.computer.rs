@@ -1,10 +1,11 @@
 use std::convert::TryFrom;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Error, Result};
 use csv::{Reader, ReaderBuilder, StringRecord};
+use glob::{glob, Paths, PatternError};
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -20,32 +21,47 @@ use crate::event_file::traits::{GameType, RetrosheetEventRecord};
 pub type RecordVec = Vec<MappedRecord>;
 pub type RecordSlice = [MappedRecord];
 
-
 lazy_static! {
     static ref ALL_STAR_GAME: Regex = Regex::new(r"[0-9]{4}AS\.EVE$").unwrap();
     static ref WORLD_SERIES: Regex = Regex::new(r"[0-9]{4}WS\.EVE$").unwrap();
     static ref LCS: Regex = Regex::new(r"[0-9]{4}[AN]LCS\.EVE$").unwrap();
     static ref DIVISION_SERIES: Regex = Regex::new(r"[0-9]{4}[AN]LD[12]\.EVE$").unwrap();
     static ref WILD_CARD: Regex = Regex::new(r"[0-9]{4}[AN]W[C1234]\.EVE$").unwrap();
-    static ref REGULAR_SEASON: Regex = Regex::new(r"[0-9]{4}([[:alnum]]{3})\.E[BVD][ANF]$").unwrap();
+    static ref REGULAR_SEASON: Regex =
+        Regex::new(r"[0-9]{4}([[:alnum:]]{3})?\.E[BVD][ANF]$").unwrap();
     static ref NEGRO_LEAGUES: Regex = Regex::new(r".*\.E[BV]$").unwrap();
     static ref PLAY_BY_PLAY: Regex = Regex::new(r".*\.EV[ANF]?").unwrap();
-    static ref DERIVED: Regex = Regex::new(r".*\.EV[ANF]?").unwrap();
-    static ref BOX_SCORE: Regex = Regex::new(r".*\.EV[ANF]?").unwrap();
-
+    static ref DERIVED: Regex = Regex::new(r".*\.ED[ANF]?").unwrap();
+    static ref BOX_SCORE: Regex = Regex::new(r".*\.EB[ANF]?").unwrap();
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum AccountType {
     PlayByPlay,
-    Derived,
+    Deduced,
     BoxScore,
-    Other
 }
 
+impl AccountType {
+    pub fn glob(&self, input_prefix: &Path) -> Result<Paths, PatternError> {
+        let pattern = match self {
+            Self::PlayByPlay => "**/*.EV*",
+            Self::Deduced => "**/*.ED*",
+            Self::BoxScore => "**/*.EB*",
+        };
+        let input = input_prefix
+            .join(Path::new(pattern))
+            .to_str()
+            .unwrap_or_default()
+            .to_string();
+        glob(&*input)
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct FileInfo {
-    filename: String,
-    game_type: GameType,
-    account_type: AccountType
+    pub game_type: GameType,
+    pub account_type: AccountType,
 }
 
 impl From<&PathBuf> for FileInfo {
@@ -57,30 +73,43 @@ impl From<&PathBuf> for FileInfo {
             .unwrap_or_default()
             .to_string();
         Self {
-            filename: filename.clone(),
             game_type: Self::game_type(&filename),
-            account_type: Self::account_type(&filename)
+            account_type: Self::account_type(&filename),
         }
     }
 }
 
 impl FileInfo {
     fn game_type(s: &str) -> GameType {
-        if REGULAR_SEASON.is_match(s) { GameType::RegularSeason }
-        else if ALL_STAR_GAME.is_match(s) { GameType::AllStarGame }
-        else if WORLD_SERIES.is_match(s) { GameType::WorldSeries }
-        else if LCS.is_match(s) { GameType::LeagueChampionshipSeries }
-        else if DIVISION_SERIES.is_match(s) { GameType::DivisionSeries }
-        else if WILD_CARD.is_match(s) { GameType::WildCardSeries }
-        else if NEGRO_LEAGUES.is_match(s) { GameType::NegroLeagues }
-        else { GameType::Other }
+        if REGULAR_SEASON.is_match(s) {
+            GameType::RegularSeason
+        } else if ALL_STAR_GAME.is_match(s) {
+            GameType::AllStarGame
+        } else if WORLD_SERIES.is_match(s) {
+            GameType::WorldSeries
+        } else if LCS.is_match(s) {
+            GameType::LeagueChampionshipSeries
+        } else if DIVISION_SERIES.is_match(s) {
+            GameType::DivisionSeries
+        } else if WILD_CARD.is_match(s) {
+            GameType::WildCardSeries
+        } else if NEGRO_LEAGUES.is_match(s) {
+            GameType::NegroLeagues
+        } else {
+            GameType::Other
+        }
     }
 
     fn account_type(s: &str) -> AccountType {
-        if PLAY_BY_PLAY.is_match(s) { AccountType::PlayByPlay }
-        else if BOX_SCORE.is_match(s) { AccountType::BoxScore }
-        else if DERIVED.is_match(s) { AccountType::Derived }
-        else { AccountType::Other }
+        if PLAY_BY_PLAY.is_match(s) {
+            AccountType::PlayByPlay
+        } else if BOX_SCORE.is_match(s) {
+            AccountType::BoxScore
+        } else if DERIVED.is_match(s) {
+            AccountType::Deduced
+        } else {
+            panic!("Unexpected file naming convention: {}", s)
+        }
     }
 }
 
@@ -89,7 +118,7 @@ pub struct RetrosheetReader {
     current_record: StringRecord,
     current_game_id: GameId,
     current_record_vec: RecordVec,
-    pub file_info: FileInfo
+    pub file_info: FileInfo,
 }
 
 impl Iterator for RetrosheetReader {
@@ -158,7 +187,9 @@ impl TryFrom<&PathBuf> for RetrosheetReader {
         }
         let current_game_id = match MappedRecord::try_from(&current_record)? {
             MappedRecord::GameId(g) => Ok(g),
-            _ => Err(anyhow!("First record was not a game ID, cannot read file.")),
+            _ => Err(anyhow!(
+                "First non-comment record was not a game ID, cannot read file."
+            )),
         }?;
         let current_record_vec = RecordVec::new();
         let file_info: FileInfo = path.into();
@@ -167,7 +198,7 @@ impl TryFrom<&PathBuf> for RetrosheetReader {
             current_record,
             current_game_id,
             current_record_vec,
-            file_info
+            file_info,
         })
     }
 }
