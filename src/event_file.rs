@@ -8,3 +8,4 @@ pub mod pitch_sequence;
 pub mod play;
 pub mod schemas;
 pub mod traits;
+pub mod writer;
