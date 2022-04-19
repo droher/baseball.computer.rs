@@ -1,21 +1,28 @@
 #![allow(dead_code)]
 #![forbid(unsafe_code)]
 
+extern crate core;
+
 use std::collections::HashSet;
+use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Instant;
 
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use structopt::StructOpt;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
-use anyhow::Context;
+use anyhow::{Result, Context};
+use itertools::Zip;
+use reqwest::blocking::Response;
+use zip::read::ZipFile;
 
 use event_file::writer;
 use event_file::writer::EventFileSchema;
 
 use crate::event_file::misc::GameId;
-use crate::event_file::parser::AccountType;
+use crate::event_file::parser::{AccountType, FileInfo};
 
 mod event_file;
 
@@ -31,7 +38,57 @@ struct Opt {
     output_dir: PathBuf,
 }
 
+#[derive(Debug)]
+struct RetrosheetFile {
+    data: String,
+    file_name: PathBuf
+}
+
+impl RetrosheetFile {
+    pub fn new(zip_file: &mut ZipFile) -> Result<Self> {
+        let file_name = PathBuf::from_str(zip_file.name())?;
+        let mut data = String::with_capacity(2000000);
+        zip_file.read_to_string(&mut data)?;
+        Ok(Self {
+            data,
+            file_name,
+        })
+    }
+
+}
+
+struct ZipIterator {
+    reader: BufReader<Response>
+}
+
+impl Iterator for ZipIterator {
+    type Item = Result<RetrosheetFile>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let mut res = zip::read::read_zipfile_from_stream(&mut self.reader);
+            match res {
+                Ok(Some(mut z)) => Some(RetrosheetFile::new(&mut z)),
+                Ok(None) => None,
+                Err(e) => Some(Err(e.into()))
+            }
+        }
+
+    }
+}
+
+fn iter_files() {
+    let url = "https://github.com/droher/retrosheet/archive/refs/heads/master.zip";
+    let res = reqwest::blocking::get(url).unwrap();
+    let reader = BufReader::new(res);
+    let zi = ZipIterator { reader };
+    for rf in zi {
+        println!("{:?}", rf.unwrap().file_name)
+    }
+}
+
 fn main() {
+    iter_files();
     let mut parsed_game_ids = HashSet::with_capacity(200000);
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
