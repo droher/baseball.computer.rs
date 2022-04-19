@@ -10,11 +10,7 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v3
       - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-      - name: Checkout Retrosheet
-        uses: actions/checkout@v3
-        with:
-          repository: droher/retrosheet
-          path: retrosheet
+      - run: curl -JLO "https://github.com/droher/retrosheet/archive/refs/heads/master.zip"
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
       - name: List files in the repository
         run: |
