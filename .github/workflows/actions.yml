@@ -22,7 +22,15 @@ jobs:
           toolchain: stable
       - run: cargo build --release
 
-      - uses: actions/upload-artifact@v2.2.4
+  retrosheet:
+    name: retrosheet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache@v3
         with:
-          name: bin
-          path: target/release/boxball-rs
+          path: |
+            retrosheet/
+          key: retrosheet-${{ hashFiles('**/retrosheet.zip') }}
+
+      - run: wget https://github.com/droher/retrosheet/archive/master.zip -O retrosheet.zip
+      - run: unzip retrosheet.zip && mv retrosheet-* retrosheet
