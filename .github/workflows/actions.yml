@@ -21,6 +21,8 @@ jobs:
       - uses: actions/cache@v3
         id: cache-bin
         with:
+          path: # fails without this even though don't need it
+            /src
           key: ${{ runner.os }}-cargo-${{ hashFiles('**') }}
 
       - uses: actions-rs/toolchain@v1
