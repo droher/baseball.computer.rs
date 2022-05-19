@@ -5,6 +5,8 @@ jobs:
     name: boxball-rs
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+
       - uses: actions/cache@v3
         with:
           path: |
@@ -13,11 +15,15 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - uses: actions/checkout@v3
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
 
       - uses: actions-rs/toolchain@v1
+        if: steps.cache.outputs.cache-hit != 'true'
         with:
           toolchain: stable
       - run: cargo build --release
+
+      - uses: actions/upload-artifact@v2.2.4
+        with:
+          name: bin
+          path: target/
