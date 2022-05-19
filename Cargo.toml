@@ -36,6 +36,3 @@ version = "1.5.4"
 # No need for unicode
 default-features = false
 features = ["std", "perf"]
-
-[profile.release]
-incremental = true

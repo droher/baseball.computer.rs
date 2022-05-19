@@ -4,3 +4,4 @@ output
 .idea
 *.iml
 perf.data*
+data/
