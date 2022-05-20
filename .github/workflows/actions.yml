@@ -2,7 +2,7 @@ name: build_parser
 on: [push]
 jobs:
   build:
-    name: boxball-rs
+    name: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -32,11 +32,24 @@ jobs:
       - uses: actions/cache@v3
         id: cache
         with:
-          path: |
-            retrosheet/
+          path: retrosheet/
           key: retrosheet-${{ steps.sha.outputs.sha }}
 
       - if: steps.cache.outputs.cache-hit != 'true'
         run: wget https://github.com/droher/retrosheet/archive/master.zip -O retrosheet.zip
       - if: steps.cache.outputs.cache-hit != 'true'
         run: unzip retrosheet.zip && mv retrosheet-* retrosheet
+
+  run:
+    name: run
+    needs: [build, retrosheet]
+    runs-on: ubuntu-latest
+    steps:
+      - id: sha
+        run: echo "::set-output name=sha::$(git ls-remote https://github.com/droher/retrosheet master)"
+
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          path: retrosheet/
+          key: retrosheet-${{ steps.sha.outputs.sha }}
