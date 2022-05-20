@@ -22,9 +22,16 @@ jobs:
           toolchain: stable
       - run: cargo build --release
 
+      - uses: actions/upload-artifact@v2.2.4
+        name: bin
+        with:
+          path: target/release/boxball-rs
+
   retrosheet:
     name: retrosheet
     runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
     steps:
       - id: sha
         run: echo "::set-output name=sha::$(git ls-remote https://github.com/droher/retrosheet master)"
@@ -45,11 +52,7 @@ jobs:
     needs: [build, retrosheet]
     runs-on: ubuntu-latest
     steps:
-      - id: sha
-        run: echo "::set-output name=sha::$(git ls-remote https://github.com/droher/retrosheet master)"
-
       - uses: actions/cache@v3
-        id: cache
         with:
           path: retrosheet/
-          key: retrosheet-${{ steps.sha.outputs.sha }}
+          key: retrosheet-${{ needs.retrosheet.outputs.sha }}
