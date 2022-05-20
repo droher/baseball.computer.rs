@@ -59,9 +59,9 @@ jobs:
       - uses: actions/download-artifact@v3
       - run: chmod +x ./artifact/boxball-rs
       - run: ./artifact/boxball-rs -i retrosheet -o data
-      - run: tar -czvf data.tar.gz data
+      - run: gzip data
 
       - uses: actions/upload-artifact@v2.2.4
         name: csv
         with:
-          path: data.tar.gz
+          path: data
