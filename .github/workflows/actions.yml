@@ -26,13 +26,14 @@ jobs:
     name: retrosheet
     runs-on: ubuntu-latest
     steps:
-      - run: echo $(git ls-remote https://github.com/droher/retrosheet master)
+      - id: sha
+        run: echo "::set-output name=sha::$(git ls-remote https://github.com/droher/retrosheet master)"
 
       - uses: actions/cache@v3
         with:
           path: |
             retrosheet/
-          key: retrosheet-${{ hashFiles('**/retrosheet.zip') }}
+          key: retrosheet-${{ steps.sha.outputs.sha }}
 
       - run: wget https://github.com/droher/retrosheet/archive/master.zip -O retrosheet.zip
       - run: unzip retrosheet.zip && mv retrosheet-* retrosheet
