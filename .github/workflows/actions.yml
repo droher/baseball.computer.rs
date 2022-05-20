@@ -57,4 +57,4 @@ jobs:
           path: retrosheet/
           key: retrosheet-${{ needs.retrosheet.outputs.sha }}
       - uses: actions/download-artifact@v3
-      - run: ls -R
+      - run: ./artifact/boxball-rs -i retrosheet -o data
