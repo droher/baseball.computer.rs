@@ -57,4 +57,10 @@ jobs:
           path: retrosheet/
           key: retrosheet-${{ needs.retrosheet.outputs.sha }}
       - uses: actions/download-artifact@v3
+      - run: chmod +x ./artifact/boxball-rs
       - run: ./artifact/boxball-rs -i retrosheet -o data
+
+      - uses: actions/upload-artifact@v2.2.4
+        name: csv
+        with:
+          path: data
