@@ -9,9 +9,9 @@ def file_to_data_frame_to_parquet(local_file: str, parquet_file: str) -> None:
 
 
 if __name__ == "__main__":
-    for f in glob.glob("**/csv/*.csv"):
+    for f in glob.glob("csv/*.csv"):
         print(f)
         try:
-            file_to_data_frame_to_parquet(f, f"{f.split('.')[0]}.parquet")
+            file_to_data_frame_to_parquet(f, f"parquet/{f.split('.')[0]}.parquet")
         except Exception as e:
             print(e)

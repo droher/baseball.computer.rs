@@ -61,6 +61,7 @@ jobs:
 
       - uses: actions/download-artifact@v3
       - run: chmod +x ./artifact/boxball-rs
+      - run: mkdir csv parquet
       - run: ./artifact/boxball-rs -i retrosheet -o csv
 
       - uses: actions/cache@v3
@@ -71,3 +72,8 @@ jobs:
       - run: ls -R
       - run: pip install -r bin/requirements.txt
       - run: python bin/parquet.py
+
+      - uses: actions/upload-artifact@v2.2.4
+        name: parquet
+        with:
+          path: parquet
