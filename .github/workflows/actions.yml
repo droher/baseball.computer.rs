@@ -68,5 +68,6 @@ jobs:
           path: ~/.cache/pip
           key: pip-${{ hashFiles('**/requirements.txt') }}
 
+      - run: ls -R
       - run: pip install -r bin/requirements.txt
       - run: python bin/parquet.py
