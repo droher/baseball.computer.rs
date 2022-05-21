@@ -12,6 +12,7 @@ if __name__ == "__main__":
     for f in glob.glob("csv/*.csv"):
         print(f)
         try:
-            file_to_data_frame_to_parquet(f, f"parquet/{f.split('.')[0]}.parquet")
+            fname = f.split("/")[-1].split(".")[0]
+            file_to_data_frame_to_parquet(f, f"parquet/{fname}.parquet")
         except Exception as e:
             print(e)
