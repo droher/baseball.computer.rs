@@ -23,7 +23,7 @@ jobs:
       - run: cargo build --release
 
       - uses: actions/upload-artifact@v2.2.4
-        name: bin
+        id: bin
         with:
           path: target/release/boxball-rs
 
@@ -73,6 +73,6 @@ jobs:
       - run: python bin/parquet.py
 
       - uses: actions/upload-artifact@v2.2.4
-        name: parquet
+        id: parquet
         with:
           path: parquet
