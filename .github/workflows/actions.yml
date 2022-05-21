@@ -15,7 +15,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -52,16 +52,21 @@ jobs:
     needs: [build, retrosheet]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+
       - uses: actions/cache@v3
         with:
           path: retrosheet/
           key: retrosheet-${{ needs.retrosheet.outputs.sha }}
+
       - uses: actions/download-artifact@v3
       - run: chmod +x ./artifact/boxball-rs
-      - run: ./artifact/boxball-rs -i retrosheet -o data
-      - run: gzip data
+      - run: ./artifact/boxball-rs -i retrosheet -o csv
 
-      - uses: actions/upload-artifact@v2.2.4
-        name: csv
+      - uses: actions/cache@v3
         with:
-          path: data
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('**/requirements.txt') }}
+
+      - run: pip install -r bin/requirements.txt
+      - run: python bin/parquet.py
