@@ -64,11 +64,11 @@ jobs:
       - run: pip install -r bin/requirements.txt
       - run: python bin/simple_files.py
 
-      - uses: actions/upload-artifact@v3
-        name: Upload parquet
+      - uses: aws-actions/configure-aws-credentials@v1
         with:
-          name: simple_files
-          path: retrosheet_simple/*.parquet
+          aws-access-key-id: ${{ secrets.BACKBLAZE_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.BACKBLAZE_KEY }}
+      - run: aws s3 --endpoint-url=https://s3.us-west-002.backblazeb2.com cp retrosheet-simple s3://boxball
 
   pbp:
     name: Create play-by-play
