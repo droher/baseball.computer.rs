@@ -1,0 +1,102 @@
+name: build_parser
+on: [push]
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: cargo-${{ hashFiles('**/Cargo.lock') }}-
+
+      - run: cargo build --release
+
+      - uses: actions/upload-artifact@v3
+        id: bin
+        with:
+          path: target/release/boxball-rs
+
+  retrosheet:
+    name: retrosheet
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - id: sha
+        run: echo "::set-output name=sha::$(git ls-remote https://github.com/droher/retrosheet master)"
+
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          path: retrosheet/
+          key: retrosheet-${{ steps.sha.outputs.sha }}
+
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: wget https://github.com/droher/retrosheet/archive/master.zip -O retrosheet.zip
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: unzip retrosheet.zip && mv retrosheet-* retrosheet
+
+  simple_files:
+    name: Parse simple files
+    needs: [retrosheet]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        with:
+          path: retrosheet/
+          key: retrosheet-${{ needs.retrosheet.outputs.sha }}
+
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('**/requirements.txt') }}
+
+      - run: pip install -r bin/requirements.txt
+      - run: python bin/simple_files.py
+
+      - uses: actions/upload-artifact@v3
+        name: Upload parquet
+        with:
+          name: simple_files
+          path: retrosheet_simple/*.parquet
+
+  pbp:
+    name: Create play-by-play
+    needs: [build, retrosheet]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        with:
+          path: retrosheet/
+          key: retrosheet-${{ needs.retrosheet.outputs.sha }}
+
+      - uses: actions/download-artifact@v3
+      - run: chmod +x ./artifact/boxball-rs
+      - run: mkdir csv parquet
+      - run: ./artifact/boxball-rs -i retrosheet -o csv
+
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('**/requirements.txt') }}
+
+      - run: pip install -r bin/requirements.txt
+      - run: python bin/parquet.py
+
+      - uses: actions/upload-artifact@v3
+        name: Upload parquet
+        with:
+          name: parquet
+          path: parquet/
