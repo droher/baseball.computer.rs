@@ -73,7 +73,7 @@ jobs:
   pbp:
     name: Create play-by-play
     needs: [build, retrosheet]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
 
