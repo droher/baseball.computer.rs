@@ -100,8 +100,13 @@ jobs:
       - run: pip install -r bin/requirements.txt
       - run: python bin/parquet.py
 
-      - uses: actions/upload-artifact@v3
-        name: Upload parquet
+      - uses: jakejarvis/s3-sync-action@v0.5.1
         with:
-          name: parquet
-          path: parquet/
+          args: --exclude '*' --include '*.parquet' --delete
+        env:
+          AWS_S3_BUCKET: boxball
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKBLAZE_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKBLAZE_KEY }}
+          AWS_S3_ENDPOINT: https://s3.us-west-002.backblazeb2.com
+          SOURCE_DIR: parquet
+          DEST_DIR: event
