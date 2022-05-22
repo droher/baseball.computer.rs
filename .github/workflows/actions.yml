@@ -68,6 +68,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.BACKBLAZE_KEY_ID }}
           aws-secret-access-key: ${{ secrets.BACKBLAZE_KEY }}
+          aws-region: us-west-2
       - run: aws s3 --endpoint-url=https://s3.us-west-002.backblazeb2.com cp retrosheet-simple s3://boxball
 
   pbp:
