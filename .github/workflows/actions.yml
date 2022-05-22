@@ -15,14 +15,13 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: cargo-${{ hashFiles('**/Cargo.lock') }}-
-
-      - run: cargo build --release
-
-      - uses: actions/upload-artifact@v3
-        id: bin
+          key: cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/cache@v3
         with:
           path: target/release/boxball-rs
+          key: build-${{ github.run_id }}
+
+      - run: cargo build --release
 
   retrosheet:
     name: retrosheet
@@ -87,10 +86,12 @@ jobs:
           path: retrosheet/
           key: retrosheet-${{ needs.retrosheet.outputs.sha }}
 
-      - uses: actions/download-artifact@v3
-      - run: chmod +x ./artifact/boxball-rs
+      - uses: actions/cache@v3
+        with:
+          path: target/release/boxball-rs
+          key: build-${{ github.run_id }}
       - run: mkdir csv parquet
-      - run: ./artifact/boxball-rs -i retrosheet -o csv
+      - run: ./target/release/boxball-rs -i retrosheet -o csv
 
       - uses: actions/cache@v3
         with:
