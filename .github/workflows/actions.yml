@@ -64,12 +64,16 @@ jobs:
       - run: pip install -r bin/requirements.txt
       - run: python bin/simple_files.py
 
-      - uses: aws-actions/configure-aws-credentials@v1
+      - uses: jakejarvis/s3-sync-action@v0.5.1
         with:
-          aws-access-key-id: ${{ secrets.BACKBLAZE_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.BACKBLAZE_KEY }}
-          aws-region: us-west-2
-      - run: aws s3 --endpoint-url=https://s3.us-west-002.backblazeb2.com cp retrosheet-simple s3://boxball
+          args: --include '*.parquet' --delete
+        env:
+          AWS_S3_BUCKET: boxball
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKBLAZE_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKBLAZE_KEY }}
+          AWS_S3_ENDPOINT: https://s3.us-west-002.backblazeb2.com
+          SOURCE_DIR: retrosheet_simple
+      - run: aws s3 --endpoint-url= cp retrosheet-simple s3://boxball
 
   pbp:
     name: Create play-by-play
