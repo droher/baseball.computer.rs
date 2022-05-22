@@ -11,7 +11,7 @@ from sqlalchemy import Integer, SmallInteger, Float, String, CHAR, Text, Boolean
 from sqlalchemy import Table as AlchemyTable
 from sqlalchemy.sql.type_api import TypeEngine
 
-RETROSHEET_PATH = Path("/Users/davidroher/Repos/3p/retrosheet")
+RETROSHEET_PATH = Path("retrosheet")
 OUTPUT_PATH = Path("retrosheet_simple")
 
 RETROSHEET_SUBDIRS = "gamelog", "schedule", "misc", "rosters"
@@ -27,6 +27,7 @@ def parse_simple_files() -> None:
                      strip_header: bool = False,
                      check_dupes: bool = True):
         files = (f for f in input_path.glob(glob) if f.is_file())
+        logging.info(f"Creating {output_file}, found inputs: {files}")
         with open(output_file, 'wt') as fout, fileinput.input(files) as fin:
             lines = set()
             for line in fin:
