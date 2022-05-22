@@ -53,6 +53,11 @@ jobs:
 
       - uses: actions/cache@v3
         with:
+          path: retrosheet/
+          key: retrosheet-${{ needs.retrosheet.outputs.sha }}
+
+      - uses: actions/cache@v3
+        with:
           path: ~/.cache/pip
           key: pip-${{ hashFiles('**/requirements.txt') }}
 

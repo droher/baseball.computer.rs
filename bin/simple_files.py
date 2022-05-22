@@ -27,7 +27,7 @@ def parse_simple_files() -> None:
                      strip_header: bool = False,
                      check_dupes: bool = True):
         files = (f for f in input_path.glob(glob) if f.is_file())
-        logging.info(f"Creating {output_file}, found inputs: {files}")
+        print(f"Creating {output_file}, found inputs: {files}")
         with open(output_file, 'wt') as fout, fileinput.input(files) as fin:
             lines = set()
             for line in fin:
@@ -41,7 +41,7 @@ def parse_simple_files() -> None:
                     year = Path(fin.filename()).stem[-4:]
                     new_line = f"{year},{new_line}"
                 if new_line in lines:
-                    logging.warning(f"Duplicate row in {fin.filename()}: {new_line}")
+                    print(f"Duplicate row in {fin.filename()}: {new_line}")
                     continue
                 if check_dupes:
                     lines.add(new_line)
@@ -52,7 +52,7 @@ def parse_simple_files() -> None:
     output_base.mkdir(exist_ok=True)
     subdirs = {subdir: retrosheet_base / subdir for subdir in RETROSHEET_SUBDIRS}
 
-    logging.info("Writing simple files...")
+    print("Writing simple files...")
     concat_files(subdirs["gamelog"], output_base / "gamelog.csv", glob="*.TXT", check_dupes=False)
     concat_files(subdirs["schedule"], output_base / "schedule.csv", glob="*.TXT")
     concat_files(subdirs["misc"], output_base / "park.csv", glob="parkcode.txt", strip_header=True)
