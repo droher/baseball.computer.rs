@@ -44,8 +44,29 @@ jobs:
       - if: steps.cache.outputs.cache-hit != 'true'
         run: unzip retrosheet.zip && mv retrosheet-* retrosheet
 
-  run:
-    name: run
+  simple_files:
+    name: Parse simple files
+    needs: [retrosheet]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('**/requirements.txt') }}
+
+      - run: pip install -r bin/requirements.txt
+      - run: python bin/simple_files.py
+
+      - uses: actions/upload-artifact@v3
+        name: Upload parquet
+        with:
+          name: simple_files
+          path: retrosheet_simple/*.parquet
+
+  pbp:
+    name: Create play-by-play
     needs: [build, retrosheet]
     runs-on: ubuntu-latest
     steps:
@@ -70,7 +91,7 @@ jobs:
       - run: python bin/parquet.py
 
       - uses: actions/upload-artifact@v3
-        id: parquet
+        name: Upload parquet
         with:
           name: parquet
           path: parquet/

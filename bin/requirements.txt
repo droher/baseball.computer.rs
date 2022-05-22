@@ -1,1 +1,3 @@
 pyarrow==8.0.0
+SQLAlchemy==1.4.36
+boxball-schemas==0.0.3
