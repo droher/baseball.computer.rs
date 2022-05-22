@@ -63,16 +63,14 @@ jobs:
       - run: pip install -r bin/requirements.txt
       - run: python bin/simple_files.py
 
-      - uses: jakejarvis/s3-sync-action@v0.5.1
-        with:
-          args: --exclude '*' --include '*.parquet' --delete
+      - run: |
+          aws s3 sync --endpoint-url=https://s3.us-west-002.backblazeb2.com \
+            retrosheet_simple s3://boxball/simple \
+            --exclude '*' --include '*.parquet' --delete
         env:
-          AWS_S3_BUCKET: boxball
           AWS_ACCESS_KEY_ID: ${{ secrets.BACKBLAZE_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKBLAZE_KEY }}
-          AWS_S3_ENDPOINT: https://s3.us-west-002.backblazeb2.com
-          SOURCE_DIR: retrosheet_simple
-          DEST_DIR: simple
+          AWS_DEFAULT_REGION: us-west-2
 
   pbp:
     name: Create play-by-play
@@ -101,13 +99,11 @@ jobs:
       - run: pip install -r bin/requirements.txt
       - run: python bin/parquet.py
 
-      - uses: jakejarvis/s3-sync-action@v0.5.1
-        with:
-          args: --exclude '*' --include '*.parquet' --delete
+      - run: |
+          aws s3 sync --endpoint-url=https://s3.us-west-002.backblazeb2.com \
+            parquet s3://boxball/event \
+            --exclude '*' --include '*.parquet' --delete
         env:
-          AWS_S3_BUCKET: boxball
           AWS_ACCESS_KEY_ID: ${{ secrets.BACKBLAZE_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKBLAZE_KEY }}
-          AWS_S3_ENDPOINT: https://s3.us-west-002.backblazeb2.com
-          SOURCE_DIR: parquet
-          DEST_DIR: event
+          AWS_DEFAULT_REGION: us-west-2
