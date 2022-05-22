@@ -11,7 +11,7 @@ from sqlalchemy import Integer, SmallInteger, Float, String, CHAR, Text, Boolean
 from sqlalchemy import Table as AlchemyTable
 from sqlalchemy.sql.type_api import TypeEngine
 
-RETROSHEET_PATH = Path("retrosheet")
+RETROSHEET_PATH = Path("/Users/davidroher/Repos/3p/retrosheet")
 OUTPUT_PATH = Path("retrosheet_simple")
 
 RETROSHEET_SUBDIRS = "gamelog", "schedule", "misc", "rosters"
@@ -25,23 +25,26 @@ def parse_simple_files() -> None:
     def concat_files(input_path: Path, output_file: Path, glob: str = "*",
                      prepend_filename: bool = False,
                      strip_header: bool = False,
-                     check_dupes: bool = True):
-        files = (f for f in input_path.glob(glob) if f.is_file())
-        print(f"Creating {output_file}, found inputs: {files}")
+                     check_dupes: bool = True,
+                     max_year: int = None):
+        files = [f for f in input_path.glob(glob) if f.is_file()]
+
         with open(output_file, 'wt') as fout, fileinput.input(files) as fin:
             lines = set()
             for line in fin:
+                year = Path(fin.filename()).stem[-4:]
                 # Remove DOS EOF character (CRTL+Z)
                 new_line = line.strip(DOS_EOF)
                 if not new_line or new_line.isspace():
                     continue
                 if fin.isfirstline() and strip_header:
                     continue
+                if max_year and (not year.isdigit() or (int(year) > max_year)):
+                    continue
                 if prepend_filename:
-                    year = Path(fin.filename()).stem[-4:]
                     new_line = f"{year},{new_line}"
                 if new_line in lines:
-                    print(f"Duplicate row in {fin.filename()}: {new_line}")
+                    print(f"Duplicate row in {fin.filename()}: {new_line.strip()}")
                     continue
                 if check_dupes:
                     lines.add(new_line)
@@ -53,7 +56,8 @@ def parse_simple_files() -> None:
     subdirs = {subdir: retrosheet_base / subdir for subdir in RETROSHEET_SUBDIRS}
 
     print("Writing simple files...")
-    concat_files(subdirs["gamelog"], output_base / "gamelog.csv", glob="*.TXT", check_dupes=False)
+    # Cut off gamelog after we start getting boxscores for every game
+    concat_files(subdirs["gamelog"], output_base / "gamelog.csv", glob="*.TXT", check_dupes=False, max_year=1900)
     concat_files(subdirs["schedule"], output_base / "schedule.csv", glob="*.TXT")
     concat_files(subdirs["misc"], output_base / "park.csv", glob="parkcode.txt", strip_header=True)
     concat_files(subdirs["rosters"], output_base / "roster.csv", glob="*.ROS", prepend_filename=True)
