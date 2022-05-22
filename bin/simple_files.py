@@ -1,9 +1,9 @@
 import fileinput
-import logging
 from pathlib import Path
 from typing import Dict, Type, Iterator, List, Tuple
 
 import pyarrow as pa
+import pandas
 from boxball_schemas import retrosheet
 from pyarrow import csv as pcsv
 from pyarrow import parquet as pq
@@ -11,7 +11,7 @@ from sqlalchemy import Integer, SmallInteger, Float, String, CHAR, Text, Boolean
 from sqlalchemy import Table as AlchemyTable
 from sqlalchemy.sql.type_api import TypeEngine
 
-RETROSHEET_PATH = Path("/Users/davidroher/Repos/3p/retrosheet")
+RETROSHEET_PATH = Path("retrosheet")
 OUTPUT_PATH = Path("retrosheet_simple")
 
 RETROSHEET_SUBDIRS = "gamelog", "schedule", "misc", "rosters"
@@ -19,6 +19,20 @@ FILES = "gamelog", "schedule", "park", "roster"
 
 # MS-DOS eof character that needs to be specially handled in some files
 DOS_EOF = chr(26)
+
+
+def get_prebuilt_csvs() -> None:
+    franchise_header = ["current_franchise_id", "team_id", "league", "division", "location", "nickname",
+                        "alternate_nicknames", "date_start", "date_end", "city", "state"]
+    (pandas
+     .read_csv("https://www.retrosheet.org/CurrentNames.csv", names=franchise_header, parse_dates=["date_start", "date_end"])
+     .to_parquet("retrosheet_simple/franchise.parquet", index=False)
+     )
+    (pandas
+     .read_csv("https://raw.githubusercontent.com/chadwickbureau/baseballdatabank/master/core/People.csv")
+     .to_parquet("retrosheet_simple/people.parquet", index=False)
+     )
+
 
 
 def parse_simple_files() -> None:
@@ -112,3 +126,4 @@ def write_files() -> None:
 if __name__ == "__main__":
     parse_simple_files()
     write_files()
+    get_prebuilt_csvs()
