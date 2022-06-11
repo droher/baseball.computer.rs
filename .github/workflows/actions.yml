@@ -65,7 +65,7 @@ jobs:
 
       - run: |
           aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
-            retrosheet_simple s3://boxball/simple \
+            retrosheet_simple s3://timeball/simple \
             --exclude '*' --include '*.parquet' --delete
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY }}
@@ -101,7 +101,7 @@ jobs:
 
       - run: |
           aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
-            parquet s3://boxball/event \
+            parquet s3://timeball/event \
             --exclude '*' --include '*.parquet' --delete
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY }}
