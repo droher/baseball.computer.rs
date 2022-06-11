@@ -64,12 +64,12 @@ jobs:
       - run: python bin/simple_files.py
 
       - run: |
-          aws s3 sync --endpoint-url=https://s3.us-west-002.backblazeb2.com \
+          aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
             retrosheet_simple s3://boxball/simple \
             --exclude '*' --include '*.parquet' --delete
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.BACKBLAZE_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKBLAZE_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET }}
           AWS_DEFAULT_REGION: us-west-2
 
   pbp:
