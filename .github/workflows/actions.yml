@@ -70,7 +70,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET }}
-          AWS_DEFAULT_REGION: us-west-2
+          AWS_DEFAULT_REGION: auto
 
   pbp:
     name: Create play-by-play
@@ -106,4 +106,4 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET }}
-          AWS_DEFAULT_REGION: us-west-2
+          AWS_DEFAULT_REGION: auto
