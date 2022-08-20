@@ -232,6 +232,7 @@ pub enum InfoRecord {
     InputTime,
     EditTime,
     InputProgramVersion,
+    HowEntered,
     Unrecognized,
 }
 
@@ -279,6 +280,7 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
             "sky" => I::Sky(Sky::from_str(value)?),
             "winddir" => I::WindDirection(WindDirection::from_str(value)?),
             "howscored" => I::HowScored(HowScored::from_str(value)?),
+            "howentered" => I::HowEntered,
 
             "windspeed" => I::WindSpeed(parse_positive_int::<u8>(value)),
             "timeofgame" => I::TimeOfGameMinutes(parse_positive_int::<u16>(value)),
