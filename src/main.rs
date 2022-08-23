@@ -22,12 +22,12 @@ use tracing_subscriber::FmtSubscriber;
 
 use event_file::game_state::GameContext;
 use event_file::parser::RetrosheetReader;
-use event_file::schemas::{ContextToVec, Event};
+use event_file::schemas::{ContextToVec, Events};
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
-use crate::event_file::schemas::{BoxScoreLineScore, BoxScoreWritableRecord, EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam};
+use crate::event_file::schemas::{BoxScoreLineScores, BoxScoreWritableRecord, EventFieldingPlays, EventHitLocations, EventOuts, EventPitches, Games, GameTeams};
 
 mod event_file;
 
@@ -198,10 +198,10 @@ impl EventFileSchema {
         // Write Game
         writer_map
             .get_mut(&Self::BoxScoreGame)
-            .serialize(Game::from(game_context))?;
+            .serialize(Games::from(game_context))?;
         // Write GameTeam
         let w = writer_map.get_mut(&Self::BoxScoreTeam);
-        for row in GameTeam::from_game_context(game_context) {
+        for row in GameTeams::from_game_context(game_context) {
             w.serialize(&row)?;
         }
         // Write GameUmpire
@@ -215,7 +215,7 @@ impl EventFileSchema {
                 MappedRecord::LineScore(ls) => Some(ls),
                 _ => None
             })
-            .flat_map(|ls| BoxScoreLineScore::transform_line_score(game_context.game_id.id, ls));
+            .flat_map(|ls| BoxScoreLineScores::transform_line_score(game_context.game_id.id, ls));
         let w = writer_map.get_mut(&Self::BoxScoreLineScore);
         for row in line_scores {
             w.serialize(row)?;
@@ -248,10 +248,10 @@ impl EventFileSchema {
         // Write Game
         writer_map
             .get_mut(&Self::Game)
-            .serialize(Game::from(game_context))?;
+            .serialize(Games::from(game_context))?;
         // Write GameTeam
         let w = writer_map.get_mut(&Self::GameTeam);
-        for row in GameTeam::from_game_context(game_context) {
+        for row in GameTeams::from_game_context(game_context) {
             w.serialize(&row)?;
         }
         // Write GameUmpire
@@ -271,7 +271,7 @@ impl EventFileSchema {
         }
         // Write Event
         let w = writer_map.get_mut(&Self::Event);
-        for row in Event::from_game_context(game_context) {
+        for row in Events::from_game_context(game_context) {
             w.serialize(row)?;
         }
         // Write EventStartingBaseState
@@ -296,12 +296,12 @@ impl EventFileSchema {
         }
         // Write EventOut
         let w = writer_map.get_mut(&Self::EventOut);
-        for row in EventOut::from_game_context(game_context) {
+        for row in EventOuts::from_game_context(game_context) {
             w.serialize(&row)?;
         }
         // Write EventFieldingPlay
         let w = writer_map.get_mut(&Self::EventFieldingPlay);
-        for row in EventFieldingPlay::from_game_context(game_context) {
+        for row in EventFieldingPlays::from_game_context(game_context) {
             w.serialize(&row)?;
         }
         // Write EventBaserunningAdvanceAttempt
@@ -316,7 +316,7 @@ impl EventFileSchema {
         }
         // Write EventHitLocation
         let w = writer_map.get_mut(&Self::EventHitLocation);
-        for row in EventHitLocation::from_game_context(game_context) {
+        for row in EventHitLocations::from_game_context(game_context) {
             w.serialize(&row)?;
         }
         // Write EventBaserunningPlay
@@ -332,13 +332,13 @@ impl EventFileSchema {
         }
         // Write EventPitch
         // Not in every PBP so avoid writing empty file
-        if EventPitch::from_game_context(game_context)
+        if EventPitches::from_game_context(game_context)
             .peekable()
             .peek()
             .is_some()
         {
             let w = writer_map.get_mut(&Self::EventPitch);
-            for row in EventPitch::from_game_context(game_context) {
+            for row in EventPitches::from_game_context(game_context) {
                 w.serialize(row)?;
             }
         }

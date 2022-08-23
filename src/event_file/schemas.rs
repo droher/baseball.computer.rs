@@ -13,7 +13,7 @@ use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, Park, Precipitation, Sky, Team,
     WindDirection,
 };
-use crate::event_file::pitch_sequence::{PitchType, SequenceItemTypeGeneral};
+use crate::event_file::pitch_sequence::PitchType;
 use crate::event_file::play::{
     Base, BaseRunner, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame,
 };
@@ -28,7 +28,7 @@ pub trait ContextToVec {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct Game<'a> {
+pub struct Games<'a> {
     game_id: TinyStr16,
     date: NaiveDate,
     start_time: Option<NaiveDateTime>,
@@ -55,7 +55,7 @@ pub struct Game<'a> {
     completion_info: Option<&'a str>,
 }
 
-impl<'a> From<&'a GameContext> for Game<'a> {
+impl<'a> From<&'a GameContext> for Games<'a> {
     fn from(gc: &'a GameContext) -> Self {
         let setting = &gc.setting;
         let results = &gc.results;
@@ -92,13 +92,13 @@ impl<'a> From<&'a GameContext> for Game<'a> {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct GameTeam {
+pub struct GameTeams {
     game_id: TinyStr16,
     team_id: Team,
     side: Side,
 }
 
-impl ContextToVec for GameTeam {
+impl ContextToVec for GameTeams {
     //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self>> {
         Box::from(
@@ -120,7 +120,7 @@ impl ContextToVec for GameTeam {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct Event {
+pub struct Events {
     game_id: TinyStr16,
     event_id: EventId,
     batting_side: Side,
@@ -132,7 +132,7 @@ pub struct Event {
     count_strikes: Option<u8>,
 }
 
-impl ContextToVec for Event {
+impl ContextToVec for Events {
     //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().map(move |e| Self {
@@ -150,21 +150,17 @@ impl ContextToVec for Event {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventPitch {
+pub struct EventPitches {
     game_id: TinyStr16,
     event_id: EventId,
     sequence_id: SequenceId,
-    is_pitch: bool,
-    is_strike: bool,
-    sequence_item_general: SequenceItemTypeGeneral,
     sequence_item: PitchType,
-    in_play_flag: bool,
     runners_going_flag: bool,
     blocked_by_catcher_flag: bool,
     catcher_pickoff_attempt_at_base: Option<Base>,
 }
 
-impl ContextToVec for EventPitch {
+impl ContextToVec for EventPitches {
     //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         let pitch_sequences = gc.events.iter().filter_map(|e| {
@@ -175,16 +171,11 @@ impl ContextToVec for EventPitch {
         });
         let pitch_iter = pitch_sequences.flat_map(move |(event_id, pitches)| {
             pitches.iter().map(move |psi| {
-                let general = psi.pitch_type.get_sequence_general();
                 Self {
                     game_id: gc.game_id.id,
                     event_id,
                     sequence_id: psi.sequence_id,
-                    is_pitch: general.is_pitch(),
-                    is_strike: general.is_strike(),
-                    sequence_item_general: general,
                     sequence_item: psi.pitch_type,
-                    in_play_flag: general.is_in_play(),
                     runners_going_flag: psi.runners_going,
                     blocked_by_catcher_flag: psi.blocked_by_catcher,
                     catcher_pickoff_attempt_at_base: psi.catcher_pickoff_attempt,
@@ -196,7 +187,7 @@ impl ContextToVec for EventPitch {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventFieldingPlay {
+pub struct EventFieldingPlays {
     game_id: TinyStr16,
     event_id: EventId,
     sequence_id: SequenceId,
@@ -204,7 +195,7 @@ pub struct EventFieldingPlay {
     fielding_play: FieldingPlayType,
 }
 
-impl ContextToVec for EventFieldingPlay {
+impl ContextToVec for EventFieldingPlays {
     //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().flat_map(|e| {
@@ -224,7 +215,7 @@ impl ContextToVec for EventFieldingPlay {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventHitLocation {
+pub struct EventHitLocations {
     game_id: TinyStr16,
     event_id: EventId,
     general_location: HitLocationGeneral,
@@ -233,7 +224,7 @@ pub struct EventHitLocation {
     strength: HitStrength,
 }
 
-impl ContextToVec for EventHitLocation {
+impl ContextToVec for EventHitLocations {
     //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().filter_map(|e| {
@@ -259,14 +250,14 @@ impl ContextToVec for EventHitLocation {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventOut {
+pub struct EventOuts {
     game_id: TinyStr16,
     event_id: EventId,
     sequence_id: SequenceId,
     baserunner_out: BaseRunner,
 }
 
-impl ContextToVec for EventOut {
+impl ContextToVec for EventOuts {
     //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().flat_map(|e| {
@@ -316,14 +307,14 @@ impl BoxScoreWritableRecord<'_> {
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct BoxScoreLineScore {
+pub struct BoxScoreLineScores {
     pub game_id: TinyStr16,
     pub side: Side,
     pub inning: Inning,
     pub runs: u8,
 }
 
-impl BoxScoreLineScore {
+impl BoxScoreLineScores {
     pub fn transform_line_score(game_id: TinyStr16, raw_line: &LineScore) -> Vec<Self> {
         raw_line.line_score
             .iter()

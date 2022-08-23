@@ -4,7 +4,7 @@ from pyarrow import csv, parquet
 
 
 def file_to_data_frame_to_parquet(local_file: str, parquet_file: str) -> None:
-    table = csv.read_csv(local_file)
+    table = csv.read_csv(local_file, convert_options=csv.ConvertOptions(strings_can_be_null=True))
     parquet.write_table(table, parquet_file, compression='zstd')
 
 

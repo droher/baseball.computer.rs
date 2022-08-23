@@ -8,29 +8,6 @@ use strum_macros::EnumString;
 use crate::event_file::play::Base;
 use crate::event_file::traits::SequenceId;
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub enum SequenceItemTypeGeneral {
-    Ball,
-    Strike,
-    InPlay,
-    NoPitch,
-    Unknown,
-}
-
-impl SequenceItemTypeGeneral {
-    pub fn is_pitch(&self) -> bool {
-        !([Self::NoPitch, Self::Unknown].contains(self))
-    }
-
-    pub fn is_strike(&self) -> bool {
-        [Self::Strike, Self::InPlay].contains(self)
-    }
-
-    pub fn is_in_play(&self) -> bool {
-        self == &Self::InPlay
-    }
-}
-
 #[derive(
     Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize,
 )]
@@ -81,36 +58,6 @@ pub enum PitchType {
     InPlay,
     #[strum(serialize = "Y")]
     InPlayOnPitchout,
-}
-
-impl PitchType {
-    pub fn get_sequence_general(&self) -> SequenceItemTypeGeneral {
-        match self {
-            PitchType::PickoffAttemptFirst => SequenceItemTypeGeneral::NoPitch,
-            PitchType::PickoffAttemptSecond => SequenceItemTypeGeneral::NoPitch,
-            PitchType::PickoffAttemptThird => SequenceItemTypeGeneral::NoPitch,
-            PitchType::PlayNotInvolvingBatter => SequenceItemTypeGeneral::NoPitch,
-            PitchType::Ball => SequenceItemTypeGeneral::Ball,
-            PitchType::CalledStrike => SequenceItemTypeGeneral::Strike,
-            PitchType::Foul => SequenceItemTypeGeneral::Strike,
-            PitchType::HitBatter => SequenceItemTypeGeneral::Ball,
-            PitchType::IntentionalBall => SequenceItemTypeGeneral::Ball,
-            PitchType::StrikeUnknownType => SequenceItemTypeGeneral::Strike,
-            PitchType::FoulBunt => SequenceItemTypeGeneral::Strike,
-            PitchType::MissedBunt => SequenceItemTypeGeneral::Strike,
-            PitchType::NoPitch => SequenceItemTypeGeneral::NoPitch,
-            PitchType::FoulTipBunt => SequenceItemTypeGeneral::Strike,
-            PitchType::Pitchout => SequenceItemTypeGeneral::Ball,
-            PitchType::SwingingOnPitchout => SequenceItemTypeGeneral::Strike,
-            PitchType::FoulOnPitchout => SequenceItemTypeGeneral::Strike,
-            PitchType::SwingingStrike => SequenceItemTypeGeneral::Strike,
-            PitchType::FoulTip => SequenceItemTypeGeneral::Strike,
-            PitchType::Unknown => SequenceItemTypeGeneral::Unknown,
-            PitchType::AutomaticBall => SequenceItemTypeGeneral::Ball,
-            PitchType::InPlay => SequenceItemTypeGeneral::InPlay,
-            PitchType::InPlayOnPitchout => SequenceItemTypeGeneral::InPlay,
-        }
-    }
 }
 
 impl Default for PitchType {
