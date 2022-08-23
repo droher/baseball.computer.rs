@@ -523,7 +523,8 @@ impl TryFrom<(&str, &str)> for BattingOut {
             // The fielder specified after a fielder's choice refers to the fielder making
             // the choice, not necessarily any assist/putout
             OutAtBatType::FieldersChoice => {
-                Some(FieldingPlay::fielders_choice(FieldingPosition::try_from(last)?))
+                let fp = FieldingPosition::try_from(last).unwrap_or_default();
+                Some(FieldingPlay::fielders_choice(fp))
             },
             _ => Some(FieldingPlay::try_from(last)?),
         };
