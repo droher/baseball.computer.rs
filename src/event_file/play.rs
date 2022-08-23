@@ -373,6 +373,14 @@ impl FieldingPlay {
             runners_out: vec![],
         }
     }
+
+    fn fielders_choice(position: FieldingPosition) -> Self {
+        let fc = FieldersData::new(position, FieldingPlayType::FieldersChoice);
+        Self {
+            fielders_data: vec![fc],
+            runners_out: vec![]
+        }
+    }
 }
 
 impl Default for FieldingPlay {
@@ -514,7 +522,9 @@ impl TryFrom<(&str, &str)> for BattingOut {
             }
             // The fielder specified after a fielder's choice refers to the fielder making
             // the choice, not necessarily any assist/putout
-            OutAtBatType::FieldersChoice => None,
+            OutAtBatType::FieldersChoice => {
+                Some(FieldingPlay::fielders_choice(FieldingPosition::try_from(last)?))
+            },
             _ => Some(FieldingPlay::try_from(last)?),
         };
         Ok(Self {
