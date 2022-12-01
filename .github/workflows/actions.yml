@@ -1,5 +1,5 @@
 name: build_parser
-on: [push]
+on: [push, workflow_dispatch]
 jobs:
   build:
     name: build
