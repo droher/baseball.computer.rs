@@ -22,11 +22,7 @@ use crate::event_file::misc::{
 };
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::pitch_sequence::PitchSequenceItem;
-use crate::event_file::play::{
-    Base, BaseRunner, BaserunningPlayType, CachedPlay, ContactType, Count, EarnedRunStatus,
-    FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame,
-    OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayType, RunnerAdvance,
-};
+use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, ContactType, Count, EarnedRunStatus, FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayModifier, PlayType, RunnerAdvance};
 use crate::event_file::traits::{FieldingPosition, Inning, LineupPosition, Matchup, Pitcher, Player, SequenceId, Side, Umpire};
 use crate::AccountType;
 
@@ -101,10 +97,19 @@ pub enum PlateAppearanceResultType {
     HitByPitch,
     Walk,
     IntentionalWalk,
+    SacrificeFly,
+    SacrificeHit
 }
 
-impl From<&PlateAppearanceType> for PlateAppearanceResultType {
-    fn from(plate_appearance: &PlateAppearanceType) -> Self {
+impl From<(&PlateAppearanceType, &[PlayModifier])> for PlateAppearanceResultType {
+    fn from(tup: (&PlateAppearanceType, &[PlayModifier])) -> Self {
+        let (plate_appearance, modifiers) = tup;
+        let is_sac_fly = modifiers
+            .iter()
+            .any(|m| m == &PlayModifier::SacrificeFly);
+        let is_sac_hit = modifiers
+            .iter()
+            .any(|m| m == &PlayModifier::SacrificeHit);
         match plate_appearance {
             PlateAppearanceType::Hit(h) => match h.hit_type {
                 HitType::Single => Self::Single,
@@ -121,10 +126,12 @@ impl From<&PlateAppearanceType> for PlateAppearanceResultType {
             },
             PlateAppearanceType::BattingOut(bo) => match bo.out_type {
                 OutAtBatType::ReachedOnError => Self::ReachedOnError,
-                OutAtBatType::InPlayOut if bo.implicit_advance().is_some() => Self::ReachedOnError,
                 OutAtBatType::StrikeOut => Self::StrikeOut,
                 OutAtBatType::FieldersChoice => Self::FieldersChoice,
-                OutAtBatType::InPlayOut => Self::InPlayOut,
+                OutAtBatType::InPlayOut if is_sac_fly => Self::SacrificeFly,
+                OutAtBatType::InPlayOut if is_sac_hit => Self::SacrificeHit,
+                OutAtBatType::InPlayOut if bo.implicit_advance().is_some() => Self::ReachedOnError,
+                _ => Self::InPlayOut,
             },
         }
     }
@@ -522,12 +529,13 @@ pub struct EventPlateAppearance {
 
 impl EventPlateAppearance {
     fn from_play(play: &CachedPlay, game_id: GameId, event_id: EventId) -> Option<Self> {
+        let modifiers = play.play.modifiers.as_slice();
         play.play.main_plays.iter().find_map(|pt| {
             if let PlayType::PlateAppearance(pa) = pt {
                 Some(Self {
                     game_id: game_id.id,
                     event_id,
-                    plate_appearance_result: PlateAppearanceResultType::from(pa),
+                    plate_appearance_result: PlateAppearanceResultType::from((pa, modifiers)),
                     contact: play.contact_description.map(|cd| cd.contact_type),
                     hit_to_fielder: play.hit_to_fielder,
                     hit_location: play.contact_description.and_then(|cd| cd.location),
