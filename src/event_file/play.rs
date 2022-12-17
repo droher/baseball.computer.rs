@@ -526,6 +526,7 @@ impl TryFrom<(&str, &str)> for BattingOut {
                 let fp = FieldingPosition::try_from(last).unwrap_or_default();
                 Some(FieldingPlay::fielders_choice(fp))
             },
+            OutAtBatType::FieldersChoice => None,
             _ => Some(FieldingPlay::try_from(last)?),
         };
         Ok(Self {
