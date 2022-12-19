@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
 use bimap::BiMap;
@@ -8,7 +7,6 @@ use bounded_integer::BoundedUsize;
 use chrono::{NaiveDate, NaiveTime};
 use either::Either;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use tinystr::{tinystr16, tinystr8, TinyStr16};
 
@@ -16,10 +14,7 @@ use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
     Team, UmpireAssignment, UmpirePosition, WindDirection,
 };
-use crate::event_file::misc::{
-    BatHandAdjustment, GameId, Hand, LineupAdjustment, PitchHandAdjustment, RunnerAdjustment,
-    StartRecord, SubstitutionRecord,
-};
+use crate::event_file::misc::{BatHandAdjustment, GameId, Hand, LineupAdjustment, PitcherResponsibilityAdjustment, PitchHandAdjustment, RunnerAdjustment, SubstitutionRecord};
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::pitch_sequence::PitchSequenceItem;
 use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, ContactType, Count, EarnedRunStatus, FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayModifier, PlayType, RunnerAdvance};
@@ -28,14 +23,29 @@ use crate::AccountType;
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
-const OHTANI: &str = "ohtas001";
-const OHTANI_ALL_STAR_GAME: &str = "NLS202107130";
-lazy_static! {
-    static ref FAKE_OHTANI: Player = Player::from_str("ohtas999").unwrap();
-}
 
 type Position = Either<LineupPosition, FieldingPosition>;
-type PersonnelState = BiMap<Position, Player>;
+
+/// A wrapper around `Player` that allows for a player to appear
+/// in multiple positions in a lineup. This is used for the
+/// Ohtani rule, where a player can appear in the lineup as a
+/// pitcher and a DH.
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+struct TrackedPlayer {
+    pub player: Player,
+    is_pitcher_with_dh: bool
+}
+
+impl From<(Player, bool)> for TrackedPlayer {
+    fn from((player, is_starting_pitcher_with_dh): (Player, bool)) -> Self {
+        Self {
+            player,
+            is_pitcher_with_dh: is_starting_pitcher_with_dh,
+        }
+    }
+}
+
+type PersonnelState = BiMap<Position, TrackedPlayer>;
 type Lineup = PersonnelState;
 type Defense = PersonnelState;
 pub type EventId = SequenceId;
@@ -667,8 +677,8 @@ struct Personnel {
     // switching back to his old lineup position.
     // (This also makes the convenient assumption that a player cannot play for both sides in
     // the same game, which has never happened but could theoretically).
-    lineup_appearances: HashMap<Player, Vec<GameLineupAppearance>>,
-    defense_appearances: HashMap<Player, Vec<GameFieldingAppearance>>,
+    lineup_appearances: HashMap<TrackedPlayer, Vec<GameLineupAppearance>>,
+    defense_appearances: HashMap<TrackedPlayer, Vec<GameFieldingAppearance>>,
 }
 
 impl Default for Personnel {
@@ -688,21 +698,6 @@ impl Default for Personnel {
 }
 
 impl Personnel {
-    /// In the 2021 All-Star Game, Shohei Ohtani was both the starting pitcher
-    /// and the DH, which to date is the only time a player has ever
-    /// started at two different positions.
-    /// We love Shohei but this is really annoying, so we just pretend
-    /// they're two different people in the game.
-    fn handle_2021_asg(game_id: GameId, start: &StartRecord) -> Player {
-        if game_id.id == OHTANI_ALL_STAR_GAME
-            && start.player == OHTANI
-            && start.fielding_position == FieldingPosition::Pitcher
-        {
-            *FAKE_OHTANI
-        } else {
-            start.player
-        }
-    }
 
     fn new(record_vec: &RecordSlice) -> Result<Self> {
         let game_id = get_game_id(record_vec)?;
@@ -731,7 +726,8 @@ impl Personnel {
                 start.side,
                 game_id,
             );
-            let player = Self::handle_2021_asg(game_id, start);
+            let player: TrackedPlayer = (start.player, start.lineup_position == LineupPosition::PitcherWithDh).into();
+
             lineup.insert(Either::Left(start.lineup_position), player);
             defense.insert(Either::Right(start.fielding_position), player);
             personnel
@@ -746,9 +742,10 @@ impl Personnel {
 
     fn pitcher(&self, side: &Side) -> Result<Pitcher> {
         self.get_at_position(side, &Either::Right(FieldingPosition::Pitcher))
+            .map(|tp| tp.player)
     }
 
-    fn get_at_position(&self, side: &Side, position: &Position) -> Result<Player> {
+    fn get_at_position(&self, side: &Side, position: &Position) -> Result<TrackedPlayer> {
         let map_tup = self.personnel_state.get(side);
         let map = if let Either::Left(_) = position {
             &map_tup.0
@@ -764,11 +761,12 @@ impl Personnel {
     }
 
     fn at_bat(&self, play: &CachedPlay) -> Result<LineupPosition> {
+        let player: TrackedPlayer = (play.batter, false).into();
         let position = self
             .personnel_state
             .get(&play.batting_side)
             .0
-            .get_by_right(&play.batter)
+            .get_by_right(&player)
             .copied();
 
         if let Some(Either::Left(lp)) = position {
@@ -785,14 +783,15 @@ impl Personnel {
 
     fn get_current_lineup_appearance(
         &mut self,
-        player: &Player,
+        player: &TrackedPlayer,
     ) -> Result<&mut GameLineupAppearance> {
+        let la = self.lineup_appearances.clone();
         self.lineup_appearances
             .get_mut(player)
             .with_context(|| {
                 format!(
-                    "Cannot find existing player {:?} in appearance records",
-                    player
+                    "Cannot find existing player {:?} in lineup appearance records",
+                    (player, la)
                 )
             })?
             .last_mut()
@@ -806,13 +805,13 @@ impl Personnel {
 
     fn get_current_fielding_appearance(
         &mut self,
-        player: &Player,
+        player: &TrackedPlayer,
     ) -> Result<&mut GameFieldingAppearance> {
         self.defense_appearances
             .get_mut(player)
             .with_context(|| {
                 format!(
-                    "Cannot find existing player {:?} in appearance records",
+                    "Cannot find existing player {:?} in defense appearance records",
                     player
                 )
             })?
@@ -833,7 +832,7 @@ impl Personnel {
         let original_batter = self.get_at_position(&sub.side, &Either::Left(sub.lineup_position));
         match original_batter {
             // If this substitution is the DH/PH/PR being brought in to field, no substitution takes place
-            Ok(p) if p == sub.player => return Ok(()),
+            Ok(p) if p.player == sub.player => return Ok(()),
             Ok(p) => self.get_current_lineup_appearance(&p)?.end_event_id = Some(event_id - 1),
             // There should almost always be an original batter, but in
             // the extremely rare case of a courtesy runner, there might not be.
@@ -851,9 +850,10 @@ impl Personnel {
             start_event_id: event_id,
             end_event_id: None,
         };
-        lineup.insert(Either::Left(sub.lineup_position), sub.player);
+        let tracked_player: TrackedPlayer = (sub.player, sub.lineup_position == LineupPosition::PitcherWithDh).into();
+        lineup.insert(Either::Left(sub.lineup_position), tracked_player);
         self.lineup_appearances
-            .entry(sub.player)
+            .entry(tracked_player)
             .or_insert_with(|| Vec::with_capacity(1))
             .push(new_lineup_appearance);
         Ok(())
@@ -869,7 +869,7 @@ impl Personnel {
         let original_fielder =
             self.get_at_position(&sub.side, &Either::Right(sub.fielding_position));
         match original_fielder {
-            Ok(p) if p == sub.player => return Ok(()),
+            Ok(p) if p.player == sub.player => return Ok(()),
             Ok(p) => self.get_current_fielding_appearance(&p)?.end_event_id = Some(event_id - 1),
             Err(_) => {}
         };
@@ -880,11 +880,12 @@ impl Personnel {
         // so the entire position must be removed from the defense temporarily.
         // If the data is consistent, this state (< 9 positions) can only exist between substitutions,
         // and cannot exist at the start of a play.
-        defense.remove_by_right(&sub.player);
-        defense.insert(Either::Right(sub.fielding_position), sub.player);
+        let player: TrackedPlayer = (sub.player, sub.lineup_position == LineupPosition::PitcherWithDh).into();
+        defense.remove_by_right(&player);
+        defense.insert(Either::Right(sub.fielding_position), player);
 
         self.defense_appearances
-            .entry(sub.player)
+            .entry(player)
             .or_insert_with(|| Vec::with_capacity(1))
             .push(GameFieldingAppearance::new(
                 sub.player,
@@ -1143,7 +1144,7 @@ impl GameState {
     }
 
     fn update_on_runner_adjustment(&mut self, record: &RunnerAdjustment) -> Result<()> {
-        // The 2020/2021 tiebreaker runner record can appear before or after the first record of the next
+        // The extra innings runner record can appear before or after the first record of the next
         // inning, and it doesn't have a side associated with it, so we have to do some messy
         // state changes to get it right.
         if self.outs == 3 {
@@ -1151,10 +1152,10 @@ impl GameState {
             self.batting_side = self.batting_side.flip();
             self.outs = Outs::new(0).unwrap();
         }
-
+        let tracked_runner: TrackedPlayer = (record.runner_id, false).into();
         let runner_pos = self
             .personnel
-            .get_current_lineup_appearance(&record.runner_id)?
+            .get_current_lineup_appearance(&tracked_runner)?
             .lineup_position;
         let pitcher = self.personnel.pitcher(&self.batting_side.flip())?;
         self.bases = BaseState::new_inning_tiebreaker(runner_pos, pitcher);
@@ -1163,6 +1164,10 @@ impl GameState {
     }
 
     fn update_on_comment(&mut self, _record: &str) {
+        // TODO
+    }
+
+    fn update_on_pitcher_responsibility_adjustment(&mut self, _record: &PitcherResponsibilityAdjustment) {
         // TODO
     }
 
@@ -1185,6 +1190,7 @@ impl GameState {
             MappedRecord::PitchHandAdjustment(r) => self.update_on_pitch_hand_adjustment(r),
             MappedRecord::LineupAdjustment(r) => self.update_on_lineup_adjustment(r),
             MappedRecord::RunnerAdjustment(r) => self.update_on_runner_adjustment(r)?,
+            MappedRecord::PitcherResponsibilityAdjustment(r) => self.update_on_pitcher_responsibility_adjustment(r),
             MappedRecord::Comment(r) => self.update_on_comment(r),
             _ => {}
         };

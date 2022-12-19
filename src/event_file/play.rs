@@ -526,7 +526,6 @@ impl TryFrom<(&str, &str)> for BattingOut {
                 let fp = FieldingPosition::try_from(last).unwrap_or_default();
                 Some(FieldingPlay::fielders_choice(fp))
             },
-            OutAtBatType::FieldersChoice => None,
             _ => Some(FieldingPlay::try_from(last)?),
         };
         Ok(Self {
@@ -959,7 +958,7 @@ impl PlayType {
         } else if let Ok(np) = NoPlay::try_from(str_tuple) {
             Ok(vec![Self::NoPlay(np)])
         } else {
-            bail!("Unable to parse play")
+            bail!("Unable to parse play: {value}")
         }
     }
 }

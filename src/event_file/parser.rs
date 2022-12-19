@@ -13,7 +13,7 @@ use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::InfoRecord;
 use crate::event_file::misc::{
     BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment,
-    RunnerAdjustment, StartRecord, SubstitutionRecord,
+    RunnerAdjustment, StartRecord, SubstitutionRecord, PitcherResponsibilityAdjustment
 };
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{GameType, RetrosheetEventRecord};
@@ -54,7 +54,7 @@ impl AccountType {
             .to_str()
             .unwrap_or_default()
             .to_string();
-        glob(&*input)
+        glob(&input)
     }
 }
 
@@ -215,6 +215,7 @@ pub enum MappedRecord {
     PitchHandAdjustment(PitchHandAdjustment),
     LineupAdjustment(LineupAdjustment),
     RunnerAdjustment(RunnerAdjustment),
+    PitcherResponsibilityAdjustment(PitcherResponsibilityAdjustment),
     EarnedRun(EarnedRunRecord),
     Comment(Comment),
     BoxScoreLine(BoxScoreLine),
@@ -239,6 +240,9 @@ impl TryFrom<&RetrosheetEventRecord> for MappedRecord {
             "padj" => MappedRecord::PitchHandAdjustment(PitchHandAdjustment::try_from(record)?),
             "ladj" => MappedRecord::LineupAdjustment(LineupAdjustment::try_from(record)?),
             "radj" => MappedRecord::RunnerAdjustment(RunnerAdjustment::try_from(record)?),
+            "presadj" => MappedRecord::PitcherResponsibilityAdjustment(
+                PitcherResponsibilityAdjustment::try_from(record)?,
+            ),
             "com" => MappedRecord::Comment(String::from(record.get(1).unwrap())),
             "data" => MappedRecord::EarnedRun(EarnedRunRecord::try_from(record)?),
             "stat" => MappedRecord::BoxScoreLine(BoxScoreLine::try_from(record)?),

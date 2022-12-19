@@ -202,7 +202,7 @@ impl EventFileSchema {
         // Write GameTeam
         let w = writer_map.get_mut(&Self::BoxScoreTeam);
         for row in GameTeam::from_game_context(game_context) {
-            w.serialize(&row)?;
+            w.serialize(row)?;
         }
         // Write GameUmpire
         let w = writer_map.get_mut(&Self::BoxScoreUmpire);
@@ -252,7 +252,7 @@ impl EventFileSchema {
         // Write GameTeam
         let w = writer_map.get_mut(&Self::GameTeam);
         for row in GameTeam::from_game_context(game_context) {
-            w.serialize(&row)?;
+            w.serialize(row)?;
         }
         // Write GameUmpire
         let w = writer_map.get_mut(&Self::GameUmpire);
@@ -297,12 +297,12 @@ impl EventFileSchema {
         // Write EventOut
         let w = writer_map.get_mut(&Self::EventOut);
         for row in EventOut::from_game_context(game_context) {
-            w.serialize(&row)?;
+            w.serialize(row)?;
         }
         // Write EventFieldingPlay
         let w = writer_map.get_mut(&Self::EventFieldingPlay);
         for row in EventFieldingPlay::from_game_context(game_context) {
-            w.serialize(&row)?;
+            w.serialize(row)?;
         }
         // Write EventBaserunningAdvanceAttempt
         let w = writer_map.get_mut(&Self::EventBaserunningAdvanceAttempt);
@@ -317,7 +317,7 @@ impl EventFileSchema {
         // Write EventHitLocation
         let w = writer_map.get_mut(&Self::EventHitLocation);
         for row in EventHitLocation::from_game_context(game_context) {
-            w.serialize(&row)?;
+            w.serialize(row)?;
         }
         // Write EventBaserunningPlay
         let w = writer_map.get_mut(&Self::EventBaserunningPlay);
@@ -362,7 +362,7 @@ impl EventFileSchema {
             let file = File::create(new_file).unwrap();
             let mut writer = BufWriter::new(file);
             let pattern = format!("{}/{}__*.csv", output_root, schema);
-            let glob = glob(&*pattern).unwrap();
+            let glob = glob(&pattern).unwrap();
             for g in glob {
                 let path = g.unwrap();
                 let mut reader = BufReader::new(File::open(&path).unwrap());

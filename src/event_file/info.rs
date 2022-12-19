@@ -288,7 +288,7 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
             "temp" => I::Temp(parse_positive_int::<u8>(value)),
             "innings" => I::Innings(parse_positive_int::<u8>(value)),
 
-            "usedh" => I::UseDh(bool::from_str(&*value.to_lowercase())?),
+            "usedh" => I::UseDh(bool::from_str(&value.to_lowercase())?),
             "htbf" => I::HomeTeamBatsFirst(bool::from_str(value)?),
             "date" => I::GameDate(NaiveDate::parse_from_str(value, "%Y/%m/%d")?),
             "starttime" => I::parse_time(value),

@@ -157,6 +157,25 @@ impl TryFrom<&RetrosheetEventRecord> for RunnerAdjustment {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct PitcherResponsibilityAdjustment {
+    pub pitcher_id: Pitcher,
+    pub base: Base,
+}
+
+impl TryFrom<&RetrosheetEventRecord> for PitcherResponsibilityAdjustment {
+    type Error = Error;
+
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
+        let record = record.deserialize::<[&str; 3]>(None)?;
+
+        Ok(Self {
+            pitcher_id: str_to_tinystr(record[1])?,
+            base: Base::from_str(record[2])?,
+        })
+    }
+}
+
 pub type Lineup = BiMap<LineupPosition, Batter>;
 pub type Defense = BiMap<FieldingPosition, Fielder>;
 
