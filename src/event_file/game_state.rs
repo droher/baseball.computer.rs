@@ -202,7 +202,7 @@ pub struct GameSetting {
 impl Default for GameSetting {
     fn default() -> Self {
         Self {
-            date: NaiveDate::from_num_days_from_ce(0),
+            date: NaiveDate::from_num_days_from_ce_opt(0).unwrap_or_default(),
             doubleheader_status: Default::default(),
             start_time: Default::default(),
             time_of_day: Default::default(),
