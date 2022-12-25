@@ -133,11 +133,12 @@ impl EventFileSchema {
         let mut writer_map = WriterMap::new(output_prefix, file_info.account_type);
 
         for record_vec_result in reader {
-            let record_vec = record_vec_result.as_ref().unwrap();
             if let Err(e) = record_vec_result {
                 error!("{:?}", e);
                 continue;
             }
+            let record_vec = record_vec_result.as_ref().unwrap();
+
             let game_context_result = GameContext::try_from((record_vec.as_slice(), file_info));
             if let Err(e) = game_context_result {
                 error!("{:?}", e);

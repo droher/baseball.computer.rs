@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use anyhow::{Context, Error, Result};
+use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
 
@@ -58,11 +58,12 @@ pub enum PitchType {
     InPlay,
     #[strum(serialize = "Y")]
     InPlayOnPitchout,
+    Unrecognized
 }
 
 impl Default for PitchType {
     fn default() -> Self {
-        PitchType::Unknown
+        PitchType::Unrecognized
     }
 }
 
@@ -140,10 +141,9 @@ impl TryFrom<&str> for PitchSequence {
                 }
                 _ => {}
             }
-            let pitch_type: Result<PitchType> =
-                PitchType::from_str(&c.to_string()).context("Bad pitch type");
-            // TODO: Log this as a warning once I implement logging
-            pitch_type.map(|p| pitch.update_pitch_type(p)).ok();
+            // TODO: Log this as a warning once I implement proper spans
+            let pitch_type = PitchType::from_str(&c.to_string()).unwrap_or_default();
+            pitch.update_pitch_type(pitch_type);
 
             match char_iter.peek() {
                 // Tokens indicating info on the previous pitch
