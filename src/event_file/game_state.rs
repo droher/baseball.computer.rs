@@ -1099,13 +1099,15 @@ impl GameState {
     }
 
     fn update_on_play(&mut self, play: &CachedPlay) -> Result<()> {
-        if play.play.no_play() {
-            return Ok(());
-        }
+
         let new_frame = self.get_new_frame(play)?;
         let new_outs = self.outs_after_play(play)?;
 
-        let pitcher = self.personnel.pitcher(&play.batting_side.flip())?;
+        // In the case of certain double switches, there is no pitcher of record,
+        // which is fine because we only need to track the pitcher of record for
+        // runner responsibility, which would not change on a no-play.
+        let pitcher = self.personnel.pitcher(&play.batting_side.flip()).ok();
+
         let batter_lineup_position = self.personnel.at_bat(play)?;
 
         let new_base_state = self.bases.new_base_state(
@@ -1300,7 +1302,7 @@ impl BaseState {
         end_inning: bool,
         cached_play: &CachedPlay,
         batter_lineup_position: LineupPosition,
-        pitcher: Pitcher,
+        pitcher: Option<Pitcher>,
     ) -> Result<Self> {
         let play = &cached_play.play;
 
@@ -1355,9 +1357,10 @@ impl BaseState {
             }
         }
         if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Batter, cached_play) {
+            let some_pitcher = pitcher.ok_or_else(|| anyhow!("A pitcher ID must be provided if the batter reached base"))?;
             let new_runner = Runner {
                 lineup_position: batter_lineup_position,
-                charged_to: pitcher,
+                charged_to: some_pitcher,
             };
             match a.to {
                 _ if a.is_out() || end_inning => {}
