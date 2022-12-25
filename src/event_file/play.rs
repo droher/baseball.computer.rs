@@ -846,6 +846,13 @@ impl TryFrom<(&str, &str)> for NoPlay {
     }
 }
 
+impl FieldingData for NoPlay {
+    fn fielders_data(&self) -> Vec<FieldersData> {
+        self.error
+            .map_or(vec![], |e| vec![FieldersData::new(e, FieldingPlayType::Error)])
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub enum PlayType {
     PlateAppearance(PlateAppearanceType),
@@ -904,7 +911,7 @@ impl FieldingData for PlayType {
         match self {
             Self::PlateAppearance(p) => p.fielders_data(),
             Self::BaserunningPlay(p) => p.fielders_data(),
-            Self::NoPlay(_) => vec![],
+            Self::NoPlay(p) => p.fielders_data(),
         }
     }
 }
