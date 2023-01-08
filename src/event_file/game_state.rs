@@ -577,16 +577,16 @@ impl EventBaserunningAdvanceAttempt {
             .iter()
             .enumerate()
             .map(|(i, ra)| {
-                let is_error = FieldersData::find_error(ra.fielders_data().as_slice()).is_some();
+                let advanced_on_error_flag = FieldersData::find_error(ra.fielders_data().as_slice()).is_some();
                 let is_successful = !ra.is_out();
-                let safe_on_error_flag = is_successful && (ra.out_or_error || (ra.baserunner == BaseRunner::Batter && is_error));
+                let safe_on_error_flag = is_successful && ra.out_or_error;
                 Self {
                     game_id: game_id.id,
                     event_id,
                     sequence_id: SequenceId::new(i + 1).unwrap(),
                     baserunner: ra.baserunner,
                     attempted_advance_to: ra.to,
-                    advanced_on_error_flag: is_error,
+                    advanced_on_error_flag,
                     safe_on_error_flag,
                     is_successful,
                     rbi_flag: play.rbi.contains(&ra.baserunner),
