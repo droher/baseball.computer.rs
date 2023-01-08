@@ -974,7 +974,7 @@ impl PlayType {
 pub struct RunnerAdvance {
     pub baserunner: BaseRunner,
     pub to: Base,
-    out_or_error: bool,
+    pub out_or_error: bool,
     pub modifiers: Vec<RunnerAdvanceModifier>,
 }
 
