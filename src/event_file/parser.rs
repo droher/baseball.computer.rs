@@ -62,7 +62,7 @@ impl AccountType {
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct FileInfo {
-    pub filename: ArrayString::<20>,
+    pub filename: ArrayString<20>,
     pub game_type: GameType,
     pub account_type: AccountType,
 }

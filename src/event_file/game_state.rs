@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
+use arrayvec::ArrayString;
 use bimap::BiMap;
 use bounded_integer::BoundedUsize;
 use chrono::{NaiveDate, NaiveTime};
 use either::Either;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tinystr::{tinystr16, tinystr8, TinyStr16};
 
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
@@ -155,7 +155,7 @@ impl From<(&PlateAppearanceType, &[PlayModifier])> for PlateAppearanceResultType
 // TODO: Add weird game state info to flags
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventFlag {
-    game_id: TinyStr16,
+    game_id: ArrayString<16>,
     event_id: EventId,
     sequence_id: SequenceId,
     flag: String,
@@ -221,7 +221,7 @@ impl Default for GameSetting {
             how_scored: Default::default(),
             wind_speed_mph: Default::default(),
             attendance: None,
-            park_id: tinystr8!("unknown"),
+            park_id: Park::from("unknown").unwrap(),
             season: Season(0),
         }
     }
@@ -268,7 +268,7 @@ impl From<&RecordSlice> for GameSetting {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GameUmpire {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub position: UmpirePosition,
     pub umpire_id: Option<Umpire>,
 }
@@ -349,7 +349,7 @@ impl From<&[MappedRecord]> for GameResults {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct GameLineupAppearance {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub player_id: Player,
     pub side: Side,
     pub lineup_position: LineupPosition,
@@ -379,7 +379,7 @@ impl GameLineupAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Copy)]
 pub struct GameFieldingAppearance {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub player_id: Player,
     pub side: Side,
     pub fielding_position: FieldingPosition,
@@ -470,7 +470,7 @@ impl TryFrom<(&RecordSlice, FileInfo)> for GameContext {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct EventStartingBaseState {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub event_id: EventId,
     pub baserunner: BaseRunner,
     pub runner_lineup_position: LineupPosition,
@@ -495,7 +495,7 @@ impl EventStartingBaseState {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningPlay {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub event_id: EventId,
     pub sequence_id: SequenceId,
     pub baserunning_play_type: BaserunningPlayType,
@@ -533,7 +533,7 @@ impl EventBaserunningPlay {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventPlateAppearance {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub event_id: EventId,
     pub plate_appearance_result: PlateAppearanceResultType,
     pub contact: Option<ContactType>,
@@ -564,7 +564,7 @@ impl EventPlateAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningAdvanceAttempt {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub event_id: EventId,
     pub sequence_id: SequenceId,
     pub baserunner: BaseRunner,
@@ -696,7 +696,7 @@ impl Default for Personnel {
     fn default() -> Self {
         Self {
             game_id: GameId {
-                id: tinystr16!("N/A"),
+                id: ArrayString::<16>::from("N/A").unwrap(),
             },
             personnel_state: Matchup::new(
                 (BiMap::with_capacity(15), BiMap::with_capacity(15)),

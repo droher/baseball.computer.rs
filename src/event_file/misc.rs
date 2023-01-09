@@ -2,12 +2,12 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error, Result};
+use arrayvec::ArrayString;
 use bimap::BiMap;
 use num_traits::PrimInt;
 use regex::{Match, Regex};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
-use tinystr::TinyStr16;
 
 use crate::event_file::play::Base;
 use crate::event_file::traits::{
@@ -36,7 +36,7 @@ impl Default for Hand {
 
 #[derive(Ord, PartialOrd, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct GameId {
-    pub id: TinyStr16,
+    pub id: ArrayString<16>,
 }
 impl TryFrom<&RetrosheetEventRecord> for GameId {
     type Error = Error;
