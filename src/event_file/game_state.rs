@@ -494,7 +494,7 @@ pub struct EventBaserunningPlay {
     pub event_id: EventId,
     pub sequence_id: SequenceId,
     pub baserunning_play_type: BaserunningPlayType,
-    pub at_base: Option<Base>,
+    pub baserunner: Option<BaseRunner>
 }
 
 impl EventBaserunningPlay {
@@ -511,7 +511,7 @@ impl EventBaserunningPlay {
                         event_id,
                         sequence_id: SequenceId::new(i + 1).unwrap(),
                         baserunning_play_type: br.baserunning_play_type,
-                        at_base: br.at_base,
+                        baserunner: br.baserunner(),
                     })
                 } else {
                     None

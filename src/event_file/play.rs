@@ -189,6 +189,26 @@ pub enum Base {
     Home,
 }
 
+impl Base {
+    fn prev(&self) -> Self {
+        match self {
+            Base::First => Base::Home,
+            Base::Second => Base::First,
+            Base::Third => Base::Second,
+            Base::Home => Base::Third,
+        }
+    }
+
+    fn next(&self) -> Self {
+        match self {
+            Base::First => Base::Second,
+            Base::Second => Base::Third,
+            Base::Third => Base::Home,
+            Base::Home => Base::First,
+        }
+    }
+}
+
 #[derive(
 Display,
 Debug,
@@ -736,13 +756,21 @@ impl BaserunningPlay {
             .unwrap_or_default()
     }
 
-    fn attempted_stolen_base(&self) -> bool {
+    fn is_attempted_stolen_base(&self) -> bool {
         [
             BaserunningPlayType::StolenBase,
             BaserunningPlayType::CaughtStealing,
             BaserunningPlayType::PickedOffCaughtStealing,
         ]
             .contains(&self.baserunning_play_type)
+    }
+
+    pub fn baserunner(&self) -> Option<BaseRunner> {
+        if self.is_attempted_stolen_base() {
+            self.at_base.map(|b| BaseRunner::from_target_base(b).unwrap())
+        } else {
+            self.at_base.map(|b| BaseRunner::from_current_base(b).unwrap())
+        }
     }
 }
 
@@ -753,7 +781,7 @@ impl ImplicitPlayResults for BaserunningPlay {
         {
             Some(RunnerAdvance::runner_advance_to(b).unwrap())
         } else if let (true, true, Some(b)) = (
-            self.attempted_stolen_base(),
+            self.is_attempted_stolen_base(),
             self.error_on_play(),
             self.at_base,
         ) {
@@ -1584,7 +1612,7 @@ impl Play {
                     None
                 }
             })
-            .filter(|br| br.attempted_stolen_base())
+            .filter(|br| br.is_attempted_stolen_base())
             .collect()
     }
 
