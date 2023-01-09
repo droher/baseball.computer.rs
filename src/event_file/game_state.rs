@@ -99,6 +99,7 @@ pub enum PlateAppearanceResultType {
     GroundRuleDouble,
     Triple,
     HomeRun,
+    InsideTheParkHomeRun,
     InPlayOut,
     StrikeOut,
     FieldersChoice,
@@ -120,13 +121,17 @@ impl From<(&PlateAppearanceType, &[PlayModifier])> for PlateAppearanceResultType
         let is_sac_hit = modifiers
             .iter()
             .any(|m| m == &PlayModifier::SacrificeHit);
+        let is_inside_the_park = modifiers
+            .iter()
+            .any(|m| m == &PlayModifier::InsideTheParkHomeRun);
         match plate_appearance {
             PlateAppearanceType::Hit(h) => match h.hit_type {
                 HitType::Single => Self::Single,
                 HitType::Double => Self::Double,
                 HitType::GroundRuleDouble => Self::GroundRuleDouble,
                 HitType::Triple => Self::Triple,
-                HitType::HomeRun => Self::HomeRun,
+                HitType::HomeRun if is_inside_the_park => Self::InsideTheParkHomeRun,
+                HitType::HomeRun => Self::HomeRun
             },
             PlateAppearanceType::OtherPlateAppearance(opa) => match opa {
                 OtherPlateAppearance::Walk => Self::Walk,
