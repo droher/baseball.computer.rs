@@ -149,6 +149,27 @@ impl ContextToVec for Event {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct EventRaw {
+    game_id: ArrayString<16>,
+    event_id: EventId,
+    filename: ArrayString<20>,
+    line_number: usize,
+    raw_play: String,
+}
+
+impl ContextToVec for EventRaw {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
+        Box::from(gc.events.iter().map(move |e| Self {
+            game_id: gc.game_id.id,
+            event_id: e.event_id,
+            filename: gc.file_info.filename,
+            line_number: e.line_number,
+            raw_play: e.raw_play.clone(),
+        }))
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventPitch {
     game_id: ArrayString<16>,
