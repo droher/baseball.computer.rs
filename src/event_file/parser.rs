@@ -8,6 +8,8 @@ use csv::{Reader, ReaderBuilder, StringRecord};
 use glob::{glob, Paths, PatternError};
 use lazy_static::lazy_static;
 use regex::Regex;
+use arrayvec::ArrayString;
+use tracing::warn;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::InfoRecord;
@@ -26,7 +28,7 @@ lazy_static! {
     static ref WORLD_SERIES: Regex = Regex::new(r"[0-9]{4}WS\.EVE$").unwrap();
     static ref LCS: Regex = Regex::new(r"[0-9]{4}[AN]LCS\.EVE$").unwrap();
     static ref DIVISION_SERIES: Regex = Regex::new(r"[0-9]{4}[AN]LD[12]\.EVE$").unwrap();
-    static ref WILD_CARD: Regex = Regex::new(r"[0-9]{4}[AN]W[C1234]\.EVE$").unwrap();
+    static ref WILD_CARD: Regex = Regex::new(r"[0-9]{4}[AN]LW[C1234]\.EVE$").unwrap();
     static ref REGULAR_SEASON: Regex =
         Regex::new(r"[0-9]{4}([[:alnum:]]{3})?\.E[BVD][ANF]$").unwrap();
     static ref NEGRO_LEAGUES: Regex = Regex::new(r".*\.E[BV]$").unwrap();
@@ -60,6 +62,7 @@ impl AccountType {
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct FileInfo {
+    pub filename: ArrayString::<20>,
     pub game_type: GameType,
     pub account_type: AccountType,
 }
@@ -72,7 +75,9 @@ impl From<&PathBuf> for FileInfo {
             .to_str()
             .unwrap_or_default()
             .to_string();
+        let filename = ArrayString::from(&filename).unwrap();
         Self {
+            filename,
             game_type: Self::game_type(&filename),
             account_type: Self::account_type(&filename),
         }
@@ -96,11 +101,12 @@ impl FileInfo {
         } else if NEGRO_LEAGUES.is_match(s) {
             GameType::NegroLeagues
         } else {
+            warn!("Could not determine game type given filename {s}");
             GameType::Other
         }
     }
 
-    fn account_type(s: &str) -> AccountType {
+    pub fn account_type(s: &str) -> AccountType {
         if PLAY_BY_PLAY.is_match(s) {
             AccountType::PlayByPlay
         } else if BOX_SCORE.is_match(s) {
@@ -108,7 +114,7 @@ impl FileInfo {
         } else if DERIVED.is_match(s) {
             AccountType::Deduced
         } else {
-            panic!("Unexpected file naming convention: {}", s)
+            panic!("Unexpected file naming convention: {s}")
         }
     }
 }
