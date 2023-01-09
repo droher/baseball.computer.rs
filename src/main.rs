@@ -27,7 +27,7 @@ use event_file::schemas::{ContextToVec, Event};
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
-use crate::event_file::schemas::{BoxScoreLineScore, BoxScoreWritableRecord, EventFieldingPlay, EventHitLocation, EventOut, EventPitch, Game, GameTeam};
+use crate::event_file::schemas::{BoxScoreLineScore, BoxScoreWritableRecord, EventFieldingPlay, EventHitLocation, EventOut, EventPitch, EventRaw, Game, GameTeam};
 
 mod event_file;
 
@@ -90,6 +90,7 @@ enum EventFileSchema {
     GameLineupAppearance,
     GameFieldingAppearance,
     Event,
+    EventRaw,
     EventStartingBaseState,
     EventPlateAppearance,
     EventOut,
@@ -138,8 +139,9 @@ impl EventFileSchema {
                 continue;
             }
             let record_vec = record_vec_result.as_ref().unwrap();
+            let record_slice = &record_vec.record_vec;
 
-            let game_context_result = GameContext::try_from((record_vec.as_slice(), file_info));
+            let game_context_result = GameContext::new(record_slice, file_info, record_vec.line_offset);
             if let Err(e) = game_context_result {
                 error!("{:?}", e);
                 continue;
@@ -157,7 +159,7 @@ impl EventFileSchema {
                 continue;
             }
             if game_context.file_info.account_type == AccountType::BoxScore {
-                Self::write_box_score_files(&mut writer_map, &game_context, record_vec.as_slice())
+                Self::write_box_score_files(&mut writer_map, &game_context, record_slice)
                     .unwrap();
             } else {
                 Self::write_play_by_play_files(&mut writer_map, &game_context).unwrap();
@@ -194,7 +196,7 @@ impl EventFileSchema {
     fn write_box_score_files(
         writer_map: &mut WriterMap,
         game_context: &GameContext,
-        record_vec: &RecordSlice,
+        record_slice: &RecordSlice,
     ) -> Result<()> {
         // Write Game
         writer_map
@@ -211,7 +213,7 @@ impl EventFileSchema {
             w.serialize(row)?;
         }
         // Write Linescores
-        let line_scores = record_vec.iter()
+        let line_scores = record_slice.iter()
             .filter_map(|mr| match mr {
                 MappedRecord::LineScore(ls) => Some(ls),
                 _ => None
@@ -223,7 +225,7 @@ impl EventFileSchema {
         }
         // Write Lines/Events
         let game_id = game_context.game_id.id;
-        let box_score_lines = record_vec
+        let box_score_lines = record_slice
             .iter()
             .filter_map(|mr| match mr {
                 MappedRecord::BoxScoreLine(bsl) => Some(Either::Left(bsl)),
@@ -273,6 +275,11 @@ impl EventFileSchema {
         // Write Event
         let w = writer_map.get_mut(&Self::Event);
         for row in Event::from_game_context(game_context) {
+            w.serialize(row)?;
+        }
+        // Write EventRaw
+        let w = writer_map.get_mut(&Self::EventRaw);
+        for row in EventRaw::from_game_context(game_context) {
             w.serialize(row)?;
         }
         // Write EventStartingBaseState

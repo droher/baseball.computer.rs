@@ -8,6 +8,8 @@ use csv::{Reader, ReaderBuilder, StringRecord};
 use glob::{glob, Paths, PatternError};
 use lazy_static::lazy_static;
 use regex::Regex;
+use arrayvec::ArrayString;
+use tracing::warn;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::InfoRecord;
@@ -18,7 +20,6 @@ use crate::event_file::misc::{
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{GameType, RetrosheetEventRecord};
 
-pub type RecordVec = Vec<MappedRecord>;
 pub type RecordSlice = [MappedRecord];
 
 lazy_static! {
@@ -26,7 +27,7 @@ lazy_static! {
     static ref WORLD_SERIES: Regex = Regex::new(r"[0-9]{4}WS\.EVE$").unwrap();
     static ref LCS: Regex = Regex::new(r"[0-9]{4}[AN]LCS\.EVE$").unwrap();
     static ref DIVISION_SERIES: Regex = Regex::new(r"[0-9]{4}[AN]LD[12]\.EVE$").unwrap();
-    static ref WILD_CARD: Regex = Regex::new(r"[0-9]{4}[AN]W[C1234]\.EVE$").unwrap();
+    static ref WILD_CARD: Regex = Regex::new(r"[0-9]{4}[AN]LW[C1234]\.EVE$").unwrap();
     static ref REGULAR_SEASON: Regex =
         Regex::new(r"[0-9]{4}([[:alnum:]]{3})?\.E[BVD][ANF]$").unwrap();
     static ref NEGRO_LEAGUES: Regex = Regex::new(r".*\.E[BV]$").unwrap();
@@ -60,6 +61,7 @@ impl AccountType {
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct FileInfo {
+    pub filename: ArrayString<20>,
     pub game_type: GameType,
     pub account_type: AccountType,
 }
@@ -72,7 +74,9 @@ impl From<&PathBuf> for FileInfo {
             .to_str()
             .unwrap_or_default()
             .to_string();
+        let filename = ArrayString::from(&filename).unwrap();
         Self {
+            filename,
             game_type: Self::game_type(&filename),
             account_type: Self::account_type(&filename),
         }
@@ -96,11 +100,12 @@ impl FileInfo {
         } else if NEGRO_LEAGUES.is_match(s) {
             GameType::NegroLeagues
         } else {
+            warn!("Could not determine game type given filename {s}");
             GameType::Other
         }
     }
 
-    fn account_type(s: &str) -> AccountType {
+    pub fn account_type(s: &str) -> AccountType {
         if PLAY_BY_PLAY.is_match(s) {
             AccountType::PlayByPlay
         } else if BOX_SCORE.is_match(s) {
@@ -108,16 +113,22 @@ impl FileInfo {
         } else if DERIVED.is_match(s) {
             AccountType::Deduced
         } else {
-            panic!("Unexpected file naming convention: {}", s)
+            panic!("Unexpected file naming convention: {s}")
         }
     }
+}
+
+pub struct RecordVec {
+    pub record_vec: Vec<MappedRecord>,
+    pub line_offset: usize,
 }
 
 pub struct RetrosheetReader {
     reader: Reader<BufReader<File>>,
     current_record: StringRecord,
     current_game_id: GameId,
-    current_record_vec: RecordVec,
+    current_record_vec: Vec<MappedRecord>,
+    pub line_offset: usize,
     pub file_info: FileInfo,
 }
 
@@ -125,14 +136,22 @@ impl Iterator for RetrosheetReader {
     type Item = Result<RecordVec>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.next_game() {
+        let did_process_full_game = self.next_game();
+        let old_offset = self.line_offset;
+        self.line_offset += self.current_record_vec.len();
+
+        let game = match did_process_full_game {
             Err(e) => Some(Err(e)),
             Ok(true) => Some(Ok(self.current_record_vec.drain(..).collect())),
             _ if !&self.current_record_vec.is_empty() => {
                 Some(Ok(self.current_record_vec.drain(..).collect()))
             }
             _ => None,
-        }
+        };
+        game.map(|g| g.map(|v| RecordVec {
+            record_vec: v,
+            line_offset: old_offset
+        }))
     }
 }
 
@@ -176,12 +195,13 @@ impl TryFrom<&PathBuf> for RetrosheetReader {
             .flexible(true)
             .from_reader(BufReader::new(File::open(path)?));
         let mut current_record = StringRecord::new();
+        let mut line_number = 1;
         // Skip comments at top of 1991 files
         // TODO: Unmess
         loop {
             reader.read_record(&mut current_record)?;
             match MappedRecord::try_from(&current_record)? {
-                MappedRecord::Comment(_) => {}
+                MappedRecord::Comment(_) => line_number += 1,
                 _ => break,
             }
         }
@@ -191,7 +211,7 @@ impl TryFrom<&PathBuf> for RetrosheetReader {
                 "First non-comment record was not a game ID, cannot read file."
             )),
         }?;
-        let current_record_vec = RecordVec::new();
+        let current_record_vec = Vec::<MappedRecord>::new();
         let file_info: FileInfo = path.into();
         Ok(Self {
             reader,
@@ -199,6 +219,7 @@ impl TryFrom<&PathBuf> for RetrosheetReader {
             current_game_id,
             current_record_vec,
             file_info,
+            line_offset: line_number
         })
     }
 }

@@ -1,11 +1,11 @@
 use anyhow::{bail, Context, Result};
+use arrayvec::ArrayString;
 use bounded_integer::BoundedU8;
 use chrono::{NaiveDate, NaiveDateTime};
 use either::Either;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use tinystr::TinyStr16;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::game_state::{EventId, GameContext, Outs};
@@ -29,7 +29,7 @@ pub trait ContextToVec {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Game<'a> {
-    game_id: TinyStr16,
+    game_id: ArrayString<16>,
     date: NaiveDate,
     start_time: Option<NaiveDateTime>,
     doubleheader_status: DoubleheaderStatus,
@@ -93,7 +93,7 @@ impl<'a> From<&'a GameContext> for Game<'a> {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct GameTeam {
-    game_id: TinyStr16,
+    game_id: ArrayString<16>,
     team_id: Team,
     side: Side,
 }
@@ -121,7 +121,7 @@ impl ContextToVec for GameTeam {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Event {
-    game_id: TinyStr16,
+    game_id: ArrayString<16>,
     event_id: EventId,
     batting_side: Side,
     inning: u8,
@@ -149,9 +149,30 @@ impl ContextToVec for Event {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct EventRaw {
+    game_id: ArrayString<16>,
+    event_id: EventId,
+    filename: ArrayString<20>,
+    line_number: usize,
+    raw_play: String,
+}
+
+impl ContextToVec for EventRaw {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
+        Box::from(gc.events.iter().map(move |e| Self {
+            game_id: gc.game_id.id,
+            event_id: e.event_id,
+            filename: gc.file_info.filename,
+            line_number: e.line_number,
+            raw_play: e.raw_play.clone(),
+        }))
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventPitch {
-    game_id: TinyStr16,
+    game_id: ArrayString<16>,
     event_id: EventId,
     sequence_id: SequenceId,
     sequence_item: PitchType,
@@ -188,7 +209,7 @@ impl ContextToVec for EventPitch {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventFieldingPlay {
-    game_id: TinyStr16,
+    game_id: ArrayString<16>,
     event_id: EventId,
     sequence_id: SequenceId,
     fielding_position: FieldingPosition,
@@ -216,7 +237,7 @@ impl ContextToVec for EventFieldingPlay {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventHitLocation {
-    game_id: TinyStr16,
+    game_id: ArrayString<16>,
     event_id: EventId,
     general_location: HitLocationGeneral,
     depth: HitDepth,
@@ -251,7 +272,7 @@ impl ContextToVec for EventHitLocation {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventOut {
-    game_id: TinyStr16,
+    game_id: ArrayString<16>,
     event_id: EventId,
     sequence_id: SequenceId,
     baserunner_out: BaseRunner,
@@ -277,7 +298,7 @@ impl ContextToVec for EventOut {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct BoxScoreWritableRecord<'a> {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     #[serde(with = "either::serde_untagged")]
     pub record: Either<&'a BoxScoreLine, &'a BoxScoreEvent>,
 }
@@ -308,14 +329,14 @@ impl BoxScoreWritableRecord<'_> {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct BoxScoreLineScore {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub side: Side,
     pub inning: Inning,
     pub runs: u8,
 }
 
 impl BoxScoreLineScore {
-    pub fn transform_line_score(game_id: TinyStr16, raw_line: &LineScore) -> Vec<Self> {
+    pub fn transform_line_score(game_id: ArrayString<16>, raw_line: &LineScore) -> Vec<Self> {
         raw_line.line_score
             .iter()
             .enumerate()

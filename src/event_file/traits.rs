@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
 use anyhow::{anyhow, Context, Error, Result};
+use arrayvec::ArrayString;
 use bounded_integer::BoundedUsize;
 use csv::StringRecord;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -8,7 +9,6 @@ use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_repr::{Serialize_repr, Deserialize_repr};
 use strum_macros::{Display, EnumIter, EnumString};
-use tinystr::{TinyStr16, TinyStr8};
 
 use crate::event_file::info::{InfoRecord, Team};
 use crate::event_file::misc::digit_vec;
@@ -175,8 +175,8 @@ pub enum FieldingPlayType {
 
 pub type Inning = u8;
 
-pub(crate) type Person = TinyStr8;
-pub type MiscInfoString = TinyStr16;
+pub(crate) type Person = ArrayString<8>;
+pub type MiscInfoString = ArrayString<16>;
 
 pub type Player = Person;
 pub type Umpire = Person;

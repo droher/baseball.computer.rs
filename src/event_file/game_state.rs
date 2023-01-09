@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
+use arrayvec::ArrayString;
 use bimap::BiMap;
 use bounded_integer::BoundedUsize;
 use chrono::{NaiveDate, NaiveTime};
 use either::Either;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tinystr::{tinystr16, tinystr8, TinyStr16};
 
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
@@ -155,7 +155,7 @@ impl From<(&PlateAppearanceType, &[PlayModifier])> for PlateAppearanceResultType
 // TODO: Add weird game state info to flags
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventFlag {
-    game_id: TinyStr16,
+    game_id: ArrayString<16>,
     event_id: EventId,
     sequence_id: SequenceId,
     flag: String,
@@ -221,7 +221,7 @@ impl Default for GameSetting {
             how_scored: Default::default(),
             wind_speed_mph: Default::default(),
             attendance: None,
-            park_id: tinystr8!("unknown"),
+            park_id: Park::from("unknown").unwrap(),
             season: Season(0),
         }
     }
@@ -268,7 +268,7 @@ impl From<&RecordSlice> for GameSetting {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GameUmpire {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub position: UmpirePosition,
     pub umpire_id: Option<Umpire>,
 }
@@ -298,9 +298,9 @@ impl GameUmpire {
         }
     }
 
-    fn from_record_vec(vec: &RecordSlice) -> Result<Vec<Self>> {
-        let game_id = get_game_id(vec)?;
-        Ok(vec
+    fn from_record_slice(slice: &RecordSlice) -> Result<Vec<Self>> {
+        let game_id = get_game_id(slice)?;
+        Ok(slice
             .iter()
             .filter_map(|rv| {
                 if let MappedRecord::Info(InfoRecord::UmpireAssignment(ua)) = rv {
@@ -349,7 +349,7 @@ impl From<&[MappedRecord]> for GameResults {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct GameLineupAppearance {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub player_id: Player,
     pub side: Side,
     pub lineup_position: LineupPosition,
@@ -379,7 +379,7 @@ impl GameLineupAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Copy)]
 pub struct GameFieldingAppearance {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub player_id: Player,
     pub side: Side,
     pub fielding_position: FieldingPosition,
@@ -433,24 +433,22 @@ pub struct GameContext {
     pub lineup_appearances: Vec<GameLineupAppearance>,
     pub fielding_appearances: Vec<GameFieldingAppearance>,
     pub events: Vec<Event>,
+    pub line_offset: usize
 }
 
-impl TryFrom<(&RecordSlice, FileInfo)> for GameContext {
-    type Error = Error;
-
-    fn try_from(val: (&RecordSlice, FileInfo)) -> Result<Self> {
-        let (record_vec, file_info) = val;
-        let game_id = get_game_id(record_vec)?;
-        let teams: Matchup<Team> = Matchup::try_from(record_vec)?;
-        let setting = GameSetting::try_from(record_vec)?;
-        let umpires = GameUmpire::from_record_vec(record_vec)?;
-        let results = GameResults::try_from(record_vec)?;
+impl GameContext {
+    pub fn new(record_slice: &RecordSlice, file_info: FileInfo, line_offset: usize) -> Result<Self> {
+        let game_id = get_game_id(record_slice)?;
+        let teams: Matchup<Team> = Matchup::try_from(record_slice)?;
+        let setting = GameSetting::try_from(record_slice)?;
+        let umpires = GameUmpire::from_record_slice(record_slice)?;
+        let results = GameResults::try_from(record_slice)?;
 
         let (events, lineup_appearances, fielding_appearances) =
             if file_info.account_type == AccountType::BoxScore {
                 (vec![], vec![], vec![])
             } else {
-                GameState::create_events(record_vec)
+                GameState::create_events(record_slice, line_offset)
                     .with_context(|| format!("Could not parse game {}", game_id.id))?
             };
 
@@ -464,13 +462,14 @@ impl TryFrom<(&RecordSlice, FileInfo)> for GameContext {
             lineup_appearances,
             fielding_appearances,
             events,
+            line_offset
         })
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct EventStartingBaseState {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub event_id: EventId,
     pub baserunner: BaseRunner,
     pub runner_lineup_position: LineupPosition,
@@ -495,7 +494,7 @@ impl EventStartingBaseState {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningPlay {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub event_id: EventId,
     pub sequence_id: SequenceId,
     pub baserunning_play_type: BaserunningPlayType,
@@ -533,7 +532,7 @@ impl EventBaserunningPlay {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventPlateAppearance {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub event_id: EventId,
     pub plate_appearance_result: PlateAppearanceResultType,
     pub contact: Option<ContactType>,
@@ -564,7 +563,7 @@ impl EventPlateAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningAdvanceAttempt {
-    pub game_id: TinyStr16,
+    pub game_id: ArrayString<16>,
     pub event_id: EventId,
     pub sequence_id: SequenceId,
     pub baserunner: BaseRunner,
@@ -633,6 +632,8 @@ pub struct Event {
     pub event_id: EventId,
     pub context: EventContext,
     pub results: EventResults,
+    pub raw_play: String,
+    pub line_number: usize
 }
 
 impl Event {
@@ -696,7 +697,7 @@ impl Default for Personnel {
     fn default() -> Self {
         Self {
             game_id: GameId {
-                id: tinystr16!("N/A"),
+                id: ArrayString::<16>::from("N/A").unwrap(),
             },
             personnel_state: Matchup::new(
                 (BiMap::with_capacity(15), BiMap::with_capacity(15)),
@@ -710,13 +711,13 @@ impl Default for Personnel {
 
 impl Personnel {
 
-    fn new(record_vec: &RecordSlice) -> Result<Self> {
-        let game_id = get_game_id(record_vec)?;
+    fn new(record_slice: &RecordSlice) -> Result<Self> {
+        let game_id = get_game_id(record_slice)?;
         let mut personnel = Personnel {
             game_id,
             ..Default::default()
         };
-        let start_iter = record_vec.iter().filter_map(|rv| {
+        let start_iter = record_slice.iter().filter_map(|rv| {
             if let MappedRecord::Start(sr) = rv {
                 Some(sr)
             } else {
@@ -963,7 +964,8 @@ pub struct GameState {
 
 impl GameState {
     pub fn create_events(
-        record_vec: &RecordSlice,
+        record_slice: &RecordSlice,
+        line_offset: usize,
     ) -> Result<(
         Vec<Event>,
         Vec<GameLineupAppearance>,
@@ -971,8 +973,8 @@ impl GameState {
     )> {
         let mut events: Vec<Event> = Vec::with_capacity(100);
 
-        let mut state = Self::new(record_vec)?;
-        for record in record_vec {
+        let mut state = Self::new(record_slice)?;
+        for (i, record) in record_slice.iter().enumerate() {
             let (pr, cached_play) = if let MappedRecord::Play(pr) = record {
                 (Some(pr), Some(CachedPlay::try_from(pr)?))
             } else {
@@ -980,6 +982,7 @@ impl GameState {
             };
             state.update(record, &cached_play)?;
             if let (Some(pr), Some(play)) = (pr, cached_play) {
+                let raw_play = play.play.raw_play.clone();
                 let context = EventContext {
                     inning: state.inning,
                     batting_side: state.batting_side,
@@ -1015,13 +1018,16 @@ impl GameState {
                     play_info: EventFlag::from_play(&play, state.game_id, state.event_id),
                     comment: None,
                     fielding_plays: play.fielders_data.clone(),
-                    out_on_play: play.outs,
+                    out_on_play: play.outs.clone(),
                 };
+                let line_number = line_offset + i;
                 events.push(Event {
                     game_id: state.game_id,
                     event_id: state.event_id,
                     context,
                     results,
+                    raw_play,
+                    line_number
                 });
                 state.event_id += 1;
             }
@@ -1054,9 +1060,9 @@ impl GameState {
         Ok((events, lineup_appearances, defense_appearances))
     }
 
-    pub(crate) fn new(record_vec: &RecordSlice) -> Result<Self> {
-        let game_id = get_game_id(record_vec)?;
-        let batting_side = record_vec
+    pub(crate) fn new(record_slice: &RecordSlice) -> Result<Self> {
+        let game_id = get_game_id(record_slice)?;
+        let batting_side = record_slice
             .iter()
             .find_map(|rv| {
                 if let MappedRecord::Info(InfoRecord::HomeTeamBatsFirst(b)) = rv {
@@ -1076,7 +1082,7 @@ impl GameState {
             outs: Outs::new(0).unwrap(),
             bases: Default::default(),
             at_bat: Default::default(),
-            personnel: Personnel::new(record_vec)?,
+            personnel: Personnel::new(record_slice)?,
             weird_state: Default::default(),
         })
     }

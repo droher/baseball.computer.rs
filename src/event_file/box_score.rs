@@ -3,8 +3,8 @@ use std::str::FromStr;
 
 use anyhow::{bail, Context, Error, Result};
 use arrayref::array_ref;
+use arrayvec::ArrayString;
 use serde::{Deserialize, Serialize};
-use tinystr::TinyStr8;
 
 use crate::event_file::misc::{parse_positive_int, str_to_tinystr, Defense, Lineup};
 use crate::event_file::traits::{
@@ -829,7 +829,7 @@ pub enum BoxScoreEvent {
 
 impl From<BoxScoreEvent> for RetrosheetEventRecord {
     fn from(event: BoxScoreEvent) -> RetrosheetEventRecord {
-        let opt_str = |o: Option<TinyStr8>| o.map(|s| s.to_string()).unwrap_or_default();
+        let opt_str = |o: Option<ArrayString<8>>| o.map(|s| s.to_string()).unwrap_or_default();
         let mut record = RetrosheetEventRecord::with_capacity(64, 8);
         record.push_field("event");
         match event {

@@ -1591,6 +1591,7 @@ pub struct Play {
     pub explicit_advances: Vec<RunnerAdvance>,
     pub uncertain_flag: bool,
     pub exceptional_flag: bool,
+    pub raw_play: String
 }
 
 impl Play {
@@ -1863,6 +1864,7 @@ impl TryFrom<&str> for Play {
             explicit_advances: advances,
             uncertain_flag,
             exceptional_flag,
+            raw_play: value.into()
         })
     }
 }

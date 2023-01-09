@@ -2,10 +2,10 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 
 use anyhow::{bail, Error, Result};
+use arrayvec::ArrayString;
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
-use tinystr::{TinyStr16, TinyStr8};
 
 use crate::event_file::misc::{parse_non_negative_int, parse_positive_int, str_to_tinystr};
 use crate::event_file::traits::{
@@ -104,8 +104,8 @@ impl Default for WindDirection {
     }
 }
 
-pub type Team = TinyStr8;
-pub type Park = TinyStr8;
+pub type Team = ArrayString<8>;
+pub type Park = ArrayString<8>;
 
 #[derive(
     Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
@@ -257,8 +257,8 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
         let info_type = record[1];
         let value = record[2];
 
-        let t8 = { || str_to_tinystr::<TinyStr8>(value) };
-        let t16 = { || str_to_tinystr::<TinyStr16>(value) };
+        let t8 = { || str_to_tinystr::<ArrayString<8>>(value) };
+        let t16 = { || str_to_tinystr::<ArrayString<16>>(value) };
 
         let info = match info_type {
             "visteam" => I::VisitingTeam(str_to_tinystr(value)?),
