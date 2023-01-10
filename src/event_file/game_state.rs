@@ -980,6 +980,13 @@ impl GameState {
             } else {
                 (None, None)
             };
+
+            let starting_base_state = EventStartingBaseState::from_base_state(
+                &state.bases,
+                state.game_id,
+                state.event_id,
+            );
+
             state.update(record, &cached_play)?;
             if let (Some(pr), Some(play)) = (pr, cached_play) {
                 let raw_play = play.play.raw_play.clone();
@@ -989,11 +996,7 @@ impl GameState {
                     frame: state.frame,
                     at_bat: state.at_bat,
                     outs: state.outs,
-                    starting_base_state: EventStartingBaseState::from_base_state(
-                        &state.bases,
-                        state.game_id,
-                        state.event_id,
-                    ),
+                    starting_base_state,
                     batter_hand: state.weird_state.batter_hand.unwrap_or_default(),
                     pitcher_hand: state.weird_state.pitcher_hand.unwrap_or_default(),
                 };
