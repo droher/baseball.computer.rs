@@ -731,6 +731,8 @@ pub enum BaserunningPlayType {
     WildPitch,
     #[strum(serialize = "PB")]
     PassedBall,
+    #[strum(serialize = "E")]
+    AdvancedOnError,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
@@ -815,6 +817,19 @@ impl TryFrom<&str> for BaserunningPlay {
     type Error = Error;
 
     fn try_from(value: &str) -> Result<Self> {
+        // Errors need to be handled differently than other baserunning plays
+        // because the fielding info is located directly on the token
+        if value.starts_with('E') {
+            let captures = REACHED_ON_ERROR_REGEX
+                .captures(value)
+                .context("Unable to parse advance on error")?;
+            return Ok(Self {
+                baserunning_play_type: BaserunningPlayType::AdvancedOnError,
+                at_base: None,
+                baserunning_fielding_info: Some(BaserunningFieldingInfo::from(captures)),
+            });
+        }
+
         let (first, last) = regex_split(value, &BASERUNNING_PLAY_FIELDING_REGEX);
         let baserunning_play_type = BaserunningPlayType::from_str(first)?;
         if last.is_none() {
@@ -971,22 +986,24 @@ impl PlayType {
         }
     }
 
-    fn parse_main_play(value: &str) -> Result<Vec<Self>> {
+    fn parse_main_play(value: &str, is_extra_play: bool) -> Result<Vec<Self>> {
         if value.is_empty() {
             return Ok(vec![]);
         }
         if MULTI_PLAY_REGEX.is_match(value) {
             let (first, last) = regex_split(value, &MULTI_PLAY_REGEX);
-            return Ok(Self::parse_main_play(first)?
+            return Ok(Self::parse_main_play(first, false)?
                 .into_iter()
                 .chain(
-                    Self::parse_main_play(last.unwrap().get(1..).unwrap_or_default())?.into_iter(),
+                    Self::parse_main_play(last.unwrap().get(1..).unwrap_or_default(), true)?.into_iter(),
                 )
                 .collect::<Vec<Self>>());
         }
         let (first, last) = regex_split(value, &MAIN_PLAY_FIELDING_REGEX);
         let str_tuple = (first, last.unwrap_or_default());
-        if let Ok(pa) = PlateAppearanceType::try_from(str_tuple) {
+        // Extra plays cannot be plate appearances and will produce false matches in some cases,
+        // so we need to check for that in addition to the regex match.
+        if let (false, Ok(pa)) = (is_extra_play, PlateAppearanceType::try_from(str_tuple)) {
             Ok(vec![Self::PlateAppearance(pa)])
         } else if let Ok(br) = BaserunningPlay::try_from(value) {
             Ok(vec![Self::BaserunningPlay(br)])
@@ -1845,7 +1862,12 @@ impl TryFrom<&str> for Play {
         let advances_boundary = value.find('.').unwrap_or(value.len());
         let first_boundary = min(modifiers_boundary, advances_boundary);
 
-        let main_plays = PlayType::parse_main_play(&value[..first_boundary])?;
+        let main_plays = PlayType::parse_main_play(&value[..first_boundary], false)?;
+        if main_plays.iter()
+            .filter(|p| matches!(p, PlayType::PlateAppearance(_)))
+            .count() > 1 {
+            bail!("Multiple plate appearances in play: {value}")
+        };
 
         let modifiers = if modifiers_boundary < advances_boundary {
             PlayModifier::parse_modifiers(&value[modifiers_boundary + 1..advances_boundary])?
@@ -1894,6 +1916,7 @@ impl TryFrom<&PlayRecord> for CachedPlay {
 
     fn try_from(play_record: &PlayRecord) -> Result<Self> {
         let play = Play::try_from(play_record.raw_play.as_str())?;
+
         let fielders_data = play.fielders_data();
         Ok(Self {
             batting_side: play_record.side,
