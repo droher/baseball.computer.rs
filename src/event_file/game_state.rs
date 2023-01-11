@@ -570,7 +570,7 @@ pub struct EventBaserunningAdvanceAttempt {
     pub attempted_advance_to: Base,
     pub is_successful: bool,
     pub advanced_on_error_flag: bool,
-    pub safe_on_error_flag: bool,
+    pub explicit_out_flag: bool,
     pub rbi_flag: bool,
     pub team_unearned_flag: bool,
 }
@@ -583,7 +583,7 @@ impl EventBaserunningAdvanceAttempt {
             .map(|(i, ra)| {
                 let advanced_on_error_flag = FieldersData::find_error(ra.fielders_data().as_slice()).is_some();
                 let is_successful = !ra.is_out();
-                let safe_on_error_flag = is_successful && ra.out_or_error;
+                let explicit_out_flag = ra.out_or_error;
                 Self {
                     game_id: game_id.id,
                     event_id,
@@ -591,7 +591,7 @@ impl EventBaserunningAdvanceAttempt {
                     baserunner: ra.baserunner,
                     attempted_advance_to: ra.to,
                     advanced_on_error_flag,
-                    safe_on_error_flag,
+                    explicit_out_flag,
                     is_successful,
                     rbi_flag: play.rbi.contains(&ra.baserunner),
                     team_unearned_flag: ra.earned_run_status() == Some(EarnedRunStatus::TeamUnearned),
