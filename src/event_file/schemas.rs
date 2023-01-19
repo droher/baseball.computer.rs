@@ -17,9 +17,7 @@ use crate::event_file::pitch_sequence::PitchType;
 use crate::event_file::play::{
     Base, BaseRunner, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame,
 };
-use crate::event_file::traits::{
-    FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Player, SequenceId, Side,
-};
+use crate::event_file::traits::{FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Pitcher, Player, SequenceId, Side};
 
 pub trait ContextToVec {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_>
@@ -120,6 +118,32 @@ impl ContextToVec for GameTeam {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
+// Might generalize this to "game player totals" in case there's ever a `data` field
+// other than earned runs
+pub struct GameEarnedRuns {
+    game_id: ArrayString<16>,
+    player_id: Pitcher,
+    earned_runs: u8,
+}
+
+impl ContextToVec for GameEarnedRuns {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self>> {
+        Box::from(
+            gc.results
+                .earned_runs
+                .iter()
+                .map(|er| Self {
+                    game_id: gc.game_id.id,
+                    player_id: er.pitcher_id,
+                    earned_runs: er.earned_runs,
+                })
+                .collect_vec()
+                .into_iter(),
+        )
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Event {
     game_id: ArrayString<16>,
     event_id: EventId,
@@ -133,7 +157,6 @@ pub struct Event {
 }
 
 impl ContextToVec for Event {
-    //noinspection RsTypeCheck
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().map(move |e| Self {
             game_id: gc.game_id.id,

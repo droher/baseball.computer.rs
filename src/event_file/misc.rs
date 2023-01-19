@@ -116,7 +116,7 @@ impl TryFrom<&RetrosheetEventRecord> for AppearanceRecord {
 pub type StartRecord = AppearanceRecord;
 pub type SubstitutionRecord = AppearanceRecord;
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct EarnedRunRecord {
     pub pitcher_id: Pitcher,
     pub earned_runs: u8,

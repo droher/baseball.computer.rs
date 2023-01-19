@@ -89,6 +89,7 @@ enum EventFileSchema {
     GameUmpire,
     GameLineupAppearance,
     GameFieldingAppearance,
+    GameEarnedRuns,
     Event,
     EventRaw,
     EventStartingBaseState,
@@ -272,6 +273,11 @@ impl EventFileSchema {
         for row in &game_context.fielding_appearances {
             w.serialize(row)?;
         }
+        // Write GameEarnedRun
+        let w = writer_map.get_mut(&Self::GameEarnedRuns);
+        for row in &game_context.results.earned_runs {
+            w.serialize(row)?;
+        }
         // Write Event
         let w = writer_map.get_mut(&Self::Event);
         for row in Event::from_game_context(game_context) {
@@ -364,7 +370,7 @@ impl EventFileSchema {
     }
 
     pub fn concat(output_root: &str) {
-        for schema in EventFileSchema::iter() {
+        EventFileSchema::iter().par_bridge().for_each( |schema| {
             let new_file = format!("{}/{}.csv", output_root, schema);
             let mut exists = false;
             let file = File::create(new_file).unwrap();
@@ -381,7 +387,7 @@ impl EventFileSchema {
                 remove_file(&path).unwrap();
                 exists = true;
             }
-        }
+        })
     }
 }
 

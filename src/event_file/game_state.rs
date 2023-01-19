@@ -14,7 +14,7 @@ use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
     Team, UmpireAssignment, UmpirePosition, WindDirection,
 };
-use crate::event_file::misc::{BatHandAdjustment, GameId, Hand, LineupAdjustment, PitcherResponsibilityAdjustment, PitchHandAdjustment, RunnerAdjustment, SubstitutionRecord};
+use crate::event_file::misc::{BatHandAdjustment, EarnedRunRecord, GameId, Hand, LineupAdjustment, PitcherResponsibilityAdjustment, PitchHandAdjustment, RunnerAdjustment, SubstitutionRecord};
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::pitch_sequence::PitchSequenceItem;
 use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, ContactType, Count, EarnedRunStatus, FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayModifier, PlayType, RunnerAdvance};
@@ -322,6 +322,7 @@ pub struct GameResults {
     pub time_of_game_minutes: Option<u16>,
     pub protest_info: Option<String>,
     pub completion_info: Option<String>,
+    pub earned_runs: Vec<EarnedRunRecord>
 }
 
 impl From<&[MappedRecord]> for GameResults {
@@ -343,6 +344,16 @@ impl From<&[MappedRecord]> for GameResults {
                 InfoRecord::TimeOfGameMinutes(x) => results.time_of_game_minutes = *x,
                 _ => {}
             });
+        // Add earned runs
+        vec.iter()
+            .filter_map(|rv| {
+                if let MappedRecord::EarnedRun(er) = rv {
+                    Some(er)
+                } else {
+                    None
+                }
+            })
+            .for_each(|er| results.earned_runs.push(*er));
         results
     }
 }
