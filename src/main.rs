@@ -27,7 +27,7 @@ use event_file::schemas::{ContextToVec, Event};
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
-use crate::event_file::schemas::{BoxScoreLineScore, BoxScoreWritableRecord, EventFieldingPlay, EventHitLocation, EventOut, EventPitch, EventRaw, Game, GameTeam};
+use crate::event_file::schemas::{BoxScoreLineScore, BoxScoreWritableRecord, EventFieldingPlay, EventHitLocation, EventOut, EventPitch, EventRaw, Game, GameEarnedRuns, GameTeam};
 
 mod event_file;
 
@@ -275,7 +275,7 @@ impl EventFileSchema {
         }
         // Write GameEarnedRun
         let w = writer_map.get_mut(&Self::GameEarnedRuns);
-        for row in &game_context.results.earned_runs {
+        for row in GameEarnedRuns::from_game_context(game_context) {
             w.serialize(row)?;
         }
         // Write Event
