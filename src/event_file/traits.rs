@@ -95,8 +95,8 @@ impl TryFrom<&str> for LineupPosition {
     Clone,
     Hash,
     EnumIter,
-    Serialize,
-    Deserialize,
+    Serialize_repr,
+    Deserialize_repr,
     Display,
 )]
 #[repr(u8)]
