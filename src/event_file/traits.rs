@@ -15,9 +15,11 @@ use crate::event_file::misc::digit_vec;
 use crate::event_file::parser::{MappedRecord, RecordSlice};
 
 pub const MAX_EVENTS_PER_GAME: usize = 255;
+pub const MAX_GAMES_PER_FILE: usize = 255;
+pub const EVENT_KEY_BUFFER: usize = MAX_EVENTS_PER_GAME * MAX_GAMES_PER_FILE;
 
 pub type RetrosheetEventRecord = StringRecord;
-pub type SequenceId = BoundedUsize<1, 255>;
+pub type SequenceId = BoundedUsize<1, MAX_EVENTS_PER_GAME>;
 
 #[derive(
     Ord,

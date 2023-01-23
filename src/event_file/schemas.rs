@@ -86,7 +86,7 @@ impl<'a> From<&'a GameContext> for Game<'a> {
             time_of_game_minutes: results.time_of_game_minutes,
             protest_info: results.protest_info.as_deref(),
             completion_info: results.completion_info.as_deref(),
-            game_key: gc.file_info.event_key_offset
+            game_key: gc.event_key_offset
         }
     }
 }

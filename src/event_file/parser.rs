@@ -64,11 +64,11 @@ pub struct FileInfo {
     pub filename: ArrayString<20>,
     pub game_type: GameType,
     pub account_type: AccountType,
-    pub event_key_offset: usize,
+    pub file_index: usize,
 }
 
 impl FileInfo {
-    fn new(path: &Path, event_key_offset: usize) -> Self {
+    fn new(path: &Path, file_index: usize) -> Self {
         let filename = path
             .file_name()
             .unwrap_or_default()
@@ -80,7 +80,7 @@ impl FileInfo {
             filename,
             game_type: Self::game_type(&filename),
             account_type: Self::account_type(&filename),
-            event_key_offset,
+            file_index,
         }
     }
 
@@ -156,7 +156,7 @@ impl Iterator for RetrosheetReader {
 }
 
 impl RetrosheetReader {
-    pub fn new(path: &PathBuf, event_key_offset: usize) -> Result<Self> {
+    pub fn new(path: &PathBuf, file_index: usize) -> Result<Self> {
         let mut reader = ReaderBuilder::new()
             .has_headers(false)
             .double_quote(false)
@@ -180,7 +180,7 @@ impl RetrosheetReader {
             )),
         }?;
         let current_record_vec = Vec::<MappedRecord>::new();
-        let file_info = FileInfo::new(path, event_key_offset);
+        let file_info = FileInfo::new(path, file_index);
         Ok(Self {
             reader,
             current_record,

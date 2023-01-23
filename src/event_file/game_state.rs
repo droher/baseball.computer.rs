@@ -18,7 +18,7 @@ use crate::event_file::misc::{BatHandAdjustment, EarnedRunRecord, GameId, Hand, 
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::pitch_sequence::PitchSequenceItem;
 use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, ContactType, Count, EarnedRunStatus, FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayModifier, PlayType, RunnerAdvance};
-use crate::event_file::traits::{FieldingPosition, Inning, LineupPosition, Matchup, Pitcher, Player, SequenceId, Side, Umpire};
+use crate::event_file::traits::{FieldingPosition, Inning, LineupPosition, Matchup, MAX_EVENTS_PER_GAME, Pitcher, Player, SequenceId, Side, Umpire};
 use crate::AccountType;
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
@@ -447,16 +447,17 @@ pub struct GameContext {
     pub fielding_appearances: Vec<GameFieldingAppearance>,
     pub events: Vec<Event>,
     pub line_offset: usize,
+    pub event_key_offset: usize,
 }
 
 impl GameContext {
-    pub fn new(record_slice: &RecordSlice, file_info: FileInfo, line_offset: usize) -> Result<Self> {
+    pub fn new(record_slice: &RecordSlice, file_info: FileInfo, line_offset: usize, game_num: usize) -> Result<Self> {
         let game_id = get_game_id(record_slice)?;
         let teams: Matchup<Team> = Matchup::try_from(record_slice)?;
         let setting = GameSetting::try_from(record_slice)?;
         let umpires = GameUmpire::from_record_slice(record_slice)?;
         let results = GameResults::try_from(record_slice)?;
-        let event_key_offset = file_info.event_key_offset;
+        let event_key_offset = Self::event_key_offset(file_info, game_num);
 
         let (events, lineup_appearances, fielding_appearances) =
             if file_info.account_type == AccountType::BoxScore {
@@ -477,7 +478,12 @@ impl GameContext {
             fielding_appearances,
             events,
             line_offset,
+            event_key_offset
         })
+    }
+
+    fn event_key_offset(file_info: FileInfo, game_num: usize) -> usize {
+        file_info.file_index + (game_num * MAX_EVENTS_PER_GAME)
     }
 }
 

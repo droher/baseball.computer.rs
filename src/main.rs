@@ -11,7 +11,7 @@ use std::time::Instant;
 use anyhow::{bail, Context, Result};
 use csv::{Writer, WriterBuilder};
 use either::Either;
-use glob::{glob, GlobResult};
+use glob::glob;
 use itertools::Itertools;
 use rayon::prelude::*;
 use structopt::StructOpt;
@@ -23,12 +23,12 @@ use tracing_subscriber::FmtSubscriber;
 use event_file::game_state::GameContext;
 use event_file::parser::RetrosheetReader;
 use event_file::schemas::{ContextToVec, Event};
-use event_file::traits::MAX_EVENTS_PER_GAME;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
 use crate::event_file::schemas::{BoxScoreLineScore, BoxScoreWritableRecord, EventFieldingPlay, EventHitLocation, EventOut, EventPitch, EventRaw, Game, GameEarnedRuns, GameTeam};
+use crate::event_file::traits::EVENT_KEY_BUFFER;
 
 mod event_file;
 
@@ -135,7 +135,7 @@ impl EventFileSchema {
         let mut game_ids = Vec::with_capacity(81);
         let mut writer_map = WriterMap::new(output_prefix, file_info.account_type);
 
-        for record_vec_result in reader {
+        for (game_num, record_vec_result) in reader.enumerate() {
             if let Err(e) = record_vec_result {
                 error!("{:?}", e);
                 continue;
@@ -143,7 +143,7 @@ impl EventFileSchema {
             let record_vec = record_vec_result.as_ref().unwrap();
             let record_slice = &record_vec.record_vec;
 
-            let game_context_result = GameContext::new(record_slice, file_info, record_vec.line_offset);
+            let game_context_result = GameContext::new(record_slice, file_info, record_vec.line_offset, game_num);
             if let Err(e) = game_context_result {
                 error!("{:?}", e);
                 continue;
@@ -348,8 +348,7 @@ impl EventFileSchema {
         // Write EventPitch
         // Not in every PBP so avoid writing empty file
         if EventPitch::from_game_context(game_context)
-            .peekable()
-            .peek()
+            .next()
             .is_some()
         {
             let w = writer_map.get_mut(&Self::EventPitch);
@@ -426,14 +425,13 @@ impl FileProcessor {
     }
 
     fn process_file(
-        glob_result: GlobResult,
+        input_path: &PathBuf,
         output_root: &Path,
         parsed_games: Option<&HashSet<GameId>>,
-        event_key_offset: usize,
+        file_index: usize,
     ) -> Vec<GameId> {
-        let input_path = glob_result.unwrap();
         let output_prefix = output_root.join(input_path.file_name().unwrap());
-        let reader = RetrosheetReader::new(&input_path, event_key_offset).unwrap();
+        let reader = RetrosheetReader::new(input_path, file_index).unwrap();
         EventFileSchema::write(reader, &output_prefix, parsed_games)
     }
 
@@ -445,21 +443,27 @@ impl FileProcessor {
         else {
             Some(&self.game_ids)
         };
-        let games: Vec<GameId> = account_type
+        let files = account_type
             .glob(&self.opt.input)
             .unwrap()
+            .map(|g| g.unwrap())
+            .sorted_by_key(|p| p.clone())
+            .collect_vec();
+        let file_count = files.len();
+        let games: Vec<GameId> = files
+            .into_par_iter()
             .enumerate()
-            .par_bridge()
             .flat_map(|(i, f)| {
+                println!("{} {:?}", i, &f);
                 Self::process_file(
-                    f,
+                    &f,
                     &get_output_root(&self.opt).unwrap(),
                     parsed_games,
-                    (self.index + i) * MAX_EVENTS_PER_GAME,
+                    (self.index + i) * EVENT_KEY_BUFFER,
                 )
             })
             .collect();
-        self.index += games.len();
+        self.index += file_count;
         self.game_ids.extend(games);
     }
 
