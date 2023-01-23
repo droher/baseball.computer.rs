@@ -2,9 +2,9 @@
 #![forbid(unsafe_code)]
 
 use std::collections::{HashMap, HashSet};
-use std::convert::TryFrom;
-use std::fs::{remove_file, File};
-use std::io::{copy, BufRead, BufReader, BufWriter};
+use std::fs::{File, remove_file};
+use std::hash::Hash;
+use std::io::{BufRead, BufReader, BufWriter, copy};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -17,12 +17,13 @@ use rayon::prelude::*;
 use structopt::StructOpt;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-use tracing::{debug, error, info, warn, Level};
+use tracing::{debug, error, info, Level, warn};
 use tracing_subscriber::FmtSubscriber;
 
 use event_file::game_state::GameContext;
 use event_file::parser::RetrosheetReader;
 use event_file::schemas::{ContextToVec, Event};
+use event_file::traits::MAX_EVENTS_PER_GAME;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 use crate::event_file::misc::GameId;
@@ -401,30 +402,6 @@ struct Opt {
     output_dir: PathBuf,
 }
 
-fn process_file(
-    glob_result: GlobResult,
-    output_root: &Path,
-    parsed_games: Option<&HashSet<GameId>>,
-) -> Vec<GameId> {
-    let input_path = glob_result.unwrap();
-    let output_prefix = output_root.join(input_path.file_name().unwrap());
-    let reader = RetrosheetReader::try_from(&input_path).unwrap();
-    EventFileSchema::write(reader, &output_prefix, parsed_games)
-}
-
-fn par_process_files(
-    opt: &Opt,
-    account_type: AccountType,
-    parsed_games: Option<&HashSet<GameId>>,
-) -> Vec<GameId> {
-    account_type
-        .glob(&opt.input)
-        .unwrap()
-        .par_bridge()
-        .flat_map(|f| process_file(f, &opt.output_dir, parsed_games))
-        .collect()
-}
-
 fn get_output_root(opt: &Opt) -> Result<PathBuf> {
     std::fs::create_dir_all(&opt.output_dir).context("Error occurred on output dir check")?;
     opt.output_dir
@@ -432,8 +409,72 @@ fn get_output_root(opt: &Opt) -> Result<PathBuf> {
         .context("Invalid output directory")
 }
 
+struct FileProcessor {
+    opt: Opt,
+    game_ids: HashSet<GameId>,
+}
+
+impl FileProcessor {
+
+    pub fn new(opt: Opt) -> Self {
+        Self {
+            opt,
+            game_ids: HashSet::with_capacity(200000),
+        }
+    }
+
+    fn process_file(
+        glob_result: GlobResult,
+        output_root: &Path,
+        parsed_games: Option<&HashSet<GameId>>,
+        event_key_offset: usize,
+    ) -> Vec<GameId> {
+        let input_path = glob_result.unwrap();
+        let output_prefix = output_root.join(input_path.file_name().unwrap());
+        let reader = RetrosheetReader::new(&input_path, event_key_offset).unwrap();
+        EventFileSchema::write(reader, &output_prefix, parsed_games)
+    }
+
+    pub fn par_process_files(
+        opt: &Opt,
+        account_type: AccountType,
+        parsed_games: Option<&HashSet<GameId>>,
+    ) -> Vec<GameId> {
+        account_type
+            .glob(&opt.input)
+            .unwrap()
+            .enumerate()
+            .par_bridge()
+            .flat_map(|(i, f)| {
+                Self::process_file(
+                    f,
+                    &get_output_root(opt).unwrap(),
+                    parsed_games,
+                    i * MAX_EVENTS_PER_GAME,
+                )
+            })
+            .collect()
+    }
+
+    pub fn process_files(&mut self) {
+        let output_root = get_output_root(&self.opt).unwrap();
+
+        info!("Parsing conventional play-by-play files");
+        let mut event_files = Self::par_process_files(&self.opt, AccountType::PlayByPlay, Some(&self.game_ids));
+        self.game_ids.extend(event_files.drain(..));
+
+        info!("Parsing deduced play-by-play files");
+        Self::par_process_files(&self.opt, AccountType::Deduced, Some(&self.game_ids));
+
+        info!("Parsing box score files");
+        Self::par_process_files(&self.opt, AccountType::BoxScore, None);
+
+        info!("Merging files by schema");
+        EventFileSchema::concat(output_root.to_str().unwrap());
+    }
+}
+
 fn main() {
-    let mut parsed_game_ids = HashSet::with_capacity(200000);
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .finish();
@@ -441,20 +482,8 @@ fn main() {
 
     let start = Instant::now();
     let opt: Opt = Opt::from_args();
-    let output_root = get_output_root(&opt).unwrap();
 
-    info!("Parsing conventional play-by-play files");
-    let mut event_files = par_process_files(&opt, AccountType::PlayByPlay, Some(&parsed_game_ids));
-    parsed_game_ids.extend(event_files.drain(..));
-
-    info!("Parsing deduced play-by-play files");
-    par_process_files(&opt, AccountType::Deduced, Some(&parsed_game_ids));
-
-    info!("Parsing box score files");
-    par_process_files(&opt, AccountType::BoxScore, None);
-
-    info!("Merging files by schema");
-    EventFileSchema::concat(output_root.to_str().unwrap());
+    FileProcessor::new(opt).process_files();
 
     let end = start.elapsed();
     info!("Elapsed: {:?}", end);

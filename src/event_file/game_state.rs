@@ -444,7 +444,7 @@ pub struct GameContext {
     pub lineup_appearances: Vec<GameLineupAppearance>,
     pub fielding_appearances: Vec<GameFieldingAppearance>,
     pub events: Vec<Event>,
-    pub line_offset: usize
+    pub line_offset: usize,
 }
 
 impl GameContext {
@@ -454,12 +454,13 @@ impl GameContext {
         let setting = GameSetting::try_from(record_slice)?;
         let umpires = GameUmpire::from_record_slice(record_slice)?;
         let results = GameResults::try_from(record_slice)?;
+        let event_key_offset = file_info.event_key_offset;
 
         let (events, lineup_appearances, fielding_appearances) =
             if file_info.account_type == AccountType::BoxScore {
                 (vec![], vec![], vec![])
             } else {
-                GameState::create_events(record_slice, line_offset)
+                GameState::create_events(record_slice, line_offset, event_key_offset)
                     .with_context(|| format!("Could not parse game {}", game_id.id))?
             };
 
@@ -473,7 +474,7 @@ impl GameContext {
             lineup_appearances,
             fielding_appearances,
             events,
-            line_offset
+            line_offset,
         })
     }
 }
@@ -644,7 +645,8 @@ pub struct Event {
     pub context: EventContext,
     pub results: EventResults,
     pub raw_play: String,
-    pub line_number: usize
+    pub line_number: usize,
+    pub event_key: usize,
 }
 
 impl Event {
@@ -992,6 +994,7 @@ impl GameState {
     pub fn create_events(
         record_slice: &RecordSlice,
         line_offset: usize,
+        event_key_offset: usize
     ) -> Result<(
         Vec<Event>,
         Vec<GameLineupAppearance>,
@@ -1050,13 +1053,15 @@ impl GameState {
                     out_on_play: play.outs.clone(),
                 };
                 let line_number = line_offset + i;
+                let event_key = event_key_offset + i;
                 events.push(Event {
                     game_id: state.game_id,
                     event_id: state.event_id,
                     context,
                     results,
                     raw_play,
-                    line_number
+                    line_number,
+                    event_key
                 });
                 state.event_id += 1;
             }

@@ -7,14 +7,17 @@ use csv::StringRecord;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
-use serde_repr::{Serialize_repr, Deserialize_repr};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use strum_macros::{Display, EnumIter, EnumString};
 
 use crate::event_file::info::{InfoRecord, Team};
 use crate::event_file::misc::digit_vec;
 use crate::event_file::parser::{MappedRecord, RecordSlice};
 
+pub const MAX_EVENTS_PER_GAME: usize = 255;
+
 pub type RetrosheetEventRecord = StringRecord;
+pub type SequenceId = BoundedUsize<1, 255>;
 
 #[derive(
     Ord,
@@ -426,5 +429,3 @@ impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
         })
     }
 }
-
-pub type SequenceId = BoundedUsize<1, 255>;

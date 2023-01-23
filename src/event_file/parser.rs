@@ -64,10 +64,11 @@ pub struct FileInfo {
     pub filename: ArrayString<20>,
     pub game_type: GameType,
     pub account_type: AccountType,
+    pub event_key_offset: usize,
 }
 
-impl From<&PathBuf> for FileInfo {
-    fn from(path: &PathBuf) -> Self {
+impl FileInfo {
+    fn new(path: &Path, event_key_offset: usize) -> Self {
         let filename = path
             .file_name()
             .unwrap_or_default()
@@ -79,11 +80,10 @@ impl From<&PathBuf> for FileInfo {
             filename,
             game_type: Self::game_type(&filename),
             account_type: Self::account_type(&filename),
+            event_key_offset,
         }
     }
-}
 
-impl FileInfo {
     fn game_type(s: &str) -> GameType {
         if REGULAR_SEASON.is_match(s) {
             GameType::RegularSeason
@@ -156,6 +156,41 @@ impl Iterator for RetrosheetReader {
 }
 
 impl RetrosheetReader {
+    pub fn new(path: &PathBuf, event_key_offset: usize) -> Result<Self> {
+        let mut reader = ReaderBuilder::new()
+            .has_headers(false)
+            .double_quote(false)
+            .flexible(true)
+            .from_reader(BufReader::new(File::open(path)?));
+        let mut current_record = StringRecord::new();
+        let mut line_number = 1;
+        // Skip comments at top of 1991 files
+        // TODO: Unmess
+        loop {
+            reader.read_record(&mut current_record)?;
+            match MappedRecord::try_from(&current_record)? {
+                MappedRecord::Comment(_) => line_number += 1,
+                _ => break,
+            }
+        }
+        let current_game_id = match MappedRecord::try_from(&current_record)? {
+            MappedRecord::GameId(g) => Ok(g),
+            _ => Err(anyhow!(
+                "First non-comment record was not a game ID, cannot read file."
+            )),
+        }?;
+        let current_record_vec = Vec::<MappedRecord>::new();
+        let file_info = FileInfo::new(path, event_key_offset);
+        Ok(Self {
+            reader,
+            current_record,
+            current_game_id,
+            current_record_vec,
+            file_info,
+            line_offset: line_number,
+        })
+    }
+
     fn next_game(&mut self) -> Result<bool> {
         if self.reader.is_done() {
             return Ok(false);
@@ -182,45 +217,6 @@ impl RetrosheetReader {
                 }
             }
         }
-    }
-}
-
-impl TryFrom<&PathBuf> for RetrosheetReader {
-    type Error = Error;
-
-    fn try_from(path: &PathBuf) -> Result<Self> {
-        let mut reader = ReaderBuilder::new()
-            .has_headers(false)
-            .double_quote(false)
-            .flexible(true)
-            .from_reader(BufReader::new(File::open(path)?));
-        let mut current_record = StringRecord::new();
-        let mut line_number = 1;
-        // Skip comments at top of 1991 files
-        // TODO: Unmess
-        loop {
-            reader.read_record(&mut current_record)?;
-            match MappedRecord::try_from(&current_record)? {
-                MappedRecord::Comment(_) => line_number += 1,
-                _ => break,
-            }
-        }
-        let current_game_id = match MappedRecord::try_from(&current_record)? {
-            MappedRecord::GameId(g) => Ok(g),
-            _ => Err(anyhow!(
-                "First non-comment record was not a game ID, cannot read file."
-            )),
-        }?;
-        let current_record_vec = Vec::<MappedRecord>::new();
-        let file_info: FileInfo = path.into();
-        Ok(Self {
-            reader,
-            current_record,
-            current_game_id,
-            current_record_vec,
-            file_info,
-            line_offset: line_number
-        })
     }
 }
 
