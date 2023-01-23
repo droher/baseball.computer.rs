@@ -149,6 +149,7 @@ impl ContextToVec for GameEarnedRuns {
 pub struct Event {
     game_id: ArrayString<16>,
     event_id: EventId,
+    event_key: usize,
     batting_side: Side,
     inning: u8,
     frame: InningFrame,
@@ -163,6 +164,7 @@ impl ContextToVec for Event {
         Box::from(gc.events.iter().map(move |e| Self {
             game_id: gc.game_id.id,
             event_id: e.event_id,
+            event_key: e.event_key,
             batting_side: e.context.batting_side,
             inning: e.context.inning,
             frame: e.context.frame,
@@ -178,6 +180,7 @@ impl ContextToVec for Event {
 pub struct EventRaw {
     game_id: ArrayString<16>,
     event_id: EventId,
+    event_key: usize,
     filename: ArrayString<20>,
     line_number: usize,
     raw_play: String,
@@ -188,6 +191,7 @@ impl ContextToVec for EventRaw {
         Box::from(gc.events.iter().map(move |e| Self {
             game_id: gc.game_id.id,
             event_id: e.event_id,
+            event_key: e.event_key,
             filename: gc.file_info.filename,
             line_number: e.line_number,
             raw_play: e.raw_play.clone(),
@@ -199,6 +203,7 @@ impl ContextToVec for EventRaw {
 pub struct EventPitch {
     game_id: ArrayString<16>,
     event_id: EventId,
+    event_key: usize,
     sequence_id: SequenceId,
     sequence_item: PitchType,
     runners_going_flag: bool,
@@ -213,13 +218,14 @@ impl ContextToVec for EventPitch {
             e.results
                 .pitch_sequence
                 .as_ref()
-                .map(|psi| (e.event_id, psi))
+                .map(|psi| (e.event_id, e.event_key, psi))
         });
-        let pitch_iter = pitch_sequences.flat_map(move |(event_id, pitches)| {
+        let pitch_iter = pitch_sequences.flat_map(move |(event_id, event_key, pitches)| {
             pitches.iter().map(move |psi| {
                 Self {
                     game_id: gc.game_id.id,
                     event_id,
+                    event_key,
                     sequence_id: psi.sequence_id,
                     sequence_item: psi.pitch_type,
                     runners_going_flag: psi.runners_going,
@@ -236,6 +242,7 @@ impl ContextToVec for EventPitch {
 pub struct EventFieldingPlay {
     game_id: ArrayString<16>,
     event_id: EventId,
+    event_key: usize,
     sequence_id: SequenceId,
     fielding_position: FieldingPosition,
     fielding_play: FieldingPlayType,
@@ -252,6 +259,7 @@ impl ContextToVec for EventFieldingPlay {
                 .map(move |(i, fp)| Self {
                     game_id: e.game_id.id,
                     event_id: e.event_id,
+                    event_key: e.event_key,
                     sequence_id: SequenceId::new(i + 1).unwrap(),
                     fielding_position: fp.fielding_position,
                     fielding_play: fp.fielding_play_type,
@@ -264,6 +272,7 @@ impl ContextToVec for EventFieldingPlay {
 pub struct EventHitLocation {
     game_id: ArrayString<16>,
     event_id: EventId,
+    event_key: usize,
     general_location: HitLocationGeneral,
     depth: HitDepth,
     angle: HitAngle,
@@ -283,6 +292,7 @@ impl ContextToVec for EventHitLocation {
                 Some(Self {
                     game_id: e.game_id.id,
                     event_id: e.event_id,
+                    event_key: e.event_key,
                     general_location: hl.general_location,
                     depth: hl.depth,
                     angle: hl.angle,
@@ -299,6 +309,7 @@ impl ContextToVec for EventHitLocation {
 pub struct EventOut {
     game_id: ArrayString<16>,
     event_id: EventId,
+    event_key: usize,
     sequence_id: SequenceId,
     baserunner_out: BaseRunner,
 }
@@ -314,6 +325,7 @@ impl ContextToVec for EventOut {
                 .map(move |(i, br)| Self {
                     game_id: e.game_id.id,
                     event_id: e.event_id,
+                    event_key: e.event_key,
                     sequence_id: SequenceId::new(i + 1).unwrap(),
                     baserunner_out: *br,
                 })

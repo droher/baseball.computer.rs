@@ -410,6 +410,7 @@ fn get_output_root(opt: &Opt) -> Result<PathBuf> {
 }
 
 struct FileProcessor {
+    index: usize,
     opt: Opt,
     game_ids: HashSet<GameId>,
 }
@@ -418,6 +419,7 @@ impl FileProcessor {
 
     pub fn new(opt: Opt) -> Self {
         Self {
+            index: 0,
             opt,
             game_ids: HashSet::with_capacity(200000),
         }
@@ -435,39 +437,43 @@ impl FileProcessor {
         EventFileSchema::write(reader, &output_prefix, parsed_games)
     }
 
-    pub fn par_process_files(
-        opt: &Opt,
-        account_type: AccountType,
-        parsed_games: Option<&HashSet<GameId>>,
-    ) -> Vec<GameId> {
-        account_type
-            .glob(&opt.input)
+    pub fn par_process_files(&mut self, account_type: AccountType) {
+        // Box score accounts are expected to be duplicates so we don't need to check against them
+        let parsed_games = if account_type == AccountType::BoxScore {
+            None
+        }
+        else {
+            Some(&self.game_ids)
+        };
+        let games: Vec<GameId> = account_type
+            .glob(&self.opt.input)
             .unwrap()
             .enumerate()
             .par_bridge()
             .flat_map(|(i, f)| {
                 Self::process_file(
                     f,
-                    &get_output_root(opt).unwrap(),
+                    &get_output_root(&self.opt).unwrap(),
                     parsed_games,
-                    i * MAX_EVENTS_PER_GAME,
+                    (self.index + i) * MAX_EVENTS_PER_GAME,
                 )
             })
-            .collect()
+            .collect();
+        self.index += games.len();
+        self.game_ids.extend(games);
     }
 
     pub fn process_files(&mut self) {
         let output_root = get_output_root(&self.opt).unwrap();
 
         info!("Parsing conventional play-by-play files");
-        let mut event_files = Self::par_process_files(&self.opt, AccountType::PlayByPlay, Some(&self.game_ids));
-        self.game_ids.extend(event_files.drain(..));
+        self.par_process_files( AccountType::PlayByPlay);
 
         info!("Parsing deduced play-by-play files");
-        Self::par_process_files(&self.opt, AccountType::Deduced, Some(&self.game_ids));
+        self.par_process_files(AccountType::Deduced);
 
         info!("Parsing box score files");
-        Self::par_process_files(&self.opt, AccountType::BoxScore, None);
+        self.par_process_files(AccountType::BoxScore);
 
         info!("Merging files by schema");
         EventFileSchema::concat(output_root.to_str().unwrap());
