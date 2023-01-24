@@ -454,7 +454,6 @@ impl FileProcessor {
             .into_par_iter()
             .enumerate()
             .flat_map(|(i, f)| {
-                println!("{} {:?}", i, &f);
                 Self::process_file(
                     &f,
                     &get_output_root(&self.opt).unwrap(),

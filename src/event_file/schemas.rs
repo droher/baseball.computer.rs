@@ -19,6 +19,8 @@ use crate::event_file::play::{
 };
 use crate::event_file::traits::{FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Pitcher, Player, SequenceId, Side};
 
+use super::traits::{Scorer, RetrosheetVolunteer};
+
 pub trait ContextToVec {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_>
     where
@@ -38,7 +40,6 @@ pub struct Game<'a> {
     field_condition: FieldCondition,
     precipitation: Precipitation,
     wind_direction: WindDirection,
-    scoring_method: HowScored,
     park_id: Park,
     temperature_fahrenheit: Option<u8>,
     attendance: Option<u32>,
@@ -51,6 +52,12 @@ pub struct Game<'a> {
     time_of_game_minutes: Option<u16>,
     protest_info: Option<&'a str>,
     completion_info: Option<&'a str>,
+    scorer: Option<Scorer>,
+    scoring_method: HowScored,
+    inputter: Option<RetrosheetVolunteer>,
+    translator: Option<RetrosheetVolunteer>,
+    date_inputted: Option<NaiveDateTime>,
+    date_edited: Option<NaiveDateTime>,
     game_key: usize,
 }
 
@@ -73,7 +80,6 @@ impl<'a> From<&'a GameContext> for Game<'a> {
             field_condition: setting.field_condition,
             precipitation: setting.precipitation,
             wind_direction: setting.wind_direction,
-            scoring_method: setting.how_scored,
             park_id: setting.park_id,
             temperature_fahrenheit: setting.temperature_fahrenheit,
             attendance: setting.attendance,
@@ -86,7 +92,13 @@ impl<'a> From<&'a GameContext> for Game<'a> {
             time_of_game_minutes: results.time_of_game_minutes,
             protest_info: results.protest_info.as_deref(),
             completion_info: results.completion_info.as_deref(),
-            game_key: gc.event_key_offset
+            game_key: gc.event_key_offset,
+            scorer: gc.metadata.scorer,
+            scoring_method: gc.metadata.how_scored,
+            inputter: gc.metadata.inputter,
+            translator: gc.metadata.translator,
+            date_inputted: gc.metadata.date_inputted,
+            date_edited: gc.metadata.date_edited,
         }
     }
 }
