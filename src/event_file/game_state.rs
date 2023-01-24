@@ -5,7 +5,7 @@ use anyhow::{anyhow, bail, Context, Error, Result};
 use arrayvec::ArrayString;
 use bimap::BiMap;
 use bounded_integer::BoundedUsize;
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use either::Either;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ use crate::event_file::misc::{BatHandAdjustment, EarnedRunRecord, GameId, Hand, 
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::pitch_sequence::PitchSequenceItem;
 use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, ContactType, Count, EarnedRunStatus, FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayModifier, PlayType, RunnerAdvance};
-use crate::event_file::traits::{FieldingPosition, Inning, LineupPosition, Matchup, MAX_EVENTS_PER_GAME, Pitcher, Player, SequenceId, Side, Umpire};
+use crate::event_file::traits::{FieldingPosition, Inning, LineupPosition, Matchup, MAX_EVENTS_PER_GAME, Pitcher, Player, RetrosheetVolunteer, Scorer, SequenceId, Side, Umpire};
 use crate::AccountType;
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
@@ -197,7 +197,6 @@ pub struct GameSetting {
     pub field_condition: FieldCondition,
     pub precipitation: Precipitation,
     pub wind_direction: WindDirection,
-    pub how_scored: HowScored,
     pub season: Season,
     pub park_id: Park,
     pub temperature_fahrenheit: Option<u8>,
@@ -220,7 +219,6 @@ impl Default for GameSetting {
             field_condition: Default::default(),
             precipitation: Default::default(),
             wind_direction: Default::default(),
-            how_scored: Default::default(),
             wind_speed_mph: Default::default(),
             attendance: None,
             park_id: Park::from("unknown").unwrap(),
@@ -259,13 +257,48 @@ impl From<&RecordSlice> for GameSetting {
                 InfoRecord::WindSpeed(x) => setting.wind_speed_mph = *x,
                 InfoRecord::Attendance(x) => setting.attendance = *x,
                 InfoRecord::Park(x) => setting.park_id = *x,
-                InfoRecord::HowScored(x) => setting.how_scored = *x,
                 // TODO: Season, GameType
                 _ => {}
             }
         }
         setting
     }
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize, Default)]
+pub struct GameMetadata {
+    pub scorer: Option<Scorer>,
+    pub how_scored: HowScored,
+    pub inputter: Option<RetrosheetVolunteer>,
+    pub translator: Option<RetrosheetVolunteer>,
+    pub date_inputted: Option<NaiveDateTime>,
+    pub date_edited: Option<NaiveDateTime>,
+}
+
+impl From<&RecordSlice> for GameMetadata {
+    fn from(vec: &RecordSlice) -> Self {
+        let infos = vec.iter().filter_map(|rv| {
+            if let MappedRecord::Info(i) = rv {
+                Some(i)
+            } else {
+                None
+            }
+        });
+        let mut metadata = Self::default();
+        for info in infos {
+            match info {
+                InfoRecord::Scorer(x) => metadata.scorer = *x,
+                InfoRecord::HowScored(x) => metadata.how_scored = *x,
+                InfoRecord::Inputter(x) => metadata.inputter = *x,
+                InfoRecord::Translator(x) => metadata.translator = *x,
+                InfoRecord::InputDate(x) => metadata.date_inputted = *x,
+                InfoRecord::EditDate(x) => metadata.date_edited = *x,
+                _ => {}
+            }
+        }
+        metadata
+    }
+
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -439,6 +472,7 @@ impl GameFieldingAppearance {
 pub struct GameContext {
     pub game_id: GameId,
     pub file_info: FileInfo,
+    pub metadata: GameMetadata,
     pub teams: Matchup<Team>,
     pub setting: GameSetting,
     pub umpires: Vec<GameUmpire>,
@@ -455,6 +489,7 @@ impl GameContext {
         let game_id = get_game_id(record_slice)?;
         let teams: Matchup<Team> = Matchup::try_from(record_slice)?;
         let setting = GameSetting::try_from(record_slice)?;
+        let metadata = GameMetadata::try_from(record_slice)?;
         let umpires = GameUmpire::from_record_slice(record_slice)?;
         let results = GameResults::try_from(record_slice)?;
         let event_key_offset = Self::event_key_offset(file_info, game_num);
@@ -470,6 +505,7 @@ impl GameContext {
         Ok(Self {
             game_id,
             file_info,
+            metadata,
             teams,
             setting,
             umpires,

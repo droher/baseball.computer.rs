@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use anyhow::{bail, Error, Result};
 use arrayvec::ArrayString;
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
 
@@ -222,28 +222,33 @@ pub enum InfoRecord {
     HowScored(HowScored),
     Inputter(Option<RetrosheetVolunteer>),
     Scorer(Option<Scorer>),
-    OriginalScorer(Option<Scorer>),
     Translator(Option<RetrosheetVolunteer>),
     Innings(Option<u8>),
+    InputDate(Option<NaiveDateTime>),
+    EditDate(Option<NaiveDateTime>),
     Tiebreaker,
     // We currently don't parse umpire changes as they only occur in box scores
     // and are irregularly shaped
     UmpireChange,
-    InputTime,
-    EditTime,
     InputProgramVersion,
     HowEntered,
     Unrecognized,
 }
 
 impl InfoRecord {
-    fn parse_time(time_str: &str) -> InfoRecord {
+    fn parse_datetime(datetime_str: &str) -> Option<NaiveDateTime> {
+        let mut split_str = datetime_str.split(' ');
+        let date = split_str.next()?;
+        let time = split_str.next().unwrap_or_default();
+        let parsed_date = NaiveDate::parse_from_str(date, "%Y/%m/%d").ok()?;
+        let parsed_time = Self::parse_time(time).unwrap_or_default();
+        Some(NaiveDateTime::new(parsed_date, parsed_time))
+    }
+
+    fn parse_time(time_str: &str) -> Option<NaiveTime> {
         let padded_time = format!("{:0>4}", time_str);
-        let time = NaiveTime::parse_from_str(&padded_time, "%I:%M%p");
-        match time {
-            Ok(t) => InfoRecord::StartTime(Some(t)),
-            Err(_) => InfoRecord::StartTime(None),
-        }
+        NaiveTime::parse_from_str(&padded_time, "%I:%M%p")
+            .ok()
     }
 }
 
@@ -291,26 +296,25 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
             "usedh" => I::UseDh(bool::from_str(&value.to_lowercase())?),
             "htbf" => I::HomeTeamBatsFirst(bool::from_str(value)?),
             "date" => I::GameDate(NaiveDate::parse_from_str(value, "%Y/%m/%d")?),
-            "starttime" => I::parse_time(value),
+            "starttime" => I::StartTime(I::parse_time(value)),
 
             // # TODO: Add error correction for optional fields rather than passing in None
             "wp" => I::WinningPitcher(t8().ok()),
             "lp" => I::LosingPitcher(t8().ok()),
             "save" => I::SavePitcher(t8().ok()),
             "gwrbi" => I::GameWinningRbi(t8().ok()),
-            "oscorer" => I::OriginalScorer(t16().ok()),
-            "scorer" => I::Scorer(t16().ok()),
+            "scorer" | "oscorer" => I::Scorer(t16().ok()),
             "inputter" => I::Inputter(t16().ok()),
             "translator" => I::Translator(t16().ok()),
+            "inputtime" => I::InputDate(I::parse_datetime(value)),
+            "edittime" => I::EditDate(I::parse_datetime(value)),
             "tiebreaker" => I::Tiebreaker,
             "inputprogvers" => I::InputProgramVersion,
             "umpchange" => I::UmpireChange,
-            "inputtime" => I::InputTime,
-            "edittime" => I::EditTime,
             _ => I::Unrecognized,
         };
         match info {
-            I::Unrecognized => bail!("Unrecognized info type"),
+            I::Unrecognized => bail!("Unrecognized info type: {:?}", record),
             _ => Ok(info),
         }
     }
