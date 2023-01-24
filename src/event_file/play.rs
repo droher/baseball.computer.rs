@@ -80,7 +80,7 @@ lazy_static! {
     static ref MODIFIER_DIVIDER_REGEX: Regex = Regex::new(r"[+\-0-9]").unwrap();
     static ref HIT_LOCATION_GENERAL_REGEX: Regex = Regex::new(r"[0-9]+").unwrap();
     static ref HIT_LOCATION_STRENGTH_REGEX: Regex = Regex::new(r"[+\-]").unwrap();
-    static ref HIT_LOCATION_ANGLE_REGEX: Regex = Regex::new(r"[FML]").unwrap();
+    static ref HIT_LOCATION_ANGLE_REGEX: Regex = Regex::new(r"[FMLR]").unwrap();
     static ref HIT_LOCATION_DEPTH_REGEX: Regex = Regex::new(r"(D|S|XD)").unwrap();
 }
 
@@ -1287,6 +1287,10 @@ pub enum HitAngle {
     Middle,
     #[strum(serialize = "L")]
     FoulLine,
+    // "L" is usually used for foul line, but for CF it means towards the left
+    Left,
+    #[strum(serialize = "R")]
+    Right,
     Default,
 }
 
@@ -1338,6 +1342,12 @@ pub enum HitLocationGeneral {
     Right,
 }
 
+impl HitLocationGeneral {
+    fn is_middle_position(&self) -> bool {
+        matches!(self, HitLocationGeneral::Catcher | HitLocationGeneral::Center)
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct HitLocation {
     pub general_location: HitLocationGeneral,
@@ -1354,8 +1364,13 @@ impl TryFrom<&str> for HitLocation {
         // If there's no general location found, that's unexpected behavior and
         // we should short-circuit, but other missing info is expected
         let general_location = HitLocationGeneral::from_str(as_str(&HIT_LOCATION_GENERAL_REGEX))?;
+        // "L" is usually used for foul line, but for CF and C it means towards the left
+        let angle = if general_location.is_middle_position() && value.contains('L') {
+            HitAngle::Left
+        } else {
+            HitAngle::from_str(as_str(&HIT_LOCATION_ANGLE_REGEX)).unwrap_or_default()
+        };
         let depth = HitDepth::from_str(as_str(&HIT_LOCATION_DEPTH_REGEX)).unwrap_or_default();
-        let angle = HitAngle::from_str(as_str(&HIT_LOCATION_ANGLE_REGEX)).unwrap_or_default();
         let strength =
             HitStrength::from_str(as_str(&HIT_LOCATION_STRENGTH_REGEX)).unwrap_or_default();
         Ok(Self {
