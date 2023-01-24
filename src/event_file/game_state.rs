@@ -155,23 +155,19 @@ impl From<(&PlateAppearanceType, &[PlayModifier])> for PlateAppearanceResultType
 // TODO: Add weird game state info to flags
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventFlag {
-    game_id: ArrayString<16>,
-    event_id: EventId,
     event_key: usize,
     sequence_id: SequenceId,
     flag: String,
 }
 
 impl EventFlag {
-    fn from_play(play: &CachedPlay, game_id: GameId, event_id: EventId, event_key: usize) -> Vec<Self> {
+    fn from_play(play: &CachedPlay, event_key: usize) -> Vec<Self> {
         play.play
             .modifiers
             .iter()
             .filter(|pm| pm.is_valid_event_type())
             .enumerate()
             .map(|(i, pm)| Self {
-                game_id: game_id.id,
-                event_id,
                 event_key,
                 sequence_id: SequenceId::new(i + 1).unwrap(),
                 flag: pm.into(),
@@ -525,8 +521,6 @@ impl GameContext {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct EventStartingBaseState {
-    pub game_id: ArrayString<16>,
-    pub event_id: EventId,
     pub event_key: usize,
     pub baserunner: BaseRunner,
     pub runner_lineup_position: LineupPosition,
@@ -534,13 +528,11 @@ pub struct EventStartingBaseState {
 }
 
 impl EventStartingBaseState {
-    fn from_base_state(state: &BaseState, game_id: GameId, event_id: EventId, event_key: usize) -> Vec<Self> {
+    fn from_base_state(state: &BaseState, event_key: usize) -> Vec<Self> {
         state
             .get_bases()
             .iter()
             .map(|(baserunner, runner)| Self {
-                game_id: game_id.id,
-                event_id,
                 event_key,
                 baserunner: *baserunner,
                 runner_lineup_position: runner.lineup_position,
@@ -552,8 +544,6 @@ impl EventStartingBaseState {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningPlay {
-    pub game_id: ArrayString<16>,
-    pub event_id: EventId,
     pub event_key: usize,
     pub sequence_id: SequenceId,
     pub baserunning_play_type: BaserunningPlayType,
@@ -561,7 +551,7 @@ pub struct EventBaserunningPlay {
 }
 
 impl EventBaserunningPlay {
-    fn from_play(play: &CachedPlay, game_id: GameId, event_id: EventId, event_key: usize) -> Option<Vec<Self>> {
+    fn from_play(play: &CachedPlay, event_key: usize) -> Option<Vec<Self>> {
         let vec = play
             .play
             .main_plays
@@ -570,8 +560,6 @@ impl EventBaserunningPlay {
             .filter_map(|(i, pt)| {
                 if let PlayType::BaserunningPlay(br) = pt {
                     Some(Self {
-                        game_id: game_id.id,
-                        event_id,
                         event_key,
                         sequence_id: SequenceId::new(i + 1).unwrap(),
                         baserunning_play_type: br.baserunning_play_type,
@@ -592,8 +580,6 @@ impl EventBaserunningPlay {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventPlateAppearance {
-    pub game_id: ArrayString<16>,
-    pub event_id: EventId,
     pub event_key: usize,
     pub plate_appearance_result: PlateAppearanceResultType,
     pub contact: Option<ContactType>,
@@ -603,13 +589,11 @@ pub struct EventPlateAppearance {
 }
 
 impl EventPlateAppearance {
-    fn from_play(play: &CachedPlay, game_id: GameId, event_id: EventId, event_key: usize) -> Option<Self> {
+    fn from_play(play: &CachedPlay, event_key: usize) -> Option<Self> {
         let modifiers = play.play.modifiers.as_slice();
         play.play.main_plays.iter().find_map(|pt| {
             if let PlayType::PlateAppearance(pa) = pt {
                 Some(Self {
-                    game_id: game_id.id,
-                    event_id,
                     event_key,
                     plate_appearance_result: PlateAppearanceResultType::from((pa, modifiers)),
                     contact: play.contact_description.map(|cd| cd.contact_type),
@@ -625,8 +609,6 @@ impl EventPlateAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningAdvanceAttempt {
-    pub game_id: ArrayString<16>,
-    pub event_id: EventId,
     pub event_key: usize,
     pub sequence_id: SequenceId,
     pub baserunner: BaseRunner,
@@ -639,7 +621,7 @@ pub struct EventBaserunningAdvanceAttempt {
 }
 
 impl EventBaserunningAdvanceAttempt {
-    fn from_play(play: &CachedPlay, game_id: GameId, event_id: EventId, event_key: usize) -> Vec<Self> {
+    fn from_play(play: &CachedPlay, event_key: usize) -> Vec<Self> {
         play.advances
             .iter()
             .enumerate()
@@ -648,8 +630,6 @@ impl EventBaserunningAdvanceAttempt {
                 let is_successful = !ra.is_out();
                 let explicit_out_flag = ra.out_or_error;
                 Self {
-                    game_id: game_id.id,
-                    event_id,
                     event_key,
                     sequence_id: SequenceId::new(i + 1).unwrap(),
                     baserunner: ra.baserunner,
@@ -694,11 +674,11 @@ pub struct EventResults {
 pub struct Event {
     pub game_id: GameId,
     pub event_id: EventId,
+    pub event_key: usize,
     pub context: EventContext,
     pub results: EventResults,
     pub raw_play: String,
     pub line_number: usize,
-    pub event_key: usize,
 }
 
 impl Event {
@@ -1064,8 +1044,6 @@ impl GameState {
             let event_key = event_key_offset + state.event_id;
             let starting_base_state = EventStartingBaseState::from_base_state(
                 &state.bases,
-                state.game_id,
-                state.event_id,
                 event_key
             );
 
@@ -1087,23 +1065,17 @@ impl GameState {
                     pitch_sequence: pr.pitch_sequence.as_ref().map(|ps| ps.0.clone()),
                     plate_appearance: EventPlateAppearance::from_play(
                         &play,
-                        state.game_id,
-                        state.event_id,
                         event_key,
                     ),
                     plays_at_base: EventBaserunningPlay::from_play(
                         &play,
-                        state.game_id,
-                        state.event_id,
                         event_key,
                     ),
                     baserunning_advances: EventBaserunningAdvanceAttempt::from_play(
                         &play,
-                        state.game_id,
-                        state.event_id,
                         event_key,
                     ),
-                    play_info: EventFlag::from_play(&play, state.game_id, state.event_id, event_key),
+                    play_info: EventFlag::from_play(&play, event_key),
                     comment: None,
                     fielding_plays: play.fielders_data.clone(),
                     out_on_play: play.outs.clone(),
