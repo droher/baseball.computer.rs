@@ -190,9 +190,9 @@ impl ContextToVec for Event {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventRaw {
+    event_key: usize,
     game_id: ArrayString<16>,
     event_id: EventId,
-    event_key: usize,
     filename: ArrayString<20>,
     line_number: usize,
     raw_play: String,
@@ -213,8 +213,6 @@ impl ContextToVec for EventRaw {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventPitch {
-    game_id: ArrayString<16>,
-    event_id: EventId,
     event_key: usize,
     sequence_id: SequenceId,
     sequence_item: PitchType,
@@ -230,13 +228,11 @@ impl ContextToVec for EventPitch {
             e.results
                 .pitch_sequence
                 .as_ref()
-                .map(|psi| (e.event_id, e.event_key, psi))
+                .map(|psi| (e.event_key, psi))
         });
-        let pitch_iter = pitch_sequences.flat_map(move |(event_id, event_key, pitches)| {
+        let pitch_iter = pitch_sequences.flat_map(move |(event_key, pitches)| {
             pitches.iter().map(move |psi| {
                 Self {
-                    game_id: gc.game_id.id,
-                    event_id,
                     event_key,
                     sequence_id: psi.sequence_id,
                     sequence_item: psi.pitch_type,
@@ -252,8 +248,6 @@ impl ContextToVec for EventPitch {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventFieldingPlay {
-    game_id: ArrayString<16>,
-    event_id: EventId,
     event_key: usize,
     sequence_id: SequenceId,
     fielding_position: FieldingPosition,
@@ -269,8 +263,6 @@ impl ContextToVec for EventFieldingPlay {
                 .iter()
                 .enumerate()
                 .map(move |(i, fp)| Self {
-                    game_id: e.game_id.id,
-                    event_id: e.event_id,
                     event_key: e.event_key,
                     sequence_id: SequenceId::new(i + 1).unwrap(),
                     fielding_position: fp.fielding_position,
@@ -282,8 +274,6 @@ impl ContextToVec for EventFieldingPlay {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventHitLocation {
-    game_id: ArrayString<16>,
-    event_id: EventId,
     event_key: usize,
     general_location: HitLocationGeneral,
     depth: HitDepth,
@@ -302,8 +292,6 @@ impl ContextToVec for EventHitLocation {
                 .map(|pa| pa.hit_location)
             {
                 Some(Self {
-                    game_id: e.game_id.id,
-                    event_id: e.event_id,
                     event_key: e.event_key,
                     general_location: hl.general_location,
                     depth: hl.depth,
@@ -319,8 +307,6 @@ impl ContextToVec for EventHitLocation {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventOut {
-    game_id: ArrayString<16>,
-    event_id: EventId,
     event_key: usize,
     sequence_id: SequenceId,
     baserunner_out: BaseRunner,
@@ -335,8 +321,6 @@ impl ContextToVec for EventOut {
                 .iter()
                 .enumerate()
                 .map(move |(i, br)| Self {
-                    game_id: e.game_id.id,
-                    event_id: e.event_id,
                     event_key: e.event_key,
                     sequence_id: SequenceId::new(i + 1).unwrap(),
                     baserunner_out: *br,
