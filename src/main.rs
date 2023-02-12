@@ -6,6 +6,7 @@ use std::fs::{File, remove_file};
 use std::hash::Hash;
 use std::io::{BufRead, BufReader, BufWriter, copy};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
@@ -13,6 +14,7 @@ use csv::{Writer, WriterBuilder};
 use either::Either;
 use glob::glob;
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use rayon::prelude::*;
 use structopt::StructOpt;
 use strum::IntoEnumIterator;
@@ -34,37 +36,70 @@ mod event_file;
 
 const ABOUT: &str = "Creates structured datasets from raw Retrosheet files.";
 
+lazy_static! {
+    static ref WRITER_MAP: Mutex<WriterMap> = Mutex::new(WriterMap::new(&PathBuf::from("data")));
+}
+
+struct ThreadSafeWriter {
+    writer: Writer<File>,
+    has_header_written: bool,
+}
+
+impl ThreadSafeWriter {
+    pub fn new(output_prefix: &Path, schema: &EventFileSchema) -> Self {
+        let file_name = format!("{schema}.csv");
+        let output_path = output_prefix.with_file_name(file_name);
+        let writer = WriterBuilder::new()
+            .has_headers(!schema.uses_custom_header())
+            .from_path(output_path)
+            .unwrap();
+        Self {
+            writer,
+            has_header_written: !schema.uses_custom_header(),
+        }
+    }
+}
+
 struct WriterMap {
     output_prefix: PathBuf,
-    account_type: AccountType,
-    map: HashMap<EventFileSchema, Writer<File>>,
+    map: HashMap<EventFileSchema, ThreadSafeWriter>,
 }
 
 impl WriterMap {
-    pub fn new(output_prefix: &Path, account_type: AccountType) -> Self {
+    pub fn new(output_prefix: &Path) -> Self {
         Self {
             output_prefix: output_prefix.to_path_buf(),
-            account_type,
             map: HashMap::with_capacity(25),
         }
     }
 
-    pub fn get_mut(&mut self, schema: &EventFileSchema) -> &mut Writer<File> {
-        self.map
-            .entry(*schema)
-            .or_insert_with(|| Self::new_writer(&self.output_prefix, true, schema))
+    pub fn flush_all(&mut self) {
+        self.map.par_iter_mut().for_each(|(_, writer)| {
+            writer.writer.flush().unwrap();
+        })
     }
+
+    fn get_mut(&mut self, schema: &EventFileSchema) -> &mut Writer<File> {
+        &mut self.map
+            .entry(*schema)
+            .or_insert_with(|| ThreadSafeWriter::new(&self.output_prefix, schema))
+            .writer
+    }
+
     pub fn get_mut_write_header(
         &mut self,
         schema: &EventFileSchema,
         header_template: &BoxScoreWritableRecord,
     ) -> &mut Writer<File> {
-        self.map.entry(*schema).or_insert_with(|| {
-            let mut w = Self::new_writer(&self.output_prefix, false, schema);
+        let writer = self.map
+            .entry(*schema)
+            .or_insert_with(|| ThreadSafeWriter::new(&self.output_prefix, schema));
+        if !writer.has_header_written {
             let header = header_template.generate_header().unwrap();
-            w.serialize(header).unwrap();
-            w
-        })
+            writer.writer.serialize(header).unwrap();
+            writer.has_header_written = true;
+        }
+        &mut writer.writer
     }
 
     fn new_writer(
@@ -123,6 +158,26 @@ enum EventFileSchema {
 }
 
 impl EventFileSchema {
+    const fn uses_custom_header(&self) -> bool {
+        match self {
+            EventFileSchema::BoxScoreBattingLines
+            | EventFileSchema::BoxScorePitchingLines
+            | EventFileSchema::BoxScoreFieldingLines
+            | EventFileSchema::BoxScorePinchHittingLines
+            | EventFileSchema::BoxScorePinchRunningLines
+            | EventFileSchema::BoxScoreTeamMiscellaneousLines
+            | EventFileSchema::BoxScoreTeamBattingLines
+            | EventFileSchema::BoxScoreTeamFieldingLines
+            | EventFileSchema::BoxScoreDoublePlays
+            | EventFileSchema::BoxScoreTriplePlays
+            | EventFileSchema::BoxScoreHitByPitches
+            | EventFileSchema::BoxScoreHomeRuns
+            | EventFileSchema::BoxScoreStolenBases
+            | EventFileSchema::BoxScoreCaughtStealing => true,
+            _ => false,
+        }
+    }
+
     fn write(
         reader: RetrosheetReader,
         output_prefix: &Path,
@@ -133,7 +188,6 @@ impl EventFileSchema {
         debug!("Processing file {}", output_prefix_display);
 
         let mut game_ids = Vec::with_capacity(81);
-        let mut writer_map = WriterMap::new(output_prefix, file_info.account_type);
 
         for (game_num, record_vec_result) in reader.enumerate() {
             if let Err(e) = record_vec_result {
@@ -161,10 +215,10 @@ impl EventFileSchema {
                 continue;
             }
             if game_context.file_info.account_type == AccountType::BoxScore {
-                Self::write_box_score_files(&mut writer_map, &game_context, record_slice)
+                Self::write_box_score_files(&game_context, record_slice)
                     .unwrap();
             } else {
-                Self::write_play_by_play_files(&mut writer_map, &game_context).unwrap();
+                Self::write_play_by_play_files(&game_context).unwrap();
             }
         }
         game_ids
@@ -196,10 +250,10 @@ impl EventFileSchema {
     }
 
     fn write_box_score_files(
-        writer_map: &mut WriterMap,
         game_context: &GameContext,
         record_slice: &RecordSlice,
     ) -> Result<()> {
+        let mut writer_map = WRITER_MAP.lock().unwrap();
         // Write Game
         writer_map
             .get_mut(&Self::BoxScoreGame)
@@ -247,9 +301,9 @@ impl EventFileSchema {
     }
 
     fn write_play_by_play_files(
-        writer_map: &mut WriterMap,
         game_context: &GameContext,
     ) -> Result<()> {
+        let mut writer_map = WRITER_MAP.lock().unwrap();
         // Write Game
         writer_map
             .get_mut(&Self::Game)
@@ -294,8 +348,7 @@ impl EventFileSchema {
         let base_states = game_context
             .events
             .iter()
-            .flat_map(|e| &e.context.starting_base_state)
-            .collect_vec();
+            .flat_map(|e| &e.context.starting_base_state);
         for row in base_states {
             w.serialize(row)?;
         }
@@ -304,8 +357,7 @@ impl EventFileSchema {
         let pa = game_context
             .events
             .iter()
-            .filter_map(|e| e.results.plate_appearance.as_ref())
-            .collect_vec();
+            .filter_map(|e| e.results.plate_appearance.as_ref());
         for row in pa {
             w.serialize(row)?;
         }
@@ -324,8 +376,7 @@ impl EventFileSchema {
         let advance_attempts = game_context
             .events
             .iter()
-            .flat_map(|e| &e.results.baserunning_advances)
-            .collect_vec();
+            .flat_map(|e| &e.results.baserunning_advances);
         for row in advance_attempts {
             w.serialize(row)?;
         }
@@ -340,8 +391,7 @@ impl EventFileSchema {
             .events
             .iter()
             .filter_map(|e| e.results.plays_at_base.as_ref())
-            .flatten()
-            .collect_vec();
+            .flatten();
         for row in baserunning_plays {
             w.serialize(row)?;
         }
@@ -361,8 +411,7 @@ impl EventFileSchema {
         let event_flags = game_context
             .events
             .iter()
-            .flat_map(|e| &e.results.play_info)
-            .collect_vec();
+            .flat_map(|e| &e.results.play_info);
         for row in event_flags {
             w.serialize(row)?;
         }
@@ -478,8 +527,8 @@ impl FileProcessor {
         info!("Parsing box score files");
         self.par_process_files(AccountType::BoxScore);
 
-        info!("Merging files by schema");
-        EventFileSchema::concat(output_root.to_str().unwrap());
+        info!("Finishing writes");
+        WRITER_MAP.lock().unwrap().flush_all();
     }
 }
 

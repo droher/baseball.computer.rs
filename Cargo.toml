@@ -31,3 +31,4 @@ tracing-subscriber = "0.3.15"
 bounded-integer = {version = "0.5.3", features = ["types", "serde"]}
 serde_repr = "0.1.9"
 regex = {version = "1.7.1", default-features = false, features = ["std", "perf"]} # No need for unicode
+quick_cache = "0.2.0"

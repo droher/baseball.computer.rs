@@ -4,12 +4,14 @@ use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::mem::discriminant;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use anyhow::{bail, Context, Error, Result};
 use bounded_integer::BoundedU8;
 use const_format::{concatcp, formatcp};
 use lazy_static::lazy_static;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use quick_cache::sync::Cache;
 use regex::{Captures, Match, Regex};
 use serde::{Deserialize, Serialize};
 use strum::ParseError;
@@ -82,6 +84,13 @@ lazy_static! {
     static ref HIT_LOCATION_STRENGTH_REGEX: Regex = Regex::new(r"[+\-]").unwrap();
     static ref HIT_LOCATION_ANGLE_REGEX: Regex = Regex::new(r"[FMLR]").unwrap();
     static ref HIT_LOCATION_DEPTH_REGEX: Regex = Regex::new(r"(D|S|XD)").unwrap();
+}
+
+lazy_static! {
+    static ref MAIN_PLAY_CACHE: Arc<Cache<String, Arc<Vec<PlayType>>>> = Arc::new(Cache::new(5000));
+    static ref PLAY_MODIFIER_CACHE: Arc<Cache<String, Arc<Vec<PlayModifier>>>> = Arc::new(Cache::new(10000));
+    static ref RUNNER_ADVANCES_CACHE: Arc<Cache<String, Arc<Vec<RunnerAdvance>>>> = Arc::new(Cache::new(30000));
+    static ref PLAY_STATS_CACHE: Arc<Cache<String, Arc<PlayStats>>> = Arc::new(Cache::new(100000));
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize, Ord, PartialOrd)]
@@ -1614,19 +1623,92 @@ impl PlayModifier {
     }
 }
 
-// TODO: Some QA here would be nice:
-//  -- Assert no more than one PlateAppearance in the main plays
-#[derive(Debug, Eq, PartialEq, Default, Clone, Hash)]
-pub struct Play {
-    pub main_plays: Vec<PlayType>,
-    pub modifiers: Vec<PlayModifier>,
-    pub explicit_advances: Vec<RunnerAdvance>,
+#[derive(
+    Debug, Default, Eq, PartialEq, Copy, Clone, Hash, Ord, PartialOrd, Serialize, Deserialize,
+    )]
+    pub struct Count {
+        pub balls: Option<Balls>,
+        pub strikes: Option<Strikes>,
+    }
+    
+    impl Count {
+        fn new(count_str: &str) -> Result<Self> {
+            let mut ints = count_str.chars().map(|c| c.to_digit(10));
+    
+            Ok(Self {
+                balls: ints.next().flatten().and_then(|b| Balls::new(b as u8)),
+                strikes: ints.next().flatten().and_then(|s| Strikes::new(s as u8)),
+            })
+        }
+    }
+    
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct PlayRecord {
+    pub inning: Inning,
+    pub side: Side,
+    pub batter: Batter,
+    pub count: Count,
+    pub pitch_sequence: Option<PitchSequence>,
+    raw_play: String,
+}
+
+impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
+    type Error = Error;
+
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
+        let record = record.deserialize::<[&str; 7]>(None)?;
+        Ok(Self {
+            inning: record[1].parse::<Inning>()?,
+            side: Side::from_str(record[2])?,
+            batter: str_to_tinystr(record[3])?,
+            count: Count::new(record[4])?,
+            pitch_sequence: {
+                match record[5] {
+                    "" => None,
+                    s => Some(PitchSequence::try_from(s)?),
+                }
+            },
+            raw_play: record[6].to_string(),
+        })
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
+pub struct PlayContext {
+    pub batting_side: Side,
+    pub inning: Inning,
+    pub batter: Batter,
+    pub count: Count,
     pub uncertain_flag: bool,
     pub exceptional_flag: bool,
+}
+
+impl TryFrom<&PlayRecord> for PlayContext {
+    type Error = Error;
+
+    fn try_from(record: &PlayRecord) -> Result<Self> {
+        let (uncertain_flag, exceptional_flag) = (record.raw_play.contains('#'), record.raw_play.contains('!'));
+        Ok(Self {
+            batting_side: record.side,
+            inning: record.inning,
+            batter: record.batter,
+            count: record.count,
+            uncertain_flag,
+            exceptional_flag,
+        })
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Default, Clone, Hash)]
+pub struct ParsedPlay {
+    pub main_plays: Arc<Vec<PlayType>>,
+    pub modifiers: Arc<Vec<PlayModifier>>,
+    pub explicit_advances: Arc<Vec<RunnerAdvance>>,
     pub raw_play: String
 }
 
-impl Play {
+impl ParsedPlay {
     pub fn no_play(&self) -> bool {
         self.main_plays.iter().all(PlayType::no_play)
     }
@@ -1847,7 +1929,7 @@ impl Play {
     }
 }
 
-impl FieldingData for Play {
+impl FieldingData for ParsedPlay {
     fn fielders_data(&self) -> Vec<FieldersData> {
         self.main_plays
             .iter()
@@ -1862,11 +1944,11 @@ impl FieldingData for Play {
     }
 }
 
-impl TryFrom<&str> for Play {
+impl TryFrom<&PlayRecord> for ParsedPlay {
     type Error = Error;
 
-    fn try_from(value: &str) -> Result<Self> {
-        let (uncertain_flag, exceptional_flag) = (value.contains('#'), value.contains('!'));
+    fn try_from(record: &PlayRecord) -> Result<Self> {
+        let value = record.raw_play.as_str();
         let value = &*STRIP_CHARS_REGEX.replace_all(value, "");
         let value = &*UNKNOWN_FIELDER_REGEX.replace_all(value, "0");
         if value.is_empty() {
@@ -1877,7 +1959,16 @@ impl TryFrom<&str> for Play {
         let advances_boundary = value.find('.').unwrap_or(value.len());
         let first_boundary = min(modifiers_boundary, advances_boundary);
 
-        let main_plays = PlayType::parse_main_play(&value[..first_boundary], false)?;
+        let main_play_raw = &value[..first_boundary];
+
+        let main_plays = if let Some(pt) = MAIN_PLAY_CACHE.get(main_play_raw) {
+            pt
+        } else {
+            let pt = Arc::new(PlayType::parse_main_play(main_play_raw, false)?);
+            MAIN_PLAY_CACHE.insert(main_play_raw.to_string(), pt.clone());
+            pt
+        };
+
         if main_plays.iter()
             .filter(|p| matches!(p, PlayType::PlateAppearance(_)))
             .count() > 1 {
@@ -1885,33 +1976,42 @@ impl TryFrom<&str> for Play {
         };
 
         let modifiers = if modifiers_boundary < advances_boundary {
-            PlayModifier::parse_modifiers(&value[modifiers_boundary + 1..advances_boundary])?
+            let modifiers_raw = &value[modifiers_boundary + 1..advances_boundary];
+            if let Some(pm) = PLAY_MODIFIER_CACHE.get(modifiers_raw) {
+                pm
+            } else {
+                let pm = Arc::new(PlayModifier::parse_modifiers(modifiers_raw)?);
+                PLAY_MODIFIER_CACHE.insert(modifiers_raw.to_string(), pm.clone());
+                pm
+            }
         } else {
-            Vec::new()
+            Arc::new(Vec::new())
         };
 
         let advances = if advances_boundary < value.len() - 1 {
-            RunnerAdvance::parse_advances(&value[advances_boundary + 1..])?
+            let advances_raw = &value[advances_boundary + 1..];
+            if let Some(ra) = RUNNER_ADVANCES_CACHE.get(advances_raw) {
+                ra
+            } else {
+                let ra = RunnerAdvance::parse_advances(advances_raw)?;
+                let arc_ra = Arc::new(ra);
+                RUNNER_ADVANCES_CACHE.insert(advances_raw.to_string(), arc_ra.clone());
+                arc_ra
+            }
         } else {
-            Vec::new()
+            Arc::new(Vec::new())
         };
         Ok(Self {
             main_plays,
             modifiers,
             explicit_advances: advances,
-            uncertain_flag,
-            exceptional_flag,
             raw_play: value.into()
         })
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
-pub struct CachedPlay {
-    pub play: Play,
-    pub batting_side: Side,
-    pub inning: Inning,
-    pub batter: Batter,
+pub struct PlayStats {
     pub fielders_data: Vec<FieldersData>,
     pub putouts: PositionVec,
     pub assists: PositionVec,
@@ -1926,80 +2026,68 @@ pub struct CachedPlay {
     pub hit_to_fielder: Option<FieldingPosition>,
 }
 
-impl TryFrom<&PlayRecord> for CachedPlay {
+impl PlayStats {
+    pub fn new(parsed_play: &ParsedPlay) -> Result<Arc<Self>> {
+        if let Some(cp) = PLAY_STATS_CACHE.get(&parsed_play.raw_play) {
+            Ok(cp)
+        } else {
+            let cp = Arc::new(Self::try_from(parsed_play)?);
+            PLAY_STATS_CACHE.insert(parsed_play.raw_play.clone(), cp.clone());
+            Ok(cp)
+        }
+    }
+}
+
+impl TryFrom<&ParsedPlay> for PlayStats {
     type Error = Error;
 
-    fn try_from(play_record: &PlayRecord) -> Result<Self> {
-        let play = Play::try_from(play_record.raw_play.as_str())?;
-
-        let fielders_data = play.fielders_data();
+    fn try_from(parsed_play: &ParsedPlay) -> Result<Self> {
+        let fielders_data = parsed_play.fielders_data();
         Ok(Self {
-            batting_side: play_record.side,
-            inning: play_record.inning,
-            batter: play_record.batter,
             putouts: FieldersData::putouts(&fielders_data),
             assists: FieldersData::assists(&fielders_data),
             errors: FieldersData::errors(&fielders_data),
             fielders_data,
-            outs: play.outs()?,
-            advances: play.advances().collect(),
-            runs: play.runs(),
-            team_unearned_runs: play.team_unearned_runs(),
-            rbi: play.rbi(),
-            plate_appearance: play.plate_appearance().cloned(),
-            contact_description: play.contact_description().copied(),
-            hit_to_fielder: play.hit_to_fielder(),
-            play,
-        })
+            outs: parsed_play.outs()?,
+            advances: parsed_play.advances().collect(),
+            runs: parsed_play.runs(),
+            team_unearned_runs: parsed_play.team_unearned_runs(),
+            rbi: parsed_play.rbi(),
+            plate_appearance: parsed_play.plate_appearance().cloned(),
+            contact_description: parsed_play.contact_description().copied(),
+            hit_to_fielder: parsed_play.hit_to_fielder(),
+        })   
     }
 }
 
-#[derive(
-Debug, Default, Eq, PartialEq, Copy, Clone, Hash, Ord, PartialOrd, Serialize, Deserialize,
-)]
-pub struct Count {
-    pub balls: Option<Balls>,
-    pub strikes: Option<Strikes>,
-}
-
-impl Count {
-    fn new(count_str: &str) -> Result<Self> {
-        let mut ints = count_str.chars().map(|c| c.to_digit(10));
-
-        Ok(Self {
-            balls: ints.next().flatten().and_then(|b| Balls::new(b as u8)),
-            strikes: ints.next().flatten().and_then(|s| Strikes::new(s as u8)),
-        })
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub struct PlayRecord {
-    pub inning: Inning,
-    pub side: Side,
-    pub batter: Batter,
-    pub count: Count,
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+pub struct Play {
+    pub context: PlayContext,
+    pub parsed: ParsedPlay,
+    pub stats: Arc<PlayStats>,
     pub pitch_sequence: Option<PitchSequence>,
-    raw_play: String,
 }
 
-impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
+impl TryFrom<&PlayRecord> for Play {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
-        let record = record.deserialize::<[&str; 7]>(None)?;
+    fn try_from(play_record: &PlayRecord) -> Result<Self> {
+        let context = PlayContext::try_from(play_record)?;
+        let parsed = ParsedPlay::try_from(play_record)?;
+        let stats = PlayStats::new(&parsed)?;
+        let pitch_sequence = play_record.pitch_sequence.clone();
         Ok(Self {
-            inning: record[1].parse::<Inning>()?,
-            side: Side::from_str(record[2])?,
-            batter: str_to_tinystr(record[3])?,
-            count: Count::new(record[4])?,
-            pitch_sequence: {
-                match record[5] {
-                    "" => None,
-                    s => Some(PitchSequence::try_from(s)?),
-                }
-            },
-            raw_play: record[6].to_string(),
+            context,
+            parsed,
+            stats,
+            pitch_sequence,
         })
     }
+}
+
+pub fn print_cache_info() {
+    println!("MAIN_PLAY_CACHE: {:?}", (MAIN_PLAY_CACHE.hits(), MAIN_PLAY_CACHE.misses()));
+    println!("PLAY_MODIFIER_CACHE: {:?}", (PLAY_MODIFIER_CACHE.hits(), PLAY_MODIFIER_CACHE.misses()));
+    println!("RUNNER_ADVANCES_CACHE: {:?}", (RUNNER_ADVANCES_CACHE.hits(), RUNNER_ADVANCES_CACHE.misses()));
+    println!("PLAY_STATS_CACHE: {:?}", (PLAY_STATS_CACHE.hits(), PLAY_STATS_CACHE.misses()));
 }
