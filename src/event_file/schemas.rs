@@ -3,7 +3,6 @@ use arrayvec::ArrayString;
 use bounded_integer::BoundedU8;
 use chrono::{NaiveDate, NaiveDateTime};
 use either::Either;
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -24,7 +23,7 @@ use super::traits::{Scorer, RetrosheetVolunteer};
 pub trait ContextToVec {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_>
     where
-        Self: Sized;
+        Self: Sized + Serialize;
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
@@ -141,18 +140,15 @@ pub struct GameEarnedRuns {
 }
 
 impl ContextToVec for GameEarnedRuns {
-    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self>> {
-        Box::from(
-            gc.results
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
+        Box::from(gc.results
                 .earned_runs
                 .iter()
-                .map(|er| Self {
+                .map(move |er| Self {
                     game_id: gc.game_id.id,
                     player_id: er.pitcher_id,
                     earned_runs: er.earned_runs,
                 })
-                .collect_vec()
-                .into_iter(),
         )
     }
 }
@@ -173,17 +169,19 @@ pub struct Event {
 
 impl ContextToVec for Event {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        Box::from(gc.events.iter().map(move |e| Self {
-            game_id: gc.game_id.id,
-            event_id: e.event_id,
-            event_key: e.event_key,
-            batting_side: e.context.batting_side,
-            inning: e.context.inning,
-            frame: e.context.frame,
-            at_bat: e.context.at_bat,
-            outs: e.context.outs,
-            count_balls: e.results.count_at_event.balls.map(BoundedU8::get),
-            count_strikes: e.results.count_at_event.strikes.map(BoundedU8::get),
+        Box::from(gc.events
+            .iter()
+            .map(move |e| Self {
+                game_id: gc.game_id.id,
+                event_id: e.event_id,
+                event_key: e.event_key,
+                batting_side: e.context.batting_side,
+                inning: e.context.inning,
+                frame: e.context.frame,
+                at_bat: e.context.at_bat,
+                outs: e.context.outs,
+                count_balls: e.results.count_at_event.balls.map(BoundedU8::get),
+                count_strikes: e.results.count_at_event.strikes.map(BoundedU8::get),
         }))
     }
 }
@@ -369,16 +367,16 @@ pub struct BoxScoreLineScore {
 }
 
 impl BoxScoreLineScore {
-    pub fn transform_line_score(game_id: ArrayString<16>, raw_line: &LineScore) -> Vec<Self> {
-        raw_line.line_score
+    pub fn transform_line_score(game_id: ArrayString<16>, raw_line: &LineScore) -> Box<dyn Iterator<Item = Self> + '_> {
+        let iter = raw_line.line_score
             .iter()
             .enumerate()
-            .map(|(index, runs)| Self {
+            .map(move |(index, runs)| Self {
                 game_id,
                 side: raw_line.side,
                 inning: (index + 1) as Inning,
                 runs: *runs
-            } )
-            .collect_vec()
+            });
+        Box::from(iter)
     }
 }
