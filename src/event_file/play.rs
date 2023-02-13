@@ -1,6 +1,7 @@
 use std::cmp::min;
 use std::collections::HashSet;
 use std::convert::TryFrom;
+use std::hash::Hash;
 use std::iter::FromIterator;
 use std::mem::discriminant;
 use std::str::FromStr;
@@ -87,10 +88,20 @@ lazy_static! {
 }
 
 lazy_static! {
-    static ref MAIN_PLAY_CACHE: Arc<Cache<String, Arc<Vec<PlayType>>>> = Arc::new(Cache::new(5000));
-    static ref PLAY_MODIFIER_CACHE: Arc<Cache<String, Arc<Vec<PlayModifier>>>> = Arc::new(Cache::new(10000));
-    static ref RUNNER_ADVANCES_CACHE: Arc<Cache<String, Arc<Vec<RunnerAdvance>>>> = Arc::new(Cache::new(30000));
-    static ref PLAY_STATS_CACHE: Arc<Cache<String, Arc<PlayStats>>> = Arc::new(Cache::new(100000));
+    static ref RAW_PLAY_CACHE: Arc<Cache<Arc<String>, Arc<()>>> = preallocated_cache::<Arc<String>, ()>(10000);
+    static ref MAIN_PLAY_CACHE: Arc<Cache<String, Arc<Vec<PlayType>>>> = preallocated_cache::<String, Vec<PlayType>>(4000);
+    static ref PLAY_MODIFIER_CACHE: Arc<Cache<String, Arc<Vec<PlayModifier>>>> = preallocated_cache::<String, Vec<PlayModifier>>(10000);
+    static ref RUNNER_ADVANCES_CACHE: Arc<Cache<String, Arc<Vec<RunnerAdvance>>>> = preallocated_cache::<String, Vec<RunnerAdvance>>(10000);
+    static ref PLAY_STATS_CACHE: Arc<Cache<String, Arc<PlayStats>>> = preallocated_cache::<String, PlayStats>(10000);
+    static ref PITCH_SEQUENCE_CACHE: Arc<Cache<String, Arc<PitchSequence>>> = preallocated_cache::<String, PitchSequence>(10000);
+}
+
+/// Instantiates a new cache with the given size and preallocates the given number of entries.
+/// This reduces the number of allocations needed to insert new entries into the cache.
+fn preallocated_cache<K: Hash + Eq, V: Clone>(size: usize) -> Arc<Cache<K, Arc<V>>> {
+    let mut cache = Cache::new(size);
+    cache.reserve(size);
+    Arc::new(cache)
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize, Ord, PartialOrd)]
@@ -1649,8 +1660,28 @@ pub struct PlayRecord {
     pub side: Side,
     pub batter: Batter,
     pub count: Count,
-    pub pitch_sequence: Option<PitchSequence>,
-    raw_play: String,
+    pub pitch_sequence: Option<Arc<PitchSequence>>,
+    raw_play: Arc<String>,
+}
+
+impl PlayRecord {
+    fn store_raw_play(raw_play: &Arc<String>) {
+        if RAW_PLAY_CACHE.get(raw_play).is_some() {
+            ()
+        } else {
+            RAW_PLAY_CACHE.insert(raw_play.clone(), Arc::new(()));
+        }
+    }
+
+    fn get_pitch_sequence(sequence: &str) -> Result<Arc<PitchSequence>> {
+        if let Some(s) = PITCH_SEQUENCE_CACHE.get(sequence) {
+            Ok(s.clone())
+        } else {
+            let ps = Arc::new(PitchSequence::try_from(sequence)?);
+            PITCH_SEQUENCE_CACHE.insert(sequence.into(), ps.clone());
+            Ok(ps)
+        }
+    }
 }
 
 impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
@@ -1658,6 +1689,9 @@ impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let record = record.deserialize::<[&str; 7]>(None)?;
+        let raw_play = Arc::new(record[6].to_string());
+        Self::store_raw_play(&raw_play);
+
         Ok(Self {
             inning: record[1].parse::<Inning>()?,
             side: Side::from_str(record[2])?,
@@ -1666,10 +1700,10 @@ impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
             pitch_sequence: {
                 match record[5] {
                     "" => None,
-                    s => Some(PitchSequence::try_from(s)?),
+                    s => Some(Self::get_pitch_sequence(s)?),
                 }
             },
-            raw_play: record[6].to_string(),
+            raw_play,
         })
     }
 }
@@ -1705,7 +1739,7 @@ pub struct ParsedPlay {
     pub main_plays: Arc<Vec<PlayType>>,
     pub modifiers: Arc<Vec<PlayModifier>>,
     pub explicit_advances: Arc<Vec<RunnerAdvance>>,
-    pub raw_play: String
+    pub raw_play: Arc<String>
 }
 
 impl ParsedPlay {
@@ -2005,7 +2039,7 @@ impl TryFrom<&PlayRecord> for ParsedPlay {
             main_plays,
             modifiers,
             explicit_advances: advances,
-            raw_play: value.into()
+            raw_play: record.raw_play.clone(),
         })
     }
 }
@@ -2028,11 +2062,11 @@ pub struct PlayStats {
 
 impl PlayStats {
     pub fn new(parsed_play: &ParsedPlay) -> Result<Arc<Self>> {
-        if let Some(cp) = PLAY_STATS_CACHE.get(&parsed_play.raw_play) {
+        if let Some(cp) = PLAY_STATS_CACHE.get(parsed_play.raw_play.as_str()) {
             Ok(cp)
         } else {
             let cp = Arc::new(Self::try_from(parsed_play)?);
-            PLAY_STATS_CACHE.insert(parsed_play.raw_play.clone(), cp.clone());
+            PLAY_STATS_CACHE.insert(parsed_play.raw_play.to_string(), cp.clone());
             Ok(cp)
         }
     }
@@ -2065,7 +2099,7 @@ pub struct Play {
     pub context: PlayContext,
     pub parsed: ParsedPlay,
     pub stats: Arc<PlayStats>,
-    pub pitch_sequence: Option<PitchSequence>,
+    pub pitch_sequence: Option<Arc<PitchSequence>>,
 }
 
 impl TryFrom<&PlayRecord> for Play {
@@ -2086,6 +2120,7 @@ impl TryFrom<&PlayRecord> for Play {
 }
 
 pub fn print_cache_info() {
+    println!("RAW_PLAY_CACHE: {:?}", (RAW_PLAY_CACHE.hits(), RAW_PLAY_CACHE.misses()));
     println!("MAIN_PLAY_CACHE: {:?}", (MAIN_PLAY_CACHE.hits(), MAIN_PLAY_CACHE.misses()));
     println!("PLAY_MODIFIER_CACHE: {:?}", (PLAY_MODIFIER_CACHE.hits(), PLAY_MODIFIER_CACHE.misses()));
     println!("RUNNER_ADVANCES_CACHE: {:?}", (RUNNER_ADVANCES_CACHE.hits(), RUNNER_ADVANCES_CACHE.misses()));

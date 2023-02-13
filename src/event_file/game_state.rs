@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
 use arrayvec::ArrayString;
@@ -679,7 +680,7 @@ pub struct Event {
     pub event_key: usize,
     pub context: EventContext,
     pub results: EventResults,
-    pub raw_play: String,
+    pub raw_play: Arc<String>,
     pub line_number: usize,
 }
 

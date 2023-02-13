@@ -204,7 +204,7 @@ impl ContextToVec for EventRaw {
             event_key: e.event_key,
             filename: gc.file_info.filename,
             line_number: e.line_number,
-            raw_play: e.raw_play.clone(),
+            raw_play: e.raw_play.to_string(),
         }))
     }
 }
