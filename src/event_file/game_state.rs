@@ -17,7 +17,7 @@ use crate::event_file::info::{
 use crate::event_file::misc::{BatHandAdjustment, EarnedRunRecord, GameId, Hand, LineupAdjustment, PitcherResponsibilityAdjustment, PitchHandAdjustment, RunnerAdjustment, SubstitutionRecord};
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::pitch_sequence::PitchSequenceItem;
-use crate::event_file::play::{Base, BaseRunner, BaserunningPlayType, CachedPlay, ContactType, Count, EarnedRunStatus, FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, Play, PlayModifier, PlayType, RunnerAdvance};
+use crate::event_file::play::{Play, Base, BaseRunner, BaserunningPlayType, ContactType, Count, EarnedRunStatus, FieldersData, FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, PlayModifier, PlayType, RunnerAdvance};
 use crate::event_file::traits::{FieldingPosition, Inning, LineupPosition, Matchup, MAX_EVENTS_PER_GAME, Pitcher, Player, RetrosheetVolunteer, Scorer, SequenceId, Side, Umpire};
 use crate::AccountType;
 
@@ -161,8 +161,8 @@ pub struct EventFlag {
 }
 
 impl EventFlag {
-    fn from_play(play: &CachedPlay, event_key: usize) -> Vec<Self> {
-        play.play
+    fn from_play(play: &Play, event_key: usize) -> Vec<Self> {
+        play.parsed
             .modifiers
             .iter()
             .filter(|pm| pm.is_valid_event_type())
@@ -495,7 +495,7 @@ impl GameContext {
                 (vec![], vec![], vec![])
             } else {
                 GameState::create_events(record_slice, line_offset, event_key_offset)
-                    .with_context(|| format!("Could not parse game {}", game_id.id))?
+                    .with_context(|| anyhow!("Could not parse game {}", game_id.id))?
             };
 
         Ok(Self {
@@ -551,9 +551,9 @@ pub struct EventBaserunningPlay {
 }
 
 impl EventBaserunningPlay {
-    fn from_play(play: &CachedPlay, event_key: usize) -> Option<Vec<Self>> {
+    fn from_play(play: &Play, event_key: usize) -> Option<Vec<Self>> {
         let vec = play
-            .play
+            .parsed
             .main_plays
             .iter()
             .enumerate()
@@ -589,16 +589,16 @@ pub struct EventPlateAppearance {
 }
 
 impl EventPlateAppearance {
-    fn from_play(play: &CachedPlay, event_key: usize) -> Option<Self> {
-        let modifiers = play.play.modifiers.as_slice();
-        play.play.main_plays.iter().find_map(|pt| {
+    fn from_play(play: &Play, event_key: usize) -> Option<Self> {
+        let modifiers = play.parsed.modifiers.as_slice();
+        play.parsed.main_plays.iter().find_map(|pt| {
             if let PlayType::PlateAppearance(pa) = pt {
                 Some(Self {
                     event_key,
                     plate_appearance_result: PlateAppearanceResultType::from((pa, modifiers)),
-                    contact: play.contact_description.map(|cd| cd.contact_type),
-                    hit_to_fielder: play.hit_to_fielder,
-                    hit_location: play.contact_description.and_then(|cd| cd.location),
+                    contact: play.stats.contact_description.map(|cd| cd.contact_type),
+                    hit_to_fielder: play.stats.hit_to_fielder,
+                    hit_location: play.stats.contact_description.and_then(|cd| cd.location),
                 })
             } else {
                 None
@@ -621,8 +621,10 @@ pub struct EventBaserunningAdvanceAttempt {
 }
 
 impl EventBaserunningAdvanceAttempt {
-    fn from_play(play: &CachedPlay, event_key: usize) -> Vec<Self> {
-        play.advances
+    fn from_play(play: &Play, event_key: usize) -> Vec<Self> {
+        play
+            .stats
+            .advances
             .iter()
             .enumerate()
             .map(|(i, ra)| {
@@ -637,7 +639,7 @@ impl EventBaserunningAdvanceAttempt {
                     advanced_on_error_flag,
                     explicit_out_flag,
                     is_successful,
-                    rbi_flag: play.rbi.contains(&ra.baserunner),
+                    rbi_flag: play.stats.rbi.contains(&ra.baserunner),
                     team_unearned_flag: ra.earned_run_status() == Some(EarnedRunStatus::TeamUnearned),
                 }
             })
@@ -810,7 +812,7 @@ impl Personnel {
             &map_tup.1
         };
         map.get_by_left(position).copied().with_context(|| {
-            format!(
+            anyhow!(
                 "Position {:?} for side {:?} missing from current game state: {:?}",
                 position, side, map
             )
@@ -822,11 +824,11 @@ impl Personnel {
         lineup.get_by_right(player).copied()
     }
 
-    fn at_bat(&self, play: &CachedPlay) -> Result<LineupPosition> {
-        let player: TrackedPlayer = (play.batter, false).into();
+    fn at_bat(&self, play: &Play) -> Result<LineupPosition> {
+        let player: TrackedPlayer = (play.context.batter, false).into();
         let position = self
             .personnel_state
-            .get(&play.batting_side)
+            .get(&play.context.batting_side)
             .0
             .get_by_right(&player)
             .copied();
@@ -837,7 +839,7 @@ impl Personnel {
             bail!(
                 "Fatal error parsing {}: Cannot find lineup position of player currently at bat {:?}.\nFull state: {:?}",
                 self.game_id.id,
-                &play.batter,
+                &play.context.batter,
                 self.personnel_state
             )
         }
@@ -847,18 +849,17 @@ impl Personnel {
         &mut self,
         player: &TrackedPlayer,
     ) -> Result<&mut GameLineupAppearance> {
-        let la = self.lineup_appearances.clone();
         self.lineup_appearances
             .get_mut(player)
             .with_context(|| {
-                format!(
+                anyhow!(
                     "Cannot find existing player {:?} in lineup appearance records",
-                    (player, la)
+                    player
                 )
             })?
             .last_mut()
             .with_context(|| {
-                format!(
+                anyhow!(
                     "Player {:?} has an empty list of lineup appearances",
                     player
                 )
@@ -872,14 +873,14 @@ impl Personnel {
         self.defense_appearances
             .get_mut(player)
             .with_context(|| {
-                format!(
+                anyhow!(
                     "Cannot find existing player {:?} in defense appearance records",
                     player
                 )
             })?
             .last_mut()
             .with_context(|| {
-                format!(
+                anyhow!(
                     "Player {:?} has an empty list of fielding appearances",
                     player
                 )
@@ -1036,10 +1037,10 @@ impl GameState {
 
         let mut state = Self::new(record_slice)?;
         for (i, record) in record_slice.iter().enumerate() {
-            let (pr, cached_play) = if let MappedRecord::Play(pr) = record {
-                (Some(pr), Some(CachedPlay::try_from(pr)?))
+            let opt_play = if let MappedRecord::Play(pr) = record {
+                Some(Play::try_from(pr)?)
             } else {
-                (None, None)
+                None
             };
             let event_key = event_key_offset + state.event_id;
             let starting_base_state = EventStartingBaseState::from_base_state(
@@ -1047,9 +1048,9 @@ impl GameState {
                 event_key
             );
 
-            state.update(record, &cached_play)?;
-            if let (Some(pr), Some(play)) = (pr, cached_play) {
-                let raw_play = play.play.raw_play.clone();
+            state.update(record, &opt_play)?;
+            if let Some(play) = opt_play {
+                let raw_play = play.parsed.raw_play.clone();
                 let context = EventContext {
                     inning: state.inning,
                     batting_side: state.batting_side,
@@ -1061,8 +1062,8 @@ impl GameState {
                     pitcher_hand: state.weird_state.pitcher_hand.unwrap_or_default(),
                 };
                 let results = EventResults {
-                    count_at_event: pr.count,
-                    pitch_sequence: pr.pitch_sequence.as_ref().map(|ps| ps.0.clone()),
+                    count_at_event: play.context.count,
+                    pitch_sequence: play.pitch_sequence.as_ref().map(|ps| ps.0.clone()),
                     plate_appearance: EventPlateAppearance::from_play(
                         &play,
                         event_key,
@@ -1077,8 +1078,8 @@ impl GameState {
                     ),
                     play_info: EventFlag::from_play(&play, event_key),
                     comment: None,
-                    fielding_plays: play.fielders_data.clone(),
-                    out_on_play: play.outs.clone(),
+                    fielding_plays: play.stats.fielders_data.clone(),
+                    out_on_play: play.stats.outs.clone(),
                 };
                 let line_number = line_offset + i;
                 events.push(Event {
@@ -1148,8 +1149,8 @@ impl GameState {
         })
     }
 
-    fn is_frame_flipped(&self, play: &CachedPlay) -> Result<bool> {
-        if self.batting_side == play.batting_side {
+    fn is_frame_flipped(&self, play: &Play) -> Result<bool> {
+        if self.batting_side == play.context.batting_side {
             Ok(false)
         } else if self.outs < 3 {
             bail!("New frame without 3 outs recorded")
@@ -1158,7 +1159,7 @@ impl GameState {
         }
     }
 
-    fn get_new_frame(&self, play: &CachedPlay) -> Result<InningFrame> {
+    fn get_new_frame(&self, play: &Play) -> Result<InningFrame> {
         Ok(if self.is_frame_flipped(play)? {
             self.frame.flip()
         } else {
@@ -1166,8 +1167,8 @@ impl GameState {
         })
     }
 
-    fn outs_after_play(&self, play: &CachedPlay) -> Result<Outs> {
-        let play_outs = play.outs.len();
+    fn outs_after_play(&self, play: &Play) -> Result<Outs> {
+        let play_outs = play.stats.outs.len();
         let new_outs = if self.is_frame_flipped(play)? {
             play_outs
         } else {
@@ -1176,7 +1177,7 @@ impl GameState {
         Outs::new(new_outs).context("Illegal state, more than 3 outs recorded")
     }
 
-    fn update_on_play(&mut self, play: &CachedPlay) -> Result<()> {
+    fn update_on_play(&mut self, play: &Play) -> Result<()> {
 
         let new_frame = self.get_new_frame(play)?;
         let new_outs = self.outs_after_play(play)?;
@@ -1184,7 +1185,7 @@ impl GameState {
         // In the case of certain double switches, there is no pitcher of record,
         // which is fine because we only need to track the pitcher of record for
         // runner responsibility, which would not change on a no-play.
-        let pitcher = self.personnel.pitcher(&play.batting_side.flip()).ok();
+        let pitcher = self.personnel.pitcher(&play.context.batting_side.flip()).ok();
 
         let batter_lineup_position = self.personnel.at_bat(play)?;
 
@@ -1196,9 +1197,9 @@ impl GameState {
             pitcher,
         )?;
 
-        self.inning = play.inning;
+        self.inning = play.context.inning;
         self.frame = new_frame;
-        self.batting_side = play.batting_side;
+        self.batting_side = play.context.batting_side;
         self.outs = new_outs;
         self.bases = new_base_state;
         self.at_bat = batter_lineup_position;
@@ -1254,13 +1255,13 @@ impl GameState {
     pub fn update(
         &mut self,
         record: &MappedRecord,
-        cached_play: &Option<CachedPlay>,
+        play: &Option<Play>,
     ) -> Result<()> {
         match record {
             MappedRecord::Play(_) => {
-                if let Some(cp) = cached_play {
+                if let Some(cp) = play {
                     self.update_on_play(cp)
-                        .with_context(|| format!("Failed to parse play {:?}", cp))
+                        .with_context(|| anyhow!("Failed to parse play {:?}", cp))
                 } else {
                     bail!("Expected cached play but got None")
                 }
@@ -1331,9 +1332,10 @@ impl BaseState {
 
     fn get_advance_from_baserunner(
         baserunner: BaseRunner,
-        cached_play: &CachedPlay,
+        play: &Play,
     ) -> Option<&RunnerAdvance> {
-        cached_play
+        play
+            .stats
             .advances
             .iter()
             .find(|a| a.baserunner == baserunner)
@@ -1378,12 +1380,10 @@ impl BaseState {
         &self,
         start_inning: bool,
         end_inning: bool,
-        cached_play: &CachedPlay,
+        play: &Play,
         batter_lineup_position: LineupPosition,
         pitcher: Option<Pitcher>,
     ) -> Result<Self> {
-        let play = &cached_play.play;
-
         let mut new_state = if start_inning {
             Self::default()
         } else {
@@ -1392,11 +1392,11 @@ impl BaseState {
         new_state.scored = vec![];
 
         // Cover cases where outs are not included in advance information
-        for out in &cached_play.outs {
+        for out in &play.stats.outs {
             new_state.clear_baserunner(out);
         }
 
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, cached_play) {
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, play) {
             new_state.clear_baserunner(&BaseRunner::Third);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
@@ -1405,7 +1405,7 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, cached_play) {
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, play) {
             new_state.clear_baserunner(&BaseRunner::Second);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
@@ -1421,7 +1421,7 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, cached_play) {
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, play) {
             new_state.clear_baserunner(&BaseRunner::First);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
@@ -1434,7 +1434,7 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Batter, cached_play) {
+        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Batter, play) {
             let some_pitcher = pitcher.ok_or_else(|| anyhow!("A pitcher ID must be provided if the batter reached base"))?;
             let new_runner = Runner {
                 lineup_position: batter_lineup_position,

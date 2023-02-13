@@ -204,13 +204,13 @@ pub enum Side {
 }
 
 impl Side {
-    pub fn flip(&self) -> Self {
+    pub const fn flip(&self) -> Self {
         match self {
             Self::Away => Self::Home,
             Self::Home => Self::Away,
         }
     }
-    pub fn retrosheet_str(&self) -> &str {
+    pub const fn retrosheet_str(&self) -> &str {
         match self {
             Self::Away => "0",
             Self::Home => "1",
@@ -321,7 +321,7 @@ impl<T> Matchup<T> {
         Self { away, home }
     }
 
-    pub fn get(&self, side: &Side) -> &T {
+    pub const fn get(&self, side: &Side) -> &T {
         match side {
             Side::Away => &self.away,
             Side::Home => &self.home,

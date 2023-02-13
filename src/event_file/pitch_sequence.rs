@@ -9,7 +9,7 @@ use crate::event_file::play::Base;
 use crate::event_file::traits::SequenceId;
 
 #[derive(
-    Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize,
+    Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize, Hash
 )]
 pub enum PitchType {
     #[strum(serialize = "1")]
@@ -67,7 +67,7 @@ impl Default for PitchType {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize, Hash)]
 pub struct PitchSequenceItem {
     pub sequence_id: SequenceId,
     pub pitch_type: PitchType,
@@ -103,7 +103,7 @@ impl PitchSequenceItem {
     }
 }
 
-#[derive(Debug, Default, Eq, PartialEq, Clone)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Hash)]
 pub struct PitchSequence(pub Vec<PitchSequenceItem>);
 
 impl TryFrom<&str> for PitchSequence {
