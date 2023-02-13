@@ -209,11 +209,11 @@ impl RetrosheetReader {
                     return Ok(true);
                 }
                 Ok(m) => self.current_record_vec.push(m),
-                Err(e) => {
-                    return Err(e.context(format!(
-                        "Error during game {} -- Error reading record: {:?}",
-                        &self.current_game_id.id, &self.current_record
-                    )))
+                Err(_) => {
+                    return Err(anyhow!(
+                        "Error during game {} -- Error reading record: {}",
+                        &self.current_game_id.id, &self.current_record.as_slice()
+                    ))
                 }
             }
         }

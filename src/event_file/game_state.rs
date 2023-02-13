@@ -495,7 +495,7 @@ impl GameContext {
                 (vec![], vec![], vec![])
             } else {
                 GameState::create_events(record_slice, line_offset, event_key_offset)
-                    .with_context(|| format!("Could not parse game {}", game_id.id))?
+                    .with_context(|| anyhow!("Could not parse game {}", game_id.id))?
             };
 
         Ok(Self {
@@ -812,7 +812,7 @@ impl Personnel {
             &map_tup.1
         };
         map.get_by_left(position).copied().with_context(|| {
-            format!(
+            anyhow!(
                 "Position {:?} for side {:?} missing from current game state: {:?}",
                 position, side, map
             )
@@ -849,18 +849,17 @@ impl Personnel {
         &mut self,
         player: &TrackedPlayer,
     ) -> Result<&mut GameLineupAppearance> {
-        let la = self.lineup_appearances.clone();
         self.lineup_appearances
             .get_mut(player)
             .with_context(|| {
-                format!(
+                anyhow!(
                     "Cannot find existing player {:?} in lineup appearance records",
-                    (player, la)
+                    player
                 )
             })?
             .last_mut()
             .with_context(|| {
-                format!(
+                anyhow!(
                     "Player {:?} has an empty list of lineup appearances",
                     player
                 )
@@ -874,14 +873,14 @@ impl Personnel {
         self.defense_appearances
             .get_mut(player)
             .with_context(|| {
-                format!(
+                anyhow!(
                     "Cannot find existing player {:?} in defense appearance records",
                     player
                 )
             })?
             .last_mut()
             .with_context(|| {
-                format!(
+                anyhow!(
                     "Player {:?} has an empty list of fielding appearances",
                     player
                 )
@@ -1262,7 +1261,7 @@ impl GameState {
             MappedRecord::Play(_) => {
                 if let Some(cp) = play {
                     self.update_on_play(cp)
-                        .with_context(|| format!("Failed to parse play {:?}", cp))
+                        .with_context(|| anyhow!("Failed to parse play {:?}", cp))
                 } else {
                     bail!("Expected cached play but got None")
                 }
