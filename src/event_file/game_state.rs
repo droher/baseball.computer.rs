@@ -540,7 +540,7 @@ impl GameContext {
         })
     }
 
-    fn event_key_offset(file_info: FileInfo, game_num: usize) -> usize {
+    const fn event_key_offset(file_info: FileInfo, game_num: usize) -> usize {
         file_info.file_index + (game_num * MAX_EVENTS_PER_GAME)
     }
 }

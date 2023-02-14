@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 #![forbid(unsafe_code)]
+#![deny(clippy::all)]
+#![warn(clippy::cargo, clippy::nursery)]
 
 use std::collections::HashSet;
 use std::fs::File;

@@ -3,6 +3,12 @@ name = "boxball-rs"
 version = "0.0.1"
 authors = ["David Roher <david.roher@gmail.com>"]
 edition = "2021"
+description = "Creates structured datasets from raw Retrosheet files."
+license = "BSL-1.0"
+repository = "https://github.com/droher/boxball-rs"
+readme = "README.md"
+keywords = ["retrosheet", "baseball"]
+categories = ["command-line-utilities", "data-processing", "science"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

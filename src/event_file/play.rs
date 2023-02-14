@@ -1705,7 +1705,7 @@ impl PlayRecord {
 
     fn get_pitch_sequence(sequence: &str) -> Result<Arc<PitchSequence>> {
         if let Some(s) = PITCH_SEQUENCE_CACHE.get(sequence) {
-            Ok(s.clone())
+            Ok(s)
         } else {
             let ps = Arc::new(PitchSequence::try_from(sequence)?);
             PITCH_SEQUENCE_CACHE.insert(sequence.into(), ps.clone());
