@@ -3,13 +3,13 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
-use arrayvec::ArrayString;
-use bimap::BiMap;
+use arrayvec::{ArrayVec, ArrayString};
 use bounded_integer::BoundedUsize;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use either::Either;
+use fixed_map::{Map, Key};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use strum_macros::Display;
 
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
@@ -25,7 +25,11 @@ use crate::AccountType;
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
 
-type Position = Either<LineupPosition, FieldingPosition>;
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Display, Key)]
+enum PositionType {
+    Lineup(LineupPosition),
+    Fielding(FieldingPosition),
+}
 
 /// A wrapper around `Player` that allows for a player to appear
 /// in multiple positions in a lineup. This is used for the
@@ -46,7 +50,18 @@ impl From<(Player, bool)> for TrackedPlayer {
     }
 }
 
-type PersonnelState = BiMap<Position, TrackedPlayer>;
+impl std::fmt::Display for TrackedPlayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let dh = if self.is_pitcher_with_dh {
+            "-pitcher-with-dh"
+        } else {
+            ""
+        };
+        write!(f, "{}{}", self.player, dh)
+    }
+}
+
+type PersonnelState = Map<PositionType, TrackedPlayer>;
 type Lineup = PersonnelState;
 type Defense = PersonnelState;
 pub type EventId = SequenceId;
@@ -535,7 +550,7 @@ impl EventStartingBaseState {
             .iter()
             .map(|(baserunner, runner)| Self {
                 event_key,
-                baserunner: *baserunner,
+                baserunner,
                 runner_lineup_position: runner.lineup_position,
                 charged_to_pitcher_id: runner.charged_to,
             })
@@ -748,8 +763,8 @@ impl Default for Personnel {
                 id: ArrayString::<16>::from("N/A").unwrap(),
             },
             personnel_state: Matchup::new(
-                (BiMap::with_capacity(15), BiMap::with_capacity(15)),
-                (BiMap::with_capacity(15), BiMap::with_capacity(15)),
+                (Lineup::new(), Defense::new()),
+                (Lineup::new(), Defense::new()),
             ),
             lineup_appearances: HashMap::with_capacity(30),
             defense_appearances: HashMap::with_capacity(30),
@@ -788,8 +803,8 @@ impl Personnel {
             );
             let player: TrackedPlayer = (start.player, start.lineup_position == LineupPosition::PitcherWithDh).into();
 
-            lineup.insert(Either::Left(start.lineup_position), player);
-            defense.insert(Either::Right(start.fielding_position), player);
+            lineup.insert(PositionType::Lineup(start.lineup_position), player);
+            defense.insert(PositionType::Fielding(start.fielding_position), player);
             personnel
                 .lineup_appearances
                 .insert(player, vec![lineup_appearance]);
@@ -801,47 +816,46 @@ impl Personnel {
     }
 
     fn pitcher(&self, side: &Side) -> Result<Pitcher> {
-        self.get_at_position(side, &Either::Right(FieldingPosition::Pitcher))
+        self.get_at_position(side, &PositionType::Fielding(FieldingPosition::Pitcher))
             .map(|tp| tp.player)
     }
 
-    fn get_at_position(&self, side: &Side, position: &Position) -> Result<TrackedPlayer> {
+    fn get_at_position(&self, side: &Side, position: &PositionType) -> Result<TrackedPlayer> {
         let map_tup = self.personnel_state.get(side);
-        let map = if let Either::Left(_) = position {
+        let map = if let PositionType::Lineup(_) = position {
             &map_tup.0
         } else {
             &map_tup.1
         };
-        map.get_by_left(position).copied().with_context(|| {
+        map.get(*position).copied().with_context(|| {
             anyhow!(
-                "Position {:?} for side {:?} missing from current game state: {:?}",
-                position, side, map
+                "Position {} for side {} missing from current game state",
+                position, side
             )
         })
     }
 
-    fn get_player_lineup_position(&self, side: &Side, player: &TrackedPlayer) -> Option<Position> {
+    fn get_player_lineup_position(&self, side: &Side, player: &TrackedPlayer) -> Option<PositionType> {
         let (lineup, _) = self.personnel_state.get(side);
-        lineup.get_by_right(player).copied()
+        lineup.iter().find_map(|(position, tracked_player)| {
+            if tracked_player == player {
+                Some(position)
+            } else {
+                None
+            }
+        })
     }
 
     fn at_bat(&self, play: &Play) -> Result<LineupPosition> {
         let player: TrackedPlayer = (play.context.batter, false).into();
-        let position = self
-            .personnel_state
-            .get(&play.context.batting_side)
-            .0
-            .get_by_right(&player)
-            .copied();
-
-        if let Some(Either::Left(lp)) = position {
+        let position = self.get_player_lineup_position(&play.context.batting_side, &player);
+        if let Some(PositionType::Lineup(lp)) = position {
             Ok(lp)
         } else {
             bail!(
-                "Fatal error parsing {}: Cannot find lineup position of player currently at bat {:?}.\nFull state: {:?}",
+                "Fatal error parsing {}: Cannot find lineup position of player currently at bat {}.",
                 self.game_id.id,
                 &play.context.batter,
-                self.personnel_state
             )
         }
     }
@@ -854,14 +868,14 @@ impl Personnel {
             .get_mut(player)
             .with_context(|| {
                 anyhow!(
-                    "Cannot find existing player {:?} in lineup appearance records",
+                    "Cannot find existing player {} in lineup appearance records",
                     player
                 )
             })?
             .last_mut()
             .with_context(|| {
                 anyhow!(
-                    "Player {:?} has an empty list of lineup appearances",
+                    "Player {} has an empty list of lineup appearances",
                     player
                 )
             })
@@ -875,14 +889,14 @@ impl Personnel {
             .get_mut(player)
             .with_context(|| {
                 anyhow!(
-                    "Cannot find existing player {:?} in defense appearance records",
+                    "Cannot find existing player {} in defense appearance records",
                     player
                 )
             })?
             .last_mut()
             .with_context(|| {
                 anyhow!(
-                    "Player {:?} has an empty list of fielding appearances",
+                    "Player {} has an empty list of fielding appearances",
                     player
                 )
             })
@@ -893,7 +907,7 @@ impl Personnel {
         sub: &SubstitutionRecord,
         event_id: EventId,
     ) -> Result<()> {
-        let original_batter = self.get_at_position(&sub.side, &Either::Left(sub.lineup_position));
+        let original_batter = self.get_at_position(&sub.side, &PositionType::Lineup(sub.lineup_position));
 
         match original_batter {
             // If this substitution is the DH/PH/PR being brought in to field, no substitution takes place
@@ -907,8 +921,9 @@ impl Personnel {
 
         let new_player: TrackedPlayer = (sub.player, sub.lineup_position == LineupPosition::PitcherWithDh).into();
         // In the case of a courtesy runner, the new player may already be in the lineup
-        if self.get_player_lineup_position(&sub.side, &new_player).is_some() {
-            self.get_current_lineup_appearance(&new_player)?.end_event_id = Some(event_id - 1);
+        let check_courtesy = self.get_current_lineup_appearance(&new_player);
+        if let Ok(p) = check_courtesy {
+            p.end_event_id = p.end_event_id.or(Some(event_id - 1));
         }
 
         let new_lineup_appearance = GameLineupAppearance {
@@ -921,7 +936,7 @@ impl Personnel {
             end_event_id: None,
         };
         let (lineup, _) = self.personnel_state.get_mut(&sub.side);
-        lineup.insert(Either::Left(sub.lineup_position), new_player);
+        lineup.insert(PositionType::Lineup(sub.lineup_position), new_player);
         self.lineup_appearances
             .entry(new_player)
             .or_insert_with(|| Vec::with_capacity(1))
@@ -937,27 +952,21 @@ impl Personnel {
         event_id: EventId,
     ) -> Result<()> {
         let original_fielder =
-            self.get_at_position(&sub.side, &Either::Right(sub.fielding_position));
+            self.get_at_position(&sub.side, &PositionType::Fielding(sub.fielding_position));
         match original_fielder {
             Ok(p) if p.player == sub.player => return Ok(()),
             Ok(p) => self.get_current_fielding_appearance(&p)?.end_event_id = Some(event_id - 1),
             Err(_) => {}
         };
-
         let new_fielder: TrackedPlayer = (sub.player, sub.lineup_position == LineupPosition::PitcherWithDh).into();
         // If the new fielder is already in the game, we need to close out their previous appearance
         if let Ok(gfa) = self.get_current_fielding_appearance(&new_fielder) {
             gfa.end_event_id = Some(event_id - 1);
         }
 
-        let (_, defense) = self.personnel_state.get_mut(&sub.side);
-        // We maintain a 1:1 relationship between players and positions at all times,
-        // so the entire position must be removed from the defense temporarily.
-        // If the data is consistent, this state (< 9 positions) can only exist between substitutions,
-        // and cannot exist at the start of a play.
-        defense.remove_by_right(&new_fielder);
-        defense.insert(Either::Right(sub.fielding_position), new_fielder);
 
+        let (_, defense) = self.personnel_state.get_mut(&sub.side);
+        defense.insert(PositionType::Fielding(sub.fielding_position), new_fielder);
         self.defense_appearances
             .entry(new_fielder)
             .or_insert_with(|| Vec::with_capacity(1))
@@ -977,10 +986,10 @@ impl Personnel {
     /// This will be a safe no-op if the game in question isn't using a DH.
     fn update_on_dh_vacancy(&mut self, sub: &SubstitutionRecord, event_id: EventId) -> Result<()> {
         let non_batting_pitcher =
-            self.get_at_position(&sub.side, &Either::Left(LineupPosition::PitcherWithDh));
+            self.get_at_position(&sub.side, &PositionType::Lineup(LineupPosition::PitcherWithDh));
         let dh = self.get_at_position(
             &sub.side,
-            &Either::Right(FieldingPosition::DesignatedHitter),
+            &PositionType::Fielding(FieldingPosition::DesignatedHitter),
         );
         if let Ok(p) = non_batting_pitcher {
             self.get_current_lineup_appearance(&p)?.end_event_id = Some(event_id - 1);
@@ -1284,8 +1293,8 @@ pub type Outs = BoundedUsize<0, 3>;
 
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct BaseState {
-    bases: HashMap<BaseRunner, Runner>,
-    scored: Vec<Runner>,
+    bases: Map<BaseRunner, Runner>,
+    scored: ArrayVec<Runner, 4>,
 }
 
 impl BaseState {
@@ -1299,7 +1308,7 @@ impl BaseState {
         state
     }
 
-    pub const fn get_bases(&self) -> &HashMap<BaseRunner, Runner> {
+    pub const fn get_bases(&self) -> &Map<BaseRunner, Runner> {
         &self.bases
     }
 
@@ -1307,23 +1316,23 @@ impl BaseState {
         self.bases.len()
     }
 
-    fn get_runner(&self, baserunner: &BaseRunner) -> Option<&Runner> {
+    fn get_runner(&self, baserunner: BaseRunner) -> Option<&Runner> {
         self.bases.get(baserunner)
     }
 
     fn get_first(&self) -> Option<&Runner> {
-        self.bases.get(&BaseRunner::First)
+        self.bases.get(BaseRunner::First)
     }
 
     fn get_second(&self) -> Option<&Runner> {
-        self.bases.get(&BaseRunner::Second)
+        self.bases.get(BaseRunner::Second)
     }
 
     fn get_third(&self) -> Option<&Runner> {
-        self.bases.get(&BaseRunner::Third)
+        self.bases.get(BaseRunner::Third)
     }
 
-    fn clear_baserunner(&mut self, baserunner: &BaseRunner) -> Option<Runner> {
+    fn clear_baserunner(&mut self, baserunner: BaseRunner) -> Option<Runner> {
         self.bases.remove(baserunner)
     }
 
@@ -1343,12 +1352,12 @@ impl BaseState {
     }
 
     fn current_base_occupied(&self, advance: &RunnerAdvance) -> bool {
-        self.get_runner(&advance.baserunner).is_some()
+        self.get_runner(advance.baserunner).is_some()
     }
 
     fn target_base_occupied(&self, advance: &RunnerAdvance) -> Result<bool> {
-        let br = BaseRunner::from_target_base(advance.to);
-        Ok(self.get_runner(&br?).is_some())
+        let br = BaseRunner::from_target_base(advance.to)?;
+        Ok(self.get_runner(br).is_some())
     }
 
     fn check_integrity(old_state: &Self, new_state: &Self, advance: &RunnerAdvance) -> Result<()> {
@@ -1388,17 +1397,19 @@ impl BaseState {
         let mut new_state = if start_inning {
             Self::default()
         } else {
-            self.clone()
+            Self {
+                bases: self.bases,
+                scored: ArrayVec::new(),
+            }
         };
-        new_state.scored = vec![];
 
         // Cover cases where outs are not included in advance information
         for out in &play.stats.outs {
-            new_state.clear_baserunner(out);
+            new_state.clear_baserunner(*out);
         }
 
         if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, play) {
-            new_state.clear_baserunner(&BaseRunner::Third);
+            new_state.clear_baserunner(BaseRunner::Third);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
                 return Err(e);
@@ -1407,7 +1418,7 @@ impl BaseState {
             }
         }
         if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, play) {
-            new_state.clear_baserunner(&BaseRunner::Second);
+            new_state.clear_baserunner(BaseRunner::Second);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
                 return Err(e);
@@ -1423,7 +1434,7 @@ impl BaseState {
             }
         }
         if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, play) {
-            new_state.clear_baserunner(&BaseRunner::First);
+            new_state.clear_baserunner(BaseRunner::First);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
                 return Err(e);
