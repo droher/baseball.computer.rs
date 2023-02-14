@@ -786,7 +786,7 @@ impl Default for Personnel {
 impl Personnel {
     fn new(record_slice: &RecordSlice) -> Result<Self> {
         let game_id = get_game_id(record_slice)?;
-        let mut personnel = Personnel {
+        let mut personnel = Self {
             game_id,
             ..Default::default()
         };
@@ -941,7 +941,7 @@ impl Personnel {
         // In the case of a courtesy runner, the new player may already be in the lineup
         let check_courtesy = self.get_current_lineup_appearance(&new_player);
         if let Ok(p) = check_courtesy {
-            p.end_event_id = p.end_event_id.or(Some(event_id - 1));
+            p.end_event_id = p.end_event_id.or_else(|| Some(event_id - 1));
         }
 
         let new_lineup_appearance = GameLineupAppearance {
@@ -1394,7 +1394,7 @@ impl BaseState {
     ///  Accounts for Rule 9.16(g) regarding the assignment of trailing
     ///  baserunners as inherited if they reach on a fielder's choice
     ///  in which an inherited runner is forced out 🙃
-    fn update_runner_charges(self, _play: &Play) -> Self {
+    const fn update_runner_charges(self, _play: &Play) -> Self {
         // TODO: This
         self
     }
@@ -1421,7 +1421,7 @@ impl BaseState {
             new_state.clear_baserunner(*out);
         }
 
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, play) {
+        if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Third, play) {
             new_state.clear_baserunner(BaseRunner::Third);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
@@ -1430,7 +1430,7 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, play) {
+        if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Second, play) {
             new_state.clear_baserunner(BaseRunner::Second);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
@@ -1446,7 +1446,7 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, play) {
+        if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::First, play) {
             new_state.clear_baserunner(BaseRunner::First);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
@@ -1459,7 +1459,7 @@ impl BaseState {
                 new_state.scored.push(*r)
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Batter, play) {
+        if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Batter, play) {
             let some_pitcher = pitcher.ok_or_else(|| {
                 anyhow!("A pitcher ID must be provided if the batter reached base")
             })?;

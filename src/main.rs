@@ -165,20 +165,20 @@ impl EventFileSchema {
     const fn uses_custom_header(&self) -> bool {
         matches!(
             self,
-            EventFileSchema::BoxScoreBattingLines
-                | EventFileSchema::BoxScorePitchingLines
-                | EventFileSchema::BoxScoreFieldingLines
-                | EventFileSchema::BoxScorePinchHittingLines
-                | EventFileSchema::BoxScorePinchRunningLines
-                | EventFileSchema::BoxScoreTeamMiscellaneousLines
-                | EventFileSchema::BoxScoreTeamBattingLines
-                | EventFileSchema::BoxScoreTeamFieldingLines
-                | EventFileSchema::BoxScoreDoublePlays
-                | EventFileSchema::BoxScoreTriplePlays
-                | EventFileSchema::BoxScoreHitByPitches
-                | EventFileSchema::BoxScoreHomeRuns
-                | EventFileSchema::BoxScoreStolenBases
-                | EventFileSchema::BoxScoreCaughtStealing
+            Self::BoxScoreBattingLines
+                | Self::BoxScorePitchingLines
+                | Self::BoxScoreFieldingLines
+                | Self::BoxScorePinchHittingLines
+                | Self::BoxScorePinchRunningLines
+                | Self::BoxScoreTeamMiscellaneousLines
+                | Self::BoxScoreTeamBattingLines
+                | Self::BoxScoreTeamFieldingLines
+                | Self::BoxScoreDoublePlays
+                | Self::BoxScoreTriplePlays
+                | Self::BoxScoreHitByPitches
+                | Self::BoxScoreHomeRuns
+                | Self::BoxScoreStolenBases
+                | Self::BoxScoreCaughtStealing
         )
     }
 

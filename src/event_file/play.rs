@@ -218,21 +218,21 @@ pub enum Base {
 }
 
 impl Base {
-    fn prev(&self) -> Self {
+    const fn prev(&self) -> Self {
         match self {
-            Base::First => Base::Home,
-            Base::Second => Base::First,
-            Base::Third => Base::Second,
-            Base::Home => Base::Third,
+            Self::First => Self::Home,
+            Self::Second => Self::First,
+            Self::Third => Self::Second,
+            Self::Home => Self::Third,
         }
     }
 
-    fn next(&self) -> Self {
+    const fn next(&self) -> Self {
         match self {
-            Base::First => Base::Second,
-            Base::Second => Base::Third,
-            Base::Third => Base::Home,
-            Base::Home => Base::First,
+            Self::First => Self::Second,
+            Self::Second => Self::Third,
+            Self::Third => Self::Home,
+            Self::Home => Self::First,
         }
     }
 }
@@ -949,7 +949,7 @@ pub enum PlayType {
 
 impl PlayType {
     pub fn no_play(&self) -> bool {
-        if let PlayType::NoPlay(np) = self {
+        if let Self::NoPlay(np) = self {
             np.no_play_type == NoPlayType::NoPlay
         } else {
             false
@@ -1129,12 +1129,12 @@ impl RunnerAdvance {
             .find_map(RunnerAdvanceModifier::unearned_status)
     }
 
-    fn parse_advances(value: &str) -> Result<Vec<RunnerAdvance>> {
+    fn parse_advances(value: &str) -> Result<Vec<Self>> {
         value
             .split(';')
             .filter_map(|s| ADVANCE_REGEX.captures(s))
             .map(Self::parse_single_advance)
-            .collect::<Result<Vec<RunnerAdvance>>>()
+            .collect::<Result<Vec<Self>>>()
     }
 
     fn parse_single_advance(captures: Captures) -> Result<Self> {
@@ -1251,7 +1251,7 @@ impl RunnerAdvanceModifier {
             _ => Self::Unrecognized(value.into()),
         };
         match simple_match {
-            RunnerAdvanceModifier::Unrecognized(_) => (),
+            Self::Unrecognized(_) => (),
             _ => return Ok(simple_match),
         };
         let (first, last) = regex_split(value, &NUMERIC_REGEX);
@@ -1389,10 +1389,7 @@ pub enum HitLocationGeneral {
 
 impl HitLocationGeneral {
     fn is_middle_position(&self) -> bool {
-        matches!(
-            self,
-            HitLocationGeneral::Catcher | HitLocationGeneral::Center
-        )
+        matches!(self, Self::Catcher | Self::Center)
     }
 }
 
@@ -1643,7 +1640,7 @@ impl PlayModifier {
         let last_as_int_vec = { || FieldingPosition::fielding_vec(last.unwrap_or_default()) };
         let play_modifier = match Self::from_str(first) {
             // Fill in other variants that have non-default cases
-            Ok(PlayModifier::ErrorOn(_)) => Self::ErrorOn(
+            Ok(Self::ErrorOn(_)) => Self::ErrorOn(
                 *last_as_int_vec()
                     .first()
                     .context("Missing error position info")?,

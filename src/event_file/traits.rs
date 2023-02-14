@@ -85,8 +85,7 @@ impl TryFrom<&str> for LineupPosition {
 
     //noinspection RsTypeCheck
     fn try_from(value: &str) -> Result<Self> {
-        LineupPosition::try_from(value.parse::<u8>()?)
-            .context("Unable to convert to lineup position")
+        Self::try_from(value.parse::<u8>()?).context("Unable to convert to lineup position")
     }
 }
 
@@ -155,8 +154,7 @@ impl TryFrom<&str> for FieldingPosition {
 
     //noinspection RsTypeCheck
     fn try_from(value: &str) -> Result<Self> {
-        FieldingPosition::try_from(value.parse::<u8>()?)
-            .context("Unable to convert to fielding position")
+        Self::try_from(value.parse::<u8>()?).context("Unable to convert to fielding position")
     }
 }
 
@@ -183,7 +181,7 @@ pub enum FieldingPlayType {
 
 pub type Inning = u8;
 
-pub(crate) type Person = ArrayString<8>;
+pub type Person = ArrayString<8>;
 pub type MiscInfoString = ArrayString<16>;
 
 pub type Player = Person;
@@ -389,7 +387,7 @@ impl<T: Copy> Copy for Matchup<T> {}
 
 impl<T> From<(T, T)> for Matchup<T> {
     fn from(tup: (T, T)) -> Self {
-        Matchup {
+        Self {
             away: tup.0,
             home: tup.1,
         }
