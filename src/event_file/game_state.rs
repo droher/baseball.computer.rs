@@ -4,12 +4,12 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
 use arrayvec::ArrayString;
-use bimap::BiMap;
 use bounded_integer::BoundedUsize;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use either::Either;
+use fixed_map::{Map, Key};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use strum_macros::Display;
 
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
@@ -25,7 +25,11 @@ use crate::AccountType;
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
 
-type Position = Either<LineupPosition, FieldingPosition>;
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Display, Key)]
+enum PositionType {
+    Lineup(LineupPosition),
+    Fielding(FieldingPosition),
+}
 
 /// A wrapper around `Player` that allows for a player to appear
 /// in multiple positions in a lineup. This is used for the
@@ -46,7 +50,7 @@ impl From<(Player, bool)> for TrackedPlayer {
     }
 }
 
-type PersonnelState = BiMap<Position, TrackedPlayer>;
+type PersonnelState = Map<PositionType, TrackedPlayer>;
 type Lineup = PersonnelState;
 type Defense = PersonnelState;
 pub type EventId = SequenceId;
@@ -748,8 +752,8 @@ impl Default for Personnel {
                 id: ArrayString::<16>::from("N/A").unwrap(),
             },
             personnel_state: Matchup::new(
-                (BiMap::with_capacity(15), BiMap::with_capacity(15)),
-                (BiMap::with_capacity(15), BiMap::with_capacity(15)),
+                (Lineup::new(), Defense::new()),
+                (Lineup::new(), Defense::new()),
             ),
             lineup_appearances: HashMap::with_capacity(30),
             defense_appearances: HashMap::with_capacity(30),
@@ -788,8 +792,8 @@ impl Personnel {
             );
             let player: TrackedPlayer = (start.player, start.lineup_position == LineupPosition::PitcherWithDh).into();
 
-            lineup.insert(Either::Left(start.lineup_position), player);
-            defense.insert(Either::Right(start.fielding_position), player);
+            lineup.insert(PositionType::Lineup(start.lineup_position), player);
+            defense.insert(PositionType::Fielding(start.fielding_position), player);
             personnel
                 .lineup_appearances
                 .insert(player, vec![lineup_appearance]);
@@ -801,18 +805,19 @@ impl Personnel {
     }
 
     fn pitcher(&self, side: &Side) -> Result<Pitcher> {
-        self.get_at_position(side, &Either::Right(FieldingPosition::Pitcher))
+        self.get_at_position(side, &PositionType::Fielding(FieldingPosition::Pitcher))
             .map(|tp| tp.player)
     }
 
-    fn get_at_position(&self, side: &Side, position: &Position) -> Result<TrackedPlayer> {
+    #[inline(never)]
+    fn get_at_position(&self, side: &Side, position: &PositionType) -> Result<TrackedPlayer> {
         let map_tup = self.personnel_state.get(side);
-        let map = if let Either::Left(_) = position {
+        let map = if let PositionType::Lineup(_) = position {
             &map_tup.0
         } else {
             &map_tup.1
         };
-        map.get_by_left(position).copied().with_context(|| {
+        map.get(*position).copied().with_context(|| {
             anyhow!(
                 "Position {:?} for side {:?} missing from current game state: {:?}",
                 position, side, map
@@ -820,25 +825,25 @@ impl Personnel {
         })
     }
 
-    fn get_player_lineup_position(&self, side: &Side, player: &TrackedPlayer) -> Option<Position> {
+    fn get_player_lineup_position(&self, side: &Side, player: &TrackedPlayer) -> Option<PositionType> {
         let (lineup, _) = self.personnel_state.get(side);
-        lineup.get_by_right(player).copied()
+        lineup.iter().find_map(|(position, tracked_player)| {
+            if tracked_player == player {
+                Some(position)
+            } else {
+                None
+            }
+        })
     }
 
     fn at_bat(&self, play: &Play) -> Result<LineupPosition> {
         let player: TrackedPlayer = (play.context.batter, false).into();
-        let position = self
-            .personnel_state
-            .get(&play.context.batting_side)
-            .0
-            .get_by_right(&player)
-            .copied();
-
-        if let Some(Either::Left(lp)) = position {
+        let position = self.get_player_lineup_position(&play.context.batting_side, &player);
+        if let Some(PositionType::Lineup(lp)) = position {
             Ok(lp)
         } else {
             bail!(
-                "Fatal error parsing {}: Cannot find lineup position of player currently at bat {:?}.\nFull state: {:?}",
+                "Fatal error parsing {}: Cannot find lineup position of player currently at bat {}.\nFull state: {:?}",
                 self.game_id.id,
                 &play.context.batter,
                 self.personnel_state
@@ -888,12 +893,13 @@ impl Personnel {
             })
     }
 
+    #[inline(never)]
     fn update_lineup_on_substitution(
         &mut self,
         sub: &SubstitutionRecord,
         event_id: EventId,
     ) -> Result<()> {
-        let original_batter = self.get_at_position(&sub.side, &Either::Left(sub.lineup_position));
+        let original_batter = self.get_at_position(&sub.side, &PositionType::Lineup(sub.lineup_position));
 
         match original_batter {
             // If this substitution is the DH/PH/PR being brought in to field, no substitution takes place
@@ -907,8 +913,9 @@ impl Personnel {
 
         let new_player: TrackedPlayer = (sub.player, sub.lineup_position == LineupPosition::PitcherWithDh).into();
         // In the case of a courtesy runner, the new player may already be in the lineup
-        if self.get_player_lineup_position(&sub.side, &new_player).is_some() {
-            self.get_current_lineup_appearance(&new_player)?.end_event_id = Some(event_id - 1);
+        let check_courtesy = self.get_current_lineup_appearance(&new_player);
+        if let Ok(p) = check_courtesy {
+            p.end_event_id = p.end_event_id.or(Some(event_id - 1));
         }
 
         let new_lineup_appearance = GameLineupAppearance {
@@ -921,7 +928,7 @@ impl Personnel {
             end_event_id: None,
         };
         let (lineup, _) = self.personnel_state.get_mut(&sub.side);
-        lineup.insert(Either::Left(sub.lineup_position), new_player);
+        lineup.insert(PositionType::Lineup(sub.lineup_position), new_player);
         self.lineup_appearances
             .entry(new_player)
             .or_insert_with(|| Vec::with_capacity(1))
@@ -931,33 +938,28 @@ impl Personnel {
 
     /// The semantics of defensive substitutions are more complicated, because the new player
     /// could already have been in the game, and the replaced player might not have left the game.
+    #[inline(never)]
     fn update_defense_on_substitution(
         &mut self,
         sub: &SubstitutionRecord,
         event_id: EventId,
     ) -> Result<()> {
         let original_fielder =
-            self.get_at_position(&sub.side, &Either::Right(sub.fielding_position));
+            self.get_at_position(&sub.side, &PositionType::Fielding(sub.fielding_position));
         match original_fielder {
             Ok(p) if p.player == sub.player => return Ok(()),
             Ok(p) => self.get_current_fielding_appearance(&p)?.end_event_id = Some(event_id - 1),
             Err(_) => {}
         };
-
         let new_fielder: TrackedPlayer = (sub.player, sub.lineup_position == LineupPosition::PitcherWithDh).into();
         // If the new fielder is already in the game, we need to close out their previous appearance
         if let Ok(gfa) = self.get_current_fielding_appearance(&new_fielder) {
             gfa.end_event_id = Some(event_id - 1);
         }
 
-        let (_, defense) = self.personnel_state.get_mut(&sub.side);
-        // We maintain a 1:1 relationship between players and positions at all times,
-        // so the entire position must be removed from the defense temporarily.
-        // If the data is consistent, this state (< 9 positions) can only exist between substitutions,
-        // and cannot exist at the start of a play.
-        defense.remove_by_right(&new_fielder);
-        defense.insert(Either::Right(sub.fielding_position), new_fielder);
 
+        let (_, defense) = self.personnel_state.get_mut(&sub.side);
+        defense.insert(PositionType::Fielding(sub.fielding_position), new_fielder);
         self.defense_appearances
             .entry(new_fielder)
             .or_insert_with(|| Vec::with_capacity(1))
@@ -975,12 +977,13 @@ impl Personnel {
     /// This handles the rare but always fun case of a team vacating the DH by putting the DH
     /// into the field or the pitcher into a non-pitching position.
     /// This will be a safe no-op if the game in question isn't using a DH.
+    #[inline(never)]
     fn update_on_dh_vacancy(&mut self, sub: &SubstitutionRecord, event_id: EventId) -> Result<()> {
         let non_batting_pitcher =
-            self.get_at_position(&sub.side, &Either::Left(LineupPosition::PitcherWithDh));
+            self.get_at_position(&sub.side, &PositionType::Lineup(LineupPosition::PitcherWithDh));
         let dh = self.get_at_position(
             &sub.side,
-            &Either::Right(FieldingPosition::DesignatedHitter),
+            &PositionType::Fielding(FieldingPosition::DesignatedHitter),
         );
         if let Ok(p) = non_batting_pitcher {
             self.get_current_lineup_appearance(&p)?.end_event_id = Some(event_id - 1);
@@ -991,6 +994,7 @@ impl Personnel {
         Ok(())
     }
 
+    #[inline(never)]
     fn update_on_substitution(
         &mut self,
         sub: &SubstitutionRecord,
@@ -1178,6 +1182,7 @@ impl GameState {
         Outs::new(new_outs).context("Illegal state, more than 3 outs recorded")
     }
 
+    #[inline(never)]
     fn update_on_play(&mut self, play: &Play) -> Result<()> {
 
         let new_frame = self.get_new_frame(play)?;

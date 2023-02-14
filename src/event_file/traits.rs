@@ -4,6 +4,7 @@ use anyhow::{anyhow, Context, Error, Result};
 use arrayvec::ArrayString;
 use bounded_integer::BoundedUsize;
 use csv::StringRecord;
+use fixed_map::Key;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
@@ -34,6 +35,7 @@ pub type SequenceId = BoundedUsize<1, MAX_EVENTS_PER_GAME>;
     Hash,
     Serialize_repr,
     Deserialize_repr,
+    Key
 )]
 #[repr(u8)]
 pub enum LineupPosition {
@@ -103,6 +105,7 @@ impl TryFrom<&str> for LineupPosition {
     Serialize_repr,
     Deserialize_repr,
     Display,
+    Key
 )]
 #[repr(u8)]
 pub enum FieldingPosition {

@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![forbid(unsafe_code)]
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashSet};
 use std::fs::File;
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
@@ -12,6 +12,7 @@ use std::time::Instant;
 use anyhow::{bail, Context, Result};
 use csv::{Writer, WriterBuilder};
 use either::Either;
+use fixed_map::{Map, Key};
 use itertools::Itertools;
 use lazy_static::{lazy_static};
 use rayon::prelude::*;
@@ -64,12 +65,13 @@ impl ThreadSafeWriter {
 
 struct WriterMap {
     output_prefix: PathBuf,
-    map: HashMap<EventFileSchema, ThreadSafeWriter>,
+    // Using a fixed map to speed up lookup
+    map: Map<EventFileSchema, ThreadSafeWriter>,
 }
 
 impl WriterMap {
     fn new(output_prefix: &Path) -> Self {
-        let mut map = HashMap::with_capacity(25);
+        let mut map = Map::new();
         for schema in EventFileSchema::iter() {
             map.insert(schema, ThreadSafeWriter::new(&schema));
         }
@@ -80,14 +82,14 @@ impl WriterMap {
     }
 
     fn flush_all(&self) {
-        self.map.par_iter().for_each(|(_, writer)| {
+        self.map.iter().for_each(|(_, writer)| {
             let mut csv = writer.csv.lock().unwrap();
             csv.flush().unwrap();
         })
     }
 
     fn get(&self, schema: &EventFileSchema) -> &ThreadSafeWriter {
-        self.map.get(schema).unwrap()
+        self.map.get(*schema).unwrap()
     }
 
     fn write_context<C: ContextToVec + Serialize>(&self, schema: &EventFileSchema, game_context: &GameContext) -> Result<()> {
@@ -104,7 +106,7 @@ impl WriterMap {
         line: &BoxScoreWritableRecord,
     ) -> Result<()> {
         let schema = EventFileSchema::box_score_schema(line)?;
-        let writer = self.map.get(&schema).unwrap();
+        let writer = self.map.get(schema).unwrap();
         let mut csv = writer.csv.lock().unwrap();
         if !writer.has_header_written.load(Ordering::Relaxed) {
             let header = line.generate_header()?;
@@ -116,7 +118,7 @@ impl WriterMap {
 
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash, Display, EnumIter)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash, Display, EnumIter, Key)]
 #[strum(serialize_all = "snake_case")]
 enum EventFileSchema {
     Game,
@@ -428,12 +430,12 @@ impl FileProcessor {
         let files = account_type
             .glob(&self.opt.input)
             .unwrap()
-            .map(|g| g.unwrap())
+            .map(Result::unwrap)
             .sorted_by_key(|p| p.clone())
             .collect_vec();
         let file_count = files.len();
         let games: Vec<GameId> = files
-            .into_par_iter()
+            .into_iter()
             .enumerate()
             .flat_map(|(i, f)| {
                 Self::process_file(
