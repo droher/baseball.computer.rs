@@ -18,9 +18,12 @@ use crate::event_file::pitch_sequence::PitchType;
 use crate::event_file::play::{
     Base, BaseRunner, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame,
 };
-use crate::event_file::traits::{FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Pitcher, Player, SequenceId, Side};
+use crate::event_file::traits::{
+    FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Pitcher, Player,
+    SequenceId, Side,
+};
 
-use super::traits::{Scorer, RetrosheetVolunteer};
+use super::traits::{RetrosheetVolunteer, Scorer};
 
 pub trait ContextToVec<'a>: Serialize + Sized {
     fn from_game_context(gc: &'a GameContext) -> Box<dyn Iterator<Item = Self> + 'a>;
@@ -64,9 +67,9 @@ impl<'a> From<&'a GameContext> for Game<'a> {
     fn from(gc: &'a GameContext) -> Self {
         let setting = &gc.setting;
         let results = &gc.results;
-        let start_time = setting.start_time.map(|time|
-            NaiveDateTime::new(setting.date, time)
-            );
+        let start_time = setting
+            .start_time
+            .map(|time| NaiveDateTime::new(setting.date, time));
         Self {
             game_id: gc.game_id.id,
             date: setting.date,
@@ -138,17 +141,13 @@ pub struct GameEarnedRuns {
     earned_runs: u8,
 }
 
-impl ContextToVec<'_>  for GameEarnedRuns {
+impl ContextToVec<'_> for GameEarnedRuns {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        Box::from(gc.results
-                .earned_runs
-                .iter()
-                .map(move |er| Self {
-                    game_id: gc.game_id.id,
-                    player_id: er.pitcher_id,
-                    earned_runs: er.earned_runs,
-                })
-        )
+        Box::from(gc.results.earned_runs.iter().map(move |er| Self {
+            game_id: gc.game_id.id,
+            player_id: er.pitcher_id,
+            earned_runs: er.earned_runs,
+        }))
     }
 }
 
@@ -168,19 +167,17 @@ pub struct Event {
 
 impl ContextToVec<'_> for Event {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        Box::from(gc.events
-            .iter()
-            .map(move |e| Self {
-                game_id: gc.game_id.id,
-                event_id: e.event_id,
-                event_key: e.event_key,
-                batting_side: e.context.batting_side,
-                inning: e.context.inning,
-                frame: e.context.frame,
-                at_bat: e.context.at_bat,
-                outs: e.context.outs,
-                count_balls: e.results.count_at_event.balls.map(BoundedU8::get),
-                count_strikes: e.results.count_at_event.strikes.map(BoundedU8::get),
+        Box::from(gc.events.iter().map(move |e| Self {
+            game_id: gc.game_id.id,
+            event_id: e.event_id,
+            event_key: e.event_key,
+            batting_side: e.context.batting_side,
+            inning: e.context.inning,
+            frame: e.context.frame,
+            at_bat: e.context.at_bat,
+            outs: e.context.outs,
+            count_balls: e.results.count_at_event.balls.map(BoundedU8::get),
+            count_strikes: e.results.count_at_event.strikes.map(BoundedU8::get),
         }))
     }
 }
@@ -227,15 +224,13 @@ impl ContextToVec<'_> for EventPitch {
                 .map(|psi| (e.event_key, psi))
         });
         let pitch_iter = pitch_sequences.flat_map(move |(event_key, pitches)| {
-            pitches.iter().map(move |psi| {
-                Self {
-                    event_key,
-                    sequence_id: psi.sequence_id,
-                    sequence_item: psi.pitch_type,
-                    runners_going_flag: psi.runners_going,
-                    blocked_by_catcher_flag: psi.blocked_by_catcher,
-                    catcher_pickoff_attempt_at_base: psi.catcher_pickoff_attempt,
-                }
+            pitches.iter().map(move |psi| Self {
+                event_key,
+                sequence_id: psi.sequence_id,
+                sequence_item: psi.pitch_type,
+                runners_going_flag: psi.runners_going,
+                blocked_by_catcher_flag: psi.blocked_by_catcher,
+                catcher_pickoff_attempt_at_base: psi.catcher_pickoff_attempt,
             })
         });
         Box::from(pitch_iter)
@@ -362,15 +357,19 @@ pub struct BoxScoreLineScore {
 }
 
 impl BoxScoreLineScore {
-    pub fn transform_line_score(game_id: ArrayString<8>, raw_line: &LineScore) -> Box<dyn Iterator<Item = Self> + '_> {
-        let iter = raw_line.line_score
+    pub fn transform_line_score(
+        game_id: ArrayString<8>,
+        raw_line: &LineScore,
+    ) -> Box<dyn Iterator<Item = Self> + '_> {
+        let iter = raw_line
+            .line_score
             .iter()
             .enumerate()
             .map(move |(index, runs)| Self {
                 game_id,
                 side: raw_line.side,
                 inning: (index + 1) as Inning,
-                runs: *runs
+                runs: *runs,
             });
         Box::from(iter)
     }

@@ -9,7 +9,7 @@ use crate::event_file::play::Base;
 use crate::event_file::traits::SequenceId;
 
 #[derive(
-    Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize, Hash
+    Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize, Hash,
 )]
 pub enum PitchType {
     #[strum(serialize = "1")]
@@ -58,7 +58,7 @@ pub enum PitchType {
     InPlay,
     #[strum(serialize = "Y")]
     InPlayOnPitchout,
-    Unrecognized
+    Unrecognized,
 }
 
 impl Default for PitchType {

@@ -1,25 +1,25 @@
 #![allow(dead_code)]
 #![forbid(unsafe_code)]
 
-use std::collections::{HashSet};
+use std::collections::HashSet;
 use std::fs::File;
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
 use csv::{Writer, WriterBuilder};
 use either::Either;
-use fixed_map::{Map, Key};
+use fixed_map::{Key, Map};
 use itertools::Itertools;
-use lazy_static::{lazy_static};
+use lazy_static::lazy_static;
 use rayon::prelude::*;
 use structopt::StructOpt;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-use tracing::{debug, error, info, Level, warn};
+use tracing::{debug, error, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use event_file::game_state::GameContext;
@@ -29,7 +29,10 @@ use event_file::schemas::{ContextToVec, Event};
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
-use crate::event_file::schemas::{BoxScoreLineScore, BoxScoreWritableRecord, EventFieldingPlay, EventHitLocation, EventOut, EventPitch, EventRaw, Game, GameEarnedRuns, GameTeam};
+use crate::event_file::schemas::{
+    BoxScoreLineScore, BoxScoreWritableRecord, EventFieldingPlay, EventHitLocation, EventOut,
+    EventPitch, EventRaw, Game, GameEarnedRuns, GameTeam,
+};
 use crate::event_file::traits::EVENT_KEY_BUFFER;
 
 mod event_file;
@@ -75,7 +78,7 @@ impl WriterMap {
         }
         Self {
             output_prefix: output_prefix.to_path_buf(),
-            map
+            map,
         }
     }
 
@@ -90,7 +93,11 @@ impl WriterMap {
         self.map.get(*schema).unwrap()
     }
 
-    fn write_context<'a, C: ContextToVec<'a>>(&self, schema: &EventFileSchema, game_context: &'a GameContext) -> Result<()> {
+    fn write_context<'a, C: ContextToVec<'a>>(
+        &self,
+        schema: &EventFileSchema,
+        game_context: &'a GameContext,
+    ) -> Result<()> {
         let writer = self.get(schema);
         let mut csv = writer.csv.lock().unwrap();
         for row in C::from_game_context(game_context) {
@@ -99,10 +106,7 @@ impl WriterMap {
         Ok(())
     }
 
-    fn write_box_score_line(
-        &self,
-        line: &BoxScoreWritableRecord,
-    ) -> Result<()> {
+    fn write_box_score_line(&self, line: &BoxScoreWritableRecord) -> Result<()> {
         let schema = EventFileSchema::box_score_schema(line)?;
         let writer = self.map.get(schema).unwrap();
         let mut csv = writer.csv.lock().unwrap();
@@ -113,7 +117,6 @@ impl WriterMap {
         }
         csv.serialize(line).context("Failed to write line")
     }
-
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash, Display, EnumIter, Key)]
@@ -158,27 +161,26 @@ enum EventFileSchema {
 
 impl EventFileSchema {
     const fn uses_custom_header(&self) -> bool {
-        matches!(self, EventFileSchema::BoxScoreBattingLines
-            | EventFileSchema::BoxScorePitchingLines
-            | EventFileSchema::BoxScoreFieldingLines
-            | EventFileSchema::BoxScorePinchHittingLines
-            | EventFileSchema::BoxScorePinchRunningLines
-            | EventFileSchema::BoxScoreTeamMiscellaneousLines
-            | EventFileSchema::BoxScoreTeamBattingLines
-            | EventFileSchema::BoxScoreTeamFieldingLines
-            | EventFileSchema::BoxScoreDoublePlays
-            | EventFileSchema::BoxScoreTriplePlays
-            | EventFileSchema::BoxScoreHitByPitches
-            | EventFileSchema::BoxScoreHomeRuns
-            | EventFileSchema::BoxScoreStolenBases
-            | EventFileSchema::BoxScoreCaughtStealing
+        matches!(
+            self,
+            EventFileSchema::BoxScoreBattingLines
+                | EventFileSchema::BoxScorePitchingLines
+                | EventFileSchema::BoxScoreFieldingLines
+                | EventFileSchema::BoxScorePinchHittingLines
+                | EventFileSchema::BoxScorePinchRunningLines
+                | EventFileSchema::BoxScoreTeamMiscellaneousLines
+                | EventFileSchema::BoxScoreTeamBattingLines
+                | EventFileSchema::BoxScoreTeamFieldingLines
+                | EventFileSchema::BoxScoreDoublePlays
+                | EventFileSchema::BoxScoreTriplePlays
+                | EventFileSchema::BoxScoreHitByPitches
+                | EventFileSchema::BoxScoreHomeRuns
+                | EventFileSchema::BoxScoreStolenBases
+                | EventFileSchema::BoxScoreCaughtStealing
         )
     }
 
-    fn write(
-        reader: RetrosheetReader,
-        parsed_games: Option<&HashSet<GameId>>,
-    ) -> Vec<GameId> {
+    fn write(reader: RetrosheetReader, parsed_games: Option<&HashSet<GameId>>) -> Vec<GameId> {
         let file_info = reader.file_info;
         debug!("Processing file {}", file_info.filename);
 
@@ -192,7 +194,8 @@ impl EventFileSchema {
             let record_vec = record_vec_result.as_ref().unwrap();
             let record_slice = &record_vec.record_vec;
 
-            let game_context_result = GameContext::new(record_slice, file_info, record_vec.line_offset, game_num);
+            let game_context_result =
+                GameContext::new(record_slice, file_info, record_vec.line_offset, game_num);
             if let Err(e) = game_context_result {
                 error!("{:?}", e);
                 continue;
@@ -210,8 +213,7 @@ impl EventFileSchema {
                 continue;
             }
             if game_context.file_info.account_type == AccountType::BoxScore {
-                Self::write_box_score_files(&game_context, record_slice)
-                    .unwrap();
+                Self::write_box_score_files(&game_context, record_slice).unwrap();
             } else {
                 Self::write_play_by_play_files(&game_context).unwrap();
             }
@@ -244,10 +246,7 @@ impl EventFileSchema {
         })
     }
 
-    fn write_box_score_files(
-        game_context: &GameContext,
-        record_slice: &RecordSlice,
-    ) -> Result<()> {
+    fn write_box_score_files(game_context: &GameContext, record_slice: &RecordSlice) -> Result<()> {
         // Write Game
         WRITER_MAP
             .get(&Self::BoxScoreGame)
@@ -263,10 +262,11 @@ impl EventFileSchema {
             w.serialize(row)?;
         }
         // Write Linescores
-        let line_scores = record_slice.iter()
+        let line_scores = record_slice
+            .iter()
             .filter_map(|mr| match mr {
                 MappedRecord::LineScore(ls) => Some(ls),
-                _ => None
+                _ => None,
             })
             .flat_map(|ls| BoxScoreLineScore::transform_line_score(game_context.game_id.id, ls));
         let mut w = WRITER_MAP.get(&Self::BoxScoreLineScore).csv.lock().unwrap();
@@ -290,9 +290,7 @@ impl EventFileSchema {
         Ok(())
     }
 
-    fn write_play_by_play_files(
-        game_context: &GameContext,
-    ) -> Result<()> {
+    fn write_play_by_play_files(game_context: &GameContext) -> Result<()> {
         // Write schemas directly serializable from GameContext
         WRITER_MAP.write_context::<GameTeam>(&Self::GameTeam, game_context)?;
         WRITER_MAP.write_context::<GameEarnedRuns>(&Self::GameEarnedRuns, game_context)?;
@@ -315,17 +313,29 @@ impl EventFileSchema {
             w.serialize(row)?;
         }
         // Write GameLineupAppearance
-        let mut w = WRITER_MAP.get(&Self::GameLineupAppearance).csv.lock().unwrap();
+        let mut w = WRITER_MAP
+            .get(&Self::GameLineupAppearance)
+            .csv
+            .lock()
+            .unwrap();
         for row in &game_context.lineup_appearances {
             w.serialize(row)?;
         }
         // Write GameFieldingAppearance
-        let mut w = WRITER_MAP.get(&Self::GameFieldingAppearance).csv.lock().unwrap();
+        let mut w = WRITER_MAP
+            .get(&Self::GameFieldingAppearance)
+            .csv
+            .lock()
+            .unwrap();
         for row in &game_context.fielding_appearances {
             w.serialize(row)?;
         }
         // Write EventStartingBaseState
-        let mut w = WRITER_MAP.get(&Self::EventStartingBaseState).csv.lock().unwrap();
+        let mut w = WRITER_MAP
+            .get(&Self::EventStartingBaseState)
+            .csv
+            .lock()
+            .unwrap();
         let base_states = game_context
             .events
             .iter()
@@ -334,7 +344,11 @@ impl EventFileSchema {
             w.serialize(row)?;
         }
         // Write EventPlateAppearance
-        let mut w = WRITER_MAP.get(&Self::EventPlateAppearance).csv.lock().unwrap();
+        let mut w = WRITER_MAP
+            .get(&Self::EventPlateAppearance)
+            .csv
+            .lock()
+            .unwrap();
         let pa = game_context
             .events
             .iter()
@@ -343,7 +357,11 @@ impl EventFileSchema {
             w.serialize(row)?;
         }
         // Write EventBaserunningAdvanceAttempt
-        let mut w = WRITER_MAP.get(&Self::EventBaserunningAdvanceAttempt).csv.lock().unwrap();
+        let mut w = WRITER_MAP
+            .get(&Self::EventBaserunningAdvanceAttempt)
+            .csv
+            .lock()
+            .unwrap();
         let advance_attempts = game_context
             .events
             .iter()
@@ -352,7 +370,11 @@ impl EventFileSchema {
             w.serialize(row)?;
         }
         // Write EventBaserunningPlay
-        let mut w = WRITER_MAP.get(&Self::EventBaserunningPlay).csv.lock().unwrap();
+        let mut w = WRITER_MAP
+            .get(&Self::EventBaserunningPlay)
+            .csv
+            .lock()
+            .unwrap();
         let baserunning_plays = game_context
             .events
             .iter()
@@ -372,7 +394,6 @@ impl EventFileSchema {
         }
         Ok(())
     }
-
 }
 
 #[derive(StructOpt, Debug)]
@@ -399,7 +420,6 @@ struct FileProcessor {
 }
 
 impl FileProcessor {
-
     pub fn new(opt: Opt) -> Self {
         Self {
             index: 0,
@@ -421,8 +441,7 @@ impl FileProcessor {
         // Box score accounts are expected to be duplicates so we don't need to check against them
         let parsed_games = if account_type == AccountType::BoxScore {
             None
-        }
-        else {
+        } else {
             Some(&self.game_ids)
         };
         let files = account_type
@@ -436,11 +455,7 @@ impl FileProcessor {
             .into_par_iter()
             .enumerate()
             .flat_map(|(i, f)| {
-                Self::process_file(
-                    &f,
-                    parsed_games,
-                    (self.index + i) * EVENT_KEY_BUFFER,
-                )
+                Self::process_file(&f, parsed_games, (self.index + i) * EVENT_KEY_BUFFER)
             })
             .collect();
         self.index += file_count;
@@ -449,7 +464,7 @@ impl FileProcessor {
 
     pub fn process_files(&mut self) {
         info!("Parsing conventional play-by-play files");
-        self.par_process_files( AccountType::PlayByPlay);
+        self.par_process_files(AccountType::PlayByPlay);
 
         info!("Parsing deduced play-by-play files");
         self.par_process_files(AccountType::Deduced);

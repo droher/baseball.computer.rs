@@ -35,7 +35,7 @@ pub type SequenceId = BoundedUsize<1, MAX_EVENTS_PER_GAME>;
     Hash,
     Serialize_repr,
     Deserialize_repr,
-    Key
+    Key,
 )]
 #[repr(u8)]
 pub enum LineupPosition {
@@ -105,7 +105,7 @@ impl TryFrom<&str> for LineupPosition {
     Serialize_repr,
     Deserialize_repr,
     Display,
-    Key
+    Key,
 )]
 #[repr(u8)]
 pub enum FieldingPosition {
@@ -197,7 +197,18 @@ pub type RetrosheetVolunteer = MiscInfoString;
 pub type Scorer = MiscInfoString;
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Hash, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize, Display
+    Debug,
+    Eq,
+    PartialEq,
+    EnumString,
+    Hash,
+    Copy,
+    Clone,
+    Ord,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    Display,
 )]
 pub enum Side {
     #[strum(serialize = "0")]

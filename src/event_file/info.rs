@@ -247,8 +247,7 @@ impl InfoRecord {
 
     fn parse_time(time_str: &str) -> Option<NaiveTime> {
         let padded_time = format!("{:0>4}", time_str);
-        NaiveTime::parse_from_str(&padded_time, "%I:%M%p")
-            .ok()
+        NaiveTime::parse_from_str(&padded_time, "%I:%M%p").ok()
     }
 }
 

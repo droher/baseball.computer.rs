@@ -4,18 +4,18 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Error, Result};
+use arrayvec::ArrayString;
 use csv::{Reader, ReaderBuilder, StringRecord};
 use glob::{glob, Paths, PatternError};
 use lazy_static::lazy_static;
 use regex::Regex;
-use arrayvec::ArrayString;
 use tracing::warn;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::InfoRecord;
 use crate::event_file::misc::{
     BatHandAdjustment, Comment, EarnedRunRecord, GameId, LineupAdjustment, PitchHandAdjustment,
-    RunnerAdjustment, StartRecord, SubstitutionRecord, PitcherResponsibilityAdjustment
+    PitcherResponsibilityAdjustment, RunnerAdjustment, StartRecord, SubstitutionRecord,
 };
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{GameType, RetrosheetEventRecord};
@@ -148,10 +148,12 @@ impl Iterator for RetrosheetReader {
             }
             _ => None,
         };
-        game.map(|g| g.map(|v| RecordVec {
-            record_vec: v,
-            line_offset: old_offset
-        }))
+        game.map(|g| {
+            g.map(|v| RecordVec {
+                record_vec: v,
+                line_offset: old_offset,
+            })
+        })
     }
 }
 
@@ -212,7 +214,8 @@ impl RetrosheetReader {
                 Err(_) => {
                     return Err(anyhow!(
                         "Error during game {} -- Error reading record: {}",
-                        &self.current_game_id.id, &self.current_record.as_slice()
+                        &self.current_game_id.id,
+                        &self.current_record.as_slice()
                     ))
                 }
             }
