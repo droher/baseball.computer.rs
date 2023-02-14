@@ -90,7 +90,7 @@ lazy_static! {
 }
 
 lazy_static! {
-    static ref RAW_PLAY_CACHE: Arc<Cache<Arc<String>, Arc<()>>> = preallocated_cache::<Arc<String>, ()>(10000);
+    static ref RAW_PLAY_CACHE: Arc<Cache<String, Arc<String>>> = preallocated_cache::<String, String>(10000);
     static ref MAIN_PLAY_CACHE: Arc<Cache<String, Arc<Vec<PlayType>>>> = preallocated_cache::<String, Vec<PlayType>>(4000);
     static ref PLAY_MODIFIER_CACHE: Arc<Cache<String, Arc<Vec<PlayModifier>>>> = preallocated_cache::<String, Vec<PlayModifier>>(10000);
     static ref RUNNER_ADVANCES_CACHE: Arc<Cache<String, Arc<Vec<RunnerAdvance>>>> = preallocated_cache::<String, Vec<RunnerAdvance>>(10000);
@@ -1669,11 +1669,14 @@ pub struct PlayRecord {
 }
 
 impl PlayRecord {
-    fn store_raw_play(raw_play: &Arc<String>) {
-        if RAW_PLAY_CACHE.get(raw_play).is_some() {
-            ()
+    fn store_raw_play(raw_play: &str) -> Arc<String> {
+        if let Some(s) = RAW_PLAY_CACHE.get(raw_play) {
+            s
         } else {
-            RAW_PLAY_CACHE.insert(raw_play.clone(), Arc::new(()));
+            let raw_play_string = raw_play.to_string();
+            let arc_raw_play = Arc::new(raw_play_string.clone());
+            RAW_PLAY_CACHE.insert(raw_play_string, arc_raw_play.clone());
+            arc_raw_play
         }
     }
 
@@ -1693,8 +1696,7 @@ impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let record = record.deserialize::<[&str; 7]>(None)?;
-        let raw_play = Arc::new(record[6].to_string());
-        Self::store_raw_play(&raw_play);
+        let raw_play = Self::store_raw_play(record[6]);
 
         Ok(Self {
             inning: record[1].parse::<Inning>()?,
@@ -1986,12 +1988,11 @@ impl TryFrom<&PlayRecord> for ParsedPlay {
     type Error = Error;
 
     fn try_from(record: &PlayRecord) -> Result<Self> {
-        let value = record.raw_play.as_str();
-        let value = &*STRIP_CHARS_REGEX.replace_all(value, "");
-        let value = &*UNKNOWN_FIELDER_REGEX.replace_all(value, "0");
+        let value = &*STRIP_CHARS_REGEX.replace_all(&record.raw_play, "");
         if value.is_empty() {
             return Ok(Self::default());
         }
+        let value = &*UNKNOWN_FIELDER_REGEX.replace_all(value, "0");
 
         let modifiers_boundary = value.find('/').unwrap_or(value.len());
         let advances_boundary = value.find('.').unwrap_or(value.len());
@@ -2066,11 +2067,12 @@ pub struct PlayStats {
 
 impl PlayStats {
     pub fn new(parsed_play: &ParsedPlay) -> Result<Arc<Self>> {
-        if let Some(cp) = PLAY_STATS_CACHE.get(parsed_play.raw_play.as_str()) {
+        let raw_play: &str = &parsed_play.raw_play;
+        if let Some(cp) = PLAY_STATS_CACHE.get(raw_play) {
             Ok(cp)
         } else {
             let cp = Arc::new(Self::try_from(parsed_play)?);
-            PLAY_STATS_CACHE.insert(parsed_play.raw_play.to_string(), cp.clone());
+            PLAY_STATS_CACHE.insert(raw_play.to_string(), cp.clone());
             Ok(cp)
         }
     }

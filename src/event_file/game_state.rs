@@ -315,7 +315,7 @@ impl From<&RecordSlice> for GameMetadata {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GameUmpire {
-    pub game_id: ArrayString<16>,
+    pub game_id: ArrayString<8>,
     pub position: UmpirePosition,
     pub umpire_id: Option<Umpire>,
 }
@@ -407,7 +407,7 @@ impl From<&[MappedRecord]> for GameResults {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct GameLineupAppearance {
-    pub game_id: ArrayString<16>,
+    pub game_id: ArrayString<8>,
     pub player_id: Player,
     pub side: Side,
     pub lineup_position: LineupPosition,
@@ -437,7 +437,7 @@ impl GameLineupAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Copy)]
 pub struct GameFieldingAppearance {
-    pub game_id: ArrayString<16>,
+    pub game_id: ArrayString<8>,
     pub player_id: Player,
     pub side: Side,
     pub fielding_position: FieldingPosition,
@@ -760,7 +760,7 @@ impl Default for Personnel {
     fn default() -> Self {
         Self {
             game_id: GameId {
-                id: ArrayString::<16>::from("N/A").unwrap(),
+                id: ArrayString::<8>::from("N/A").unwrap(),
             },
             personnel_state: Matchup::new(
                 (Lineup::new(), Defense::new()),

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{bail, Context, Result};
 use arrayvec::ArrayString;
 use bounded_integer::BoundedU8;
@@ -20,15 +22,13 @@ use crate::event_file::traits::{FieldingPlayType, FieldingPosition, GameType, In
 
 use super::traits::{Scorer, RetrosheetVolunteer};
 
-pub trait ContextToVec {
-    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_>
-    where
-        Self: Sized + Serialize;
+pub trait ContextToVec<'a>: Serialize + Sized {
+    fn from_game_context(gc: &'a GameContext) -> Box<dyn Iterator<Item = Self> + 'a>;
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Game<'a> {
-    game_id: ArrayString<16>,
+    game_id: ArrayString<8>,
     date: NaiveDate,
     start_time: Option<NaiveDateTime>,
     doubleheader_status: DoubleheaderStatus,
@@ -104,13 +104,12 @@ impl<'a> From<&'a GameContext> for Game<'a> {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct GameTeam {
-    game_id: ArrayString<16>,
+    game_id: ArrayString<8>,
     team_id: Team,
     side: Side,
 }
 
-impl ContextToVec for GameTeam {
-    //noinspection RsTypeCheck
+impl ContextToVec<'_> for GameTeam {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self>> {
         Box::from(
             vec![
@@ -134,12 +133,12 @@ impl ContextToVec for GameTeam {
 // Might generalize this to "game player totals" in case there's ever a `data` field
 // other than earned runs
 pub struct GameEarnedRuns {
-    game_id: ArrayString<16>,
+    game_id: ArrayString<8>,
     player_id: Pitcher,
     earned_runs: u8,
 }
 
-impl ContextToVec for GameEarnedRuns {
+impl ContextToVec<'_>  for GameEarnedRuns {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.results
                 .earned_runs
@@ -155,7 +154,7 @@ impl ContextToVec for GameEarnedRuns {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Event {
-    game_id: ArrayString<16>,
+    game_id: ArrayString<8>,
     event_id: EventId,
     event_key: usize,
     batting_side: Side,
@@ -167,7 +166,7 @@ pub struct Event {
     count_strikes: Option<u8>,
 }
 
-impl ContextToVec for Event {
+impl ContextToVec<'_> for Event {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events
             .iter()
@@ -189,14 +188,14 @@ impl ContextToVec for Event {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventRaw {
     event_key: usize,
-    game_id: ArrayString<16>,
+    game_id: ArrayString<8>,
     event_id: EventId,
     filename: ArrayString<20>,
     line_number: usize,
-    raw_play: String,
+    raw_play: Arc<String>,
 }
 
-impl ContextToVec for EventRaw {
+impl ContextToVec<'_> for EventRaw {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().map(move |e| Self {
             game_id: gc.game_id.id,
@@ -204,7 +203,7 @@ impl ContextToVec for EventRaw {
             event_key: e.event_key,
             filename: gc.file_info.filename,
             line_number: e.line_number,
-            raw_play: e.raw_play.to_string(),
+            raw_play: e.raw_play.clone(),
         }))
     }
 }
@@ -219,8 +218,7 @@ pub struct EventPitch {
     catcher_pickoff_attempt_at_base: Option<Base>,
 }
 
-impl ContextToVec for EventPitch {
-    //noinspection RsTypeCheck
+impl ContextToVec<'_> for EventPitch {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         let pitch_sequences = gc.events.iter().filter_map(|e| {
             e.results
@@ -252,8 +250,7 @@ pub struct EventFieldingPlay {
     fielding_play: FieldingPlayType,
 }
 
-impl ContextToVec for EventFieldingPlay {
-    //noinspection RsTypeCheck
+impl ContextToVec<'_> for EventFieldingPlay {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().flat_map(|e| {
             e.results
@@ -279,8 +276,7 @@ pub struct EventHitLocation {
     strength: HitStrength,
 }
 
-impl ContextToVec for EventHitLocation {
-    //noinspection RsTypeCheck
+impl ContextToVec<'_> for EventHitLocation {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().filter_map(|e| {
             if let Some(Some(hl)) = e
@@ -310,8 +306,7 @@ pub struct EventOut {
     baserunner_out: BaseRunner,
 }
 
-impl ContextToVec for EventOut {
-    //noinspection RsTypeCheck
+impl ContextToVec<'_> for EventOut {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().flat_map(|e| {
             e.results
@@ -329,7 +324,7 @@ impl ContextToVec for EventOut {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct BoxScoreWritableRecord<'a> {
-    pub game_id: ArrayString<16>,
+    pub game_id: ArrayString<8>,
     #[serde(with = "either::serde_untagged")]
     pub record: Either<&'a BoxScoreLine, &'a BoxScoreEvent>,
 }
@@ -360,14 +355,14 @@ impl BoxScoreWritableRecord<'_> {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct BoxScoreLineScore {
-    pub game_id: ArrayString<16>,
+    pub game_id: ArrayString<8>,
     pub side: Side,
     pub inning: Inning,
     pub runs: u8,
 }
 
 impl BoxScoreLineScore {
-    pub fn transform_line_score(game_id: ArrayString<16>, raw_line: &LineScore) -> Box<dyn Iterator<Item = Self> + '_> {
+    pub fn transform_line_score(game_id: ArrayString<8>, raw_line: &LineScore) -> Box<dyn Iterator<Item = Self> + '_> {
         let iter = raw_line.line_score
             .iter()
             .enumerate()

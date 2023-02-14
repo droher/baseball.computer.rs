@@ -36,7 +36,7 @@ impl Default for Hand {
 
 #[derive(Ord, PartialOrd, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct GameId {
-    pub id: ArrayString<16>,
+    pub id: ArrayString<8>,
 }
 impl TryFrom<&RetrosheetEventRecord> for GameId {
     type Error = Error;

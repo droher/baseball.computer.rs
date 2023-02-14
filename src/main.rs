@@ -16,7 +16,6 @@ use fixed_map::{Map, Key};
 use itertools::Itertools;
 use lazy_static::{lazy_static};
 use rayon::prelude::*;
-use serde::Serialize;
 use structopt::StructOpt;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -65,7 +64,6 @@ impl ThreadSafeWriter {
 
 struct WriterMap {
     output_prefix: PathBuf,
-    // Using a fixed map to speed up lookup
     map: Map<EventFileSchema, ThreadSafeWriter>,
 }
 
@@ -92,7 +90,7 @@ impl WriterMap {
         self.map.get(*schema).unwrap()
     }
 
-    fn write_context<C: ContextToVec + Serialize>(&self, schema: &EventFileSchema, game_context: &GameContext) -> Result<()> {
+    fn write_context<'a, C: ContextToVec<'a>>(&self, schema: &EventFileSchema, game_context: &'a GameContext) -> Result<()> {
         let writer = self.get(schema);
         let mut csv = writer.csv.lock().unwrap();
         for row in C::from_game_context(game_context) {
