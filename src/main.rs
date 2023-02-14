@@ -82,7 +82,7 @@ impl WriterMap {
     }
 
     fn flush_all(&self) {
-        self.map.iter().for_each(|(_, writer)| {
+        self.map.iter().par_bridge().for_each(|(_, writer)| {
             let mut csv = writer.csv.lock().unwrap();
             csv.flush().unwrap();
         })
@@ -435,7 +435,7 @@ impl FileProcessor {
             .collect_vec();
         let file_count = files.len();
         let games: Vec<GameId> = files
-            .into_iter()
+            .into_par_iter()
             .enumerate()
             .flat_map(|(i, f)| {
                 Self::process_file(

@@ -197,7 +197,7 @@ pub type RetrosheetVolunteer = MiscInfoString;
 pub type Scorer = MiscInfoString;
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Hash, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize,
+    Debug, Eq, PartialEq, EnumString, Hash, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize, Display
 )]
 pub enum Side {
     #[strum(serialize = "0")]

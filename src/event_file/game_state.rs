@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
-use arrayvec::ArrayString;
+use arrayvec::{ArrayVec, ArrayString};
 use bounded_integer::BoundedUsize;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use fixed_map::{Map, Key};
@@ -47,6 +47,17 @@ impl From<(Player, bool)> for TrackedPlayer {
             player,
             is_pitcher_with_dh: is_starting_pitcher_with_dh,
         }
+    }
+}
+
+impl std::fmt::Display for TrackedPlayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let dh = if self.is_pitcher_with_dh {
+            "-pitcher-with-dh"
+        } else {
+            ""
+        };
+        write!(f, "{}{}", self.player, dh)
     }
 }
 
@@ -539,7 +550,7 @@ impl EventStartingBaseState {
             .iter()
             .map(|(baserunner, runner)| Self {
                 event_key,
-                baserunner: *baserunner,
+                baserunner,
                 runner_lineup_position: runner.lineup_position,
                 charged_to_pitcher_id: runner.charged_to,
             })
@@ -809,7 +820,6 @@ impl Personnel {
             .map(|tp| tp.player)
     }
 
-    #[inline(never)]
     fn get_at_position(&self, side: &Side, position: &PositionType) -> Result<TrackedPlayer> {
         let map_tup = self.personnel_state.get(side);
         let map = if let PositionType::Lineup(_) = position {
@@ -819,8 +829,8 @@ impl Personnel {
         };
         map.get(*position).copied().with_context(|| {
             anyhow!(
-                "Position {:?} for side {:?} missing from current game state: {:?}",
-                position, side, map
+                "Position {} for side {} missing from current game state",
+                position, side
             )
         })
     }
@@ -843,10 +853,9 @@ impl Personnel {
             Ok(lp)
         } else {
             bail!(
-                "Fatal error parsing {}: Cannot find lineup position of player currently at bat {}.\nFull state: {:?}",
+                "Fatal error parsing {}: Cannot find lineup position of player currently at bat {}.",
                 self.game_id.id,
                 &play.context.batter,
-                self.personnel_state
             )
         }
     }
@@ -859,14 +868,14 @@ impl Personnel {
             .get_mut(player)
             .with_context(|| {
                 anyhow!(
-                    "Cannot find existing player {:?} in lineup appearance records",
+                    "Cannot find existing player {} in lineup appearance records",
                     player
                 )
             })?
             .last_mut()
             .with_context(|| {
                 anyhow!(
-                    "Player {:?} has an empty list of lineup appearances",
+                    "Player {} has an empty list of lineup appearances",
                     player
                 )
             })
@@ -880,20 +889,19 @@ impl Personnel {
             .get_mut(player)
             .with_context(|| {
                 anyhow!(
-                    "Cannot find existing player {:?} in defense appearance records",
+                    "Cannot find existing player {} in defense appearance records",
                     player
                 )
             })?
             .last_mut()
             .with_context(|| {
                 anyhow!(
-                    "Player {:?} has an empty list of fielding appearances",
+                    "Player {} has an empty list of fielding appearances",
                     player
                 )
             })
     }
 
-    #[inline(never)]
     fn update_lineup_on_substitution(
         &mut self,
         sub: &SubstitutionRecord,
@@ -938,7 +946,6 @@ impl Personnel {
 
     /// The semantics of defensive substitutions are more complicated, because the new player
     /// could already have been in the game, and the replaced player might not have left the game.
-    #[inline(never)]
     fn update_defense_on_substitution(
         &mut self,
         sub: &SubstitutionRecord,
@@ -977,7 +984,6 @@ impl Personnel {
     /// This handles the rare but always fun case of a team vacating the DH by putting the DH
     /// into the field or the pitcher into a non-pitching position.
     /// This will be a safe no-op if the game in question isn't using a DH.
-    #[inline(never)]
     fn update_on_dh_vacancy(&mut self, sub: &SubstitutionRecord, event_id: EventId) -> Result<()> {
         let non_batting_pitcher =
             self.get_at_position(&sub.side, &PositionType::Lineup(LineupPosition::PitcherWithDh));
@@ -994,7 +1000,6 @@ impl Personnel {
         Ok(())
     }
 
-    #[inline(never)]
     fn update_on_substitution(
         &mut self,
         sub: &SubstitutionRecord,
@@ -1182,7 +1187,6 @@ impl GameState {
         Outs::new(new_outs).context("Illegal state, more than 3 outs recorded")
     }
 
-    #[inline(never)]
     fn update_on_play(&mut self, play: &Play) -> Result<()> {
 
         let new_frame = self.get_new_frame(play)?;
@@ -1289,8 +1293,8 @@ pub type Outs = BoundedUsize<0, 3>;
 
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct BaseState {
-    bases: HashMap<BaseRunner, Runner>,
-    scored: Vec<Runner>,
+    bases: Map<BaseRunner, Runner>,
+    scored: ArrayVec<Runner, 4>,
 }
 
 impl BaseState {
@@ -1304,7 +1308,7 @@ impl BaseState {
         state
     }
 
-    pub const fn get_bases(&self) -> &HashMap<BaseRunner, Runner> {
+    pub const fn get_bases(&self) -> &Map<BaseRunner, Runner> {
         &self.bases
     }
 
@@ -1312,23 +1316,23 @@ impl BaseState {
         self.bases.len()
     }
 
-    fn get_runner(&self, baserunner: &BaseRunner) -> Option<&Runner> {
+    fn get_runner(&self, baserunner: BaseRunner) -> Option<&Runner> {
         self.bases.get(baserunner)
     }
 
     fn get_first(&self) -> Option<&Runner> {
-        self.bases.get(&BaseRunner::First)
+        self.bases.get(BaseRunner::First)
     }
 
     fn get_second(&self) -> Option<&Runner> {
-        self.bases.get(&BaseRunner::Second)
+        self.bases.get(BaseRunner::Second)
     }
 
     fn get_third(&self) -> Option<&Runner> {
-        self.bases.get(&BaseRunner::Third)
+        self.bases.get(BaseRunner::Third)
     }
 
-    fn clear_baserunner(&mut self, baserunner: &BaseRunner) -> Option<Runner> {
+    fn clear_baserunner(&mut self, baserunner: BaseRunner) -> Option<Runner> {
         self.bases.remove(baserunner)
     }
 
@@ -1348,12 +1352,12 @@ impl BaseState {
     }
 
     fn current_base_occupied(&self, advance: &RunnerAdvance) -> bool {
-        self.get_runner(&advance.baserunner).is_some()
+        self.get_runner(advance.baserunner).is_some()
     }
 
     fn target_base_occupied(&self, advance: &RunnerAdvance) -> Result<bool> {
-        let br = BaseRunner::from_target_base(advance.to);
-        Ok(self.get_runner(&br?).is_some())
+        let br = BaseRunner::from_target_base(advance.to)?;
+        Ok(self.get_runner(br).is_some())
     }
 
     fn check_integrity(old_state: &Self, new_state: &Self, advance: &RunnerAdvance) -> Result<()> {
@@ -1393,17 +1397,19 @@ impl BaseState {
         let mut new_state = if start_inning {
             Self::default()
         } else {
-            self.clone()
+            Self {
+                bases: self.bases,
+                scored: ArrayVec::new(),
+            }
         };
-        new_state.scored = vec![];
 
         // Cover cases where outs are not included in advance information
         for out in &play.stats.outs {
-            new_state.clear_baserunner(out);
+            new_state.clear_baserunner(*out);
         }
 
         if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, play) {
-            new_state.clear_baserunner(&BaseRunner::Third);
+            new_state.clear_baserunner(BaseRunner::Third);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
                 return Err(e);
@@ -1412,7 +1418,7 @@ impl BaseState {
             }
         }
         if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, play) {
-            new_state.clear_baserunner(&BaseRunner::Second);
+            new_state.clear_baserunner(BaseRunner::Second);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
                 return Err(e);
@@ -1428,7 +1434,7 @@ impl BaseState {
             }
         }
         if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, play) {
-            new_state.clear_baserunner(&BaseRunner::First);
+            new_state.clear_baserunner(BaseRunner::First);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
                 return Err(e);

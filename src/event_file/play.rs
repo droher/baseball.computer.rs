@@ -8,8 +8,10 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{bail, Context, Error, Result};
+use arrayvec::ArrayVec;
 use bounded_integer::BoundedU8;
 use const_format::{concatcp, formatcp};
+use fixed_map::Key;
 use lazy_static::lazy_static;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use quick_cache::sync::Cache;
@@ -245,6 +247,7 @@ IntoPrimitive,
 EnumIter,
 Serialize,
 Deserialize,
+Key
 )]
 #[repr(u8)]
 pub enum BaseRunner {
@@ -311,6 +314,7 @@ pub enum RbiStatus {
 }
 
 pub type PositionVec = Vec<FieldingPosition>;
+pub type BaseRunners = ArrayVec<BaseRunner, 4>;
 pub type Balls = BoundedU8<0, 3>;
 pub type Strikes = BoundedU8<0, 2>;
 
@@ -331,7 +335,7 @@ pub trait ImplicitPlayResults {
 }
 
 #[derive(
-Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize,
+Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize, Display
 )]
 pub enum HitType {
     #[strum(serialize = "S")]
