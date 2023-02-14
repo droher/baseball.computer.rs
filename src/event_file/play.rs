@@ -624,11 +624,9 @@ pub enum PlateAppearanceType {
 impl FieldingData for PlateAppearanceType {
     fn fielders_data(&self) -> Vec<FieldersData> {
         if let Self::BattingOut(bo) = self {
-            if let Some(fp) = &bo.fielding_play {
-                fp.fielders_data.clone()
-            } else {
-                vec![]
-            }
+            bo.fielding_play
+                .as_ref()
+                .map_or(vec![], |fp| fp.fielders_data.clone())
         } else {
             vec![]
         }
@@ -1388,7 +1386,7 @@ pub enum HitLocationGeneral {
 }
 
 impl HitLocationGeneral {
-    fn is_middle_position(&self) -> bool {
+    const fn is_middle_position(&self) -> bool {
         matches!(self, Self::Catcher | Self::Center)
     }
 }
@@ -1690,14 +1688,15 @@ pub struct PlayRecord {
 
 impl PlayRecord {
     fn store_raw_play(raw_play: &str) -> Arc<String> {
-        if let Some(s) = RAW_PLAY_CACHE.get(raw_play) {
-            s
-        } else {
-            let raw_play_string = raw_play.to_string();
-            let arc_raw_play = Arc::new(raw_play_string.clone());
-            RAW_PLAY_CACHE.insert(raw_play_string, arc_raw_play.clone());
-            arc_raw_play
-        }
+        RAW_PLAY_CACHE.get(raw_play).map_or_else(
+            || {
+                let raw_play_string = raw_play.to_string();
+                let arc_raw_play = Arc::new(raw_play_string.clone());
+                RAW_PLAY_CACHE.insert(raw_play_string, arc_raw_play.clone());
+                arc_raw_play
+            },
+            |s| s,
+        )
     }
 
     fn get_pitch_sequence(sequence: &str) -> Result<Arc<PitchSequence>> {

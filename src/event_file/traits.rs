@@ -329,7 +329,7 @@ pub struct Matchup<T> {
 }
 
 impl<T> Matchup<T> {
-    pub fn new(away: T, home: T) -> Self {
+    pub const fn new(away: T, home: T) -> Self {
         Self { away, home }
     }
 

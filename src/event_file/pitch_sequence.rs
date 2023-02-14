@@ -109,6 +109,7 @@ pub struct PitchSequence(pub Vec<PitchSequenceItem>);
 impl TryFrom<&str> for PitchSequence {
     type Error = Error;
 
+    #[allow(clippy::unused_peekable)]
     fn try_from(str_sequence: &str) -> Result<Self> {
         let mut pitches = Vec::with_capacity(10);
 
