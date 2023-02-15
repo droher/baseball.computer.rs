@@ -1,7 +1,6 @@
-use std::convert::TryFrom;
 use std::str::FromStr;
 
-use anyhow::{Error, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
 
@@ -76,6 +75,8 @@ pub struct PitchSequenceItem {
     pub catcher_pickoff_attempt: Option<Base>,
 }
 
+pub type PitchSequence = Vec<PitchSequenceItem>;
+
 impl PitchSequenceItem {
     fn new(sequence_id: usize) -> Self {
         Self {
@@ -101,16 +102,8 @@ impl PitchSequenceItem {
     fn update_runners_going(&mut self) {
         self.runners_going = true;
     }
-}
 
-#[derive(Debug, Default, Eq, PartialEq, Clone, Hash)]
-pub struct PitchSequence(pub Vec<PitchSequenceItem>);
-
-impl TryFrom<&str> for PitchSequence {
-    type Error = Error;
-
-    #[allow(clippy::unused_peekable)]
-    fn try_from(str_sequence: &str) -> Result<Self> {
+    pub fn new_pitch_sequence(str_sequence: &str) -> Result<PitchSequence> {
         let mut pitches = Vec::with_capacity(10);
 
         // If a single PA lasts multiple events (e.g. because of a stolen base or substitution),
@@ -169,6 +162,6 @@ impl TryFrom<&str> for PitchSequence {
             pitch = PitchSequenceItem::new(final_pitch.sequence_id.get() + 1);
             pitches.push(final_pitch);
         }
-        Ok(Self(pitches))
+        Ok(pitches)
     }
 }

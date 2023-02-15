@@ -219,15 +219,9 @@ pub struct EventPitch {
 
 impl ContextToVec<'_> for EventPitch {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        let pitch_sequences = gc.events.iter().filter_map(|e| {
-            e.results
-                .pitch_sequence
-                .as_ref()
-                .map(|psi| (e.event_key, psi))
-        });
-        let pitch_iter = pitch_sequences.flat_map(move |(event_key, pitches)| {
-            pitches.iter().map(move |psi| Self {
-                event_key,
+        let pitch_sequences = gc.events.iter().flat_map(|e| {
+            e.results.pitch_sequence.iter().map(move |psi| Self {
+                event_key: e.event_key,
                 sequence_id: psi.sequence_id,
                 sequence_item: psi.pitch_type,
                 runners_going_flag: psi.runners_going,
@@ -235,7 +229,7 @@ impl ContextToVec<'_> for EventPitch {
                 catcher_pickoff_attempt_at_base: psi.catcher_pickoff_attempt,
             })
         });
-        Box::from(pitch_iter)
+        Box::from(pitch_sequences)
     }
 }
 

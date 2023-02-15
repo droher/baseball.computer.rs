@@ -26,6 +26,8 @@ use crate::event_file::traits::{
     Batter, FieldingPlayType, FieldingPosition, Inning, RetrosheetEventRecord, Side,
 };
 
+use super::pitch_sequence::PitchSequenceItem;
+
 const NAMING_PREFIX: &str = r"(?P<";
 const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
 
@@ -1695,7 +1697,7 @@ pub struct PlayRecord {
     pub side: Side,
     pub batter: Batter,
     pub count: Count,
-    pub pitch_sequence: Option<Arc<PitchSequence>>,
+    pub pitch_sequence: Arc<PitchSequence>,
     raw_play: Arc<String>,
 }
 
@@ -1716,7 +1718,7 @@ impl PlayRecord {
         if let Some(s) = PITCH_SEQUENCE_CACHE.get(sequence) {
             Ok(s)
         } else {
-            let ps = Arc::new(PitchSequence::try_from(sequence)?);
+            let ps = Arc::new(PitchSequenceItem::new_pitch_sequence(sequence)?);
             PITCH_SEQUENCE_CACHE.insert(sequence.into(), ps.clone());
             Ok(ps)
         }
@@ -1737,8 +1739,8 @@ impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
             count: Count::new(record[4]),
             pitch_sequence: {
                 match record[5] {
-                    "" => None,
-                    s => Some(Self::get_pitch_sequence(s)?),
+                    "" => Arc::new(PitchSequence::default()),
+                    s => Self::get_pitch_sequence(s)?,
                 }
             },
             raw_play,
@@ -2138,7 +2140,7 @@ pub struct Play {
     pub context: PlayContext,
     pub parsed: ParsedPlay,
     pub stats: Arc<PlayStats>,
-    pub pitch_sequence: Option<Arc<PitchSequence>>,
+    pub pitch_sequence: Arc<PitchSequence>,
 }
 
 impl TryFrom<&PlayRecord> for Play {

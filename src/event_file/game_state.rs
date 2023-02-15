@@ -20,7 +20,6 @@ use crate::event_file::misc::{
     PitcherResponsibilityAdjustment, RunnerAdjustment, SubstitutionRecord,
 };
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
-use crate::event_file::pitch_sequence::PitchSequenceItem;
 use crate::event_file::play::{
     Base, BaseRunner, BaserunningPlayType, ContactType, Count, EarnedRunStatus, FieldersData,
     FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance,
@@ -32,6 +31,7 @@ use crate::event_file::traits::{
 };
 use crate::AccountType;
 
+use super::pitch_sequence::PitchSequence;
 use super::schemas::GameIdString;
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
@@ -689,10 +689,10 @@ pub struct EventContext {
     pub pitcher_hand: Hand,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct EventResults {
     pub count_at_event: Count,
-    pub pitch_sequence: Option<Vec<PitchSequenceItem>>,
+    pub pitch_sequence: Arc<PitchSequence>,
     pub plate_appearance: Option<EventPlateAppearance>,
     pub plays_at_base: Option<Vec<EventBaserunningPlay>>,
     pub out_on_play: Vec<BaseRunner>,
@@ -1097,7 +1097,7 @@ impl GameState {
                 };
                 let results = EventResults {
                     count_at_event: play.context.count,
-                    pitch_sequence: play.pitch_sequence.as_ref().map(|ps| ps.0.clone()),
+                    pitch_sequence: play.pitch_sequence.clone(),
                     plate_appearance: EventPlateAppearance::from_play(&play, event_key),
                     plays_at_base: EventBaserunningPlay::from_play(&play, event_key),
                     baserunning_advances: EventBaserunningAdvanceAttempt::from_play(
