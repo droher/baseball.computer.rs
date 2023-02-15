@@ -44,7 +44,7 @@ pub enum AccountType {
 }
 
 impl AccountType {
-    pub fn glob(&self, input_prefix: &Path) -> Result<Paths, PatternError> {
+    pub fn glob(self, input_prefix: &Path) -> Result<Paths, PatternError> {
         let pattern = match self {
             Self::PlayByPlay => "**/*.EV*",
             Self::Deduced => "**/*.ED*",

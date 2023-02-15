@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 #![forbid(unsafe_code)]
 #![deny(clippy::all)]
-#![warn(clippy::cargo, clippy::nursery)]
+#![warn(clippy::cargo, clippy::nursery, clippy::pedantic)]
+#![allow(clippy::module_name_repetitions)]
 
 use std::collections::HashSet;
 use std::fs::File;
@@ -52,7 +53,7 @@ struct ThreadSafeWriter {
 }
 
 impl ThreadSafeWriter {
-    pub fn new(schema: &EventFileSchema) -> Self {
+    pub fn new(schema: EventFileSchema) -> Self {
         let file_name = format!("{schema}.csv");
         let output_path = OUTPUT_ROOT.join(file_name);
         debug!("Creating file {}", output_path.display());
@@ -76,7 +77,7 @@ impl WriterMap {
     fn new(output_prefix: &Path) -> Self {
         let mut map = Map::new();
         for schema in EventFileSchema::iter() {
-            map.insert(schema, ThreadSafeWriter::new(&schema));
+            map.insert(schema, ThreadSafeWriter::new(schema));
         }
         Self {
             output_prefix: output_prefix.to_path_buf(),
@@ -88,16 +89,16 @@ impl WriterMap {
         self.map.iter().par_bridge().for_each(|(_, writer)| {
             let mut csv = writer.csv.lock().unwrap();
             csv.flush().unwrap();
-        })
+        });
     }
 
-    fn get(&self, schema: &EventFileSchema) -> &ThreadSafeWriter {
-        self.map.get(*schema).unwrap()
+    fn get(&self, schema: EventFileSchema) -> &ThreadSafeWriter {
+        self.map.get(schema).unwrap()
     }
 
     fn write_context<'a, C: ContextToVec<'a>>(
         &self,
-        schema: &EventFileSchema,
+        schema: EventFileSchema,
         game_context: &'a GameContext,
     ) -> Result<()> {
         let writer = self.get(schema);
@@ -162,7 +163,7 @@ enum EventFileSchema {
 }
 
 impl EventFileSchema {
-    const fn uses_custom_header(&self) -> bool {
+    const fn uses_custom_header(self) -> bool {
         matches!(
             self,
             Self::BoxScoreBattingLines
@@ -251,15 +252,15 @@ impl EventFileSchema {
     fn write_box_score_files(game_context: &GameContext, record_slice: &RecordSlice) -> Result<()> {
         // Write Game
         WRITER_MAP
-            .get(&Self::BoxScoreGame)
+            .get(Self::BoxScoreGame)
             .csv
             .lock()
             .unwrap()
             .serialize(Game::from(game_context))?;
         // Write BoxScoreTeam
-        WRITER_MAP.write_context::<GameTeam>(&Self::BoxScoreTeam, game_context)?;
+        WRITER_MAP.write_context::<GameTeam>(Self::BoxScoreTeam, game_context)?;
         // Write GameUmpire
-        let mut w = WRITER_MAP.get(&Self::BoxScoreUmpire).csv.lock().unwrap();
+        let mut w = WRITER_MAP.get(Self::BoxScoreUmpire).csv.lock().unwrap();
         for row in &game_context.umpires {
             w.serialize(row)?;
         }
@@ -271,7 +272,7 @@ impl EventFileSchema {
                 _ => None,
             })
             .flat_map(|ls| BoxScoreLineScore::transform_line_score(game_context.game_id.id, ls));
-        let mut w = WRITER_MAP.get(&Self::BoxScoreLineScore).csv.lock().unwrap();
+        let mut w = WRITER_MAP.get(Self::BoxScoreLineScore).csv.lock().unwrap();
         for row in line_scores {
             w.serialize(row)?;
         }
@@ -294,29 +295,29 @@ impl EventFileSchema {
 
     fn write_play_by_play_files(game_context: &GameContext) -> Result<()> {
         // Write schemas directly serializable from GameContext
-        WRITER_MAP.write_context::<GameTeam>(&Self::GameTeam, game_context)?;
-        WRITER_MAP.write_context::<GameEarnedRuns>(&Self::GameEarnedRuns, game_context)?;
-        WRITER_MAP.write_context::<Event>(&Self::Event, game_context)?;
-        WRITER_MAP.write_context::<EventRaw>(&Self::EventRaw, game_context)?;
-        WRITER_MAP.write_context::<EventOut>(&Self::EventOut, game_context)?;
-        WRITER_MAP.write_context::<EventFieldingPlay>(&Self::EventFieldingPlay, game_context)?;
-        WRITER_MAP.write_context::<EventPitch>(&Self::EventPitch, game_context)?;
-        WRITER_MAP.write_context::<EventHitLocation>(&Self::EventHitLocation, game_context)?;
+        WRITER_MAP.write_context::<GameTeam>(Self::GameTeam, game_context)?;
+        WRITER_MAP.write_context::<GameEarnedRuns>(Self::GameEarnedRuns, game_context)?;
+        WRITER_MAP.write_context::<Event>(Self::Event, game_context)?;
+        WRITER_MAP.write_context::<EventRaw>(Self::EventRaw, game_context)?;
+        WRITER_MAP.write_context::<EventOut>(Self::EventOut, game_context)?;
+        WRITER_MAP.write_context::<EventFieldingPlay>(Self::EventFieldingPlay, game_context)?;
+        WRITER_MAP.write_context::<EventPitch>(Self::EventPitch, game_context)?;
+        WRITER_MAP.write_context::<EventHitLocation>(Self::EventHitLocation, game_context)?;
         // Write Game
         WRITER_MAP
-            .get(&Self::Game)
+            .get(Self::Game)
             .csv
             .lock()
             .unwrap()
             .serialize(Game::from(game_context))?;
         // Write GameUmpire
-        let mut w = WRITER_MAP.get(&Self::GameUmpire).csv.lock().unwrap();
+        let mut w = WRITER_MAP.get(Self::GameUmpire).csv.lock().unwrap();
         for row in &game_context.umpires {
             w.serialize(row)?;
         }
         // Write GameLineupAppearance
         let mut w = WRITER_MAP
-            .get(&Self::GameLineupAppearance)
+            .get(Self::GameLineupAppearance)
             .csv
             .lock()
             .unwrap();
@@ -325,7 +326,7 @@ impl EventFileSchema {
         }
         // Write GameFieldingAppearance
         let mut w = WRITER_MAP
-            .get(&Self::GameFieldingAppearance)
+            .get(Self::GameFieldingAppearance)
             .csv
             .lock()
             .unwrap();
@@ -334,7 +335,7 @@ impl EventFileSchema {
         }
         // Write EventStartingBaseState
         let mut w = WRITER_MAP
-            .get(&Self::EventStartingBaseState)
+            .get(Self::EventStartingBaseState)
             .csv
             .lock()
             .unwrap();
@@ -347,7 +348,7 @@ impl EventFileSchema {
         }
         // Write EventPlateAppearance
         let mut w = WRITER_MAP
-            .get(&Self::EventPlateAppearance)
+            .get(Self::EventPlateAppearance)
             .csv
             .lock()
             .unwrap();
@@ -360,7 +361,7 @@ impl EventFileSchema {
         }
         // Write EventBaserunningAdvanceAttempt
         let mut w = WRITER_MAP
-            .get(&Self::EventBaserunningAdvanceAttempt)
+            .get(Self::EventBaserunningAdvanceAttempt)
             .csv
             .lock()
             .unwrap();
@@ -373,7 +374,7 @@ impl EventFileSchema {
         }
         // Write EventBaserunningPlay
         let mut w = WRITER_MAP
-            .get(&Self::EventBaserunningPlay)
+            .get(Self::EventBaserunningPlay)
             .csv
             .lock()
             .unwrap();
@@ -386,7 +387,7 @@ impl EventFileSchema {
             w.serialize(row)?;
         }
         //Write EventFlag
-        let mut w = WRITER_MAP.get(&Self::EventFlag).csv.lock().unwrap();
+        let mut w = WRITER_MAP.get(Self::EventFlag).csv.lock().unwrap();
         let event_flags = game_context
             .events
             .iter()
@@ -426,7 +427,7 @@ impl FileProcessor {
         Self {
             index: 0,
             opt,
-            game_ids: HashSet::with_capacity(200000),
+            game_ids: HashSet::with_capacity(200_000),
         }
     }
 
@@ -450,7 +451,7 @@ impl FileProcessor {
             .glob(&self.opt.input)
             .unwrap()
             .map(Result::unwrap)
-            .sorted_by_key(|p| p.clone())
+            .sorted_by_key(Clone::clone)
             .collect_vec();
         let file_count = files.len();
         let games: Vec<GameId> = files

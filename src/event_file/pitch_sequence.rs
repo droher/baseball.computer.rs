@@ -80,7 +80,7 @@ impl PitchSequenceItem {
     fn new(sequence_id: usize) -> Self {
         Self {
             sequence_id: SequenceId::new(sequence_id).unwrap(),
-            pitch_type: Default::default(),
+            pitch_type: PitchType::default(),
             runners_going: false,
             blocked_by_catcher: false,
             catcher_pickoff_attempt: None,
@@ -90,16 +90,16 @@ impl PitchSequenceItem {
 
 impl PitchSequenceItem {
     fn update_pitch_type(&mut self, pitch_type: PitchType) {
-        self.pitch_type = pitch_type
+        self.pitch_type = pitch_type;
     }
     fn update_catcher_pickoff(&mut self, base: Option<Base>) {
-        self.catcher_pickoff_attempt = base
+        self.catcher_pickoff_attempt = base;
     }
     fn update_blocked_by_catcher(&mut self) {
-        self.blocked_by_catcher = true
+        self.blocked_by_catcher = true;
     }
     fn update_runners_going(&mut self) {
-        self.runners_going = true
+        self.runners_going = true;
     }
 }
 
@@ -157,11 +157,11 @@ impl TryFrom<&str> for PitchSequence {
                     // TODO: Figure out what's going on here and fix if needed or delete the todo
                     let mut speculative_iter = char_iter.clone();
                     if speculative_iter.nth(1) == Some('+') {
-                        pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(2)))
+                        pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(2)));
                     }
                 }
                 Some('+') => {
-                    pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(1)))
+                    pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(1)));
                 }
                 _ => {}
             }

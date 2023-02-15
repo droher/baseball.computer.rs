@@ -357,6 +357,7 @@ pub struct BoxScoreLineScore {
 }
 
 impl BoxScoreLineScore {
+    #[allow(clippy::cast_possible_truncation)]
     pub fn transform_line_score(
         game_id: ArrayString<8>,
         raw_line: &LineScore,

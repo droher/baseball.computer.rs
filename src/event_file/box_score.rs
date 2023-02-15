@@ -150,7 +150,7 @@ impl From<BattingLine> for RetrosheetEventRecord {
         record.push_field(&line.nth_player_at_position.to_string());
         let stats: Vec<u8> = line.batting_stats.into();
         for stat in stats {
-            record.push_field(&stat.to_string())
+            record.push_field(&stat.to_string());
         }
         record
     }
@@ -182,11 +182,11 @@ impl From<PinchHittingLine> for RetrosheetEventRecord {
         record.push_field("stat");
         record.push_field("phline");
         record.push_field(line.pinch_hitter_id.as_str());
-        record.push_field(&line.inning.map_or("".to_string(), |u| u.to_string()));
+        record.push_field(&line.inning.map_or(String::new(), |u| u.to_string()));
         record.push_field(line.side.retrosheet_str());
         let stats: Vec<u8> = line.batting_stats.into();
         for stat in stats {
-            record.push_field(&stat.to_string())
+            record.push_field(&stat.to_string());
         }
         record
     }
@@ -240,7 +240,7 @@ impl From<PinchRunningLine> for RetrosheetEventRecord {
         record.push_field("stat");
         record.push_field("prline");
         record.push_field(line.pinch_runner_id.as_str());
-        record.push_field(&line.inning.map_or("".to_string(), |u| u.to_string()));
+        record.push_field(&line.inning.map_or(String::new(), |u| u.to_string()));
         record.push_field(line.side.retrosheet_str());
         record.push_field(&line.runs.unwrap_or_default().to_string());
         record.push_field(&line.stolen_bases.unwrap_or_default().to_string());
@@ -374,7 +374,7 @@ impl From<DefenseLine> for RetrosheetEventRecord {
 
         let stats: Vec<u8> = line.defensive_stats.unwrap_or_default().into();
         for stat in stats {
-            record.push_field(&stat.to_string())
+            record.push_field(&stat.to_string());
         }
         record
     }
@@ -512,7 +512,7 @@ impl From<PitchingLine> for RetrosheetEventRecord {
 
         let stats: Vec<u8> = line.pitching_stats.into();
         for stat in stats {
-            record.push_field(&stat.to_string())
+            record.push_field(&stat.to_string());
         }
         record
     }
@@ -545,13 +545,13 @@ impl From<TeamMiscellaneousLine> for RetrosheetEventRecord {
             "stat".to_string(),
             "tline".to_string(),
             line.side.retrosheet_str().to_string(),
-            line.left_on_base.map_or("".to_string(), |u| u.to_string()),
+            line.left_on_base.map_or(String::new(), |u| u.to_string()),
             line.team_earned_runs
-                .map_or("".to_string(), |u| u.to_string()),
+                .map_or(String::new(), |u| u.to_string()),
             line.double_plays_turned
-                .map_or("".to_string(), |u| u.to_string()),
+                .map_or(String::new(), |u| u.to_string()),
             line.triple_plays_turned
-                .map_or("".to_string(), |u| u.to_string()),
+                .map_or(String::new(), |u| u.to_string()),
         ];
         Self::from(info)
     }
@@ -661,7 +661,7 @@ impl TryFrom<&RetrosheetEventRecord> for LineScore {
             line_score: {
                 let mut vec = Vec::with_capacity(9);
                 for s in iter {
-                    vec.push(s.parse::<u8>()?)
+                    vec.push(s.parse::<u8>()?);
                 }
                 vec
             },
@@ -835,14 +835,14 @@ impl From<BoxScoreEvent> for RetrosheetEventRecord {
                 record.push_field("dpline");
                 record.push_field(dp.defense_side.retrosheet_str());
                 for fielder in dp.fielders.split('-') {
-                    record.push_field(fielder)
+                    record.push_field(fielder);
                 }
             }
             BoxScoreEvent::TriplePlay(tp) => {
                 record.push_field("tpline");
                 record.push_field(tp.defense_side.retrosheet_str());
                 for fielder in tp.fielders.split('-') {
-                    record.push_field(fielder)
+                    record.push_field(fielder);
                 }
             }
             BoxScoreEvent::HitByPitch(hbp) => {
@@ -875,7 +875,7 @@ impl From<BoxScoreEvent> for RetrosheetEventRecord {
                 record.push_field(&opt_str(cs.catcher_id));
                 record.push_field(&cs.inning.unwrap_or_default().to_string());
             }
-            _ => (),
+            BoxScoreEvent::Unrecognized => (),
         };
         record
     }

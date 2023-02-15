@@ -69,8 +69,8 @@ impl LineupPosition {
         }
     }
 
-    pub fn bats_in_lineup(&self) -> bool {
-        let as_u8: u8 = (*self).into();
+    pub fn bats_in_lineup(self) -> bool {
+        let as_u8: u8 = (self).into();
         as_u8 > 0
     }
 
@@ -133,8 +133,8 @@ impl FieldingPosition {
 
     /// Indicates whether the position is actually a true position in the lineup, as opposed
     /// to a pinch-hitter/runner placeholder. DH counts as a position for these purposes
-    pub fn is_true_position(&self) -> bool {
-        let numeric_position: u8 = (*self).into();
+    pub fn is_true_position(self) -> bool {
+        let numeric_position: u8 = self.into();
         (1..11).contains(&numeric_position)
     }
 
@@ -216,13 +216,13 @@ pub enum Side {
 }
 
 impl Side {
-    pub const fn flip(&self) -> Self {
+    pub const fn flip(self) -> Self {
         match self {
             Self::Away => Self::Home,
             Self::Home => Self::Away,
         }
     }
-    pub const fn retrosheet_str(&self) -> &str {
+    pub const fn retrosheet_str(self) -> &'static str {
         match self {
             Self::Away => "0",
             Self::Home => "1",
@@ -333,14 +333,14 @@ impl<T> Matchup<T> {
         Self { away, home }
     }
 
-    pub const fn get(&self, side: &Side) -> &T {
+    pub const fn get(&self, side: Side) -> &T {
         match side {
             Side::Away => &self.away,
             Side::Home => &self.home,
         }
     }
 
-    pub fn get_mut(&mut self, side: &Side) -> &mut T {
+    pub fn get_mut(&mut self, side: Side) -> &mut T {
         match side {
             Side::Away => &mut self.away,
             Side::Home => &mut self.home,
