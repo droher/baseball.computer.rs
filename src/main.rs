@@ -60,7 +60,7 @@ impl ThreadSafeWriter {
         let csv = WriterBuilder::new()
             .has_headers(!schema.uses_custom_header())
             .from_path(output_path)
-            .unwrap();
+            .expect("Failed to create file");
         Self {
             csv: Mutex::new(csv),
             has_header_written: AtomicBool::new(!schema.uses_custom_header()),
@@ -87,8 +87,8 @@ impl WriterMap {
 
     fn flush_all(&self) {
         self.map.iter().par_bridge().for_each(|(_, writer)| {
-            let mut csv = writer.csv.lock().unwrap();
-            csv.flush().unwrap();
+            let mut csv = writer.csv.lock().expect("Failed to acquire writer lock");
+            csv.flush().expect("Failed to flush file");
         });
     }
 
@@ -185,7 +185,10 @@ impl EventFileSchema {
         )
     }
 
-    fn write(reader: RetrosheetReader, parsed_games: Option<&HashSet<GameId>>) -> Vec<GameId> {
+    fn write(
+        reader: RetrosheetReader,
+        parsed_games: Option<&HashSet<GameId>>,
+    ) -> Result<Vec<GameId>> {
         let file_info = reader.file_info;
         debug!("Processing file {}", file_info.filename);
 
@@ -196,7 +199,7 @@ impl EventFileSchema {
                 error!("{:?}", e);
                 continue;
             }
-            let record_vec = record_vec_result.as_ref().unwrap();
+            let record_vec = record_vec_result?;
             let record_slice = &record_vec.record_vec;
 
             let game_context_result =
@@ -205,7 +208,7 @@ impl EventFileSchema {
                 error!("{:?}", e);
                 continue;
             }
-            let game_context = game_context_result.unwrap();
+            let game_context = game_context_result?;
             game_ids.push(game_context.game_id);
             if parsed_games
                 .map(|pg| pg.contains(&game_context.game_id))
@@ -218,12 +221,12 @@ impl EventFileSchema {
                 continue;
             }
             if game_context.file_info.account_type == AccountType::BoxScore {
-                Self::write_box_score_files(&game_context, record_slice).unwrap();
+                Self::write_box_score_files(&game_context, record_slice)?;
             } else {
-                Self::write_play_by_play_files(&game_context).unwrap();
+                Self::write_play_by_play_files(&game_context)?;
             }
         }
-        game_ids
+        Ok(game_ids)
     }
 
     fn box_score_schema(line: &BoxScoreWritableRecord) -> Result<Self> {
@@ -439,12 +442,12 @@ impl FileProcessor {
         input_path: &PathBuf,
         parsed_games: Option<&HashSet<GameId>>,
         file_index: usize,
-    ) -> Vec<GameId> {
-        let reader = RetrosheetReader::new(input_path, file_index).unwrap();
+    ) -> Result<Vec<GameId>> {
+        let reader = RetrosheetReader::new(input_path, file_index)?;
         EventFileSchema::write(reader, parsed_games)
     }
 
-    pub fn par_process_files(&mut self, account_type: AccountType) {
+    pub fn par_process_files(&mut self, account_type: AccountType) -> Result<()> {
         // Box score accounts are expected to be duplicates so we don't need to check against them
         let parsed_games = if account_type == AccountType::BoxScore {
             None
@@ -452,34 +455,34 @@ impl FileProcessor {
             Some(&self.game_ids)
         };
         let files = account_type
-            .glob(&self.opt.input)
-            .unwrap()
+            .glob(&self.opt.input)?
             .map(Result::unwrap)
             .sorted_by_key(Clone::clone)
             .collect_vec();
         let file_count = files.len();
-        let games: Vec<GameId> = files
+        let games = files
             .into_par_iter()
             .enumerate()
-            .flat_map(|(i, f)| {
-                Self::process_file(&f, parsed_games, (self.index + i) * EVENT_KEY_BUFFER)
-            })
-            .collect();
-        self.index += file_count;
+            .map(|(i, f)| Self::process_file(&f, parsed_games, (self.index + i) * EVENT_KEY_BUFFER))
+            .collect::<Result<Vec<Vec<GameId>>>>()?;
+        self.index += file_count * EVENT_KEY_BUFFER;
+        let games = games.iter().flatten();
         self.game_ids.extend(games);
+        Ok(())
     }
 
-    pub fn process_files(&mut self) {
+    pub fn process_files(&mut self) -> Result<()> {
         info!("Parsing conventional play-by-play files");
-        self.par_process_files(AccountType::PlayByPlay);
+        self.par_process_files(AccountType::PlayByPlay)?;
 
         info!("Parsing deduced play-by-play files");
-        self.par_process_files(AccountType::Deduced);
+        self.par_process_files(AccountType::Deduced)?;
 
         info!("Parsing box score files");
-        self.par_process_files(AccountType::BoxScore);
+        self.par_process_files(AccountType::BoxScore)?;
 
         WRITER_MAP.flush_all();
+        Ok(())
     }
 }
 
@@ -492,7 +495,9 @@ fn main() {
     let start = Instant::now();
     let opt: Opt = Opt::from_args();
 
-    FileProcessor::new(opt).process_files();
+    FileProcessor::new(opt)
+        .process_files()
+        .expect("Error occurred while processing files");
 
     let end = start.elapsed();
     info!("Elapsed: {:?}", end);

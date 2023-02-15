@@ -1370,13 +1370,13 @@ impl BaseState {
         self.get_runner(advance.baserunner).is_some()
     }
 
-    fn target_base_occupied(&self, advance: &RunnerAdvance) -> Result<bool> {
-        let br = BaseRunner::from_target_base(advance.to)?;
-        Ok(self.get_runner(br).is_some())
+    fn target_base_occupied(&self, advance: &RunnerAdvance) -> bool {
+        let br = BaseRunner::from_target_base(advance.to);
+        self.get_runner(br).is_some()
     }
 
     fn check_integrity(old_state: &Self, new_state: &Self, advance: &RunnerAdvance) -> Result<()> {
-        if new_state.target_base_occupied(advance)? {
+        if new_state.target_base_occupied(advance) {
             bail!("Runner is listed as moving to a base that is occupied by another runner")
         } else if old_state.current_base_occupied(advance) {
             Ok(())
@@ -1437,7 +1437,7 @@ impl BaseState {
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
                 return Err(e);
-            } else if let (Ok(true), Some(r)) = (
+            } else if let (true, Some(r)) = (
                 a.is_this_that_one_time_jean_segura_ran_in_reverse(),
                 self.get_second(),
             ) {
@@ -1471,11 +1471,11 @@ impl BaseState {
             };
             match a.to {
                 _ if a.is_out() || end_inning => {}
-                _ if new_state.target_base_occupied(a)? => {
+                _ if new_state.target_base_occupied(a) => {
                     return Err(anyhow!("Batter advanced to an occupied base"))
                 }
                 Base::Home => new_state.scored.push(new_runner),
-                b => new_state.set_runner(BaseRunner::from_current_base(b)?, new_runner),
+                b => new_state.set_runner(BaseRunner::from_current_base(b), new_runner),
             }
         }
         Ok(new_state.update_runner_charges(play))

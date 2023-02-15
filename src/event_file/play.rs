@@ -268,16 +268,27 @@ pub enum BaseRunner {
 }
 
 impl BaseRunner {
-    pub fn from_target_base(base: Base) -> Result<Self> {
-        let base_int: u8 = base.into();
-        Self::try_from(base_int - 1)
-            .with_context(|| format!("Could not find baserunner for target base {base}"))
+    /// In some cases, only the base being advanced to is known. This function
+    /// returns the baserunner that would be advancing to that base (always
+    /// the baserunner on the previous base, otherwise it would be specified).
+    pub const fn from_target_base(base: Base) -> Self {
+        match base {
+            Base::First => Self::Batter,
+            Base::Second => Self::First,
+            Base::Third => Self::Second,
+            Base::Home => Self::Third,
+        }
     }
 
-    pub fn from_current_base(base: Base) -> Result<Self> {
-        let base_int: u8 = base.into();
-        Self::try_from(base_int)
-            .with_context(|| format!("Could not find baserunner for current base {base}"))
+    pub const fn from_current_base(base: Base) -> Self {
+        match base {
+            Base::First => Self::First,
+            Base::Second => Self::Second,
+            Base::Third => Self::Third,
+            // This condition doesn't get hit in the current implementation,
+            // but it's here for completeness
+            Base::Home => Self::Batter,
+        }
     }
 }
 
@@ -808,28 +819,25 @@ impl BaserunningPlay {
 
     pub fn baserunner(&self) -> Option<BaseRunner> {
         if self.is_attempted_stolen_base() {
-            self.at_base
-                .map(|b| BaseRunner::from_target_base(b).unwrap())
+            self.at_base.map(BaseRunner::from_target_base)
         } else {
-            self.at_base
-                .map(|b| BaseRunner::from_current_base(b).unwrap())
+            self.at_base.map(BaseRunner::from_current_base)
         }
     }
 }
 
 impl ImplicitPlayResults for BaserunningPlay {
-    #[allow(clippy::unwrap_in_result)]
     fn implicit_advance(&self) -> Option<RunnerAdvance> {
         if let (Some(b), BaserunningPlayType::StolenBase) =
             (self.at_base, self.baserunning_play_type)
         {
-            Some(RunnerAdvance::runner_advance_to(b).unwrap())
+            Some(RunnerAdvance::runner_advance_to(b))
         } else if let (true, true, Some(b)) = (
             self.is_attempted_stolen_base(),
             self.error_on_play(),
             self.at_base,
         ) {
-            Some(RunnerAdvance::runner_advance_to(b).unwrap())
+            Some(RunnerAdvance::runner_advance_to(b))
         } else {
             None
         }
@@ -845,10 +853,10 @@ impl ImplicitPlayResults for BaserunningPlay {
                 Some(b),
                 BaserunningPlayType::CaughtStealing | BaserunningPlayType::PickedOffCaughtStealing,
             ) => {
-                vec![BaseRunner::from_target_base(b).unwrap()]
+                vec![BaseRunner::from_target_base(b)]
             }
             (Some(b), BaserunningPlayType::PickedOff) => {
-                vec![BaseRunner::from_current_base(b).unwrap()]
+                vec![BaseRunner::from_current_base(b)]
             }
             _ => vec![],
         }
@@ -1089,14 +1097,14 @@ impl RunnerAdvance {
         }
     }
 
-    pub fn runner_advance_to(target_base: Base) -> Result<Self> {
-        let baserunner = BaseRunner::from_target_base(target_base)?;
-        Ok(Self {
+    pub const fn runner_advance_to(target_base: Base) -> Self {
+        let baserunner = BaseRunner::from_target_base(target_base);
+        Self {
             baserunner,
             to: target_base,
             out_or_error: false,
             modifiers: vec![],
-        })
+        }
     }
 
     pub fn is_out(&self) -> bool {
@@ -1108,8 +1116,8 @@ impl RunnerAdvance {
         self.to == Base::Home && !self.is_out()
     }
 
-    pub fn is_this_that_one_time_jean_segura_ran_in_reverse(&self) -> Result<bool> {
-        Ok(BaseRunner::from_target_base(self.to)? < self.baserunner)
+    pub fn is_this_that_one_time_jean_segura_ran_in_reverse(&self) -> bool {
+        BaseRunner::from_target_base(self.to) < self.baserunner
     }
 
     /// When a run scores, whether or not it counts as an RBI for the batter cannot be determined
