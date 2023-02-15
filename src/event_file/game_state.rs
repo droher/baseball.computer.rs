@@ -1120,8 +1120,7 @@ impl GameState {
             }
         }
         // Set all remaining blank end_event_ids to final event
-        let max_event_id = Some(EventId::new(events.len()))
-            .context("No events in list")?;
+        let max_event_id = Some(EventId::new(events.len())).context("No events in list")?;
         let mut lineup_appearances = state
             .personnel
             .lineup_appearances
@@ -1294,7 +1293,7 @@ impl GameState {
             MappedRecord::Substitution(r) => self.update_on_substitution(r)?,
             MappedRecord::BatHandAdjustment(r) => self.update_on_bat_hand_adjustment(r),
             MappedRecord::PitchHandAdjustment(r) => self.update_on_pitch_hand_adjustment(r),
-           // Nothing to do here, since we map player to batting order anyway
+            // Nothing to do here, since we map player to batting order anyway
             MappedRecord::LineupAdjustment(_) => (),
             MappedRecord::RunnerAdjustment(r) => self.update_on_runner_adjustment(r)?,
             MappedRecord::PitcherResponsibilityAdjustment(r) => {

@@ -1038,8 +1038,11 @@ impl PlayType {
             return Ok(Self::parse_main_play(first, false)?
                 .into_iter()
                 .chain(
-                    Self::parse_main_play(last.unwrap_or_default().get(1..).unwrap_or_default(), true)?
-                        .into_iter(),
+                    Self::parse_main_play(
+                        last.unwrap_or_default().get(1..).unwrap_or_default(),
+                        true,
+                    )?
+                    .into_iter(),
                 )
                 .collect::<Vec<Self>>());
         }
@@ -1997,7 +2000,7 @@ impl FieldingData for ParsedPlay {
             .chain(
                 self.explicit_advances
                     .iter()
-                    .flat_map(RunnerAdvance::fielders_data)
+                    .flat_map(RunnerAdvance::fielders_data),
             )
             .collect()
     }

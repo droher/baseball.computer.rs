@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![forbid(unsafe_code)]
-#![deny(clippy::all)]
-#![warn(clippy::cargo, clippy::nursery, clippy::pedantic, clippy::unwrap_in_result)]
+#![deny(clippy::all, clippy::cargo)]
+#![warn(clippy::nursery, clippy::pedantic, clippy::unwrap_in_result)]
 #![allow(clippy::module_name_repetitions)]
 
 use std::collections::HashSet;
