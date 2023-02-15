@@ -218,21 +218,21 @@ pub enum Base {
 }
 
 impl Base {
-    fn prev(&self) -> Self {
+    const fn prev(self) -> Self {
         match self {
-            Base::First => Base::Home,
-            Base::Second => Base::First,
-            Base::Third => Base::Second,
-            Base::Home => Base::Third,
+            Self::First => Self::Home,
+            Self::Second => Self::First,
+            Self::Third => Self::Second,
+            Self::Home => Self::Third,
         }
     }
 
-    fn next(&self) -> Self {
+    const fn next(self) -> Self {
         match self {
-            Base::First => Base::Second,
-            Base::Second => Base::Third,
-            Base::Third => Base::Home,
-            Base::Home => Base::First,
+            Self::First => Self::Second,
+            Self::Second => Self::Third,
+            Self::Third => Self::Home,
+            Self::Home => Self::First,
         }
     }
 }
@@ -271,13 +271,13 @@ impl BaseRunner {
     pub fn from_target_base(base: Base) -> Result<Self> {
         let base_int: u8 = base.into();
         Self::try_from(base_int - 1)
-            .with_context(|| format!("Could not find baserunner for target base {:?}", base))
+            .with_context(|| format!("Could not find baserunner for target base {base}"))
     }
 
     pub fn from_current_base(base: Base) -> Result<Self> {
         let base_int: u8 = base.into();
         Self::try_from(base_int)
-            .with_context(|| format!("Could not find baserunner for current base {:?}", base))
+            .with_context(|| format!("Could not find baserunner for current base {base}"))
     }
 }
 
@@ -624,11 +624,9 @@ pub enum PlateAppearanceType {
 impl FieldingData for PlateAppearanceType {
     fn fielders_data(&self) -> Vec<FieldersData> {
         if let Self::BattingOut(bo) = self {
-            if let Some(fp) = &bo.fielding_play {
-                fp.fielders_data.clone()
-            } else {
-                vec![]
-            }
+            bo.fielding_play
+                .as_ref()
+                .map_or(vec![], |fp| fp.fielders_data.clone())
         } else {
             vec![]
         }
@@ -820,6 +818,7 @@ impl BaserunningPlay {
 }
 
 impl ImplicitPlayResults for BaserunningPlay {
+    #[allow(clippy::unwrap_in_result)]
     fn implicit_advance(&self) -> Option<RunnerAdvance> {
         if let (Some(b), BaserunningPlayType::StolenBase) =
             (self.at_base, self.baserunning_play_type)
@@ -949,7 +948,7 @@ pub enum PlayType {
 
 impl PlayType {
     pub fn no_play(&self) -> bool {
-        if let PlayType::NoPlay(np) = self {
+        if let Self::NoPlay(np) = self {
             np.no_play_type == NoPlayType::NoPlay
         } else {
             false
@@ -1039,8 +1038,11 @@ impl PlayType {
             return Ok(Self::parse_main_play(first, false)?
                 .into_iter()
                 .chain(
-                    Self::parse_main_play(last.unwrap().get(1..).unwrap_or_default(), true)?
-                        .into_iter(),
+                    Self::parse_main_play(
+                        last.unwrap_or_default().get(1..).unwrap_or_default(),
+                        true,
+                    )?
+                    .into_iter(),
                 )
                 .collect::<Vec<Self>>());
         }
@@ -1129,15 +1131,15 @@ impl RunnerAdvance {
             .find_map(RunnerAdvanceModifier::unearned_status)
     }
 
-    fn parse_advances(value: &str) -> Result<Vec<RunnerAdvance>> {
+    fn parse_advances(value: &str) -> Result<Vec<Self>> {
         value
             .split(';')
             .filter_map(|s| ADVANCE_REGEX.captures(s))
-            .map(Self::parse_single_advance)
-            .collect::<Result<Vec<RunnerAdvance>>>()
+            .map(|c| Self::parse_single_advance(&c))
+            .collect::<Result<Vec<Self>>>()
     }
 
-    fn parse_single_advance(captures: Captures) -> Result<Self> {
+    fn parse_single_advance(captures: &Captures) -> Result<Self> {
         let (from_match, to_match, out_at_match, mods) = (
             captures.name("from"),
             captures.name("to"),
@@ -1156,9 +1158,9 @@ impl RunnerAdvance {
                 .context("Missing destination base in advance")?,
         )?;
         let out_or_error = out_at_match.is_some();
-        let modifiers = mods.map_or(Ok(Vec::new()), |m| {
+        let modifiers = mods.map_or(Vec::new(), |m| {
             RunnerAdvanceModifier::parse_advance_modifiers(m.as_str())
-        })?;
+        });
         Ok(Self {
             baserunner,
             to,
@@ -1226,7 +1228,7 @@ impl FieldingData for RunnerAdvanceModifier {
 }
 
 impl RunnerAdvanceModifier {
-    fn parse_advance_modifiers(value: &str) -> Result<Vec<Self>> {
+    fn parse_advance_modifiers(value: &str) -> Vec<Self> {
         value
             .split(')')
             .filter(|s| !s.is_empty())
@@ -1234,7 +1236,7 @@ impl RunnerAdvanceModifier {
             .collect()
     }
 
-    fn parse_single_advance_modifier(value: &str) -> Result<Self> {
+    fn parse_single_advance_modifier(value: &str) -> Self {
         let simple_match = match value {
             "(UR" => Self::UnearnedRun,
             "(TUR" => Self::TeamUnearnedRun,
@@ -1251,8 +1253,8 @@ impl RunnerAdvanceModifier {
             _ => Self::Unrecognized(value.into()),
         };
         match simple_match {
-            RunnerAdvanceModifier::Unrecognized(_) => (),
-            _ => return Ok(simple_match),
+            Self::Unrecognized(_) => (),
+            _ => return simple_match,
         };
         let (first, last) = regex_split(value, &NUMERIC_REGEX);
         let last = last.unwrap_or_default();
@@ -1288,7 +1290,7 @@ impl RunnerAdvanceModifier {
             }
             _ => Self::Unrecognized(value.into()),
         };
-        Ok(final_match)
+        final_match
     }
 }
 
@@ -1388,11 +1390,8 @@ pub enum HitLocationGeneral {
 }
 
 impl HitLocationGeneral {
-    fn is_middle_position(&self) -> bool {
-        matches!(
-            self,
-            HitLocationGeneral::Catcher | HitLocationGeneral::Center
-        )
+    const fn is_middle_position(self) -> bool {
+        matches!(self, Self::Catcher | Self::Center)
     }
 }
 
@@ -1571,10 +1570,10 @@ impl From<&PlayModifier> for String {
         match pm {
             PlayModifier::ErrorOn(f) => format!("ErrorOn({f})"),
             PlayModifier::RelayToFielderWithNoOutMade(pv) => {
-                format!("RelayToFielderWithNoOutMade({:?})", pv)
+                format!("RelayToFielderWithNoOutMade({pv:?})")
             }
-            PlayModifier::ThrowToBase(Some(b)) => format!("ThrowToBase({:?})", b),
-            _ => format!("{:?}", pm),
+            PlayModifier::ThrowToBase(Some(b)) => format!("ThrowToBase({b:?})"),
+            _ => format!("{pm:?}"),
         }
     }
 }
@@ -1643,7 +1642,7 @@ impl PlayModifier {
         let last_as_int_vec = { || FieldingPosition::fielding_vec(last.unwrap_or_default()) };
         let play_modifier = match Self::from_str(first) {
             // Fill in other variants that have non-default cases
-            Ok(PlayModifier::ErrorOn(_)) => Self::ErrorOn(
+            Ok(Self::ErrorOn(_)) => Self::ErrorOn(
                 *last_as_int_vec()
                     .first()
                     .context("Missing error position info")?,
@@ -1671,13 +1670,14 @@ pub struct Count {
 }
 
 impl Count {
-    fn new(count_str: &str) -> Result<Self> {
+    #[allow(clippy::cast_possible_truncation)]
+    fn new(count_str: &str) -> Self {
         let mut ints = count_str.chars().map(|c| c.to_digit(10));
 
-        Ok(Self {
+        Self {
             balls: ints.next().flatten().and_then(|b| Balls::new(b as u8)),
             strikes: ints.next().flatten().and_then(|s| Strikes::new(s as u8)),
-        })
+        }
     }
 }
 
@@ -1693,19 +1693,20 @@ pub struct PlayRecord {
 
 impl PlayRecord {
     fn store_raw_play(raw_play: &str) -> Arc<String> {
-        if let Some(s) = RAW_PLAY_CACHE.get(raw_play) {
-            s
-        } else {
-            let raw_play_string = raw_play.to_string();
-            let arc_raw_play = Arc::new(raw_play_string.clone());
-            RAW_PLAY_CACHE.insert(raw_play_string, arc_raw_play.clone());
-            arc_raw_play
-        }
+        RAW_PLAY_CACHE.get(raw_play).map_or_else(
+            || {
+                let raw_play_string = raw_play.to_string();
+                let arc_raw_play = Arc::new(raw_play_string.clone());
+                RAW_PLAY_CACHE.insert(raw_play_string, arc_raw_play.clone());
+                arc_raw_play
+            },
+            |s| s,
+        )
     }
 
     fn get_pitch_sequence(sequence: &str) -> Result<Arc<PitchSequence>> {
         if let Some(s) = PITCH_SEQUENCE_CACHE.get(sequence) {
-            Ok(s.clone())
+            Ok(s)
         } else {
             let ps = Arc::new(PitchSequence::try_from(sequence)?);
             PITCH_SEQUENCE_CACHE.insert(sequence.into(), ps.clone());
@@ -1725,7 +1726,7 @@ impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
             inning: record[1].parse::<Inning>()?,
             side: Side::from_str(record[2])?,
             batter: str_to_tinystr(record[3])?,
-            count: Count::new(record[4])?,
+            count: Count::new(record[4]),
             pitch_sequence: {
                 match record[5] {
                     "" => None,
@@ -1796,7 +1797,7 @@ impl ParsedPlay {
     }
 
     fn implicit_outs(&self) -> Box<dyn Iterator<Item = BaseRunner> + '_> {
-        Box::from(self.main_plays.iter().flat_map(|pt| pt.implicit_out()))
+        Box::from(self.main_plays.iter().flat_map(PlayType::implicit_out))
     }
 
     pub fn advances(&self) -> Box<dyn Iterator<Item = RunnerAdvance> + '_> {
@@ -1859,9 +1860,8 @@ impl ParsedPlay {
             if o > full_outs.len() {
                 if full_outs.contains(&BaseRunner::Batter) {
                     bail!("Double play indicated, but cannot be resolved")
-                } else {
-                    Ok([full_outs, vec![BaseRunner::Batter]].concat())
                 }
+                Ok([full_outs, vec![BaseRunner::Batter]].concat())
             } else {
                 Ok(full_outs)
             }
@@ -1995,12 +1995,12 @@ impl FieldingData for ParsedPlay {
     fn fielders_data(&self) -> Vec<FieldersData> {
         self.main_plays
             .iter()
-            .flat_map(|pt| pt.fielders_data())
-            .chain(self.modifiers.iter().flat_map(|pm| pm.fielders_data()))
+            .flat_map(FieldingData::fielders_data)
+            .chain(self.modifiers.iter().flat_map(PlayModifier::fielders_data))
             .chain(
                 self.explicit_advances
                     .iter()
-                    .flat_map(|a| a.fielders_data()),
+                    .flat_map(RunnerAdvance::fielders_data),
             )
             .collect()
     }

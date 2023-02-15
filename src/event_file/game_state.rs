@@ -16,7 +16,7 @@ use crate::event_file::info::{
     Team, UmpireAssignment, UmpirePosition, WindDirection,
 };
 use crate::event_file::misc::{
-    BatHandAdjustment, EarnedRunRecord, GameId, Hand, LineupAdjustment, PitchHandAdjustment,
+    BatHandAdjustment, EarnedRunRecord, GameId, Hand, PitchHandAdjustment,
     PitcherResponsibilityAdjustment, RunnerAdjustment, SubstitutionRecord,
 };
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
@@ -168,7 +168,7 @@ impl From<(&PlateAppearanceType, &[PlayModifier])> for PlateAppearanceResultType
                 OutAtBatType::InPlayOut if is_sac_fly => Self::SacrificeFly,
                 OutAtBatType::InPlayOut if is_sac_hit => Self::SacrificeHit,
                 OutAtBatType::InPlayOut if bo.implicit_advance().is_some() => Self::ReachedOnError,
-                _ => Self::InPlayOut,
+                OutAtBatType::InPlayOut => Self::InPlayOut,
             },
         }
     }
@@ -227,17 +227,17 @@ impl Default for GameSetting {
     fn default() -> Self {
         Self {
             date: NaiveDate::from_num_days_from_ce_opt(0).unwrap_or_default(),
-            doubleheader_status: Default::default(),
-            start_time: Default::default(),
-            time_of_day: Default::default(),
+            doubleheader_status: DoubleheaderStatus::default(),
+            start_time: Option::default(),
+            time_of_day: DayNight::default(),
             use_dh: false,
             bat_first_side: Side::Away,
-            sky: Default::default(),
-            temperature_fahrenheit: Default::default(),
-            field_condition: Default::default(),
-            precipitation: Default::default(),
-            wind_direction: Default::default(),
-            wind_speed_mph: Default::default(),
+            sky: Sky::default(),
+            temperature_fahrenheit: Option::default(),
+            field_condition: FieldCondition::default(),
+            precipitation: Precipitation::default(),
+            wind_direction: WindDirection::default(),
+            wind_speed_mph: Option::default(),
             attendance: None,
             park_id: Park::from("unknown").unwrap(),
             season: Season(0),
@@ -540,7 +540,7 @@ impl GameContext {
         })
     }
 
-    fn event_key_offset(file_info: FileInfo, game_num: usize) -> usize {
+    const fn event_key_offset(file_info: FileInfo, game_num: usize) -> usize {
         file_info.file_index + (game_num * MAX_EVENTS_PER_GAME)
     }
 }
@@ -634,6 +634,7 @@ impl EventPlateAppearance {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct EventBaserunningAdvanceAttempt {
     pub event_key: usize,
     pub sequence_id: SequenceId,
@@ -786,7 +787,7 @@ impl Default for Personnel {
 impl Personnel {
     fn new(record_slice: &RecordSlice) -> Result<Self> {
         let game_id = get_game_id(record_slice)?;
-        let mut personnel = Personnel {
+        let mut personnel = Self {
             game_id,
             ..Default::default()
         };
@@ -798,7 +799,7 @@ impl Personnel {
             }
         });
         for start in start_iter {
-            let (lineup, defense) = personnel.personnel_state.get_mut(&start.side);
+            let (lineup, defense) = personnel.personnel_state.get_mut(start.side);
             let lineup_appearance = GameLineupAppearance::new_starter(
                 start.player,
                 start.lineup_position,
@@ -829,19 +830,19 @@ impl Personnel {
         Ok(personnel)
     }
 
-    fn pitcher(&self, side: &Side) -> Result<Pitcher> {
-        self.get_at_position(side, &PositionType::Fielding(FieldingPosition::Pitcher))
+    fn pitcher(&self, side: Side) -> Result<Pitcher> {
+        self.get_at_position(side, PositionType::Fielding(FieldingPosition::Pitcher))
             .map(|tp| tp.player)
     }
 
-    fn get_at_position(&self, side: &Side, position: &PositionType) -> Result<TrackedPlayer> {
+    fn get_at_position(&self, side: Side, position: PositionType) -> Result<TrackedPlayer> {
         let map_tup = self.personnel_state.get(side);
         let map = if let PositionType::Lineup(_) = position {
             &map_tup.0
         } else {
             &map_tup.1
         };
-        map.get(*position).copied().with_context(|| {
+        map.get(position).copied().with_context(|| {
             anyhow!(
                 "Position {} for side {} missing from current game state",
                 position,
@@ -852,7 +853,7 @@ impl Personnel {
 
     fn get_player_lineup_position(
         &self,
-        side: &Side,
+        side: Side,
         player: &TrackedPlayer,
     ) -> Option<PositionType> {
         let (lineup, _) = self.personnel_state.get(side);
@@ -867,7 +868,7 @@ impl Personnel {
 
     fn at_bat(&self, play: &Play) -> Result<LineupPosition> {
         let player: TrackedPlayer = (play.context.batter, false).into();
-        let position = self.get_player_lineup_position(&play.context.batting_side, &player);
+        let position = self.get_player_lineup_position(play.context.batting_side, &player);
         if let Some(PositionType::Lineup(lp)) = position {
             Ok(lp)
         } else {
@@ -922,7 +923,7 @@ impl Personnel {
         event_id: EventId,
     ) -> Result<()> {
         let original_batter =
-            self.get_at_position(&sub.side, &PositionType::Lineup(sub.lineup_position));
+            self.get_at_position(sub.side, PositionType::Lineup(sub.lineup_position));
 
         match original_batter {
             // If this substitution is the DH/PH/PR being brought in to field, no substitution takes place
@@ -941,7 +942,7 @@ impl Personnel {
         // In the case of a courtesy runner, the new player may already be in the lineup
         let check_courtesy = self.get_current_lineup_appearance(&new_player);
         if let Ok(p) = check_courtesy {
-            p.end_event_id = p.end_event_id.or(Some(event_id - 1));
+            p.end_event_id = p.end_event_id.or_else(|| Some(event_id - 1));
         }
 
         let new_lineup_appearance = GameLineupAppearance {
@@ -953,7 +954,7 @@ impl Personnel {
             start_event_id: event_id,
             end_event_id: None,
         };
-        let (lineup, _) = self.personnel_state.get_mut(&sub.side);
+        let (lineup, _) = self.personnel_state.get_mut(sub.side);
         lineup.insert(PositionType::Lineup(sub.lineup_position), new_player);
         self.lineup_appearances
             .entry(new_player)
@@ -970,7 +971,7 @@ impl Personnel {
         event_id: EventId,
     ) -> Result<()> {
         let original_fielder =
-            self.get_at_position(&sub.side, &PositionType::Fielding(sub.fielding_position));
+            self.get_at_position(sub.side, PositionType::Fielding(sub.fielding_position));
         match original_fielder {
             Ok(p) if p.player == sub.player => return Ok(()),
             Ok(p) => self.get_current_fielding_appearance(&p)?.end_event_id = Some(event_id - 1),
@@ -986,7 +987,7 @@ impl Personnel {
             gfa.end_event_id = Some(event_id - 1);
         }
 
-        let (_, defense) = self.personnel_state.get_mut(&sub.side);
+        let (_, defense) = self.personnel_state.get_mut(sub.side);
         defense.insert(PositionType::Fielding(sub.fielding_position), new_fielder);
         self.defense_appearances
             .entry(new_fielder)
@@ -1007,12 +1008,12 @@ impl Personnel {
     /// This will be a safe no-op if the game in question isn't using a DH.
     fn update_on_dh_vacancy(&mut self, sub: &SubstitutionRecord, event_id: EventId) -> Result<()> {
         let non_batting_pitcher = self.get_at_position(
-            &sub.side,
-            &PositionType::Lineup(LineupPosition::PitcherWithDh),
+            sub.side,
+            PositionType::Lineup(LineupPosition::PitcherWithDh),
         );
         let dh = self.get_at_position(
-            &sub.side,
-            &PositionType::Fielding(FieldingPosition::DesignatedHitter),
+            sub.side,
+            PositionType::Fielding(FieldingPosition::DesignatedHitter),
         );
         if let Ok(p) = non_batting_pitcher {
             self.get_current_lineup_appearance(&p)?.end_event_id = Some(event_id - 1);
@@ -1030,13 +1031,13 @@ impl Personnel {
     ) -> Result<()> {
         self.update_lineup_on_substitution(sub, event_id)?;
         if sub.fielding_position.is_true_position() {
-            self.update_defense_on_substitution(sub, event_id)?
-        };
+            self.update_defense_on_substitution(sub, event_id)?;
+        }
         if sub.fielding_position == FieldingPosition::Pitcher
             && sub.lineup_position != LineupPosition::PitcherWithDh
         {
-            self.update_on_dh_vacancy(sub, event_id)?
-        };
+            self.update_on_dh_vacancy(sub, event_id)?;
+        }
         Ok(())
     }
 }
@@ -1119,7 +1120,7 @@ impl GameState {
             }
         }
         // Set all remaining blank end_event_ids to final event
-        let max_event_id = Some(EventId::new(events.len()).unwrap());
+        let max_event_id = Some(EventId::new(events.len())).context("No events in list")?;
         let mut lineup_appearances = state
             .personnel
             .lineup_appearances
@@ -1135,10 +1136,10 @@ impl GameState {
             .copied()
             .collect_vec();
         for la in &mut lineup_appearances {
-            la.end_event_id = la.end_event_id.or(max_event_id)
+            la.end_event_id = la.end_event_id.or(max_event_id);
         }
         for da in &mut defense_appearances {
-            da.end_event_id = da.end_event_id.or(max_event_id)
+            da.end_event_id = da.end_event_id.or(max_event_id);
         }
         lineup_appearances.sort_by_key(|la| (la.side, la.lineup_position, la.start_event_id));
         defense_appearances.sort_by_key(|da| (da.side, da.fielding_position, da.start_event_id));
@@ -1161,15 +1162,15 @@ impl GameState {
 
         Ok(Self {
             game_id,
-            event_id: EventId::new(1).unwrap(),
+            event_id: EventId::new(1).context("Unexpected event ID bound error")?,
             inning: 1,
             frame: InningFrame::Top,
             batting_side,
-            outs: Outs::new(0).unwrap(),
-            bases: Default::default(),
-            at_bat: Default::default(),
+            outs: Outs::new(0).context("Unexpected outs bound error")?,
+            bases: BaseState::default(),
+            at_bat: LineupPosition::default(),
             personnel: Personnel::new(record_slice)?,
-            weird_state: Default::default(),
+            weird_state: WeirdGameState::default(),
         })
     }
 
@@ -1210,7 +1211,7 @@ impl GameState {
         // runner responsibility, which would not change on a no-play.
         let pitcher = self
             .personnel
-            .pitcher(&play.context.batting_side.flip())
+            .pitcher(play.context.batting_side.flip())
             .ok();
 
         let batter_lineup_position = self.personnel.at_bat(play)?;
@@ -1229,7 +1230,7 @@ impl GameState {
         self.outs = new_outs;
         self.bases = new_base_state;
         self.at_bat = batter_lineup_position;
-        self.weird_state = Default::default();
+        self.weird_state = WeirdGameState::default();
 
         Ok(())
     }
@@ -1239,15 +1240,11 @@ impl GameState {
     }
 
     fn update_on_bat_hand_adjustment(&mut self, record: &BatHandAdjustment) {
-        self.weird_state.batter_hand = Some(record.hand)
+        self.weird_state.batter_hand = Some(record.hand);
     }
 
     fn update_on_pitch_hand_adjustment(&mut self, record: &PitchHandAdjustment) {
-        self.weird_state.batter_hand = Some(record.hand)
-    }
-
-    fn update_on_lineup_adjustment(&mut self, _record: &LineupAdjustment) {
-        // Nothing to do here, since we map player to batting order anyway
+        self.weird_state.batter_hand = Some(record.hand);
     }
 
     fn update_on_runner_adjustment(&mut self, record: &RunnerAdjustment) -> Result<()> {
@@ -1257,25 +1254,27 @@ impl GameState {
         if self.outs == 3 {
             self.frame = self.frame.flip();
             self.batting_side = self.batting_side.flip();
-            self.outs = Outs::new(0).unwrap();
+            self.outs = Outs::new(0).context("Unexpected outs bound error")?;
         }
         let tracked_runner: TrackedPlayer = (record.runner_id, false).into();
         let runner_pos = self
             .personnel
             .get_current_lineup_appearance(&tracked_runner)?
             .lineup_position;
-        let pitcher = self.personnel.pitcher(&self.batting_side.flip())?;
+        let pitcher = self.personnel.pitcher(self.batting_side.flip())?;
         self.bases = BaseState::new_inning_tiebreaker(runner_pos, pitcher);
 
         Ok(())
     }
 
-    fn update_on_comment(&mut self, _record: &str) {
+    #[allow(clippy::unused_self)]
+    const fn update_on_comment(&self, _record: &str) {
         // TODO
     }
 
-    fn update_on_pitcher_responsibility_adjustment(
-        &mut self,
+    #[allow(clippy::unused_self)]
+    const fn update_on_pitcher_responsibility_adjustment(
+        &self,
         _record: &PitcherResponsibilityAdjustment,
     ) {
         // TODO
@@ -1294,10 +1293,11 @@ impl GameState {
             MappedRecord::Substitution(r) => self.update_on_substitution(r)?,
             MappedRecord::BatHandAdjustment(r) => self.update_on_bat_hand_adjustment(r),
             MappedRecord::PitchHandAdjustment(r) => self.update_on_pitch_hand_adjustment(r),
-            MappedRecord::LineupAdjustment(r) => self.update_on_lineup_adjustment(r),
+            // Nothing to do here, since we map player to batting order anyway
+            MappedRecord::LineupAdjustment(_) => (),
             MappedRecord::RunnerAdjustment(r) => self.update_on_runner_adjustment(r)?,
             MappedRecord::PitcherResponsibilityAdjustment(r) => {
-                self.update_on_pitcher_responsibility_adjustment(r)
+                self.update_on_pitcher_responsibility_adjustment(r);
             }
             MappedRecord::Comment(r) => self.update_on_comment(r),
             _ => {}
@@ -1394,7 +1394,7 @@ impl BaseState {
     ///  Accounts for Rule 9.16(g) regarding the assignment of trailing
     ///  baserunners as inherited if they reach on a fielder's choice
     ///  in which an inherited runner is forced out 🙃
-    fn update_runner_charges(self, _play: &Play) -> Self {
+    const fn update_runner_charges(self, _play: &Play) -> Self {
         // TODO: This
         self
     }
@@ -1421,16 +1421,16 @@ impl BaseState {
             new_state.clear_baserunner(*out);
         }
 
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Third, play) {
+        if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Third, play) {
             new_state.clear_baserunner(BaseRunner::Third);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
                 return Err(e);
             } else if let Some(r) = self.get_third() {
-                new_state.scored.push(*r)
+                new_state.scored.push(*r);
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Second, play) {
+        if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Second, play) {
             new_state.clear_baserunner(BaseRunner::Second);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
@@ -1439,27 +1439,27 @@ impl BaseState {
                 a.is_this_that_one_time_jean_segura_ran_in_reverse(),
                 self.get_second(),
             ) {
-                new_state.set_runner(BaseRunner::First, *r)
+                new_state.set_runner(BaseRunner::First, *r);
             } else if let (Base::Third, Some(r)) = (a.to, self.get_second()) {
-                new_state.set_runner(BaseRunner::Third, *r)
+                new_state.set_runner(BaseRunner::Third, *r);
             } else if let (Base::Home, Some(r)) = (a.to, self.get_second()) {
-                new_state.scored.push(*r)
+                new_state.scored.push(*r);
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::First, play) {
+        if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::First, play) {
             new_state.clear_baserunner(BaseRunner::First);
             if a.is_out() {
             } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
                 return Err(e);
             } else if let (Base::Second, Some(r)) = (&a.to, self.get_first()) {
-                new_state.set_runner(BaseRunner::Second, *r)
+                new_state.set_runner(BaseRunner::Second, *r);
             } else if let (Base::Third, Some(r)) = (&a.to, self.get_first()) {
-                new_state.set_runner(BaseRunner::Third, *r)
+                new_state.set_runner(BaseRunner::Third, *r);
             } else if let (Base::Home, Some(r)) = (&a.to, self.get_first()) {
-                new_state.scored.push(*r)
+                new_state.scored.push(*r);
             }
         }
-        if let Some(a) = BaseState::get_advance_from_baserunner(BaseRunner::Batter, play) {
+        if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Batter, play) {
             let some_pitcher = pitcher.ok_or_else(|| {
                 anyhow!("A pitcher ID must be provided if the batter reached base")
             })?;

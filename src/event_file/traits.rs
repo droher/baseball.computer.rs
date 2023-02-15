@@ -69,8 +69,8 @@ impl LineupPosition {
         }
     }
 
-    pub fn bats_in_lineup(&self) -> bool {
-        let as_u8: u8 = (*self).into();
+    pub fn bats_in_lineup(self) -> bool {
+        let as_u8: u8 = (self).into();
         as_u8 > 0
     }
 
@@ -85,8 +85,7 @@ impl TryFrom<&str> for LineupPosition {
 
     //noinspection RsTypeCheck
     fn try_from(value: &str) -> Result<Self> {
-        LineupPosition::try_from(value.parse::<u8>()?)
-            .context("Unable to convert to lineup position")
+        Self::try_from(value.parse::<u8>()?).context("Unable to convert to lineup position")
     }
 }
 
@@ -134,8 +133,8 @@ impl FieldingPosition {
 
     /// Indicates whether the position is actually a true position in the lineup, as opposed
     /// to a pinch-hitter/runner placeholder. DH counts as a position for these purposes
-    pub fn is_true_position(&self) -> bool {
-        let numeric_position: u8 = (*self).into();
+    pub fn is_true_position(self) -> bool {
+        let numeric_position: u8 = self.into();
         (1..11).contains(&numeric_position)
     }
 
@@ -155,8 +154,7 @@ impl TryFrom<&str> for FieldingPosition {
 
     //noinspection RsTypeCheck
     fn try_from(value: &str) -> Result<Self> {
-        FieldingPosition::try_from(value.parse::<u8>()?)
-            .context("Unable to convert to fielding position")
+        Self::try_from(value.parse::<u8>()?).context("Unable to convert to fielding position")
     }
 }
 
@@ -183,7 +181,7 @@ pub enum FieldingPlayType {
 
 pub type Inning = u8;
 
-pub(crate) type Person = ArrayString<8>;
+pub type Person = ArrayString<8>;
 pub type MiscInfoString = ArrayString<16>;
 
 pub type Player = Person;
@@ -218,13 +216,13 @@ pub enum Side {
 }
 
 impl Side {
-    pub const fn flip(&self) -> Self {
+    pub const fn flip(self) -> Self {
         match self {
             Self::Away => Self::Home,
             Self::Home => Self::Away,
         }
     }
-    pub const fn retrosheet_str(&self) -> &str {
+    pub const fn retrosheet_str(self) -> &'static str {
         match self {
             Self::Away => "0",
             Self::Home => "1",
@@ -331,18 +329,18 @@ pub struct Matchup<T> {
 }
 
 impl<T> Matchup<T> {
-    pub fn new(away: T, home: T) -> Self {
+    pub const fn new(away: T, home: T) -> Self {
         Self { away, home }
     }
 
-    pub const fn get(&self, side: &Side) -> &T {
+    pub const fn get(&self, side: Side) -> &T {
         match side {
             Side::Away => &self.away,
             Side::Home => &self.home,
         }
     }
 
-    pub fn get_mut(&mut self, side: &Side) -> &mut T {
+    pub fn get_mut(&mut self, side: Side) -> &mut T {
         match side {
             Side::Away => &mut self.away,
             Side::Home => &mut self.home,
@@ -389,7 +387,7 @@ impl<T: Copy> Copy for Matchup<T> {}
 
 impl<T> From<(T, T)> for Matchup<T> {
     fn from(tup: (T, T)) -> Self {
-        Matchup {
+        Self {
             away: tup.0,
             home: tup.1,
         }

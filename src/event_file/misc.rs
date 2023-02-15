@@ -41,9 +41,9 @@ pub struct GameId {
 impl TryFrom<&RetrosheetEventRecord> for GameId {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<GameId> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let record = record.deserialize::<[&str; 2]>(None)?;
-        Ok(GameId {
+        Ok(Self {
             id: str_to_tinystr(record[1])?,
         })
     }
@@ -60,10 +60,10 @@ pub type PitchHandAdjustment = HandAdjustment;
 impl TryFrom<&RetrosheetEventRecord> for HandAdjustment {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<HandAdjustment> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let record = record.deserialize::<[&str; 3]>(None)?;
 
-        Ok(HandAdjustment {
+        Ok(Self {
             player_id: str_to_tinystr(record[1])?,
             hand: Hand::from_str(record[2])?,
         })
@@ -79,10 +79,10 @@ pub struct LineupAdjustment {
 impl TryFrom<&RetrosheetEventRecord> for LineupAdjustment {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<LineupAdjustment> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let record = record.deserialize::<[&str; 3]>(None)?;
 
-        Ok(LineupAdjustment {
+        Ok(Self {
             side: Side::from_str(record[1])?,
             lineup_position: LineupPosition::try_from(record[2])?,
         })
@@ -101,9 +101,9 @@ pub struct AppearanceRecord {
 impl TryFrom<&RetrosheetEventRecord> for AppearanceRecord {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<AppearanceRecord> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let record = record.deserialize::<[&str; 6]>(None)?;
-        Ok(AppearanceRecord {
+        Ok(Self {
             player: str_to_tinystr(record[1])?,
             player_name: record[2].to_string(),
             side: Side::from_str(record[3])?,
@@ -125,10 +125,10 @@ pub struct EarnedRunRecord {
 impl TryFrom<&RetrosheetEventRecord> for EarnedRunRecord {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<EarnedRunRecord> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let arr = record.deserialize::<[&str; 4]>(None)?;
         match arr[1] {
-            "er" => Ok(EarnedRunRecord {
+            "er" => Ok(Self {
                 pitcher_id: str_to_tinystr(arr[2])?,
                 earned_runs: arr[3].trim_end().parse::<u8>()?,
             }),
@@ -205,10 +205,8 @@ pub fn str_to_tinystr<T: FromStr>(s: &str) -> Result<T> {
 
 #[inline]
 pub fn regex_split<'a>(s: &'a str, re: &'static Regex) -> (&'a str, Option<&'a str>) {
-    match re.find(s) {
-        None => (s, None),
-        Some(m) => (&s[..m.start()], Some(&s[m.start()..])),
-    }
+    re.find(s)
+        .map_or((s, None), |m| (&s[..m.start()], Some(&s[m.start()..])))
 }
 
 #[inline]

@@ -63,7 +63,7 @@ pub enum PitchType {
 
 impl Default for PitchType {
     fn default() -> Self {
-        PitchType::Unrecognized
+        Self::Unrecognized
     }
 }
 
@@ -80,7 +80,7 @@ impl PitchSequenceItem {
     fn new(sequence_id: usize) -> Self {
         Self {
             sequence_id: SequenceId::new(sequence_id).unwrap(),
-            pitch_type: Default::default(),
+            pitch_type: PitchType::default(),
             runners_going: false,
             blocked_by_catcher: false,
             catcher_pickoff_attempt: None,
@@ -90,16 +90,16 @@ impl PitchSequenceItem {
 
 impl PitchSequenceItem {
     fn update_pitch_type(&mut self, pitch_type: PitchType) {
-        self.pitch_type = pitch_type
+        self.pitch_type = pitch_type;
     }
     fn update_catcher_pickoff(&mut self, base: Option<Base>) {
-        self.catcher_pickoff_attempt = base
+        self.catcher_pickoff_attempt = base;
     }
     fn update_blocked_by_catcher(&mut self) {
-        self.blocked_by_catcher = true
+        self.blocked_by_catcher = true;
     }
     fn update_runners_going(&mut self) {
-        self.runners_going = true
+        self.runners_going = true;
     }
 }
 
@@ -109,6 +109,7 @@ pub struct PitchSequence(pub Vec<PitchSequenceItem>);
 impl TryFrom<&str> for PitchSequence {
     type Error = Error;
 
+    #[allow(clippy::unused_peekable)]
     fn try_from(str_sequence: &str) -> Result<Self> {
         let mut pitches = Vec::with_capacity(10);
 
@@ -155,12 +156,12 @@ impl TryFrom<&str> for PitchSequence {
                     // not apply the advance attempt info to the pitch.
                     // TODO: Figure out what's going on here and fix if needed or delete the todo
                     let mut speculative_iter = char_iter.clone();
-                    if let Some('+') = speculative_iter.nth(1) {
-                        pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(2)))
+                    if speculative_iter.nth(1) == Some('+') {
+                        pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(2)));
                     }
                 }
                 Some('+') => {
-                    pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(1)))
+                    pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(1)));
                 }
                 _ => {}
             }

@@ -44,7 +44,7 @@ pub enum AccountType {
 }
 
 impl AccountType {
-    pub fn glob(&self, input_prefix: &Path) -> Result<Paths, PatternError> {
+    pub fn glob(self, input_prefix: &Path) -> Result<Paths, PatternError> {
         let pattern = match self {
             Self::PlayByPlay => "**/*.EV*",
             Self::Deduced => "**/*.ED*",
@@ -247,31 +247,31 @@ pub enum MappedRecord {
 impl TryFrom<&RetrosheetEventRecord> for MappedRecord {
     type Error = Error;
 
-    fn try_from(record: &RetrosheetEventRecord) -> Result<MappedRecord> {
+    fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let line_type = record.get(0).context("No record")?;
         let mapped = match line_type {
-            "id" => MappedRecord::GameId(GameId::try_from(record)?),
-            "version" => MappedRecord::Version,
-            "info" => MappedRecord::Info(InfoRecord::try_from(record)?),
-            "start" => MappedRecord::Start(StartRecord::try_from(record)?),
-            "sub" => MappedRecord::Substitution(SubstitutionRecord::try_from(record)?),
-            "play" => MappedRecord::Play(PlayRecord::try_from(record)?),
-            "badj" => MappedRecord::BatHandAdjustment(BatHandAdjustment::try_from(record)?),
-            "padj" => MappedRecord::PitchHandAdjustment(PitchHandAdjustment::try_from(record)?),
-            "ladj" => MappedRecord::LineupAdjustment(LineupAdjustment::try_from(record)?),
-            "radj" => MappedRecord::RunnerAdjustment(RunnerAdjustment::try_from(record)?),
-            "presadj" => MappedRecord::PitcherResponsibilityAdjustment(
+            "id" => Self::GameId(GameId::try_from(record)?),
+            "version" => Self::Version,
+            "info" => Self::Info(InfoRecord::try_from(record)?),
+            "start" => Self::Start(StartRecord::try_from(record)?),
+            "sub" => Self::Substitution(SubstitutionRecord::try_from(record)?),
+            "play" => Self::Play(PlayRecord::try_from(record)?),
+            "badj" => Self::BatHandAdjustment(BatHandAdjustment::try_from(record)?),
+            "padj" => Self::PitchHandAdjustment(PitchHandAdjustment::try_from(record)?),
+            "ladj" => Self::LineupAdjustment(LineupAdjustment::try_from(record)?),
+            "radj" => Self::RunnerAdjustment(RunnerAdjustment::try_from(record)?),
+            "presadj" => Self::PitcherResponsibilityAdjustment(
                 PitcherResponsibilityAdjustment::try_from(record)?,
             ),
-            "com" => MappedRecord::Comment(String::from(record.get(1).unwrap())),
-            "data" => MappedRecord::EarnedRun(EarnedRunRecord::try_from(record)?),
-            "stat" => MappedRecord::BoxScoreLine(BoxScoreLine::try_from(record)?),
-            "line" => MappedRecord::LineScore(LineScore::try_from(record)?),
-            "event" => MappedRecord::BoxScoreEvent(BoxScoreEvent::try_from(record)?),
-            _ => MappedRecord::Unrecognized,
+            "com" => Self::Comment(String::from(record.get(1).context("Empty comment")?)),
+            "data" => Self::EarnedRun(EarnedRunRecord::try_from(record)?),
+            "stat" => Self::BoxScoreLine(BoxScoreLine::try_from(record)?),
+            "line" => Self::LineScore(LineScore::try_from(record)?),
+            "event" => Self::BoxScoreEvent(BoxScoreEvent::try_from(record)?),
+            _ => Self::Unrecognized,
         };
         match mapped {
-            MappedRecord::Unrecognized => Err(anyhow!("Unrecognized record type {:?}", record)),
+            Self::Unrecognized => Err(anyhow!("Unrecognized record type {:?}", record)),
             _ => Ok(mapped),
         }
     }
