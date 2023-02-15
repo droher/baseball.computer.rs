@@ -818,6 +818,7 @@ impl BaserunningPlay {
 }
 
 impl ImplicitPlayResults for BaserunningPlay {
+    #[allow(clippy::unwrap_in_result)]
     fn implicit_advance(&self) -> Option<RunnerAdvance> {
         if let (Some(b), BaserunningPlayType::StolenBase) =
             (self.at_base, self.baserunning_play_type)
@@ -1037,7 +1038,7 @@ impl PlayType {
             return Ok(Self::parse_main_play(first, false)?
                 .into_iter()
                 .chain(
-                    Self::parse_main_play(last.unwrap().get(1..).unwrap_or_default(), true)?
+                    Self::parse_main_play(last.unwrap_or_default().get(1..).unwrap_or_default(), true)?
                         .into_iter(),
                 )
                 .collect::<Vec<Self>>());

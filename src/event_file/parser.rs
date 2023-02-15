@@ -263,7 +263,7 @@ impl TryFrom<&RetrosheetEventRecord> for MappedRecord {
             "presadj" => Self::PitcherResponsibilityAdjustment(
                 PitcherResponsibilityAdjustment::try_from(record)?,
             ),
-            "com" => Self::Comment(String::from(record.get(1).unwrap())),
+            "com" => Self::Comment(String::from(record.get(1).context("Empty comment")?)),
             "data" => Self::EarnedRun(EarnedRunRecord::try_from(record)?),
             "stat" => Self::BoxScoreLine(BoxScoreLine::try_from(record)?),
             "line" => Self::LineScore(LineScore::try_from(record)?),

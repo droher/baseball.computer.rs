@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![forbid(unsafe_code)]
 #![deny(clippy::all)]
-#![warn(clippy::cargo, clippy::nursery, clippy::pedantic)]
+#![warn(clippy::cargo, clippy::nursery, clippy::pedantic, clippy::unwrap_in_result)]
 #![allow(clippy::module_name_repetitions)]
 
 use std::collections::HashSet;
@@ -96,6 +96,7 @@ impl WriterMap {
         self.map.get(schema).unwrap()
     }
 
+    #[allow(clippy::unwrap_in_result)]
     fn write_context<'a, C: ContextToVec<'a>>(
         &self,
         schema: EventFileSchema,
@@ -109,9 +110,10 @@ impl WriterMap {
         Ok(())
     }
 
+    #[allow(clippy::unwrap_in_result)]
     fn write_box_score_line(&self, line: &BoxScoreWritableRecord) -> Result<()> {
         let schema = EventFileSchema::box_score_schema(line)?;
-        let writer = self.map.get(schema).unwrap();
+        let writer = self.map.get(schema).context("Failed to get writer")?;
         let mut csv = writer.csv.lock().unwrap();
         if !writer.has_header_written.load(Ordering::Relaxed) {
             let header = line.generate_header()?;
@@ -249,6 +251,7 @@ impl EventFileSchema {
         })
     }
 
+    #[allow(clippy::unwrap_in_result)]
     fn write_box_score_files(game_context: &GameContext, record_slice: &RecordSlice) -> Result<()> {
         // Write Game
         WRITER_MAP
@@ -293,6 +296,7 @@ impl EventFileSchema {
         Ok(())
     }
 
+    #[allow(clippy::unwrap_in_result)]
     fn write_play_by_play_files(game_context: &GameContext) -> Result<()> {
         // Write schemas directly serializable from GameContext
         WRITER_MAP.write_context::<GameTeam>(Self::GameTeam, game_context)?;

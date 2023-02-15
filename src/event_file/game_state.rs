@@ -1120,7 +1120,8 @@ impl GameState {
             }
         }
         // Set all remaining blank end_event_ids to final event
-        let max_event_id = Some(EventId::new(events.len()).unwrap());
+        let max_event_id = Some(EventId::new(events.len()))
+            .context("No events in list")?;
         let mut lineup_appearances = state
             .personnel
             .lineup_appearances
@@ -1162,11 +1163,11 @@ impl GameState {
 
         Ok(Self {
             game_id,
-            event_id: EventId::new(1).unwrap(),
+            event_id: EventId::new(1).context("Unexpected event ID bound error")?,
             inning: 1,
             frame: InningFrame::Top,
             batting_side,
-            outs: Outs::new(0).unwrap(),
+            outs: Outs::new(0).context("Unexpected outs bound error")?,
             bases: BaseState::default(),
             at_bat: LineupPosition::default(),
             personnel: Personnel::new(record_slice)?,
@@ -1254,7 +1255,7 @@ impl GameState {
         if self.outs == 3 {
             self.frame = self.frame.flip();
             self.batting_side = self.batting_side.flip();
-            self.outs = Outs::new(0).unwrap();
+            self.outs = Outs::new(0).context("Unexpected outs bound error")?;
         }
         let tracked_runner: TrackedPlayer = (record.runner_id, false).into();
         let runner_pos = self
