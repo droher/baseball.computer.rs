@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
-use arrayvec::{ArrayString, ArrayVec};
+use arrayvec::ArrayVec;
 use bounded_integer::BoundedUsize;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use fixed_map::{Key, Map};
@@ -31,6 +31,8 @@ use crate::event_file::traits::{
     Scorer, SequenceId, Side, Umpire, MAX_EVENTS_PER_GAME,
 };
 use crate::AccountType;
+
+use super::schemas::GameIdString;
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
@@ -320,7 +322,7 @@ impl From<&RecordSlice> for GameMetadata {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GameUmpire {
-    pub game_id: ArrayString<8>,
+    pub game_id: GameIdString,
     pub position: UmpirePosition,
     pub umpire_id: Option<Umpire>,
 }
@@ -412,7 +414,7 @@ impl From<&[MappedRecord]> for GameResults {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct GameLineupAppearance {
-    pub game_id: ArrayString<8>,
+    pub game_id: GameIdString,
     pub player_id: Player,
     pub side: Side,
     pub lineup_position: LineupPosition,
@@ -442,7 +444,7 @@ impl GameLineupAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Copy)]
 pub struct GameFieldingAppearance {
-    pub game_id: ArrayString<8>,
+    pub game_id: GameIdString,
     pub player_id: Player,
     pub side: Side,
     pub fielding_position: FieldingPosition,
@@ -772,7 +774,7 @@ impl Default for Personnel {
     fn default() -> Self {
         Self {
             game_id: GameId {
-                id: ArrayString::<8>::from("N/A").unwrap(),
+                id: GameIdString::from("N/A").unwrap(),
             },
             personnel_state: Matchup::new(
                 (Lineup::new(), Defense::new()),

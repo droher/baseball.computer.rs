@@ -29,9 +29,11 @@ pub trait ContextToVec<'a>: Serialize + Sized {
     fn from_game_context(gc: &'a GameContext) -> Box<dyn Iterator<Item = Self> + 'a>;
 }
 
+pub type GameIdString = ArrayString<12>;
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Game<'a> {
-    game_id: ArrayString<8>,
+    game_id: GameIdString,
     date: NaiveDate,
     start_time: Option<NaiveDateTime>,
     doubleheader_status: DoubleheaderStatus,
@@ -107,7 +109,7 @@ impl<'a> From<&'a GameContext> for Game<'a> {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct GameTeam {
-    game_id: ArrayString<8>,
+    game_id: GameIdString,
     team_id: Team,
     side: Side,
 }
@@ -136,7 +138,7 @@ impl ContextToVec<'_> for GameTeam {
 // Might generalize this to "game player totals" in case there's ever a `data` field
 // other than earned runs
 pub struct GameEarnedRuns {
-    game_id: ArrayString<8>,
+    game_id: GameIdString,
     player_id: Pitcher,
     earned_runs: u8,
 }
@@ -153,7 +155,7 @@ impl ContextToVec<'_> for GameEarnedRuns {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Event {
-    game_id: ArrayString<8>,
+    game_id: GameIdString,
     event_id: EventId,
     event_key: usize,
     batting_side: Side,
@@ -185,7 +187,7 @@ impl ContextToVec<'_> for Event {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventRaw {
     event_key: usize,
-    game_id: ArrayString<8>,
+    game_id: GameIdString,
     event_id: EventId,
     filename: ArrayString<20>,
     line_number: usize,
@@ -319,7 +321,7 @@ impl ContextToVec<'_> for EventOut {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct BoxScoreWritableRecord<'a> {
-    pub game_id: ArrayString<8>,
+    pub game_id: GameIdString,
     #[serde(with = "either::serde_untagged")]
     pub record: Either<&'a BoxScoreLine, &'a BoxScoreEvent>,
 }
@@ -350,7 +352,7 @@ impl BoxScoreWritableRecord<'_> {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct BoxScoreLineScore {
-    pub game_id: ArrayString<8>,
+    pub game_id: GameIdString,
     pub side: Side,
     pub inning: Inning,
     pub runs: u8,
@@ -359,7 +361,7 @@ pub struct BoxScoreLineScore {
 impl BoxScoreLineScore {
     #[allow(clippy::cast_possible_truncation)]
     pub fn transform_line_score(
-        game_id: ArrayString<8>,
+        game_id: GameIdString,
         raw_line: &LineScore,
     ) -> Box<dyn Iterator<Item = Self> + '_> {
         let iter = raw_line

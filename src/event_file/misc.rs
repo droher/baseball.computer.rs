@@ -2,7 +2,6 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error, Result};
-use arrayvec::ArrayString;
 use bimap::BiMap;
 use num_traits::PrimInt;
 use regex::{Match, Regex};
@@ -13,6 +12,8 @@ use crate::event_file::play::Base;
 use crate::event_file::traits::{
     Batter, Fielder, FieldingPosition, LineupPosition, Pitcher, Player, RetrosheetEventRecord, Side,
 };
+
+use super::schemas::GameIdString;
 
 pub type Comment = String;
 
@@ -36,7 +37,7 @@ impl Default for Hand {
 
 #[derive(Ord, PartialOrd, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct GameId {
-    pub id: ArrayString<8>,
+    pub id: GameIdString,
 }
 impl TryFrom<&RetrosheetEventRecord> for GameId {
     type Error = Error;
@@ -200,7 +201,7 @@ pub fn digit_vec(int_str: &str) -> Vec<u8> {
 
 #[inline]
 pub fn str_to_tinystr<T: FromStr>(s: &str) -> Result<T> {
-    T::from_str(s).map_err(|_| anyhow!("TinyStr not formatted properly"))
+    T::from_str(s).map_err(|_| anyhow!("TinyStr {s} not formatted properly"))
 }
 
 #[inline]
