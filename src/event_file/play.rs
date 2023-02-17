@@ -1713,7 +1713,7 @@ impl PlayRecord {
     fn get_pitch_sequence(sequence: &str) -> Result<Arc<PitchSequence>> {
         PITCH_SEQUENCE_CACHE.get(sequence).map_or_else(
             || {
-                let ps = Arc::new(PitchSequenceItem::new_pitch_sequence(sequence));
+                let ps = Arc::new(PitchSequenceItem::new_pitch_sequence(sequence)?);
                 PITCH_SEQUENCE_CACHE.insert(sequence.into(), ps.clone());
                 Ok(ps)
             },

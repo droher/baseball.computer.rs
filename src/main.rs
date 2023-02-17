@@ -372,8 +372,7 @@ impl EventFileSchema {
         let baserunning_plays = game_context
             .events
             .iter()
-            .filter_map(|e| e.results.plays_at_base.as_ref())
-            .flatten();
+            .flat_map(|e| &e.results.plays_at_base);
         for row in baserunning_plays {
             w.serialize(row)?;
         }

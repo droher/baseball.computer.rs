@@ -232,7 +232,7 @@ impl ContextToVec<'_> for EventPitch {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventFieldingPlay {
     event_key: usize,
-    sequence_id: SequenceId,
+    sequence_id: usize,
     fielding_position: FieldingPosition,
     fielding_play: FieldingPlayType,
 }
@@ -246,7 +246,7 @@ impl ContextToVec<'_> for EventFieldingPlay {
                 .enumerate()
                 .map(move |(i, fp)| Self {
                     event_key: e.event_key,
-                    sequence_id: SequenceId::new(i + 1).unwrap(),
+                    sequence_id: i + 1,
                     fielding_position: fp.fielding_position,
                     fielding_play: fp.fielding_play_type,
                 })
@@ -289,7 +289,7 @@ impl ContextToVec<'_> for EventHitLocation {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventOut {
     event_key: usize,
-    sequence_id: SequenceId,
+    sequence_id: usize,
     baserunner_out: BaseRunner,
 }
 
@@ -302,7 +302,7 @@ impl ContextToVec<'_> for EventOut {
                 .enumerate()
                 .map(move |(i, br)| Self {
                     event_key: e.event_key,
-                    sequence_id: SequenceId::new(i + 1).unwrap(),
+                    sequence_id: i + 1,
                     baserunner_out: *br,
                 })
         }))

@@ -185,18 +185,20 @@ pub struct EventFlag {
 }
 
 impl EventFlag {
-    fn from_play(play: &PlayRecord, event_key: usize) -> Vec<Self> {
+    fn from_play(play: &PlayRecord, event_key: usize) -> Result<Vec<Self>> {
         play.parsed
             .modifiers
             .iter()
             .filter(|pm| pm.is_valid_event_type())
             .enumerate()
-            .map(|(i, pm)| Self {
-                event_key,
-                sequence_id: SequenceId::new(i + 1).unwrap(),
-                flag: pm.to_string(),
+            .map(|(i, pm)| {
+                Ok(Self {
+                    event_key,
+                    sequence_id: SequenceId::new(i + 1).context("Invalid sequence ID")?,
+                    flag: pm.to_string(),
+                })
             })
-            .collect_vec()
+            .collect()
     }
 }
 
@@ -429,16 +431,16 @@ impl GameLineupAppearance {
         lineup_position: LineupPosition,
         side: Side,
         game_id: GameId,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        Ok(Self {
             game_id: game_id.id,
             player_id: player,
             lineup_position,
             side,
             entered_game_as: EnteredGameAs::Starter,
-            start_event_id: EventId::new(1).unwrap(),
+            start_event_id: EventId::new(1).context("Could not create event ID")?,
             end_event_id: None,
-        }
+        })
     }
 
     fn finalize(self, end_event_id: EventId) -> Self {
@@ -465,15 +467,15 @@ impl GameFieldingAppearance {
         fielding_position: FieldingPosition,
         side: Side,
         game_id: GameId,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        Ok(Self {
             game_id: game_id.id,
             player_id: player,
             fielding_position,
             side,
-            start_event_id: EventId::new(1).unwrap(),
+            start_event_id: EventId::new(1).context("Could not create event ID")?,
             end_event_id: None,
-        }
+        })
     }
 
     const fn new(
@@ -593,17 +595,22 @@ pub struct EventBaserunningPlay {
 }
 
 impl EventBaserunningPlay {
-    fn from_play(play: &PlayRecord, event_key: usize) -> Option<Vec<Self>> {
-        let vec = play
-            .parsed
+    fn from_play(play: &PlayRecord, event_key: usize) -> Result<Vec<Self>> {
+        play.parsed
             .main_plays
             .iter()
             .enumerate()
-            .filter_map(|(i, pt)| {
+            .map(|(i, pt)| {
+                Ok((
+                    SequenceId::new(i + 1).context("Could not create sequence ID")?,
+                    pt,
+                ))
+            })
+            .filter_map_ok(|(i, pt)| {
                 if let PlayType::BaserunningPlay(br) = pt {
                     Some(Self {
                         event_key,
-                        sequence_id: SequenceId::new(i + 1).unwrap(),
+                        sequence_id: i,
                         baserunning_play_type: br.baserunning_play_type,
                         baserunner: br.baserunner(),
                     })
@@ -611,12 +618,7 @@ impl EventBaserunningPlay {
                     None
                 }
             })
-            .collect_vec();
-        if vec.is_empty() {
-            None
-        } else {
-            Some(vec)
-        }
+            .collect::<Result<Vec<Self>>>()
     }
 }
 
@@ -664,7 +666,7 @@ pub struct EventBaserunningAdvanceAttempt {
 }
 
 impl EventBaserunningAdvanceAttempt {
-    fn from_play(play: &PlayRecord, event_key: usize) -> Vec<Self> {
+    fn from_play(play: &PlayRecord, event_key: usize) -> Result<Vec<Self>> {
         play.stats
             .advances
             .iter()
@@ -674,9 +676,9 @@ impl EventBaserunningAdvanceAttempt {
                     FieldersData::find_error(ra.fielders_data().as_slice()).is_some();
                 let is_successful = !ra.is_out();
                 let explicit_out_flag = ra.out_or_error;
-                Self {
+                Ok(Self {
                     event_key,
-                    sequence_id: SequenceId::new(i + 1).unwrap(),
+                    sequence_id: SequenceId::new(i + 1).context("Could not create sequence ID")?,
                     baserunner: ra.baserunner,
                     attempted_advance_to: ra.to,
                     advanced_on_error_flag,
@@ -685,9 +687,9 @@ impl EventBaserunningAdvanceAttempt {
                     rbi_flag: play.stats.rbi.contains(&ra.baserunner),
                     team_unearned_flag: ra.earned_run_status()
                         == Some(EarnedRunStatus::TeamUnearned),
-                }
+                })
             })
-            .collect_vec()
+            .collect()
     }
 }
 
@@ -708,7 +710,7 @@ pub struct EventResults {
     pub count_at_event: Count,
     pub pitch_sequence: Arc<PitchSequence>,
     pub plate_appearance: Option<EventPlateAppearance>,
-    pub plays_at_base: Option<Vec<EventBaserunningPlay>>,
+    pub plays_at_base: Vec<EventBaserunningPlay>,
     pub out_on_play: Vec<BaseRunner>,
     pub fielding_plays: Vec<FieldersData>,
     pub baserunning_advances: Vec<EventBaserunningAdvanceAttempt>,
@@ -787,7 +789,7 @@ impl Default for Personnel {
     fn default() -> Self {
         Self {
             game_id: GameId {
-                id: GameIdString::from("N/A").unwrap(),
+                id: GameIdString::default(),
             },
             personnel_state: Matchup::new(
                 (Lineup::new(), Defense::new()),
@@ -837,10 +839,10 @@ impl Personnel {
             defense.insert(PositionType::Fielding(start.fielding_position), player);
             personnel
                 .lineup_appearances
-                .insert(player, vec![lineup_appearance]);
+                .insert(player, vec![lineup_appearance?]);
             personnel
                 .defense_appearances
-                .insert(player, vec![fielding_appearance]);
+                .insert(player, vec![fielding_appearance?]);
         }
         Ok(personnel)
     }
@@ -1111,11 +1113,11 @@ impl GameState {
                     count_at_event: play.count,
                     pitch_sequence: play.pitch_sequence.clone(),
                     plate_appearance: EventPlateAppearance::from_play(play, event_key),
-                    plays_at_base: EventBaserunningPlay::from_play(play, event_key),
+                    plays_at_base: EventBaserunningPlay::from_play(play, event_key)?,
                     baserunning_advances: EventBaserunningAdvanceAttempt::from_play(
                         play, event_key,
-                    ),
-                    play_info: EventFlag::from_play(play, event_key),
+                    )?,
+                    play_info: EventFlag::from_play(play, event_key)?,
                     comment: None,
                     fielding_plays: play.stats.fielders_data.clone(),
                     out_on_play: play.stats.outs.clone(),

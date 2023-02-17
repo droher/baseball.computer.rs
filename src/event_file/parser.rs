@@ -68,20 +68,21 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
-    fn new(path: &Path, file_index: usize) -> Self {
-        let filename = path
+    fn new(path: &Path, file_index: usize) -> Result<Self> {
+        let raw_filename = path
             .file_name()
             .unwrap_or_default()
             .to_str()
             .unwrap_or_default()
             .to_string();
-        let filename = ArrayString::from(&filename).unwrap();
-        Self {
+        let filename = ArrayString::from(&raw_filename)
+            .map_err(|_| anyhow!("Capacity error converting {raw_filename} to array string"))?;
+        Ok(Self {
             filename,
-            game_type: Self::game_type(&filename),
-            account_type: Self::account_type(&filename),
+            game_type: Self::game_type(&raw_filename),
+            account_type: Self::account_type(&raw_filename),
             file_index,
-        }
+        })
     }
 
     fn game_type(s: &str) -> GameType {
@@ -182,7 +183,7 @@ impl RetrosheetReader {
             )),
         }?;
         let current_record_vec = Vec::<MappedRecord>::new();
-        let file_info = FileInfo::new(path, file_index);
+        let file_info = FileInfo::new(path, file_index)?;
         Ok(Self {
             reader,
             current_record,
