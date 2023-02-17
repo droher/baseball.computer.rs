@@ -123,7 +123,6 @@ pub enum FieldingPosition {
     PinchRunner,
 }
 impl FieldingPosition {
-    //noinspection RsTypeCheck
     pub fn fielding_vec(int_str: &str) -> Vec<Self> {
         digit_vec(int_str)
             .iter()

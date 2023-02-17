@@ -193,7 +193,7 @@ pub struct EventAudit {
 
 impl ContextToVec<'_> for EventAudit {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        Box::from(gc.events.iter().map(move |e| Self {
+        Box::from(gc.events.iter().map(|e| Self {
             game_id: gc.game_id.id,
             event_id: e.event_id,
             event_key: e.event_key,

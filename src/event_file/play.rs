@@ -1495,7 +1495,7 @@ pub enum ContactType {
     None,
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, EnumString, Clone, Hash, Display)]
 pub enum PlayModifier {
     ContactDescription(ContactDescription),
     #[strum(serialize = "AP")]
@@ -1573,19 +1573,6 @@ pub enum PlayModifier {
     #[strum(serialize = "U")]
     Unknown,
     Unrecognized(String),
-}
-
-impl From<&PlayModifier> for String {
-    fn from(pm: &PlayModifier) -> Self {
-        match pm {
-            PlayModifier::ErrorOn(f) => format!("ErrorOn({f})"),
-            PlayModifier::RelayToFielderWithNoOutMade(pv) => {
-                format!("RelayToFielderWithNoOutMade({pv:?})")
-            }
-            PlayModifier::ThrowToBase(Some(b)) => format!("ThrowToBase({b:?})"),
-            _ => format!("{pm:?}"),
-        }
-    }
 }
 
 impl FieldingData for PlayModifier {

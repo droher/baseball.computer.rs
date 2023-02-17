@@ -194,7 +194,7 @@ impl EventFlag {
             .map(|(i, pm)| Self {
                 event_key,
                 sequence_id: SequenceId::new(i + 1).unwrap(),
-                flag: pm.into(),
+                flag: pm.to_string(),
             })
             .collect_vec()
     }
@@ -241,7 +241,7 @@ impl Default for GameSetting {
             wind_direction: WindDirection::default(),
             wind_speed_mph: Option::default(),
             attendance: None,
-            park_id: Park::from("unknown").unwrap(),
+            park_id: Park::default(),
             season: Season(0),
         }
     }

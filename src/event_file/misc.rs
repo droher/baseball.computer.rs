@@ -7,6 +7,7 @@ use num_traits::PrimInt;
 use regex::{Match, Regex};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
+use tracing::warn;
 
 use crate::event_file::play::Base;
 use crate::event_file::traits::{
@@ -195,7 +196,13 @@ pub fn digit_vec(int_str: &str) -> Vec<u8> {
     int_str
         .chars()
         .filter_map(|c| c.to_digit(10))
-        .map(|u| u.try_into().unwrap())
+        .map(|u| match u.try_into() {
+            Ok(u) => u,
+            Err(e) => {
+                warn!("Impossible error converting u32 to u8: {}", e);
+                0
+            }
+        })
         .collect()
 }
 
