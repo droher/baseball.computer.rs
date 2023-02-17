@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
 
@@ -103,7 +102,8 @@ impl PitchSequenceItem {
         self.runners_going = true;
     }
 
-    pub fn new_pitch_sequence(str_sequence: &str) -> Result<PitchSequence> {
+    #[allow(clippy::unused_peekable)]
+    pub fn new_pitch_sequence(str_sequence: &str) -> PitchSequence {
         let mut pitches = Vec::with_capacity(10);
 
         // If a single PA lasts multiple events (e.g. because of a stolen base or substitution),
@@ -117,7 +117,7 @@ impl PitchSequenceItem {
             str_sequence
         };
         let mut char_iter = trimmed_sequence.chars().peekable();
-        let mut pitch = PitchSequenceItem::new(1);
+        let mut pitch = Self::new(1);
 
         let get_catcher_pickoff_base =
             { |c: Option<char>| Base::from_str(&c.unwrap_or('.').to_string()).ok() };
@@ -159,9 +159,9 @@ impl PitchSequenceItem {
                 _ => {}
             }
             let final_pitch = pitch;
-            pitch = PitchSequenceItem::new(final_pitch.sequence_id.get() + 1);
+            pitch = Self::new(final_pitch.sequence_id.get() + 1);
             pitches.push(final_pitch);
         }
-        Ok(pitches)
+        pitches
     }
 }

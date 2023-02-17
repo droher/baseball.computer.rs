@@ -33,8 +33,8 @@ use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
 use crate::event_file::schemas::{
-    BoxScoreLineScore, BoxScoreWritableRecord, EventFieldingPlay, EventHitLocation, EventOut,
-    EventPitch, EventRaw, Game, GameEarnedRuns, GameTeam,
+    BoxScoreLineScore, BoxScoreWritableRecord, EventAudit, EventFieldingPlay, EventHitLocation,
+    EventOut, EventPitch, Game, GameEarnedRuns, GameTeam,
 };
 use crate::event_file::traits::EVENT_KEY_BUFFER;
 
@@ -305,7 +305,7 @@ impl EventFileSchema {
         WRITER_MAP.write_context::<GameTeam>(Self::GameTeam, game_context)?;
         WRITER_MAP.write_context::<GameEarnedRuns>(Self::GameEarnedRuns, game_context)?;
         WRITER_MAP.write_context::<Event>(Self::Event, game_context)?;
-        WRITER_MAP.write_context::<EventRaw>(Self::EventRaw, game_context)?;
+        WRITER_MAP.write_context::<EventAudit>(Self::EventRaw, game_context)?;
         WRITER_MAP.write_context::<EventOut>(Self::EventOut, game_context)?;
         WRITER_MAP.write_context::<EventFieldingPlay>(Self::EventFieldingPlay, game_context)?;
         WRITER_MAP.write_context::<EventPitch>(Self::EventPitch, game_context)?;

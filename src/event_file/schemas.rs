@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::{bail, Context, Result};
 use arrayvec::ArrayString;
 use bounded_integer::BoundedU8;
@@ -185,16 +183,15 @@ impl ContextToVec<'_> for Event {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct EventRaw {
+pub struct EventAudit {
     event_key: usize,
     game_id: GameIdString,
     event_id: EventId,
     filename: ArrayString<20>,
     line_number: usize,
-    raw_play: Arc<String>,
 }
 
-impl ContextToVec<'_> for EventRaw {
+impl ContextToVec<'_> for EventAudit {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().map(move |e| Self {
             game_id: gc.game_id.id,
@@ -202,7 +199,6 @@ impl ContextToVec<'_> for EventRaw {
             event_key: e.event_key,
             filename: gc.file_info.filename,
             line_number: e.line_number,
-            raw_play: e.raw_play.clone(),
         }))
     }
 }
