@@ -440,6 +440,13 @@ impl GameLineupAppearance {
             end_event_id: None,
         }
     }
+
+    fn finalize(self, end_event_id: EventId) -> Self {
+        Self {
+            end_event_id: self.end_event_id.or(Some(end_event_id)),
+            ..self
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Copy)]
@@ -483,6 +490,13 @@ impl GameFieldingAppearance {
             side,
             start_event_id: start_event,
             end_event_id: None,
+        }
+    }
+
+    fn finalize(self, end_event_id: EventId) -> Self {
+        Self {
+            end_event_id: self.end_event_id.or(Some(end_event_id)),
+            ..self
         }
     }
 }
@@ -1119,29 +1133,23 @@ impl GameState {
             }
         }
         // Set all remaining blank end_event_ids to final event
-        let max_event_id = Some(EventId::new(events.len())).context("No events in list")?;
-        let mut lineup_appearances = state
+        let max_event_id = EventId::new(events.len()).context("No events in list")?;
+        let lineup_appearances = state
             .personnel
             .lineup_appearances
             .values()
             .flatten()
-            .copied()
+            .map(|la| la.finalize(max_event_id))
+            .sorted_by_key(|la| (la.side, la.lineup_position, la.start_event_id))
             .collect_vec();
-        let mut defense_appearances = state
+        let defense_appearances = state
             .personnel
             .defense_appearances
             .values()
             .flatten()
-            .copied()
+            .map(|la| la.finalize(max_event_id))
+            .sorted_by_key(|la| (la.side, la.fielding_position, la.start_event_id))
             .collect_vec();
-        for la in &mut lineup_appearances {
-            la.end_event_id = la.end_event_id.or(max_event_id);
-        }
-        for da in &mut defense_appearances {
-            da.end_event_id = da.end_event_id.or(max_event_id);
-        }
-        lineup_appearances.sort_by_key(|la| (la.side, la.lineup_position, la.start_event_id));
-        defense_appearances.sort_by_key(|da| (da.side, da.fielding_position, da.start_event_id));
 
         Ok((events, lineup_appearances, defense_appearances))
     }
