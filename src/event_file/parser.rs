@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context, Error, Result};
 use arrayvec::ArrayString;
 use csv::{Reader, ReaderBuilder, StringRecord};
 use glob::{glob, Paths, PatternError};
-use lazy_static::lazy_static;
+use lazy_regex::{Lazy, regex};
 use regex::Regex;
 use tracing::warn;
 
@@ -22,19 +22,16 @@ use crate::event_file::traits::{GameType, RetrosheetEventRecord};
 
 pub type RecordSlice = [MappedRecord];
 
-lazy_static! {
-    static ref ALL_STAR_GAME: Regex = Regex::new(r"[0-9]{4}AS\.EVE$").unwrap();
-    static ref WORLD_SERIES: Regex = Regex::new(r"[0-9]{4}WS\.EVE$").unwrap();
-    static ref LCS: Regex = Regex::new(r"[0-9]{4}[AN]LCS\.EVE$").unwrap();
-    static ref DIVISION_SERIES: Regex = Regex::new(r"[0-9]{4}[AN]LD[12]\.EVE$").unwrap();
-    static ref WILD_CARD: Regex = Regex::new(r"[0-9]{4}[AN]LW[C1234]\.EVE$").unwrap();
-    static ref REGULAR_SEASON: Regex =
-        Regex::new(r"[0-9]{4}([[:alnum:]]{3})?\.E[BVD][ANF]$").unwrap();
-    static ref NEGRO_LEAGUES: Regex = Regex::new(r".*\.E[BV]$").unwrap();
-    static ref PLAY_BY_PLAY: Regex = Regex::new(r".*\.EV[ANF]?").unwrap();
-    static ref DERIVED: Regex = Regex::new(r".*\.ED[ANF]?").unwrap();
-    static ref BOX_SCORE: Regex = Regex::new(r".*\.EB[ANF]?").unwrap();
-}
+pub static ALL_STAR_GAME: &Lazy<Regex> = regex!(r"[0-9]{4}AS\.EVE$");
+pub static WORLD_SERIES: &Lazy<Regex> = regex!(r"[0-9]{4}WS\.EVE$");
+pub static LCS: &Lazy<Regex> = regex!(r"[0-9]{4}[AN]LCS\.EVE$");
+pub static DIVISION_SERIES: &Lazy<Regex> = regex!(r"[0-9]{4}[AN]LD[12]\.EVE$");
+pub static WILD_CARD: &Lazy<Regex> = regex!(r"[0-9]{4}[AN]LW[C1234]\.EVE$");
+pub static REGULAR_SEASON: &Lazy<Regex> = regex!(r"[0-9]{4}([[:alnum:]]{3})?\.E[BVD][ANF]$");
+pub static NEGRO_LEAGUES: &Lazy<Regex> = regex!(r".*\.E[BV]$");
+pub static PLAY_BY_PLAY: &Lazy<Regex> = regex!(r".*\.EV[ANF]?");
+pub static DERIVED: &Lazy<Regex> = regex!(r".*\.ED[ANF]?");
+pub static BOX_SCORE: &Lazy<Regex> = regex!(r".*\.EB[ANF]?");
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum AccountType {

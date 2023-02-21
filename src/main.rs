@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![forbid(unsafe_code)]
 #![deny(clippy::all, clippy::cargo)]
-#![warn(clippy::nursery, clippy::pedantic, clippy::unwrap_in_result)]
+#![warn(clippy::nursery, clippy::pedantic, clippy::unwrap_used, clippy::expect_used)]
 #![allow(clippy::module_name_repetitions)]
 
 use glob::GlobError;
@@ -43,7 +43,7 @@ mod event_file;
 const ABOUT: &str = "Creates structured datasets from raw Retrosheet files.";
 
 lazy_static! {
-    static ref OUTPUT_ROOT: PathBuf = get_output_root(&Opt::from_args()).unwrap();
+    static ref OUTPUT_ROOT: PathBuf = get_output_root(&Opt::from_args());
     static ref WRITER_MAP: WriterMap = WriterMap::new(&OUTPUT_ROOT);
 }
 
@@ -53,6 +53,7 @@ struct ThreadSafeWriter {
 }
 
 impl ThreadSafeWriter {
+    #[allow(clippy::expect_used)]
     pub fn new(schema: EventFileSchema) -> Self {
         let file_name = format!("{schema}.csv");
         let output_path = OUTPUT_ROOT.join(file_name);
@@ -399,11 +400,12 @@ struct Opt {
     output_dir: PathBuf,
 }
 
-fn get_output_root(opt: &Opt) -> Result<PathBuf> {
-    std::fs::create_dir_all(&opt.output_dir).context("Error occurred on output dir check")?;
+#[allow(clippy::expect_used)]
+fn get_output_root(opt: &Opt) -> PathBuf {
+    std::fs::create_dir_all(&opt.output_dir).expect("Error occurred on output dir check");
     opt.output_dir
         .canonicalize()
-        .context("Invalid output directory")
+        .expect("Error occurred on output dir canonicalization")
 }
 
 struct FileProcessor {
@@ -468,6 +470,7 @@ impl FileProcessor {
     }
 }
 
+#[allow(clippy::expect_used)]
 fn main() {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)

@@ -24,7 +24,7 @@ arrayvec = {version = "0.7.2", features = ["serde"]}
 lazy_static = "1.4.0"
 const_format = "0.2.30"
 either = {version = "1.8.1", features = ["serde", "use_std"]}
-num_enum = "0.5.9"
+num_enum = "0.5.10"
 bimap = "0.6.2"
 structopt = "0.3.26"
 itertools = "0.10.5"
@@ -39,4 +39,4 @@ serde_repr = "0.1.10"
 regex = {version = "1.7.1", default-features = false, features = ["std", "perf"]} # No need for unicode
 quick_cache = "0.2.0"
 fixed-map = "0.8.1"
-
+lazy-regex = "2.4.1"

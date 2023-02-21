@@ -10,7 +10,7 @@ use std::sync::Arc;
 use anyhow::{bail, Context, Error, Result};
 use arrayvec::ArrayVec;
 use bounded_integer::BoundedU8;
-use const_format::{concatcp, formatcp};
+use lazy_regex::{Lazy, regex};
 use fixed_map::Key;
 use lazy_static::lazy_static;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -21,75 +21,27 @@ use strum::ParseError;
 use strum_macros::{Display, EnumDiscriminants, EnumIter, EnumString};
 
 use crate::event_file::misc::{regex_split, str_to_tinystr, to_str_vec};
-use crate::event_file::pitch_sequence::PitchSequence;
+use crate::event_file::pitch_sequence::{PitchSequence, PitchSequenceItem};
 use crate::event_file::traits::{
     Batter, FieldingPlayType, FieldingPosition, Inning, RetrosheetEventRecord, Side,
 };
 
-use super::pitch_sequence::PitchSequenceItem;
-
-const NAMING_PREFIX: &str = r"(?P<";
-const GROUP_ASSISTS: &str = r">(?:[0-9]?)+)";
-
-//noinspection RsTypeCheck
-const GROUP_ASSISTS1: &str = concatcp!(NAMING_PREFIX, "a1", GROUP_ASSISTS);
-//noinspection RsTypeCheck
-const GROUP_ASSISTS2: &str = concatcp!(NAMING_PREFIX, "a2", GROUP_ASSISTS);
-//noinspection RsTypeCheck
-const GROUP_ASSISTS3: &str = concatcp!(NAMING_PREFIX, "a3", GROUP_ASSISTS);
-const GROUP_PUTOUT: &str = r">[0-9])";
-//noinspection RsTypeCheck
-const GROUP_PUTOUT1: &str = concatcp!(NAMING_PREFIX, "po1", GROUP_PUTOUT);
-//noinspection RsTypeCheck
-const GROUP_PUTOUT2: &str = concatcp!(NAMING_PREFIX, "po2", GROUP_PUTOUT);
-//noinspection RsTypeCheck
-const GROUP_PUTOUT3: &str = concatcp!(NAMING_PREFIX, "po3", GROUP_PUTOUT);
-const GROUP_OUT_AT_BASE_PREFIX: &str = r"(?:\((?P<runner";
-const GROUP_OUT_AT_BASE_SUFFIX: &str = r">[B123])\))?";
-//noinspection RsTypeCheck
-const GROUP_OUT_AT_BASE1: &str = concatcp!(GROUP_OUT_AT_BASE_PREFIX, "1", GROUP_OUT_AT_BASE_SUFFIX);
-//noinspection RsTypeCheck
-const GROUP_OUT_AT_BASE2: &str = concatcp!(GROUP_OUT_AT_BASE_PREFIX, "2", GROUP_OUT_AT_BASE_SUFFIX);
-//noinspection RsTypeCheck
-const GROUP_OUT_AT_BASE3: &str = concatcp!(GROUP_OUT_AT_BASE_PREFIX, "3", GROUP_OUT_AT_BASE_SUFFIX);
-
-const OUT: &str = formatcp!(
-    r"^{}{}{}({}{}{})?({}{}{})?$",
-    GROUP_ASSISTS1,
-    GROUP_PUTOUT1,
-    GROUP_OUT_AT_BASE1,
-    GROUP_ASSISTS2,
-    GROUP_PUTOUT2,
-    GROUP_OUT_AT_BASE2,
-    GROUP_ASSISTS3,
-    GROUP_PUTOUT3,
-    GROUP_OUT_AT_BASE3
-);
-
-const REACH_ON_ERROR: &str = formatcp!(r"{}E(?P<e>[0-9])$", GROUP_ASSISTS1);
-const BASERUNNING_FIELDING_INFO: &str =
-    r"(?P<base>[123H])(?:\((?P<fielders>[0-9]*)(?P<error>E[0-9])?\)?)?(?P<unearned_run>\(T?UR\))?$";
-
-const ADVANCE: &str = r"^(?P<from>[B123])(?:(-(?P<to>[123H])|X(?P<out_at>[123H])))(?P<mods>.*)?";
-
-lazy_static! {
-    static ref OUT_REGEX: Regex = Regex::new(OUT).unwrap();
-    static ref REACHED_ON_ERROR_REGEX: Regex = Regex::new(REACH_ON_ERROR).unwrap();
-    static ref BASERUNNING_FIELDING_INFO_REGEX: Regex =
-        Regex::new(BASERUNNING_FIELDING_INFO).unwrap();
-    static ref ADVANCE_REGEX: Regex = Regex::new(ADVANCE).unwrap();
-    static ref STRIP_CHARS_REGEX: Regex = Regex::new(r"[#! ]").unwrap();
-    static ref UNKNOWN_FIELDER_REGEX: Regex = Regex::new(r"999*|\?").unwrap();
-    static ref MULTI_PLAY_REGEX: Regex = Regex::new(r"[+;]").unwrap();
-    static ref NUMERIC_REGEX: Regex = Regex::new(r"[0-9]").unwrap();
-    static ref MAIN_PLAY_FIELDING_REGEX: Regex = Regex::new(r"[0-9]").unwrap();
-    static ref BASERUNNING_PLAY_FIELDING_REGEX: Regex = Regex::new(r"[123H]").unwrap();
-    static ref MODIFIER_DIVIDER_REGEX: Regex = Regex::new(r"[+\-0-9]").unwrap();
-    static ref HIT_LOCATION_GENERAL_REGEX: Regex = Regex::new(r"[0-9]+").unwrap();
-    static ref HIT_LOCATION_STRENGTH_REGEX: Regex = Regex::new(r"[+\-]").unwrap();
-    static ref HIT_LOCATION_ANGLE_REGEX: Regex = Regex::new(r"[FMLR]").unwrap();
-    static ref HIT_LOCATION_DEPTH_REGEX: Regex = Regex::new(r"(D|S|XD)").unwrap();
-}
+// Sorry
+pub static OUT_REGEX: &Lazy<Regex> = regex!(r"^(?P<a1>(?:[0-9]?)+)(?P<po1>[0-9])(?:\((?P<runner1>[B123])\))?((?P<a2>(?:[0-9]?)+)(?P<po2>[0-9])(?:\((?P<runner2>[B123])\))?)?((?P<a3>(?:[0-9]?)+)(?P<po3>[0-9])(?:\((?P<runner3>[B123])\))?)?$");
+pub static REACHED_ON_ERROR_REGEX: &Lazy<Regex> = regex!(r"(?P<a1>(?:[0-9]?)+)E(?P<e>[0-9])$");
+pub static BASERUNNING_FIELDING_INFO_REGEX: &Lazy<Regex> = regex!(r"(?P<base>[123H])(?:\((?P<fielders>[0-9]*)(?P<error>E[0-9])?\)?)?(?P<unearned_run>\(T?UR\))?$");
+pub static ADVANCE_REGEX: &Lazy<Regex> = regex!(r"^(?P<from>[B123])(?:(-(?P<to>[123H])|X(?P<out_at>[123H])))(?P<mods>.*)?$");
+pub static STRIP_CHARS_REGEX: &Lazy<Regex> = regex!(r"[#! ]");
+pub static UNKNOWN_FIELDER_REGEX: &Lazy<Regex> = regex!(r"999*|\?");
+pub static MULTI_PLAY_REGEX: &Lazy<Regex> = regex!(r"[+;]");
+pub static NUMERIC_REGEX: &Lazy<Regex> = regex!(r"[0-9]");
+pub static MAIN_PLAY_FIELDING_REGEX: &Lazy<Regex> = regex!(r"[0-9]");
+pub static BASERUNNING_PLAY_FIELDING_REGEX: &Lazy<Regex> = regex!(r"[123H]");
+pub static MODIFIER_DIVIDER_REGEX: &Lazy<Regex> = regex!(r"[+\-0-9]");
+pub static HIT_LOCATION_GENERAL_REGEX: &Lazy<Regex> = regex!(r"[0-9]+");
+pub static HIT_LOCATION_STRENGTH_REGEX: &Lazy<Regex> = regex!(r"[0-9]+");
+pub static HIT_LOCATION_ANGLE_REGEX: &Lazy<Regex> = regex!(r"[FMLR]");
+pub static HIT_LOCATION_DEPTH_REGEX: &Lazy<Regex> = regex!(r"(D|S|XD)");
 
 lazy_static! {
     static ref PARSED_PLAY_CACHE: Arc<Cache<String, Arc<ParsedPlay>>> =
@@ -882,7 +834,7 @@ impl TryFrom<&str> for BaserunningPlay {
             });
         }
 
-        let (first, last) = regex_split(value, &BASERUNNING_PLAY_FIELDING_REGEX);
+        let (first, last) = regex_split(value, BASERUNNING_PLAY_FIELDING_REGEX);
         let baserunning_play_type = BaserunningPlayType::from_str(first)?;
         if last.is_none() {
             return Ok(Self {
@@ -1044,7 +996,7 @@ impl PlayType {
             return Ok(vec![]);
         }
         if MULTI_PLAY_REGEX.is_match(value) {
-            let (first, last) = regex_split(value, &MULTI_PLAY_REGEX);
+            let (first, last) = regex_split(value, MULTI_PLAY_REGEX);
             return Ok(Self::parse_main_play(first, false)?
                 .into_iter()
                 .chain(
@@ -1056,7 +1008,7 @@ impl PlayType {
                 )
                 .collect::<Vec<Self>>());
         }
-        let (first, last) = regex_split(value, &MAIN_PLAY_FIELDING_REGEX);
+        let (first, last) = regex_split(value, MAIN_PLAY_FIELDING_REGEX);
         let str_tuple = (first, last.unwrap_or_default());
         // Extra plays cannot be plate appearances and will produce false matches in some cases,
         // so we need to check for that in addition to the regex match.
@@ -1266,7 +1218,7 @@ impl RunnerAdvanceModifier {
             Self::Unrecognized(_) => (),
             _ => return simple_match,
         };
-        let (first, last) = regex_split(value, &NUMERIC_REGEX);
+        let (first, last) = regex_split(value, NUMERIC_REGEX);
         let last = last.unwrap_or_default();
         let last_as_int_vec: PositionVec = FieldingPosition::fielding_vec(last);
         let final_match = match first {
@@ -1283,7 +1235,7 @@ impl RunnerAdvanceModifier {
                     .unwrap_or(FieldingPosition::Unknown),
             },
             "(" if last.contains('E') => {
-                let (assist_str, error_str) = last.split_at(last.find('E').unwrap());
+                let (assist_str, error_str) = last.split_at(last.find('E').unwrap_or_default());
                 let (assists, error) = (
                     FieldingPosition::fielding_vec(assist_str),
                     FieldingPosition::fielding_vec(error_str)
@@ -1420,16 +1372,16 @@ impl TryFrom<&str> for HitLocation {
         let as_str = { |re: &Regex| re.find(value).map_or("", |m| m.as_str()) };
         // If there's no general location found, that's unexpected behavior and
         // we should short-circuit, but other missing info is expected
-        let general_location = HitLocationGeneral::from_str(as_str(&HIT_LOCATION_GENERAL_REGEX))?;
+        let general_location = HitLocationGeneral::from_str(as_str(HIT_LOCATION_GENERAL_REGEX))?;
         // "L" is usually used for foul line, but for CF and C it means towards the left
         let angle = if general_location.is_middle_position() && value.contains('L') {
             HitAngle::Left
         } else {
-            HitAngle::from_str(as_str(&HIT_LOCATION_ANGLE_REGEX)).unwrap_or_default()
+            HitAngle::from_str(as_str(HIT_LOCATION_ANGLE_REGEX)).unwrap_or_default()
         };
-        let depth = HitDepth::from_str(as_str(&HIT_LOCATION_DEPTH_REGEX)).unwrap_or_default();
+        let depth = HitDepth::from_str(as_str(HIT_LOCATION_DEPTH_REGEX)).unwrap_or_default();
         let strength =
-            HitStrength::from_str(as_str(&HIT_LOCATION_STRENGTH_REGEX)).unwrap_or_default();
+            HitStrength::from_str(as_str(HIT_LOCATION_STRENGTH_REGEX)).unwrap_or_default();
         Ok(Self {
             general_location,
             depth,
@@ -1632,7 +1584,7 @@ impl PlayModifier {
     }
 
     fn parse_single_modifier(value: &str) -> Result<Self> {
-        let (first, last) = regex_split(value, &MODIFIER_DIVIDER_REGEX);
+        let (first, last) = regex_split(value, MODIFIER_DIVIDER_REGEX);
         if let Ok(cd) = ContactDescription::try_from((first, last.unwrap_or_default())) {
             return Ok(Self::ContactDescription(cd));
         }
