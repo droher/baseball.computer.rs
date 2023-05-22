@@ -256,7 +256,7 @@ impl ContextToVec<'_> for EventFieldingPlay {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventPlateAppearance {
     event_key: usize,
-    plate_apperance_result: PlateAppearanceResultType,
+    plate_appearance_result: PlateAppearanceResultType,
 }
 
 impl ContextToVec<'_> for EventPlateAppearance {
@@ -264,7 +264,7 @@ impl ContextToVec<'_> for EventPlateAppearance {
         Box::from(gc.events.iter().filter_map(|e| {
             e.results.plate_appearance.map(|pa| Self {
                 event_key: e.event_key,
-                plate_apperance_result: pa,
+                plate_appearance_result: pa,
             })
         }))
     }
