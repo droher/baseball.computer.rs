@@ -10,8 +10,8 @@ use std::sync::Arc;
 use anyhow::{bail, Context, Error, Result};
 use arrayvec::ArrayVec;
 use bounded_integer::BoundedU8;
-use lazy_regex::{Lazy, regex};
 use fixed_map::Key;
+use lazy_regex::{regex, Lazy};
 use lazy_static::lazy_static;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use quick_cache::sync::Cache;
@@ -27,10 +27,15 @@ use crate::event_file::traits::{
 };
 
 // Sorry
-pub static OUT_REGEX: &Lazy<Regex> = regex!(r"^(?P<a1>(?:[0-9]?)+)(?P<po1>[0-9])(?:\((?P<runner1>[B123])\))?((?P<a2>(?:[0-9]?)+)(?P<po2>[0-9])(?:\((?P<runner2>[B123])\))?)?((?P<a3>(?:[0-9]?)+)(?P<po3>[0-9])(?:\((?P<runner3>[B123])\))?)?$");
+pub static OUT_REGEX: &Lazy<Regex> = regex!(
+    r"^(?P<a1>(?:[0-9]?)+)(?P<po1>[0-9])(?:\((?P<runner1>[B123])\))?((?P<a2>(?:[0-9]?)+)(?P<po2>[0-9])(?:\((?P<runner2>[B123])\))?)?((?P<a3>(?:[0-9]?)+)(?P<po3>[0-9])(?:\((?P<runner3>[B123])\))?)?$"
+);
 pub static REACHED_ON_ERROR_REGEX: &Lazy<Regex> = regex!(r"(?P<a1>(?:[0-9]?)+)E(?P<e>[0-9])$");
-pub static BASERUNNING_FIELDING_INFO_REGEX: &Lazy<Regex> = regex!(r"(?P<base>[123H])(?:\((?P<fielders>[0-9]*)(?P<error>E[0-9])?\)?)?(?P<unearned_run>\(T?UR\))?$");
-pub static ADVANCE_REGEX: &Lazy<Regex> = regex!(r"^(?P<from>[B123])(?:(-(?P<to>[123H])|X(?P<out_at>[123H])))(?P<mods>.*)?$");
+pub static BASERUNNING_FIELDING_INFO_REGEX: &Lazy<Regex> = regex!(
+    r"(?P<base>[123H])(?:\((?P<fielders>[0-9]*)(?P<error>E[0-9])?\)?)?(?P<unearned_run>\(T?UR\))?$"
+);
+pub static ADVANCE_REGEX: &Lazy<Regex> =
+    regex!(r"^(?P<from>[B123])(?:(-(?P<to>[123H])|X(?P<out_at>[123H])))(?P<mods>.*)?$");
 pub static STRIP_CHARS_REGEX: &Lazy<Regex> = regex!(r"[#! ]");
 pub static UNKNOWN_FIELDER_REGEX: &Lazy<Regex> = regex!(r"999*|\?");
 pub static MULTI_PLAY_REGEX: &Lazy<Regex> = regex!(r"[+;]");
@@ -624,6 +629,19 @@ impl PlateAppearanceType {
 
     pub const fn is_at_bat(&self) -> bool {
         matches!(self, Self::Hit(_) | Self::BattingOut(_))
+    }
+
+    pub const fn is_batted_ball(&self) -> bool {
+        matches!(
+            self,
+            Self::Hit(_)
+                | Self::BattingOut(BattingOut {
+                    out_type: OutAtBatType::InPlayOut
+                        | OutAtBatType::ReachedOnError
+                        | OutAtBatType::FieldersChoice,
+                    ..
+                })
+        )
     }
 }
 
@@ -1349,6 +1367,7 @@ pub enum HitLocationGeneral {
     RightCenter,
     #[strum(serialize = "9")]
     Right,
+    Unknown,
 }
 
 impl HitLocationGeneral {
@@ -1363,6 +1382,17 @@ pub struct HitLocation {
     pub depth: HitDepth,
     pub angle: HitAngle,
     pub strength: HitStrength,
+}
+
+impl Default for HitLocation {
+    fn default() -> Self {
+        Self {
+            general_location: HitLocationGeneral::Unknown,
+            depth: HitDepth::Default,
+            angle: HitAngle::Default,
+            strength: HitStrength::Default,
+        }
+    }
 }
 
 impl TryFrom<&str> for HitLocation {

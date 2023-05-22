@@ -13,14 +13,13 @@ use crate::event_file::info::{
     WindDirection,
 };
 use crate::event_file::pitch_sequence::PitchType;
-use crate::event_file::play::{
-    Base, BaseRunner, HitAngle, HitDepth, HitLocationGeneral, HitStrength, InningFrame,
-};
+use crate::event_file::play::{Base, BaseRunner, InningFrame};
 use crate::event_file::traits::{
     FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Pitcher, Player,
     SequenceId, Side,
 };
 
+use super::game_state::PlateAppearanceResultType;
 use super::traits::{RetrosheetVolunteer, Scorer};
 
 pub trait ContextToVec<'a>: Serialize + Sized {
@@ -255,33 +254,18 @@ impl ContextToVec<'_> for EventFieldingPlay {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventHitLocation {
+pub struct EventPlateAppearance {
     event_key: usize,
-    general_location: HitLocationGeneral,
-    depth: HitDepth,
-    angle: HitAngle,
-    strength: HitStrength,
+    plate_apperance_result: PlateAppearanceResultType,
 }
 
-impl ContextToVec<'_> for EventHitLocation {
+impl ContextToVec<'_> for EventPlateAppearance {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().filter_map(|e| {
-            if let Some(Some(hl)) = e
-                .results
-                .plate_appearance
-                .as_ref()
-                .map(|pa| pa.hit_location)
-            {
-                Some(Self {
-                    event_key: e.event_key,
-                    general_location: hl.general_location,
-                    depth: hl.depth,
-                    angle: hl.angle,
-                    strength: hl.strength,
-                })
-            } else {
-                None
-            }
+            e.results.plate_appearance.map(|pa| Self {
+                event_key: e.event_key,
+                plate_apperance_result: pa,
+            })
         }))
     }
 }

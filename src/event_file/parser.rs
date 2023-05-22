@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context, Error, Result};
 use arrayvec::ArrayString;
 use csv::{Reader, ReaderBuilder, StringRecord};
 use glob::{glob, Paths, PatternError};
-use lazy_regex::{Lazy, regex};
+use lazy_regex::{regex, Lazy};
 use regex::Regex;
 use tracing::warn;
 

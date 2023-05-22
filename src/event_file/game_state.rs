@@ -22,8 +22,8 @@ use crate::event_file::misc::{
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::play::{
     Base, BaseRunner, BaserunningPlayType, ContactType, Count, EarnedRunStatus, FieldersData,
-    FieldingData, HitLocation, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance,
-    OutAtBatType, PlateAppearanceType, PlayModifier, PlayRecord, PlayType, RunnerAdvance,
+    FieldingData, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType,
+    PlateAppearanceType, PlayModifier, PlayRecord, PlayType, RunnerAdvance,
 };
 use crate::event_file::traits::{
     FieldingPosition, Inning, LineupPosition, Matchup, Pitcher, Player, RetrosheetVolunteer,
@@ -32,6 +32,7 @@ use crate::event_file::traits::{
 use crate::AccountType;
 
 use super::pitch_sequence::PitchSequence;
+use super::play::{HitAngle, HitDepth, HitLocationGeneral, HitStrength};
 use super::schemas::GameIdString;
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
@@ -140,9 +141,19 @@ pub enum PlateAppearanceResultType {
     SacrificeHit,
 }
 
-impl From<(&PlateAppearanceType, &[PlayModifier])> for PlateAppearanceResultType {
-    fn from(tup: (&PlateAppearanceType, &[PlayModifier])) -> Self {
-        let (plate_appearance, modifiers) = tup;
+impl PlateAppearanceResultType {
+    pub fn from_play(play: &PlayRecord) -> Option<Self> {
+        let modifiers = play.parsed.modifiers.as_slice();
+        play.parsed.main_plays.iter().find_map(|pt| {
+            if let PlayType::PlateAppearance(pa) = pt {
+                Some(Self::from_internal(pa, modifiers))
+            } else {
+                None
+            }
+        })
+    }
+
+    fn from_internal(plate_appearance: &PlateAppearanceType, modifiers: &[PlayModifier]) -> Self {
         let is_sac_fly = modifiers.iter().any(|m| m == &PlayModifier::SacrificeFly);
         let is_sac_hit = modifiers.iter().any(|m| m == &PlayModifier::SacrificeHit);
         let is_inside_the_park = modifiers
@@ -623,29 +634,37 @@ impl EventBaserunningPlay {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct EventPlateAppearance {
+pub struct EventBattedBallInfo {
     pub event_key: usize,
-    pub plate_appearance_result: PlateAppearanceResultType,
-    pub contact: Option<ContactType>,
-    pub hit_to_fielder: Option<FieldingPosition>,
-    #[serde(skip_serializing)]
-    pub hit_location: Option<HitLocation>,
+    pub contact: ContactType,
+    pub hit_to_fielder: FieldingPosition,
+    pub general_location: HitLocationGeneral,
+    pub depth: HitDepth,
+    pub angle: HitAngle,
+    pub strength: HitStrength,
 }
 
-impl EventPlateAppearance {
+impl EventBattedBallInfo {
     fn from_play(play: &PlayRecord, event_key: usize) -> Option<Self> {
-        let modifiers = play.parsed.modifiers.as_slice();
+        // Determine whether the ball was hit in play, and then extract all contact/location info if so
         play.parsed.main_plays.iter().find_map(|pt| {
-            if let PlayType::PlateAppearance(pa) = pt {
-                Some(Self {
-                    event_key,
-                    plate_appearance_result: PlateAppearanceResultType::from((pa, modifiers)),
-                    contact: play.stats.contact_description.map(|cd| cd.contact_type),
-                    hit_to_fielder: play.stats.hit_to_fielder,
-                    hit_location: play.stats.contact_description.and_then(|cd| cd.location),
-                })
-            } else {
-                None
+            match pt {
+                PlayType::PlateAppearance(pa) if pa.is_batted_ball() => {
+                    // In the absence of any contact info, we still want to return Some to indicate that
+                    // the ball was hit in play but we don't have any data on it
+                    let contact_description = play.stats.contact_description.unwrap_or_default();
+                    let location = contact_description.location.unwrap_or_default();
+                    Some(Self {
+                        event_key,
+                        contact: contact_description.contact_type,
+                        hit_to_fielder: play.stats.hit_to_fielder.unwrap_or_default(),
+                        general_location: location.general_location,
+                        depth: location.depth,
+                        angle: location.angle,
+                        strength: location.strength,
+                    })
+                }
+                _ => None,
             }
         })
     }
@@ -709,7 +728,8 @@ pub struct EventContext {
 pub struct EventResults {
     pub count_at_event: Count,
     pub pitch_sequence: Arc<PitchSequence>,
-    pub plate_appearance: Option<EventPlateAppearance>,
+    pub plate_appearance: Option<PlateAppearanceResultType>,
+    pub batted_ball_info: Option<EventBattedBallInfo>,
     pub plays_at_base: Vec<EventBaserunningPlay>,
     pub out_on_play: Vec<BaseRunner>,
     pub fielding_plays: Vec<FieldersData>,
@@ -745,11 +765,7 @@ impl Event {
             inning = self.context.inning,
             outs_at_event = self.context.outs,
             ab = self.context.at_bat,
-            pa = self
-                .results
-                .plate_appearance
-                .as_ref()
-                .map(|pa| pa.plate_appearance_result),
+            pa = self.results.plate_appearance,
             ba = self.results.baserunning_advances,
             out = self.results.out_on_play,
         )
@@ -1112,7 +1128,8 @@ impl GameState {
                 let results = EventResults {
                     count_at_event: play.count,
                     pitch_sequence: play.pitch_sequence.clone(),
-                    plate_appearance: EventPlateAppearance::from_play(play, event_key),
+                    plate_appearance: PlateAppearanceResultType::from_play(play),
+                    batted_ball_info: EventBattedBallInfo::from_play(play, event_key),
                     plays_at_base: EventBaserunningPlay::from_play(play, event_key)?,
                     baserunning_advances: EventBaserunningAdvanceAttempt::from_play(
                         play, event_key,

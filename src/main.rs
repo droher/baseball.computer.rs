@@ -1,7 +1,12 @@
 #![allow(dead_code)]
 #![forbid(unsafe_code)]
 #![deny(clippy::all, clippy::cargo)]
-#![warn(clippy::nursery, clippy::pedantic, clippy::unwrap_used, clippy::expect_used)]
+#![warn(
+    clippy::nursery,
+    clippy::pedantic,
+    clippy::unwrap_used,
+    clippy::expect_used
+)]
 #![allow(clippy::module_name_repetitions)]
 
 use glob::GlobError;
@@ -27,14 +32,13 @@ use tracing_subscriber::FmtSubscriber;
 
 use event_file::game_state::GameContext;
 use event_file::parser::RetrosheetReader;
-use event_file::schemas::{ContextToVec, Event};
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
 use crate::event_file::schemas::{
-    BoxScoreLineScore, BoxScoreWritableRecord, EventAudit, EventFieldingPlay, EventHitLocation,
-    EventOut, EventPitch, Game, GameEarnedRuns, GameTeam,
+    BoxScoreLineScore, BoxScoreWritableRecord, ContextToVec, Event, EventAudit, EventFieldingPlay,
+    EventOut, EventPitch, EventPlateAppearance, Game, GameEarnedRuns, GameTeam,
 };
 use crate::event_file::traits::EVENT_KEY_BUFFER;
 
@@ -153,11 +157,11 @@ enum EventFileSchema {
     Event,
     EventRaw,
     EventStartingBaseState,
+    EventBattedBallInfo,
     EventPlateAppearance,
     EventOut,
     EventFieldingPlay,
     EventBaserunningAdvanceAttempt,
-    EventHitLocation,
     EventBaserunningPlay,
     EventPitch,
     EventFlag,
@@ -321,7 +325,8 @@ impl EventFileSchema {
         WRITER_MAP.write_context::<EventOut>(Self::EventOut, game_context)?;
         WRITER_MAP.write_context::<EventFieldingPlay>(Self::EventFieldingPlay, game_context)?;
         WRITER_MAP.write_context::<EventPitch>(Self::EventPitch, game_context)?;
-        WRITER_MAP.write_context::<EventHitLocation>(Self::EventHitLocation, game_context)?;
+        WRITER_MAP
+            .write_context::<EventPlateAppearance>(Self::EventPlateAppearance, game_context)?;
         // Write Game
         WRITER_MAP
             .get_csv(Self::Game)?
@@ -350,12 +355,12 @@ impl EventFileSchema {
         for row in base_states {
             w.serialize(row)?;
         }
-        // Write EventPlateAppearance
-        let mut w = WRITER_MAP.get_csv(Self::EventPlateAppearance)?;
+        // Write EventBattedBallInfo
+        let mut w = WRITER_MAP.get_csv(Self::EventBattedBallInfo)?;
         let pa = game_context
             .events
             .iter()
-            .filter_map(|e| e.results.plate_appearance.as_ref());
+            .filter_map(|e| e.results.batted_ball_info.as_ref());
         for row in pa {
             w.serialize(row)?;
         }
