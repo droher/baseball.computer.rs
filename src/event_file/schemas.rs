@@ -15,12 +15,11 @@ use crate::event_file::info::{
 use crate::event_file::pitch_sequence::PitchType;
 use crate::event_file::play::{Base, BaseRunner, InningFrame};
 use crate::event_file::traits::{
-    FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Pitcher, Player,
-    SequenceId, Side,
+    EventKey, FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Pitcher,
+    Player, RetrosheetVolunteer, Scorer, SequenceId, Side,
 };
 
 use super::game_state::PlateAppearanceResultType;
-use super::traits::{RetrosheetVolunteer, Scorer};
 
 pub trait ContextToVec<'a>: Serialize + Sized {
     fn from_game_context(gc: &'a GameContext) -> Box<dyn Iterator<Item = Self> + 'a>;
@@ -59,7 +58,7 @@ pub struct Game<'a> {
     translator: Option<RetrosheetVolunteer>,
     date_inputted: Option<NaiveDateTime>,
     date_edited: Option<NaiveDateTime>,
-    game_key: usize,
+    game_key: EventKey,
 }
 
 impl<'a> From<&'a GameContext> for Game<'a> {
@@ -154,7 +153,7 @@ impl ContextToVec<'_> for GameEarnedRuns {
 pub struct Event {
     game_id: GameIdString,
     event_id: EventId,
-    event_key: usize,
+    event_key: EventKey,
     batting_side: Side,
     inning: u8,
     frame: InningFrame,
@@ -183,7 +182,7 @@ impl ContextToVec<'_> for Event {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventAudit {
-    event_key: usize,
+    event_key: EventKey,
     game_id: GameIdString,
     event_id: EventId,
     filename: ArrayString<20>,
@@ -204,7 +203,7 @@ impl ContextToVec<'_> for EventAudit {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventPitch {
-    event_key: usize,
+    event_key: EventKey,
     sequence_id: SequenceId,
     sequence_item: PitchType,
     runners_going_flag: bool,
@@ -230,7 +229,7 @@ impl ContextToVec<'_> for EventPitch {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventFieldingPlay {
-    event_key: usize,
+    event_key: EventKey,
     sequence_id: usize,
     fielding_position: FieldingPosition,
     fielding_play: FieldingPlayType,
@@ -255,7 +254,7 @@ impl ContextToVec<'_> for EventFieldingPlay {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventPlateAppearance {
-    event_key: usize,
+    event_key: EventKey,
     plate_appearance_result: PlateAppearanceResultType,
 }
 
@@ -272,7 +271,7 @@ impl ContextToVec<'_> for EventPlateAppearance {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventOut {
-    event_key: usize,
+    event_key: EventKey,
     sequence_id: usize,
     baserunner_out: BaseRunner,
 }

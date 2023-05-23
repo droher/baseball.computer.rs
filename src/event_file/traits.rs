@@ -21,6 +21,7 @@ pub const EVENT_KEY_BUFFER: usize = MAX_EVENTS_PER_GAME * MAX_GAMES_PER_FILE;
 
 pub type RetrosheetEventRecord = StringRecord;
 pub type SequenceId = BoundedUsize<1, MAX_EVENTS_PER_GAME>;
+pub type EventKey = u32;
 
 #[derive(
     Ord,

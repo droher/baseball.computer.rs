@@ -454,7 +454,7 @@ impl FileProcessor {
             .enumerate()
             .map(|(i, f)| Self::process_file(&f, parsed_games, (self.index + i) * EVENT_KEY_BUFFER))
             .collect::<Result<Vec<Vec<GameId>>>>()?;
-        self.index += file_count * EVENT_KEY_BUFFER;
+        self.index += file_count;
         let games = games.iter().flatten();
         self.game_ids.extend(games);
         Ok(())

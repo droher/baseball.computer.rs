@@ -34,6 +34,7 @@ use crate::AccountType;
 use super::pitch_sequence::PitchSequence;
 use super::play::{HitAngle, HitDepth, HitLocationGeneral, HitStrength};
 use super::schemas::GameIdString;
+use super::traits::EventKey;
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
@@ -190,13 +191,13 @@ impl PlateAppearanceResultType {
 // TODO: Add weird game state info to flags
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventFlag {
-    event_key: usize,
+    event_key: EventKey,
     sequence_id: SequenceId,
     flag: String,
 }
 
 impl EventFlag {
-    fn from_play(play: &PlayRecord, event_key: usize) -> Result<Vec<Self>> {
+    fn from_play(play: &PlayRecord, event_key: EventKey) -> Result<Vec<Self>> {
         play.parsed
             .modifiers
             .iter()
@@ -527,7 +528,7 @@ pub struct GameContext {
     pub fielding_appearances: Vec<GameFieldingAppearance>,
     pub events: Vec<Event>,
     pub line_offset: usize,
-    pub event_key_offset: usize,
+    pub event_key_offset: u32,
 }
 
 impl GameContext {
@@ -543,7 +544,7 @@ impl GameContext {
         let metadata = GameMetadata::try_from(record_slice)?;
         let umpires = GameUmpire::from_record_slice(record_slice)?;
         let results = GameResults::try_from(record_slice)?;
-        let event_key_offset = Self::event_key_offset(file_info, game_num);
+        let event_key_offset = Self::event_key_offset(file_info, game_num)?;
 
         let (events, lineup_appearances, fielding_appearances) =
             if file_info.account_type == AccountType::BoxScore {
@@ -569,21 +570,23 @@ impl GameContext {
         })
     }
 
-    const fn event_key_offset(file_info: FileInfo, game_num: usize) -> usize {
-        file_info.file_index + (game_num * MAX_EVENTS_PER_GAME)
+    fn event_key_offset(file_info: FileInfo, game_num: usize) -> Result<u32> {
+        (file_info.file_index + (game_num * MAX_EVENTS_PER_GAME))
+            .try_into()
+            .context("u32 overflow on event key creation")
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct EventStartingBaseState {
-    pub event_key: usize,
+    pub event_key: EventKey,
     pub baserunner: BaseRunner,
     pub runner_lineup_position: LineupPosition,
     pub charged_to_pitcher_id: Pitcher,
 }
 
 impl EventStartingBaseState {
-    fn from_base_state(state: &BaseState, event_key: usize) -> Vec<Self> {
+    fn from_base_state(state: &BaseState, event_key: EventKey) -> Vec<Self> {
         state
             .get_bases()
             .iter()
@@ -599,14 +602,14 @@ impl EventStartingBaseState {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningPlay {
-    pub event_key: usize,
+    pub event_key: EventKey,
     pub sequence_id: SequenceId,
     pub baserunning_play_type: BaserunningPlayType,
     pub baserunner: Option<BaseRunner>,
 }
 
 impl EventBaserunningPlay {
-    fn from_play(play: &PlayRecord, event_key: usize) -> Result<Vec<Self>> {
+    fn from_play(play: &PlayRecord, event_key: EventKey) -> Result<Vec<Self>> {
         play.parsed
             .main_plays
             .iter()
@@ -635,7 +638,7 @@ impl EventBaserunningPlay {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBattedBallInfo {
-    pub event_key: usize,
+    pub event_key: EventKey,
     pub contact: ContactType,
     pub hit_to_fielder: FieldingPosition,
     pub general_location: HitLocationGeneral,
@@ -645,7 +648,7 @@ pub struct EventBattedBallInfo {
 }
 
 impl EventBattedBallInfo {
-    fn from_play(play: &PlayRecord, event_key: usize) -> Option<Self> {
+    fn from_play(play: &PlayRecord, event_key: EventKey) -> Option<Self> {
         // Determine whether the ball was hit in play, and then extract all contact/location info if so
         play.parsed.main_plays.iter().find_map(|pt| {
             match pt {
@@ -673,7 +676,7 @@ impl EventBattedBallInfo {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct EventBaserunningAdvanceAttempt {
-    pub event_key: usize,
+    pub event_key: EventKey,
     pub sequence_id: SequenceId,
     pub baserunner: BaseRunner,
     pub attempted_advance_to: Base,
@@ -685,7 +688,7 @@ pub struct EventBaserunningAdvanceAttempt {
 }
 
 impl EventBaserunningAdvanceAttempt {
-    fn from_play(play: &PlayRecord, event_key: usize) -> Result<Vec<Self>> {
+    fn from_play(play: &PlayRecord, event_key: EventKey) -> Result<Vec<Self>> {
         play.stats
             .advances
             .iter()
@@ -742,7 +745,7 @@ pub struct EventResults {
 pub struct Event {
     pub game_id: GameId,
     pub event_id: EventId,
-    pub event_key: usize,
+    pub event_key: EventKey,
     pub context: EventContext,
     pub results: EventResults,
     pub line_number: usize,
@@ -1094,7 +1097,7 @@ impl GameState {
     pub fn create_events(
         record_slice: &RecordSlice,
         line_offset: usize,
-        event_key_offset: usize,
+        event_key_offset: u32,
     ) -> Result<(
         Vec<Event>,
         Vec<GameLineupAppearance>,
@@ -1109,7 +1112,7 @@ impl GameState {
             } else {
                 None
             };
-            let event_key = event_key_offset + state.event_id;
+            let event_key: u32 = event_key_offset + u32::try_from(state.event_id.get())?;
             let starting_base_state =
                 EventStartingBaseState::from_base_state(&state.bases, event_key);
 
