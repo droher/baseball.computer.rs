@@ -1107,14 +1107,18 @@ impl GameState {
 
         let mut state = Self::new(record_slice)?;
         for (i, record) in record_slice.iter().enumerate() {
-            let opt_play = if let MappedRecord::Play(pr) = record {
-                Some(pr)
-            } else {
-                None
-            };
             let event_key: u32 = event_key_offset + u32::try_from(state.event_id.get())?;
+            let opt_play = match record {
+                MappedRecord::Play(pr) => Some(pr),
+                _ => None,
+            };
+            // TODO: Would be nice to clear this automatically rather than checking
             let starting_base_state =
-                EventStartingBaseState::from_base_state(&state.bases, event_key);
+                if matches!(opt_play.map(|p| state.is_frame_flipped(p)), Some(Ok(true))) {
+                    vec![]
+                } else {
+                    EventStartingBaseState::from_base_state(&state.bases, event_key)
+                };
 
             state.update(record, opt_play)?;
             if let Some(play) = opt_play {
