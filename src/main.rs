@@ -7,7 +7,7 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::module_name_repetitions, clippy::significant_drop_tightening)]
 
 use glob::GlobError;
 use std::collections::HashSet;
