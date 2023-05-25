@@ -433,32 +433,31 @@ pub struct GameLineupAppearance {
     pub side: Side,
     pub lineup_position: LineupPosition,
     pub entered_game_as: EnteredGameAs,
-    pub start_event_key: EventKey,
-    pub end_event_key: Option<EventKey>,
+    pub start_event_id: EventId,
+    pub end_event_id: Option<EventId>,
 }
 
 impl GameLineupAppearance {
-    const fn new_starter(
+    fn new_starter(
         player: Player,
         lineup_position: LineupPosition,
         side: Side,
         game_id: GameId,
-        start_event_key: EventKey,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        Ok(Self {
             game_id: game_id.id,
             player_id: player,
             lineup_position,
             side,
             entered_game_as: EnteredGameAs::Starter,
-            start_event_key,
-            end_event_key: None,
-        }
+            start_event_id: EventId::new(1).context("Could not create event ID")?,
+            end_event_id: None,
+        })
     }
 
-    fn finalize(self, end_event_key: EventKey) -> Self {
+    fn finalize(self, end_event_id: EventId) -> Self {
         Self {
-            end_event_key: self.end_event_key.or(Some(end_event_key)),
+            end_event_id: self.end_event_id.or(Some(end_event_id)),
             ..self
         }
     }
@@ -470,31 +469,47 @@ pub struct GameFieldingAppearance {
     pub player_id: Player,
     pub side: Side,
     pub fielding_position: FieldingPosition,
-    pub start_event_key: EventKey,
-    pub end_event_key: Option<EventKey>,
+    pub start_event_id: EventId,
+    pub end_event_id: Option<EventId>,
 }
 
 impl GameFieldingAppearance {
+    fn new_starter(
+        player: Player,
+        fielding_position: FieldingPosition,
+        side: Side,
+        game_id: GameId,
+    ) -> Result<Self> {
+        Ok(Self {
+            game_id: game_id.id,
+            player_id: player,
+            fielding_position,
+            side,
+            start_event_id: EventId::new(1).context("Could not create event ID")?,
+            end_event_id: None,
+        })
+    }
+
     const fn new(
         player: Player,
         fielding_position: FieldingPosition,
         side: Side,
         game_id: GameId,
-        start_event_key: EventKey,
+        start_event: EventId,
     ) -> Self {
         Self {
             game_id: game_id.id,
             player_id: player,
             fielding_position,
             side,
-            start_event_key,
-            end_event_key: None,
+            start_event_id: start_event,
+            end_event_id: None,
         }
     }
 
-    fn finalize(self, end_event_key: EventKey) -> Self {
+    fn finalize(self, end_event_id: EventId) -> Self {
         Self {
-            end_event_key: self.end_event_key.or(Some(end_event_key)),
+            end_event_id: self.end_event_id.or(Some(end_event_id)),
             ..self
         }
     }
@@ -806,7 +821,7 @@ impl Default for Personnel {
 }
 
 impl Personnel {
-    fn new(record_slice: &RecordSlice, start_event_key: EventKey) -> Result<Self> {
+    fn new(record_slice: &RecordSlice) -> Result<Self> {
         let game_id = get_game_id(record_slice)?;
         let mut personnel = Self {
             game_id,
@@ -826,14 +841,12 @@ impl Personnel {
                 start.lineup_position,
                 start.side,
                 game_id,
-                start_event_key,
             );
-            let fielding_appearance = GameFieldingAppearance::new(
+            let fielding_appearance = GameFieldingAppearance::new_starter(
                 start.player,
                 start.fielding_position,
                 start.side,
                 game_id,
-                start_event_key,
             );
             let player: TrackedPlayer = (
                 start.player,
@@ -845,10 +858,10 @@ impl Personnel {
             defense.insert(PositionType::Fielding(start.fielding_position), player);
             personnel
                 .lineup_appearances
-                .insert(player, vec![lineup_appearance]);
+                .insert(player, vec![lineup_appearance?]);
             personnel
                 .defense_appearances
-                .insert(player, vec![fielding_appearance]);
+                .insert(player, vec![fielding_appearance?]);
         }
         Ok(personnel)
     }
@@ -943,7 +956,7 @@ impl Personnel {
     fn update_lineup_on_substitution(
         &mut self,
         sub: &SubstitutionRecord,
-        event_key: EventKey,
+        event_id: EventId,
     ) -> Result<()> {
         let original_batter =
             self.get_at_position(sub.side, PositionType::Lineup(sub.lineup_position));
@@ -951,7 +964,7 @@ impl Personnel {
         match original_batter {
             // If this substitution is the DH/PH/PR being brought in to field, no substitution takes place
             Ok(p) if p.player == sub.player => return Ok(()),
-            Ok(p) => self.get_current_lineup_appearance(&p)?.end_event_key = Some(event_key - 1),
+            Ok(p) => self.get_current_lineup_appearance(&p)?.end_event_id = Some(event_id - 1),
             // There should almost always be an original batter, but in
             // the extremely rare case of a courtesy runner, there might not be.
             Err(_) => {}
@@ -965,7 +978,7 @@ impl Personnel {
         // In the case of a courtesy runner, the new player may already be in the lineup
         let check_courtesy = self.get_current_lineup_appearance(&new_player);
         if let Ok(p) = check_courtesy {
-            p.end_event_key = p.end_event_key.or(Some(event_key - 1));
+            p.end_event_id = p.end_event_id.or_else(|| Some(event_id - 1));
         }
 
         let new_lineup_appearance = GameLineupAppearance {
@@ -974,8 +987,8 @@ impl Personnel {
             lineup_position: sub.lineup_position,
             side: sub.side,
             entered_game_as: EnteredGameAs::substitution_type(sub),
-            start_event_key: event_key,
-            end_event_key: None,
+            start_event_id: event_id,
+            end_event_id: None,
         };
         let (lineup, _) = self.personnel_state.get_mut(sub.side);
         lineup.insert(PositionType::Lineup(sub.lineup_position), new_player);
@@ -991,13 +1004,13 @@ impl Personnel {
     fn update_defense_on_substitution(
         &mut self,
         sub: &SubstitutionRecord,
-        event_key: EventKey,
+        event_id: EventId,
     ) -> Result<()> {
         let original_fielder =
             self.get_at_position(sub.side, PositionType::Fielding(sub.fielding_position));
         match original_fielder {
             Ok(p) if p.player == sub.player => return Ok(()),
-            Ok(p) => self.get_current_fielding_appearance(&p)?.end_event_key = Some(event_key - 1),
+            Ok(p) => self.get_current_fielding_appearance(&p)?.end_event_id = Some(event_id - 1),
             Err(_) => {}
         };
         let new_fielder: TrackedPlayer = (
@@ -1007,7 +1020,7 @@ impl Personnel {
             .into();
         // If the new fielder is already in the game, we need to close out their previous appearance
         if let Ok(gfa) = self.get_current_fielding_appearance(&new_fielder) {
-            gfa.end_event_key = Some(event_key - 1);
+            gfa.end_event_id = Some(event_id - 1);
         }
 
         let (_, defense) = self.personnel_state.get_mut(sub.side);
@@ -1020,7 +1033,7 @@ impl Personnel {
                 sub.fielding_position,
                 sub.side,
                 self.game_id,
-                event_key,
+                event_id,
             ));
 
         Ok(())
@@ -1029,11 +1042,7 @@ impl Personnel {
     /// This handles the rare but always fun case of a team vacating the DH by putting the DH
     /// into the field or the pitcher into a non-pitching position.
     /// This will be a safe no-op if the game in question isn't using a DH.
-    fn update_on_dh_vacancy(
-        &mut self,
-        sub: &SubstitutionRecord,
-        event_key: EventKey,
-    ) -> Result<()> {
+    fn update_on_dh_vacancy(&mut self, sub: &SubstitutionRecord, event_id: EventId) -> Result<()> {
         let non_batting_pitcher = self.get_at_position(
             sub.side,
             PositionType::Lineup(LineupPosition::PitcherWithDh),
@@ -1043,10 +1052,10 @@ impl Personnel {
             PositionType::Fielding(FieldingPosition::DesignatedHitter),
         );
         if let Ok(p) = non_batting_pitcher {
-            self.get_current_lineup_appearance(&p)?.end_event_key = Some(event_key - 1);
+            self.get_current_lineup_appearance(&p)?.end_event_id = Some(event_id - 1);
         }
         if let Ok(p) = dh {
-            self.get_current_fielding_appearance(&p)?.end_event_key = Some(event_key - 1);
+            self.get_current_fielding_appearance(&p)?.end_event_id = Some(event_id - 1);
         }
         Ok(())
     }
@@ -1054,16 +1063,16 @@ impl Personnel {
     fn update_on_substitution(
         &mut self,
         sub: &SubstitutionRecord,
-        event_key: EventKey,
+        event_id: EventId,
     ) -> Result<()> {
-        self.update_lineup_on_substitution(sub, event_key)?;
+        self.update_lineup_on_substitution(sub, event_id)?;
         if sub.fielding_position.is_true_position() {
-            self.update_defense_on_substitution(sub, event_key)?;
+            self.update_defense_on_substitution(sub, event_id)?;
         }
         if sub.fielding_position == FieldingPosition::Pitcher
             && sub.lineup_position != LineupPosition::PitcherWithDh
         {
-            self.update_on_dh_vacancy(sub, event_key)?;
+            self.update_on_dh_vacancy(sub, event_id)?;
         }
         Ok(())
     }
@@ -1074,7 +1083,6 @@ impl Personnel {
 pub struct GameState {
     game_id: GameId,
     event_id: EventId,
-    event_key: EventKey,
     inning: Inning,
     frame: InningFrame,
     batting_side: Side,
@@ -1096,10 +1104,10 @@ impl GameState {
         Vec<GameFieldingAppearance>,
     )> {
         let mut events: Vec<Event> = Vec::with_capacity(100);
-        let start_event_key: EventKey = event_key_offset + 1;
 
-        let mut state = Self::new(record_slice, start_event_key)?;
+        let mut state = Self::new(record_slice)?;
         for (i, record) in record_slice.iter().enumerate() {
+            let event_key: u32 = event_key_offset + u32::try_from(state.event_id.get())?;
             let opt_play = match record {
                 MappedRecord::Play(pr) => Some(pr),
                 _ => None,
@@ -1109,7 +1117,7 @@ impl GameState {
                 if matches!(opt_play.map(|p| state.is_frame_flipped(p)), Some(Ok(true))) {
                     vec![]
                 } else {
-                    EventStartingBaseState::from_base_state(&state.bases, state.event_key)
+                    EventStartingBaseState::from_base_state(&state.bases, event_key)
                 };
 
             state.update(record, opt_play)?;
@@ -1128,13 +1136,12 @@ impl GameState {
                     count_at_event: play.count,
                     pitch_sequence: play.pitch_sequence.clone(),
                     plate_appearance: PlateAppearanceResultType::from_play(play),
-                    batted_ball_info: EventBattedBallInfo::from_play(play, state.event_key),
-                    plays_at_base: EventBaserunningPlay::from_play(play, state.event_key)?,
+                    batted_ball_info: EventBattedBallInfo::from_play(play, event_key),
+                    plays_at_base: EventBaserunningPlay::from_play(play, event_key)?,
                     baserunning_advances: EventBaserunningAdvanceAttempt::from_play(
-                        play,
-                        state.event_key,
+                        play, event_key,
                     )?,
-                    play_info: EventFlag::from_play(play, state.event_key)?,
+                    play_info: EventFlag::from_play(play, event_key)?,
                     comment: None,
                     fielding_plays: play.stats.fielders_data.clone(),
                     out_on_play: play.stats.outs.clone(),
@@ -1143,41 +1150,37 @@ impl GameState {
                 events.push(Event {
                     game_id: state.game_id,
                     event_id: state.event_id,
-                    event_key: state.event_key,
                     context,
                     results,
                     line_number,
+                    event_key,
                 });
                 state.event_id += 1;
-                state.event_key += 1;
             }
         }
         // Set all remaining blank end_event_ids to final event
-        let max_event_key = events
-            .last()
-            .map(|e| e.event_key)
-            .context("Empty event list")?;
+        let max_event_id = EventId::new(events.len()).context("No events in list")?;
         let lineup_appearances = state
             .personnel
             .lineup_appearances
             .values()
             .flatten()
-            .map(|la| la.finalize(max_event_key))
-            .sorted_by_key(|la| (la.side, la.lineup_position, la.start_event_key))
+            .map(|la| la.finalize(max_event_id))
+            .sorted_by_key(|la| (la.side, la.lineup_position, la.start_event_id))
             .collect_vec();
         let defense_appearances = state
             .personnel
             .defense_appearances
             .values()
             .flatten()
-            .map(|la| la.finalize(max_event_key))
-            .sorted_by_key(|la| (la.side, la.fielding_position, la.start_event_key))
+            .map(|la| la.finalize(max_event_id))
+            .sorted_by_key(|la| (la.side, la.fielding_position, la.start_event_id))
             .collect_vec();
 
         Ok((events, lineup_appearances, defense_appearances))
     }
 
-    pub(crate) fn new(record_slice: &RecordSlice, start_event_key: EventKey) -> Result<Self> {
+    pub(crate) fn new(record_slice: &RecordSlice) -> Result<Self> {
         let game_id = get_game_id(record_slice)?;
         let batting_side = record_slice
             .iter()
@@ -1193,14 +1196,13 @@ impl GameState {
         Ok(Self {
             game_id,
             event_id: EventId::new(1).context("Unexpected event ID bound error")?,
-            event_key: start_event_key,
             inning: 1,
             frame: InningFrame::Top,
             batting_side,
             outs: Outs::new(0).context("Unexpected outs bound error")?,
             bases: BaseState::default(),
             at_bat: LineupPosition::default(),
-            personnel: Personnel::new(record_slice, start_event_key)?,
+            personnel: Personnel::new(record_slice)?,
             weird_state: WeirdGameState::default(),
         })
     }
@@ -1264,8 +1266,7 @@ impl GameState {
     }
 
     fn update_on_substitution(&mut self, record: &SubstitutionRecord) -> Result<()> {
-        self.personnel
-            .update_on_substitution(record, self.event_key)
+        self.personnel.update_on_substitution(record, self.event_id)
     }
 
     fn update_on_bat_hand_adjustment(&mut self, record: &BatHandAdjustment) {
