@@ -515,7 +515,7 @@ impl GameFieldingAppearance {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct GameContext {
     pub game_id: GameId,
     pub file_info: FileInfo,
@@ -727,7 +727,7 @@ pub struct EventContext {
     pub pitcher_hand: Hand,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct EventResults {
     pub count_at_event: Count,
     pub pitch_sequence: Arc<PitchSequence>,
@@ -741,7 +741,7 @@ pub struct EventResults {
     pub comment: Option<String>,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct Event {
     pub game_id: GameId,
     pub event_id: EventId,

@@ -9,6 +9,7 @@ use csv::{Reader, ReaderBuilder, StringRecord};
 use glob::{glob, Paths, PatternError};
 use lazy_regex::{regex, Lazy};
 use regex::Regex;
+use serde::Serialize;
 use tracing::warn;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
@@ -33,7 +34,7 @@ pub static PLAY_BY_PLAY: &Lazy<Regex> = regex!(r".*\.EV[ANF]?");
 pub static DERIVED: &Lazy<Regex> = regex!(r".*\.ED[ANF]?");
 pub static BOX_SCORE: &Lazy<Regex> = regex!(r".*\.EB[ANF]?");
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize)]
 pub enum AccountType {
     PlayByPlay,
     Deduced,
@@ -56,7 +57,7 @@ impl AccountType {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize)]
 pub struct FileInfo {
     pub filename: ArrayString<20>,
     pub game_type: GameType,
