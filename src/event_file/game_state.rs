@@ -3,18 +3,19 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
-use arrayvec::ArrayVec;
-use bounded_integer::BoundedUsize;
+use arrayvec::{ArrayString, ArrayVec};
+use bounded_integer::{BoundedU8, BoundedUsize};
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use fixed_map::{Key, Map};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use strum_macros::Display;
+use strum_macros::{AsRefStr, Display};
 
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
     Team, UmpireAssignment, UmpirePosition, WindDirection,
 };
+use crate::event_file::misc::arrow_hack;
 use crate::event_file::misc::{
     BatHandAdjustment, EarnedRunRecord, GameId, Hand, PitchHandAdjustment,
     PitcherResponsibilityAdjustment, RunnerAdjustment, SubstitutionRecord,
@@ -31,10 +32,11 @@ use crate::event_file::traits::{
 };
 use crate::AccountType;
 
-use super::pitch_sequence::PitchSequence;
+use super::misc::{arrow_hack_vec, skip_ids};
+use super::pitch_sequence::{PitchSequence, PitchSequenceItem, PitchType};
 use super::play::{HitAngle, HitDepth, HitLocationGeneral, HitStrength};
 use super::schemas::GameIdString;
-use super::traits::EventKey;
+use super::traits::{EventKey, FieldingPlayType, GameType};
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
@@ -92,7 +94,7 @@ fn get_game_id(rv: &RecordSlice) -> Result<GameId> {
         .context("No Game ID found in records")
 }
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Serialize, Deserialize, AsRefStr)]
 pub enum EnteredGameAs {
     Starter,
     PinchHitter,
@@ -122,7 +124,7 @@ impl TryFrom<&MappedRecord> for EnteredGameAs {
     }
 }
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Serialize, Deserialize, AsRefStr)]
 pub enum PlateAppearanceResultType {
     Single,
     Double,
@@ -191,7 +193,9 @@ impl PlateAppearanceResultType {
 // TODO: Add weird game state info to flags
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventFlag {
+    #[serde(skip_serializing_if = "skip_ids")]
     event_key: EventKey,
+    #[serde(skip_serializing_if = "skip_ids")]
     sequence_id: SequenceId,
     flag: String,
 }
@@ -224,12 +228,19 @@ struct League(String);
 pub struct GameSetting {
     pub date: NaiveDate,
     pub start_time: Option<NaiveTime>,
+    #[serde(serialize_with = "arrow_hack")]
     pub doubleheader_status: DoubleheaderStatus,
+    #[serde(serialize_with = "arrow_hack")]
     pub time_of_day: DayNight,
+    #[serde(serialize_with = "arrow_hack")]
     pub bat_first_side: Side,
+    #[serde(serialize_with = "arrow_hack")]
     pub sky: Sky,
+    #[serde(serialize_with = "arrow_hack")]
     pub field_condition: FieldCondition,
+    #[serde(serialize_with = "arrow_hack")]
     pub precipitation: Precipitation,
+    #[serde(serialize_with = "arrow_hack")]
     pub wind_direction: WindDirection,
     pub season: Season,
     pub park_id: Park,
@@ -302,6 +313,7 @@ impl From<&RecordSlice> for GameSetting {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize, Default)]
 pub struct GameMetadata {
     pub scorer: Option<Scorer>,
+    #[serde(serialize_with = "arrow_hack")]
     pub how_scored: HowScored,
     pub inputter: Option<RetrosheetVolunteer>,
     pub translator: Option<RetrosheetVolunteer>,
@@ -337,6 +349,7 @@ impl From<&RecordSlice> for GameMetadata {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GameUmpire {
     pub game_id: GameIdString,
+    #[serde(serialize_with = "arrow_hack")]
     pub position: UmpirePosition,
     pub umpire_id: Option<Umpire>,
 }
@@ -428,10 +441,13 @@ impl From<&[MappedRecord]> for GameResults {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct GameLineupAppearance {
+    #[serde(skip_serializing_if = "skip_ids")]
     pub game_id: GameIdString,
     pub player_id: Player,
+    #[serde(serialize_with = "arrow_hack")]
     pub side: Side,
     pub lineup_position: LineupPosition,
+    #[serde(serialize_with = "arrow_hack")]
     pub entered_game_as: EnteredGameAs,
     pub start_event_id: EventId,
     pub end_event_id: Option<EventId>,
@@ -465,8 +481,10 @@ impl GameLineupAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Copy)]
 pub struct GameFieldingAppearance {
+    #[serde(skip_serializing_if = "skip_ids")]
     pub game_id: GameIdString,
     pub player_id: Player,
+    #[serde(serialize_with = "arrow_hack")]
     pub side: Side,
     pub fielding_position: FieldingPosition,
     pub start_event_id: EventId,
@@ -517,6 +535,7 @@ impl GameFieldingAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct GameContext {
+    #[serde(flatten)]
     pub game_id: GameId,
     pub file_info: FileInfo,
     pub metadata: GameMetadata,
@@ -528,7 +547,7 @@ pub struct GameContext {
     pub fielding_appearances: Vec<GameFieldingAppearance>,
     pub events: Vec<Event>,
     pub line_offset: usize,
-    pub event_key_offset: u32,
+    pub event_key_offset: i32,
 }
 
 impl GameContext {
@@ -570,16 +589,18 @@ impl GameContext {
         })
     }
 
-    fn event_key_offset(file_info: FileInfo, game_num: usize) -> Result<u32> {
+    fn event_key_offset(file_info: FileInfo, game_num: usize) -> Result<i32> {
         (file_info.file_index + (game_num * MAX_EVENTS_PER_GAME))
             .try_into()
-            .context("u32 overflow on event key creation")
+            .context("i32 overflow on event key creation")
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct EventStartingBaseState {
+    #[serde(skip_serializing_if = "skip_ids")]
     pub event_key: EventKey,
+    #[serde(serialize_with = "arrow_hack")]
     pub baserunner: BaseRunner,
     pub runner_lineup_position: LineupPosition,
     pub charged_to_pitcher_id: Pitcher,
@@ -602,9 +623,13 @@ impl EventStartingBaseState {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningPlay {
+    #[serde(skip_serializing_if = "skip_ids")]
     pub event_key: EventKey,
+    #[serde(skip_serializing_if = "skip_ids")]
     pub sequence_id: SequenceId,
+    #[serde(serialize_with = "arrow_hack")]
     pub baserunning_play_type: BaserunningPlayType,
+    #[serde(serialize_with = "arrow_hack")]
     pub baserunner: Option<BaseRunner>,
 }
 
@@ -636,14 +661,20 @@ impl EventBaserunningPlay {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Default)]
 pub struct EventBattedBallInfo {
+    #[serde(skip_serializing_if = "skip_ids")]
     pub event_key: EventKey,
+    #[serde(serialize_with = "arrow_hack")]
     pub contact: ContactType,
     pub hit_to_fielder: FieldingPosition,
+    #[serde(serialize_with = "arrow_hack")]
     pub general_location: HitLocationGeneral,
+    #[serde(serialize_with = "arrow_hack")]
     pub depth: HitDepth,
+    #[serde(serialize_with = "arrow_hack")]
     pub angle: HitAngle,
+    #[serde(serialize_with = "arrow_hack")]
     pub strength: HitStrength,
 }
 
@@ -676,9 +707,13 @@ impl EventBattedBallInfo {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct EventBaserunningAdvanceAttempt {
+    #[serde(skip_serializing_if = "skip_ids")]
     pub event_key: EventKey,
+    #[serde(skip_serializing_if = "skip_ids")]
     pub sequence_id: SequenceId,
+    #[serde(serialize_with = "arrow_hack")]
     pub baserunner: BaseRunner,
+    #[serde(serialize_with = "arrow_hack")]
     pub attempted_advance_to: Base,
     pub is_successful: bool,
     pub advanced_on_error_flag: bool,
@@ -718,12 +753,16 @@ impl EventBaserunningAdvanceAttempt {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct EventContext {
     pub inning: u8,
+    #[serde(serialize_with = "arrow_hack")]
     pub batting_side: Side,
+    #[serde(serialize_with = "arrow_hack")]
     pub frame: InningFrame,
     pub at_bat: LineupPosition,
     pub outs: Outs,
     pub starting_base_state: Vec<EventStartingBaseState>,
+    #[serde(serialize_with = "arrow_hack")]
     pub batter_hand: Hand,
+    #[serde(serialize_with = "arrow_hack")]
     pub pitcher_hand: Hand,
 }
 
@@ -731,9 +770,11 @@ pub struct EventContext {
 pub struct EventResults {
     pub count_at_event: Count,
     pub pitch_sequence: Arc<PitchSequence>,
+    #[serde(serialize_with = "arrow_hack")]
     pub plate_appearance: Option<PlateAppearanceResultType>,
     pub batted_ball_info: Option<EventBattedBallInfo>,
     pub plays_at_base: Vec<EventBaserunningPlay>,
+    #[serde(serialize_with = "arrow_hack_vec")]
     pub out_on_play: Vec<BaseRunner>,
     pub fielding_plays: Vec<FieldersData>,
     pub baserunning_advances: Vec<EventBaserunningAdvanceAttempt>,
@@ -748,6 +789,7 @@ pub struct Event {
     pub event_key: EventKey,
     pub context: EventContext,
     pub results: EventResults,
+    #[serde(skip_serializing_if = "skip_ids")]
     pub line_number: usize,
 }
 
@@ -1097,7 +1139,7 @@ impl GameState {
     pub fn create_events(
         record_slice: &RecordSlice,
         line_offset: usize,
-        event_key_offset: u32,
+        event_key_offset: i32,
     ) -> Result<(
         Vec<Event>,
         Vec<GameLineupAppearance>,
@@ -1107,7 +1149,7 @@ impl GameState {
 
         let mut state = Self::new(record_slice)?;
         for (i, record) in record_slice.iter().enumerate() {
-            let event_key: u32 = event_key_offset + u32::try_from(state.event_id.get())?;
+            let event_key: i32 = event_key_offset + i32::try_from(state.event_id.get())?;
             let opt_play = match record {
                 MappedRecord::Play(pr) => Some(pr),
                 _ => None,
@@ -1517,4 +1559,155 @@ impl BaseState {
 pub struct Runner {
     pub lineup_position: LineupPosition,
     pub charged_to: Pitcher,
+}
+
+/// Returns a dummy version of GameContext that
+/// has at least one entry in each of its Vecs
+pub fn dummy() -> GameContext {
+    let dummy_str8 = ArrayString::from("dummy").unwrap();
+    let dummy_str16 = ArrayString::from("dummy").unwrap();
+    let dummy_datetime = NaiveDateTime::from_timestamp_opt(0, 0).unwrap();
+    GameContext {
+        game_id: GameId {
+            id: GameIdString::default(),
+        },
+        file_info: FileInfo {
+            filename: ArrayString::from("dummy").unwrap(),
+            game_type: GameType::RegularSeason,
+            account_type: AccountType::BoxScore,
+            file_index: 0,
+        },
+        metadata: GameMetadata {
+            scorer: Some(dummy_str16),
+            how_scored: HowScored::Unknown,
+            inputter: Some(dummy_str16),
+            translator: Some(dummy_str16),
+            date_inputted: Some(dummy_datetime),
+            date_edited: Some(dummy_datetime),
+        },
+        teams: Matchup {
+            away: dummy_str8,
+            home: dummy_str8,
+        },
+        setting: GameSetting {
+            date: NaiveDate::MIN,
+            start_time: Some(NaiveTime::default()),
+            doubleheader_status: DoubleheaderStatus::DoubleHeaderGame1,
+            time_of_day: DayNight::Day,
+            bat_first_side: Side::Away,
+            sky: Sky::Unknown,
+            field_condition: FieldCondition::Unknown,
+            precipitation: Precipitation::Unknown,
+            wind_direction: WindDirection::Unknown,
+            season: Season(1990),
+            park_id: dummy_str8,
+            temperature_fahrenheit: Some(1),
+            attendance: Some(1),
+            wind_speed_mph: Some(1),
+            use_dh: true,
+        },
+        umpires: vec![GameUmpire {
+            game_id: ArrayString::from("dummy").unwrap(),
+            umpire_id: Some(dummy_str8),
+            position: UmpirePosition::Home,
+        }],
+        results: GameResults {
+            winning_pitcher: Some(dummy_str8),
+            losing_pitcher: Some(dummy_str8),
+            save_pitcher: Some(dummy_str8),
+            game_winning_rbi: Some(dummy_str8),
+            time_of_game_minutes: Some(1),
+            protest_info: Some(String::from("dummy")),
+            completion_info: Some(String::from("dummy")),
+            earned_runs: vec![EarnedRunRecord {
+                pitcher_id: dummy_str8,
+                earned_runs: 1,
+            }],
+        },
+        lineup_appearances: vec![GameLineupAppearance {
+            game_id: ArrayString::from("dummy").unwrap(),
+            player_id: dummy_str8,
+            lineup_position: LineupPosition::PitcherWithDh,
+            side: Side::Away,
+            entered_game_as: EnteredGameAs::Starter,
+            start_event_id: EventId::new(1).unwrap(),
+            end_event_id: Some(EventId::new(1).unwrap()),
+        }],
+        fielding_appearances: vec![GameFieldingAppearance {
+            game_id: ArrayString::from("dummy").unwrap(),
+            player_id: dummy_str8,
+            fielding_position: FieldingPosition::Pitcher,
+            side: Side::Away,
+            start_event_id: EventId::new(1).unwrap(),
+            end_event_id: Some(EventId::new(1).unwrap()),
+        }],
+        events: vec![Event {
+            game_id: GameId {
+                id: GameIdString::default(),
+            },
+            event_id: EventId::new(1).unwrap(),
+            context: EventContext {
+                inning: 1,
+                batting_side: Side::Away,
+                frame: InningFrame::Top,
+                at_bat: LineupPosition::PitcherWithDh,
+                outs: Outs::new(0).unwrap(),
+                starting_base_state: vec![EventStartingBaseState {
+                    event_key: 1,
+                    runner_lineup_position: LineupPosition::PitcherWithDh,
+                    charged_to_pitcher_id: dummy_str8,
+                    baserunner: BaseRunner::Batter,
+                }],
+                batter_hand: Hand::Right,
+                pitcher_hand: Hand::Right,
+            },
+            results: EventResults {
+                count_at_event: Count {
+                    balls: Some(BoundedU8::new(1).unwrap()),
+                    strikes: Some(BoundedU8::new(1).unwrap()),
+                },
+                pitch_sequence: Arc::new(vec![PitchSequenceItem {
+                    sequence_id: SequenceId::new(1).unwrap(),
+                    pitch_type: PitchType::CalledStrike,
+                    blocked_by_catcher: false,
+                    runners_going: false,
+                    catcher_pickoff_attempt: Some(Base::First),
+                }]),
+                plate_appearance: Some(PlateAppearanceResultType::Single),
+                batted_ball_info: Some(EventBattedBallInfo::default()),
+                plays_at_base: vec![EventBaserunningPlay {
+                    event_key: 1,
+                    sequence_id: SequenceId::new(1).unwrap(),
+                    baserunning_play_type: BaserunningPlayType::Balk,
+                    baserunner: Some(BaseRunner::Batter),
+                }],
+                baserunning_advances: vec![EventBaserunningAdvanceAttempt {
+                    event_key: 1,
+                    sequence_id: SequenceId::new(1).unwrap(),
+                    baserunner: BaseRunner::Batter,
+                    attempted_advance_to: Base::Second,
+                    is_successful: true,
+                    advanced_on_error_flag: true,
+                    explicit_out_flag: true,
+                    rbi_flag: true,
+                    team_unearned_flag: true,
+                }],
+                play_info: vec![EventFlag {
+                    event_key: 1,
+                    sequence_id: SequenceId::new(1).unwrap(),
+                    flag: String::from("dummy"),
+                }],
+                comment: Some(String::from("dummy")),
+                fielding_plays: vec![FieldersData {
+                    fielding_position: FieldingPosition::Pitcher,
+                    fielding_play_type: FieldingPlayType::Assist,
+                }],
+                out_on_play: vec![BaseRunner::Batter],
+            },
+            line_number: 1,
+            event_key: 2,
+        }],
+        line_offset: 1,
+        event_key_offset: 3,
+    }
 }

@@ -5,7 +5,7 @@ use anyhow::{bail, Error, Result};
 use arrayvec::ArrayString;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use serde::{Deserialize, Serialize};
-use strum_macros::{Display, EnumString};
+use strum_macros::{AsRefStr, Display, EnumString};
 
 use crate::event_file::misc::{parse_non_negative_int, parse_positive_int, str_to_tinystr};
 use crate::event_file::traits::{
@@ -13,7 +13,18 @@ use crate::event_file::traits::{
 };
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
+    Debug,
+    Eq,
+    PartialEq,
+    EnumString,
+    Copy,
+    Clone,
+    Display,
+    Ord,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    AsRefStr,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum HowScored {
@@ -29,7 +40,18 @@ impl Default for HowScored {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
+    Debug,
+    Eq,
+    PartialEq,
+    EnumString,
+    Copy,
+    Clone,
+    Display,
+    Ord,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    AsRefStr,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum FieldCondition {
@@ -46,7 +68,18 @@ impl Default for FieldCondition {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
+    Debug,
+    Eq,
+    PartialEq,
+    EnumString,
+    Copy,
+    Clone,
+    Display,
+    Ord,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    AsRefStr,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum Precipitation {
@@ -64,7 +97,18 @@ impl Default for Precipitation {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
+    Debug,
+    Eq,
+    PartialEq,
+    EnumString,
+    Copy,
+    Clone,
+    Display,
+    Ord,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    AsRefStr,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum Sky {
@@ -82,7 +126,18 @@ impl Default for Sky {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
+    Debug,
+    Eq,
+    PartialEq,
+    EnumString,
+    Copy,
+    Clone,
+    Display,
+    Ord,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    AsRefStr,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum WindDirection {
@@ -108,7 +163,18 @@ pub type Team = ArrayString<8>;
 pub type Park = ArrayString<8>;
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
+    Debug,
+    Eq,
+    PartialEq,
+    EnumString,
+    Copy,
+    Clone,
+    Display,
+    Ord,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    AsRefStr,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum DayNight {
@@ -123,7 +189,18 @@ impl Default for DayNight {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, Ord, PartialOrd, EnumString, Copy, Clone, Display, Serialize, Deserialize,
+    Debug,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    EnumString,
+    Copy,
+    Clone,
+    Display,
+    Serialize,
+    Deserialize,
+    AsRefStr,
 )]
 pub enum DoubleheaderStatus {
     #[strum(serialize = "0")]
@@ -144,7 +221,18 @@ impl Default for DoubleheaderStatus {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, Display, Ord, PartialOrd, Serialize, Deserialize,
+    Debug,
+    Eq,
+    PartialEq,
+    EnumString,
+    Copy,
+    Clone,
+    Display,
+    Ord,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    AsRefStr,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum PitchDetail {
@@ -172,6 +260,7 @@ impl Default for PitchDetail {
     PartialOrd,
     Serialize,
     Deserialize,
+    AsRefStr,
 )]
 pub enum UmpirePosition {
     #[strum(serialize = "umphome")]

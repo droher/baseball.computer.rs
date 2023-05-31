@@ -18,13 +18,15 @@ use quick_cache::sync::Cache;
 use regex::{Captures, Match, Regex};
 use serde::{Deserialize, Serialize};
 use strum::ParseError;
-use strum_macros::{Display, EnumDiscriminants, EnumIter, EnumString};
+use strum_macros::{AsRefStr, Display, EnumDiscriminants, EnumIter, EnumString};
 
 use crate::event_file::misc::{regex_split, str_to_tinystr, to_str_vec};
 use crate::event_file::pitch_sequence::{PitchSequence, PitchSequenceItem};
 use crate::event_file::traits::{
     Batter, FieldingPlayType, FieldingPosition, Inning, RetrosheetEventRecord, Side,
 };
+
+use super::misc::arrow_hack;
 
 // Sorry
 pub static OUT_REGEX: &Lazy<Regex> = regex!(
@@ -74,6 +76,7 @@ fn preallocated_cache<K: Hash + Eq, V: Clone>(size: usize) -> Arc<Cache<K, Arc<V
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 pub struct FieldersData {
     pub fielding_position: FieldingPosition,
+    #[serde(serialize_with = "arrow_hack")]
     pub fielding_play_type: FieldingPlayType,
 }
 
@@ -163,6 +166,7 @@ pub trait FieldingData {
     Deserialize,
     Ord,
     PartialOrd,
+    AsRefStr,
 )]
 #[repr(u8)]
 pub enum Base {
@@ -174,26 +178,6 @@ pub enum Base {
     Third,
     #[strum(serialize = "H")]
     Home,
-}
-
-impl Base {
-    const fn prev(self) -> Self {
-        match self {
-            Self::First => Self::Home,
-            Self::Second => Self::First,
-            Self::Third => Self::Second,
-            Self::Home => Self::Third,
-        }
-    }
-
-    const fn next(self) -> Self {
-        match self {
-            Self::First => Self::Second,
-            Self::Second => Self::Third,
-            Self::Third => Self::Home,
-            Self::Home => Self::First,
-        }
-    }
 }
 
 #[derive(
@@ -213,6 +197,7 @@ impl Base {
     Serialize,
     Deserialize,
     Key,
+    AsRefStr,
 )]
 #[repr(u8)]
 pub enum BaseRunner {
@@ -252,7 +237,7 @@ impl BaseRunner {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize,
+    Debug, Eq, PartialEq, EnumString, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize, AsRefStr,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum InningFrame {
@@ -732,6 +717,7 @@ impl From<Captures<'_>> for BaserunningFieldingInfo {
     EnumIter,
     Serialize,
     Deserialize,
+    AsRefStr,
 )]
 #[repr(u8)]
 pub enum BaserunningPlayType {
@@ -1274,22 +1260,22 @@ impl RunnerAdvanceModifier {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize, AsRefStr)]
 pub enum HitStrength {
     #[strum(serialize = "+")]
     Hard,
     #[strum(serialize = "-")]
     Soft,
-    Default,
+    Unknown,
 }
 
 impl Default for HitStrength {
     fn default() -> Self {
-        Self::Default
+        Self::Unknown
     }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize, AsRefStr)]
 pub enum HitDepth {
     #[strum(serialize = "S")]
     Shallow,
@@ -1297,16 +1283,16 @@ pub enum HitDepth {
     Deep,
     #[strum(serialize = "XD")]
     ExtraDeep,
-    Default,
+    Unknown,
 }
 
 impl Default for HitDepth {
     fn default() -> Self {
-        Self::Default
+        Self::Unknown
     }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize, AsRefStr)]
 pub enum HitAngle {
     #[strum(serialize = "F")]
     Foul,
@@ -1318,17 +1304,28 @@ pub enum HitAngle {
     Left,
     #[strum(serialize = "R")]
     Right,
-    Default,
+    Unknown,
 }
 
 impl Default for HitAngle {
     fn default() -> Self {
-        Self::Default
+        Self::Unknown
     }
 }
 
 #[derive(
-    Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize,
+    Debug,
+    Ord,
+    PartialOrd,
+    Eq,
+    PartialEq,
+    EnumString,
+    Copy,
+    Clone,
+    Hash,
+    Serialize,
+    Deserialize,
+    AsRefStr,
 )]
 pub enum HitLocationGeneral {
     #[strum(serialize = "1")]
@@ -1370,6 +1367,12 @@ pub enum HitLocationGeneral {
     Unknown,
 }
 
+impl Default for HitLocationGeneral {
+    fn default() -> Self {
+        Self::Unknown
+    }
+}
+
 impl HitLocationGeneral {
     const fn is_middle_position(self) -> bool {
         matches!(self, Self::Catcher | Self::Center)
@@ -1388,9 +1391,9 @@ impl Default for HitLocation {
     fn default() -> Self {
         Self {
             general_location: HitLocationGeneral::Unknown,
-            depth: HitDepth::Default,
-            angle: HitAngle::Default,
-            strength: HitStrength::Default,
+            depth: HitDepth::Unknown,
+            angle: HitAngle::Unknown,
+            strength: HitStrength::Unknown,
         }
     }
 }
@@ -1451,7 +1454,18 @@ impl TryFrom<(&str, &str)> for ContactDescription {
 }
 
 #[derive(
-    Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, EnumString, Hash, Serialize, Deserialize,
+    Debug,
+    Ord,
+    PartialOrd,
+    Eq,
+    PartialEq,
+    Copy,
+    Clone,
+    EnumString,
+    Hash,
+    Serialize,
+    Deserialize,
+    AsRefStr,
 )]
 pub enum ContactType {
     #[strum(serialize = "B")]
@@ -1475,6 +1489,12 @@ pub enum ContactType {
     #[strum(serialize = "")]
     Unknown,
     None,
+}
+
+impl Default for ContactType {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, EnumString, Clone, Hash, Display)]

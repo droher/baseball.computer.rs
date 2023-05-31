@@ -4,6 +4,7 @@ output
 .idea
 *.iml
 perf.data*
+arrow/
 data/
 csv/
 parquet/

@@ -9,7 +9,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use strum_macros::{Display, EnumIter, EnumString};
+use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
 
 use crate::event_file::info::{InfoRecord, Team};
 use crate::event_file::misc::digit_vec;
@@ -21,7 +21,8 @@ pub const EVENT_KEY_BUFFER: usize = MAX_EVENTS_PER_GAME * MAX_GAMES_PER_FILE;
 
 pub type RetrosheetEventRecord = StringRecord;
 pub type SequenceId = BoundedUsize<1, MAX_EVENTS_PER_GAME>;
-pub type EventKey = u32;
+// Signed for DuckDb Parquet compatibility with delta encoding
+pub type EventKey = i32;
 
 #[derive(
     Ord,
@@ -158,7 +159,9 @@ impl TryFrom<&str> for FieldingPosition {
     }
 }
 
-#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(
+    Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize, AsRefStr,
+)]
 pub enum GameType {
     SpringTraining,
     RegularSeason,
@@ -171,7 +174,9 @@ pub enum GameType {
     Other,
 }
 
-#[derive(Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(
+    Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize, AsRefStr,
+)]
 pub enum FieldingPlayType {
     FieldersChoice,
     Putout,
@@ -207,6 +212,7 @@ pub type Scorer = MiscInfoString;
     Serialize,
     Deserialize,
     Display,
+    AsRefStr,
 )]
 pub enum Side {
     #[strum(serialize = "0")]

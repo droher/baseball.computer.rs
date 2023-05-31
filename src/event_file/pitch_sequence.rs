@@ -2,13 +2,27 @@ use std::str::FromStr;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use strum_macros::EnumString;
+use strum_macros::{AsRefStr, EnumString};
 
+use crate::event_file::misc::arrow_hack;
 use crate::event_file::play::Base;
 use crate::event_file::traits::SequenceId;
 
+use super::misc::skip_ids;
+
 #[derive(
-    Debug, Ord, PartialOrd, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize, Hash,
+    Debug,
+    Ord,
+    PartialOrd,
+    Eq,
+    PartialEq,
+    EnumString,
+    Copy,
+    Clone,
+    Serialize,
+    Deserialize,
+    Hash,
+    AsRefStr,
 )]
 pub enum PitchType {
     #[strum(serialize = "1")]
@@ -68,10 +82,13 @@ impl Default for PitchType {
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize, Hash)]
 pub struct PitchSequenceItem {
+    #[serde(skip_serializing_if = "skip_ids")]
     pub sequence_id: SequenceId,
+    #[serde(serialize_with = "arrow_hack")]
     pub pitch_type: PitchType,
     pub runners_going: bool,
     pub blocked_by_catcher: bool,
+    #[serde(serialize_with = "arrow_hack")]
     pub catcher_pickoff_attempt: Option<Base>,
 }
 

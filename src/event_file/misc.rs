@@ -3,10 +3,11 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Error, Result};
 use bimap::BiMap;
+use itertools::Itertools;
 use num_traits::PrimInt;
 use regex::{Match, Regex};
-use serde::{Deserialize, Serialize};
-use strum_macros::EnumString;
+use serde::{Deserialize, Serialize, Serializer};
+use strum_macros::{AsRefStr, EnumString};
 use tracing::warn;
 
 use crate::event_file::play::Base;
@@ -21,7 +22,7 @@ pub type Comment = String;
 /// Indicates the hands that the batter/pitcher are using. For the most part, this is not given
 /// explicitly, but occasionally the batter bats from a different side than his roster data
 /// indicates, and under very rare circumstances the pitcher can switch.
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize, AsRefStr)]
 pub enum Hand {
     #[strum(serialize = "L")]
     Left,
@@ -223,4 +224,34 @@ pub fn to_str_vec(match_vec: Vec<Option<Match>>) -> Vec<&str> {
         .into_iter()
         .filter_map(|o| o.map(|m| m.as_str()))
         .collect()
+}
+
+#[inline]
+pub fn arrow_hack<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+where
+    T: Serialize,
+    S: Serializer,
+{
+    let s = serde_json::to_string(value).unwrap();
+    Serialize::serialize(s.trim_matches('"'), serializer)
+}
+
+#[inline]
+pub fn arrow_hack_vec<T, S>(value: &Vec<T>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    T: Serialize,
+    S: Serializer,
+{
+    // Get JSON Strings on each T in value and then convert them as strs
+    let s = value
+        .iter()
+        .map(|t| serde_json::to_string(t).unwrap())
+        .collect_vec();
+    let s = s.iter().map(|s| s.trim_matches('"')).collect_vec();
+    Serialize::serialize(&s, serializer)
+}
+
+#[inline]
+pub fn skip_ids<T>(_: &T) -> bool {
+    true
 }

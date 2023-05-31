@@ -9,21 +9,36 @@
 )]
 #![allow(clippy::module_name_repetitions, clippy::significant_drop_tightening)]
 
+use arrow::record_batch::{RecordBatch, self};
 use glob::GlobError;
+use itertools::Itertools;
+use serde::Serialize;
 use std::collections::HashSet;
 use std::fs::File;
 use std::hash::Hash;
+use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 use std::time::Instant;
 
 use anyhow::{anyhow, bail, Context, Result};
+use arrow::datatypes::{Field, Schema};
 use csv::{Writer, WriterBuilder};
 use either::Either;
 use fixed_map::{Key, Map};
 use lazy_static::lazy_static;
+use parquet::{
+    arrow::ArrowWriter,
+    basic::{Compression, Encoding, GzipLevel},
+    file::properties::{EnabledStatistics, WriterProperties, WriterVersion},
+    schema::types::ColumnPath,
+};
 use rayon::prelude::*;
+use serde_arrow::{
+    arrow::{serialize_into_arrays, serialize_into_fields},
+    schema::TracingOptions,
+};
 use structopt::StructOpt;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -34,13 +49,14 @@ use event_file::game_state::GameContext;
 use event_file::parser::RetrosheetReader;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
+use crate::event_file::game_state::dummy;
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
 use crate::event_file::schemas::{
     BoxScoreLineScore, BoxScoreWritableRecord, ContextToVec, Event, EventAudit, EventFieldingPlay,
     EventOut, EventPitch, EventPlateAppearance, Game, GameEarnedRuns, GameTeam,
 };
-use crate::event_file::traits::EVENT_KEY_BUFFER;
+use crate::event_file::traits::{GameType, EVENT_KEY_BUFFER};
 
 mod event_file;
 
@@ -51,12 +67,11 @@ lazy_static! {
     static ref WRITER_MAP: WriterMap = WriterMap::new(&OUTPUT_ROOT);
 }
 
-struct ThreadSafeWriter {
+struct ThreadSafeCsvWriter {
     csv: Mutex<Writer<File>>,
     has_header_written: AtomicBool,
 }
-
-impl ThreadSafeWriter {
+impl ThreadSafeCsvWriter {
     #[allow(clippy::expect_used)]
     pub fn new(schema: EventFileSchema) -> Self {
         let file_name = format!("{schema}.csv");
@@ -79,24 +94,94 @@ impl ThreadSafeWriter {
     }
 }
 
+struct ThreadSafeParquetWriter {
+    // The reason this is an Option is because we need to be able to take ownership of the writer
+    // at closing time, and take() is a reasonable way to do that if we're not giving it back.
+    writer: Mutex<Option<ArrowWriter<File>>>,
+    fields: Vec<Field>,
+    schema: Arc<Schema>,
+}
+
+impl ThreadSafeParquetWriter {
+    fn arrow_fields() -> Result<Vec<Field>> {
+        let dummy_vec = vec![dummy()];
+        serialize_into_fields(&dummy_vec, TracingOptions::default())
+            .context("Failed to serialize dummy record")
+    }
+
+    fn writer_props() -> Result<WriterProperties> {
+        let event_key_path = vec!["events", "list", "element", "event_key"]
+            .into_iter()
+            .map(|s| String::from(s))
+            .collect_vec();
+        let props = WriterProperties::builder()
+            .set_compression(Compression::GZIP(GzipLevel::default()))
+            .set_writer_version(WriterVersion::PARQUET_2_0)
+            .set_statistics_enabled(EnabledStatistics::Page)
+            // Each row is very large, so group size needs to be smaller than normal
+            .set_max_row_group_size(10000)
+            .set_column_dictionary_enabled(ColumnPath::new(event_key_path.clone()), false)
+            .set_column_encoding(
+                ColumnPath::new(event_key_path),
+                Encoding::DELTA_BINARY_PACKED,
+            )
+            .build();
+        Ok(props)
+    }
+
+    pub fn new() -> Result<Self> {
+        let fields = Self::arrow_fields()?;
+        let schema = Arc::new(Schema::new(fields.clone()));
+
+        let parquet_file = File::create("arrow/game.parquet")?;
+        let props = Self::writer_props()?;
+        let writer = ArrowWriter::try_new(parquet_file, schema.clone(), Some(props))?;
+        Ok(Self {
+            writer: Mutex::new(Some(writer)),
+            fields,
+            schema
+        })
+    }
+
+    fn write(&self, contexts: &[GameContext]) -> Result<()> {
+        let array = serialize_into_arrays(&self.fields, contexts)?;
+        let record_batch = RecordBatch::try_new(self.schema.clone(), array)?;
+        let mut guard = self.writer.lock().unwrap();
+        let writer = guard.as_mut().unwrap();
+        writer.write(&record_batch)?;
+        Ok(())
+    }
+
+    fn close(&self) -> Result<()> {
+        let w = self.writer.lock().unwrap().take().unwrap();
+        w.close().unwrap();
+        Ok(())
+    }
+
+}
+
+
 struct WriterMap {
     output_prefix: PathBuf,
-    map: Map<EventFileSchema, ThreadSafeWriter>,
+    map: Map<EventFileSchema, ThreadSafeCsvWriter>,
+    parquet_writer: ThreadSafeParquetWriter,
 }
 
 impl WriterMap {
     fn new(output_prefix: &Path) -> Self {
         let mut map = Map::new();
         for schema in EventFileSchema::iter() {
-            map.insert(schema, ThreadSafeWriter::new(schema));
+            map.insert(schema, ThreadSafeCsvWriter::new(schema));
         }
         Self {
             output_prefix: output_prefix.to_path_buf(),
             map,
+            parquet_writer: ThreadSafeParquetWriter::new().unwrap(),
         }
     }
 
     fn flush_all(&self) -> Result<Vec<()>> {
+        self.parquet_writer.close()?;
         self.map
             .iter()
             .par_bridge()
@@ -116,7 +201,11 @@ impl WriterMap {
             .csv()
     }
 
-    fn write_context<'a, C: ContextToVec<'a>>(
+    fn write_parquet(&self, contexts: &[GameContext]) -> Result<()> {
+        self.parquet_writer.write(contexts)
+    }
+
+    fn write_csv<'a, C: ContextToVec<'a>>(
         &self,
         schema: EventFileSchema,
         game_context: &'a GameContext,
@@ -143,6 +232,14 @@ impl WriterMap {
         }
         csv.serialize(line).context("Failed to write line")
     }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
+struct FileInfo {
+    pub filename: String,
+    pub game_type: GameType,
+    pub account_type: AccountType,
+    pub file_index: usize,
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash, Display, EnumIter, Key)]
@@ -214,6 +311,7 @@ impl EventFileSchema {
         debug!("Processing file {}", file_info.filename);
 
         let mut game_ids = Vec::with_capacity(81);
+        let mut contexts = vec![];
 
         for (game_num, record_vec_result) in reader.enumerate() {
             if let Err(e) = record_vec_result {
@@ -246,7 +344,9 @@ impl EventFileSchema {
             } else {
                 Self::write_play_by_play_files(&game_context)?;
             }
+            contexts.push(game_context);
         }
+        WRITER_MAP.write_parquet(&contexts)?;
         Ok(game_ids)
     }
 
@@ -281,7 +381,7 @@ impl EventFileSchema {
             .get_csv(Self::BoxScoreGame)?
             .serialize(Game::from(game_context))?;
         // Write BoxScoreTeam
-        WRITER_MAP.write_context::<GameTeam>(Self::BoxScoreTeam, game_context)?;
+        WRITER_MAP.write_csv::<GameTeam>(Self::BoxScoreTeam, game_context)?;
         // Write GameUmpire
         let mut w = WRITER_MAP.get_csv(Self::BoxScoreUmpire)?;
         for row in &game_context.umpires {
@@ -318,15 +418,15 @@ impl EventFileSchema {
 
     fn write_play_by_play_files(game_context: &GameContext) -> Result<()> {
         // Write schemas directly serializable from GameContext
-        WRITER_MAP.write_context::<GameTeam>(Self::GameTeam, game_context)?;
-        WRITER_MAP.write_context::<GameEarnedRuns>(Self::GameEarnedRuns, game_context)?;
-        WRITER_MAP.write_context::<Event>(Self::Event, game_context)?;
-        WRITER_MAP.write_context::<EventAudit>(Self::EventRaw, game_context)?;
-        WRITER_MAP.write_context::<EventOut>(Self::EventOut, game_context)?;
-        WRITER_MAP.write_context::<EventFieldingPlay>(Self::EventFieldingPlay, game_context)?;
-        WRITER_MAP.write_context::<EventPitch>(Self::EventPitch, game_context)?;
+        WRITER_MAP.write_csv::<GameTeam>(Self::GameTeam, game_context)?;
+        WRITER_MAP.write_csv::<GameEarnedRuns>(Self::GameEarnedRuns, game_context)?;
+        WRITER_MAP.write_csv::<Event>(Self::Event, game_context)?;
+        WRITER_MAP.write_csv::<EventAudit>(Self::EventRaw, game_context)?;
+        WRITER_MAP.write_csv::<EventOut>(Self::EventOut, game_context)?;
+        WRITER_MAP.write_csv::<EventFieldingPlay>(Self::EventFieldingPlay, game_context)?;
+        WRITER_MAP.write_csv::<EventPitch>(Self::EventPitch, game_context)?;
         WRITER_MAP
-            .write_context::<EventPlateAppearance>(Self::EventPlateAppearance, game_context)?;
+            .write_csv::<EventPlateAppearance>(Self::EventPlateAppearance, game_context)?;
         // Write Game
         WRITER_MAP
             .get_csv(Self::Game)?

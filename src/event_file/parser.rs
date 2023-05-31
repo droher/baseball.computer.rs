@@ -10,6 +10,7 @@ use glob::{glob, Paths, PatternError};
 use lazy_regex::{regex, Lazy};
 use regex::Regex;
 use serde::Serialize;
+use strum_macros::AsRefStr;
 use tracing::warn;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
@@ -20,6 +21,8 @@ use crate::event_file::misc::{
 };
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{GameType, RetrosheetEventRecord};
+
+use super::misc::arrow_hack;
 
 pub type RecordSlice = [MappedRecord];
 
@@ -34,7 +37,7 @@ pub static PLAY_BY_PLAY: &Lazy<Regex> = regex!(r".*\.EV[ANF]?");
 pub static DERIVED: &Lazy<Regex> = regex!(r".*\.ED[ANF]?");
 pub static BOX_SCORE: &Lazy<Regex> = regex!(r".*\.EB[ANF]?");
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, AsRefStr)]
 pub enum AccountType {
     PlayByPlay,
     Deduced,
@@ -60,7 +63,9 @@ impl AccountType {
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize)]
 pub struct FileInfo {
     pub filename: ArrayString<20>,
+    #[serde(serialize_with = "arrow_hack")]
     pub game_type: GameType,
+    #[serde(serialize_with = "arrow_hack")]
     pub account_type: AccountType,
     pub file_index: usize,
 }
