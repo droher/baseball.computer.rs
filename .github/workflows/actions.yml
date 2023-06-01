@@ -88,7 +88,7 @@ jobs:
         with:
           path: target/release/boxball-rs
           key: build-${{ github.run_id }}
-      - run: mkdir csv parquet
+      - run: mkdir csv parquet arrow
       - run: ./target/release/boxball-rs -i retrosheet -o csv
 
       - uses: actions/cache@v3
