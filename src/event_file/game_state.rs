@@ -8,6 +8,7 @@ use bounded_integer::{BoundedU8, BoundedUsize};
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use fixed_map::{Key, Map};
 use itertools::Itertools;
+use regex::Match;
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display};
 
@@ -32,6 +33,7 @@ use crate::event_file::traits::{
 };
 use crate::AccountType;
 
+use super::box_score::{BattingLine, BoxScoreEvent, BoxScoreLine, LineScore};
 use super::misc::{arrow_hack_vec, skip_ids};
 use super::pitch_sequence::{PitchSequence, PitchSequenceItem, PitchType};
 use super::play::{HitAngle, HitDepth, HitLocationGeneral, HitStrength};
@@ -534,6 +536,34 @@ impl GameFieldingAppearance {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
+pub struct BoxScoreData {
+    pub line_scores: Vec<LineScore>,
+    pub stat_lines: Vec<BoxScoreLine>,
+    pub box_score_events: Vec<BoxScoreEvent>,
+}
+
+impl BoxScoreData {
+    fn from(record_slice: &RecordSlice) -> Self {
+        let mut line_scores = vec![];
+        let mut stat_lines = vec![];
+        let mut box_score_events = vec![];
+        for record in record_slice {
+            match record {
+                MappedRecord::LineScore(ls) => line_scores.push(ls.clone()),
+                MappedRecord::BoxScoreLine(bsl) => stat_lines.push(bsl.clone()),
+                MappedRecord::BoxScoreEvent(bse) => box_score_events.push(bse.clone()),
+                _ => {}
+            }
+        }
+        Self {
+            line_scores,
+            stat_lines,
+            box_score_events,
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct GameContext {
     #[serde(flatten)]
     pub game_id: GameId,
@@ -548,6 +578,7 @@ pub struct GameContext {
     pub events: Vec<Event>,
     pub line_offset: usize,
     pub event_key_offset: i32,
+    pub box_score_data: Option<BoxScoreData>,
 }
 
 impl GameContext {
@@ -573,6 +604,11 @@ impl GameContext {
                     .with_context(|| anyhow!("Could not parse game {}", game_id.id))?
             };
 
+        let box_score_data = match file_info.account_type {
+            AccountType::BoxScore => Some(BoxScoreData::from(record_slice)),
+            _ => None,
+        };
+
         Ok(Self {
             game_id,
             file_info,
@@ -586,6 +622,7 @@ impl GameContext {
             events,
             line_offset,
             event_key_offset,
+            box_score_data,
         })
     }
 
@@ -1709,5 +1746,13 @@ pub fn dummy() -> GameContext {
         }],
         line_offset: 1,
         event_key_offset: 3,
+        box_score_data: Some(BoxScoreData {
+            line_scores: vec![LineScore {
+                side: Side::Away,
+                line_score: vec![0, 1, 0],
+            }],
+            stat_lines: vec![],
+            box_score_events: vec![],
+        }),
     }
 }

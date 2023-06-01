@@ -9,7 +9,7 @@
 )]
 #![allow(clippy::module_name_repetitions, clippy::significant_drop_tightening)]
 
-use arrow::record_batch::{RecordBatch, self};
+use arrow::record_batch::{self, RecordBatch};
 use glob::GlobError;
 use itertools::Itertools;
 use serde::Serialize;
@@ -139,7 +139,7 @@ impl ThreadSafeParquetWriter {
         Ok(Self {
             writer: Mutex::new(Some(writer)),
             fields,
-            schema
+            schema,
         })
     }
 
@@ -157,9 +157,7 @@ impl ThreadSafeParquetWriter {
         w.close().unwrap();
         Ok(())
     }
-
 }
-
 
 struct WriterMap {
     output_prefix: PathBuf,
@@ -425,8 +423,7 @@ impl EventFileSchema {
         WRITER_MAP.write_csv::<EventOut>(Self::EventOut, game_context)?;
         WRITER_MAP.write_csv::<EventFieldingPlay>(Self::EventFieldingPlay, game_context)?;
         WRITER_MAP.write_csv::<EventPitch>(Self::EventPitch, game_context)?;
-        WRITER_MAP
-            .write_csv::<EventPlateAppearance>(Self::EventPlateAppearance, game_context)?;
+        WRITER_MAP.write_csv::<EventPlateAppearance>(Self::EventPlateAppearance, game_context)?;
         // Write Game
         WRITER_MAP
             .get_csv(Self::Game)?
