@@ -1561,8 +1561,9 @@ pub struct Runner {
     pub charged_to: Pitcher,
 }
 
-/// Returns a dummy version of GameContext that
+/// Returns a dummy version of `GameContext` that
 /// has at least one entry in each of its Vecs
+#[allow(clippy::pedantic, clippy::nursery, clippy::unwrap_used)]
 pub fn dummy() -> GameContext {
     let dummy_str8 = ArrayString::from("dummy").unwrap();
     let dummy_str16 = ArrayString::from("dummy").unwrap();

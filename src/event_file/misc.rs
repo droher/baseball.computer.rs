@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::fmt::Debug;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error, Result};
@@ -229,15 +230,18 @@ pub fn to_str_vec(match_vec: Vec<Option<Match>>) -> Vec<&str> {
 #[inline]
 pub fn arrow_hack<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
 where
-    T: Serialize,
+    T: Serialize + Debug,
     S: Serializer,
 {
-    let s = serde_json::to_string(value).unwrap();
+    let s = serde_json::to_string(value).map_err(|e| {
+        serde::ser::Error::custom(format!("Error serializing {value:?} to JSON string: {e}",))
+    })?;
     Serialize::serialize(s.trim_matches('"'), serializer)
 }
 
 #[inline]
-pub fn arrow_hack_vec<T, S>(value: &Vec<T>, serializer: S) -> Result<S::Ok, S::Error>
+#[allow(clippy::unwrap_used)]
+pub fn arrow_hack_vec<T, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
 where
     T: Serialize,
     S: Serializer,
@@ -252,6 +256,6 @@ where
 }
 
 #[inline]
-pub fn skip_ids<T>(_: &T) -> bool {
+pub const fn skip_ids<T>(_: &T) -> bool {
     false
 }

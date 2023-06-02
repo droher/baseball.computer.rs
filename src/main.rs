@@ -9,21 +9,21 @@
 )]
 #![allow(clippy::module_name_repetitions, clippy::significant_drop_tightening)]
 
-use arrow::record_batch::{RecordBatch, self};
+use arrow::record_batch::RecordBatch;
 use glob::GlobError;
 use itertools::Itertools;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::fs::File;
 use std::hash::Hash;
-use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, RwLock};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
 use anyhow::{anyhow, bail, Context, Result};
 use arrow::datatypes::{Field, Schema};
+use clap::Parser;
 use csv::{Writer, WriterBuilder};
 use either::Either;
 use fixed_map::{Key, Map};
@@ -39,7 +39,6 @@ use serde_arrow::{
     arrow::{serialize_into_arrays, serialize_into_fields},
     schema::TracingOptions,
 };
-use structopt::StructOpt;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use tracing::{debug, error, info, warn, Level};
@@ -63,7 +62,7 @@ mod event_file;
 const ABOUT: &str = "Creates structured datasets from raw Retrosheet files.";
 
 lazy_static! {
-    static ref OUTPUT_ROOT: PathBuf = get_output_root(&Opt::from_args());
+    static ref OUTPUT_ROOT: PathBuf = get_output_root(&Opt::parse());
     static ref WRITER_MAP: WriterMap = WriterMap::new(&OUTPUT_ROOT);
 }
 
@@ -109,12 +108,12 @@ impl ThreadSafeParquetWriter {
             .context("Failed to serialize dummy record")
     }
 
-    fn writer_props() -> Result<WriterProperties> {
+    fn writer_props() -> WriterProperties {
         let event_key_path = vec!["events", "list", "element", "event_key"]
             .into_iter()
-            .map(|s| String::from(s))
+            .map(String::from)
             .collect_vec();
-        let props = WriterProperties::builder()
+        WriterProperties::builder()
             .set_compression(Compression::GZIP(GzipLevel::default()))
             .set_writer_version(WriterVersion::PARQUET_2_0)
             .set_statistics_enabled(EnabledStatistics::Page)
@@ -125,8 +124,7 @@ impl ThreadSafeParquetWriter {
                 ColumnPath::new(event_key_path),
                 Encoding::DELTA_BINARY_PACKED,
             )
-            .build();
-        Ok(props)
+            .build()
     }
 
     pub fn new() -> Result<Self> {
@@ -134,32 +132,36 @@ impl ThreadSafeParquetWriter {
         let schema = Arc::new(Schema::new(fields.clone()));
 
         let parquet_file = File::create("arrow/game.parquet")?;
-        let props = Self::writer_props()?;
+        let props = Self::writer_props();
         let writer = ArrowWriter::try_new(parquet_file, schema.clone(), Some(props))?;
         Ok(Self {
             writer: Mutex::new(Some(writer)),
             fields,
-            schema
+            schema,
         })
     }
 
+    #[allow(clippy::expect_used)]
     fn write(&self, contexts: &[GameContext]) -> Result<()> {
         let array = serialize_into_arrays(&self.fields, contexts)?;
         let record_batch = RecordBatch::try_new(self.schema.clone(), array)?;
-        let mut guard = self.writer.lock().unwrap();
-        let writer = guard.as_mut().unwrap();
+        let mut guard = self.writer.lock().expect("Failed to acquire writer lock");
+        let writer = guard.as_mut().context("Writer not found")?;
         writer.write(&record_batch)?;
         Ok(())
     }
 
-    fn close(&self) -> Result<()> {
-        let w = self.writer.lock().unwrap().take().unwrap();
-        w.close().unwrap();
-        Ok(())
+    #[allow(clippy::expect_used)]
+    fn close(&self) {
+        let w = self
+            .writer
+            .lock()
+            .expect("Failed to acquire writer lock")
+            .take()
+            .expect("Writer not found");
+        w.close().expect("Failed to close writer");
     }
-
 }
-
 
 struct WriterMap {
     output_prefix: PathBuf,
@@ -168,6 +170,7 @@ struct WriterMap {
 }
 
 impl WriterMap {
+    #[allow(clippy::expect_used)]
     fn new(output_prefix: &Path) -> Self {
         let mut map = Map::new();
         for schema in EventFileSchema::iter() {
@@ -176,12 +179,13 @@ impl WriterMap {
         Self {
             output_prefix: output_prefix.to_path_buf(),
             map,
-            parquet_writer: ThreadSafeParquetWriter::new().unwrap(),
+            parquet_writer: ThreadSafeParquetWriter::new()
+                .expect("Failed to create parquet writer"),
         }
     }
 
     fn flush_all(&self) -> Result<Vec<()>> {
-        self.parquet_writer.close()?;
+        self.parquet_writer.close();
         self.map
             .iter()
             .par_bridge()
@@ -425,8 +429,7 @@ impl EventFileSchema {
         WRITER_MAP.write_csv::<EventOut>(Self::EventOut, game_context)?;
         WRITER_MAP.write_csv::<EventFieldingPlay>(Self::EventFieldingPlay, game_context)?;
         WRITER_MAP.write_csv::<EventPitch>(Self::EventPitch, game_context)?;
-        WRITER_MAP
-            .write_csv::<EventPlateAppearance>(Self::EventPlateAppearance, game_context)?;
+        WRITER_MAP.write_csv::<EventPlateAppearance>(Self::EventPlateAppearance, game_context)?;
         // Write Game
         WRITER_MAP
             .get_csv(Self::Game)?
@@ -495,13 +498,13 @@ impl EventFileSchema {
     }
 }
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "pbp-to-box", about = ABOUT)]
+#[derive(Parser, Debug)]
+#[command(name = "pbp-to-box", about = ABOUT)]
 struct Opt {
-    #[structopt(short, long, parse(from_os_str))]
+    #[arg(short, long)]
     input: PathBuf,
 
-    #[structopt(short, long, parse(from_os_str))]
+    #[arg(short, long)]
     output_dir: PathBuf,
 }
 
@@ -583,7 +586,7 @@ fn main() {
     tracing::subscriber::set_global_default(subscriber).expect("Failed to initialize trace");
 
     let start = Instant::now();
-    let opt: Opt = Opt::from_args();
+    let opt: Opt = Opt::parse();
 
     FileProcessor::new(opt)
         .process_files()
