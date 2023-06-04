@@ -1155,13 +1155,12 @@ impl GameState {
                 _ => None,
             };
             // TODO: Feels wrong to have to handle out total differently than everything else
-            let starting_outs = state.outs;
             // TODO: Would be nice to clear this automatically rather than checking
-            let starting_base_state =
+            let (starting_base_state, starting_outs) =
                 if matches!(opt_play.map(|p| state.is_frame_flipped(p)), Some(Ok(true))) {
-                    vec![]
+                    (vec![], Outs::new(0).context("Unexpected outs bound error")?)
                 } else {
-                    EventStartingBaseState::from_base_state(&state.bases, event_key)
+                    (EventStartingBaseState::from_base_state(&state.bases, event_key), state.outs)
                 };
 
             state.update(record, opt_play)?;
