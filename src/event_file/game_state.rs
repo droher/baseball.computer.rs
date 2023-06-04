@@ -1154,6 +1154,8 @@ impl GameState {
                 MappedRecord::Play(pr) => Some(pr),
                 _ => None,
             };
+            // TODO: Feels wrong to have to handle out total differently than everything else
+            let starting_outs = state.outs;
             // TODO: Would be nice to clear this automatically rather than checking
             let starting_base_state =
                 if matches!(opt_play.map(|p| state.is_frame_flipped(p)), Some(Ok(true))) {
@@ -1169,7 +1171,7 @@ impl GameState {
                     batting_side: state.batting_side,
                     frame: state.frame,
                     at_bat: state.at_bat,
-                    outs: state.outs,
+                    outs: starting_outs,
                     starting_base_state,
                     batter_hand: state.weird_state.batter_hand.unwrap_or_default(),
                     pitcher_hand: state.weird_state.pitcher_hand.unwrap_or_default(),
