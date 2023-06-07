@@ -13,6 +13,7 @@ from sqlalchemy.sql.type_api import TypeEngine
 
 RETROSHEET_PATH = Path("retrosheet")
 OUTPUT_PATH = Path("retrosheet_simple")
+DATABANK_PATH = Path("baseballdatabank")
 
 RETROSHEET_SUBDIRS = "gamelog", "schedule", "misc", "rosters"
 FILES = "gamelog", "schedule", "park", "roster"
@@ -28,11 +29,15 @@ def get_prebuilt_csvs() -> None:
      .read_csv("https://www.retrosheet.org/CurrentNames.csv", names=franchise_header, parse_dates=["date_start", "date_end"])
      .to_parquet("retrosheet_simple/franchise.parquet", index=False)
      )
-    (pandas
-     .read_csv("https://raw.githubusercontent.com/chadwickbureau/baseballdatabank/master/core/People.csv")
-     .to_parquet("retrosheet_simple/people.parquet", index=False)
-     )
-
+    databank_files = ["Appearances", "Batting", "Fielding", "Pitching", "People"]
+    DATABANK_PATH.mkdir(exist_ok=True)
+    for f in databank_files:
+        github_url = f"https://raw.githubusercontent.com/chadwickbureau/baseballdatabank/master/core/{f}.csv"
+        df = pandas.read_csv(github_url)
+        if "yearID" in df.columns:
+            # Filter out all years after 1900
+            df = df[df["yearID"] <= 1900]
+        df.to_parquet(f"baseballdatabank/{f.lower()}.parquet", index=False)
 
 
 def parse_simple_files() -> None:

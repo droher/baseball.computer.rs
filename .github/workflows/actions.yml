@@ -65,7 +65,10 @@ jobs:
 
       - run: |
           aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
-            retrosheet_simple s3://timeball/simple \
+            retrosheet_simple s3://timeball/misc \
+            --exclude '*' --include '*.parquet' --delete
+          aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
+            baseballdatabank s3://timeball/baseballdatabank \
             --exclude '*' --include '*.parquet' --delete
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY }}
