@@ -1348,7 +1348,10 @@ impl GameState {
         let cleaned_comment = comment.trim().replace('$', "");
         match self.comment_buffer {
             Some(ref mut buffer) => {
-                buffer.push_str("\n");
+                // Need some delimiting character to handle both
+                // comments that are split across multiple lines
+                // and comments that have one entry with structured data
+                buffer.push_str("$");
                 buffer.push_str(cleaned_comment.as_str())
             },
             None => self.comment_buffer = Some(cleaned_comment.to_string()),
