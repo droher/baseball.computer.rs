@@ -10,7 +10,7 @@
 #![allow(clippy::module_name_repetitions, clippy::significant_drop_tightening)]
 
 use arrow::record_batch::RecordBatch;
-use event_file::schemas::EventComment;
+use event_file::schemas::{EventComment, BoxScoreComment};
 use glob::GlobError;
 use itertools::Itertools;
 use serde::Serialize;
@@ -286,6 +286,7 @@ enum EventFileSchema {
     BoxScoreHomeRuns,
     BoxScoreStolenBases,
     BoxScoreCaughtStealing,
+    BoxScoreComment,
 }
 
 impl EventFileSchema {
@@ -405,6 +406,11 @@ impl EventFileSchema {
         for row in line_scores {
             w.serialize(row)?;
         }
+        // Write Comments
+        let mut w = WRITER_MAP.get_csv(Self::BoxScoreComment)?;
+        for row in BoxScoreComment::from_record_slice(&game_context.game_id.id, record_slice) {
+            w.serialize(row)?;
+        };
         // Write Lines/Events
         let game_id = game_context.game_id.id;
         let box_score_lines = record_slice

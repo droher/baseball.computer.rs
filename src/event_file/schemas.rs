@@ -20,6 +20,7 @@ use crate::event_file::traits::{
 };
 
 use super::game_state::PlateAppearanceResultType;
+use super::parser::{RecordSlice, MappedRecord};
 
 pub trait ContextToVec<'a>: Serialize + Sized {
     fn from_game_context(gc: &'a GameContext) -> Box<dyn Iterator<Item = Self> + 'a>;
@@ -312,6 +313,30 @@ impl ContextToVec<'_> for EventComment {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct BoxScoreComment {
+    game_id: GameIdString,
+    sequence_id: usize,
+    comment: String,
+}
+
+impl BoxScoreComment {
+    pub fn from_record_slice(game_id: &GameIdString, slice: &RecordSlice) -> Vec<Self> {
+        let mut comments = vec![];
+        let mut sequence_id = 1;
+        for record in slice {
+            if let MappedRecord::Comment(c) = record {
+                comments.push(Self {
+                    game_id: game_id.clone(),
+                    sequence_id: sequence_id,
+                    comment: c.clone(),
+                });
+                sequence_id += 1;
+            }
+        }
+        comments
+    }
+}
 
 #[derive(Debug, Serialize, Clone)]
 pub struct BoxScoreWritableRecord<'a> {
