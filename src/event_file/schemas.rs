@@ -292,6 +292,27 @@ impl ContextToVec<'_> for EventOut {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct EventComment {
+    event_key: EventKey,
+    comment: String,
+}
+
+impl ContextToVec<'_> for EventComment {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
+        Box::from(gc.events.iter().flat_map(|e| {
+            e.results
+                .comment
+                .iter()
+                .map(move |c| Self {
+                    event_key: e.event_key,
+                    comment: c.clone(),
+                })
+        }))
+    }
+}
+
+
 #[derive(Debug, Serialize, Clone)]
 pub struct BoxScoreWritableRecord<'a> {
     pub game_id: GameIdString,

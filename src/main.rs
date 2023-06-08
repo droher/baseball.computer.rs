@@ -10,6 +10,7 @@
 #![allow(clippy::module_name_repetitions, clippy::significant_drop_tightening)]
 
 use arrow::record_batch::RecordBatch;
+use event_file::schemas::EventComment;
 use glob::GlobError;
 use itertools::Itertools;
 use serde::Serialize;
@@ -266,6 +267,7 @@ enum EventFileSchema {
     EventBaserunningPlay,
     EventPitch,
     EventFlag,
+    EventComment,
     BoxScoreGame,
     BoxScoreTeam,
     BoxScoreUmpire,
@@ -430,6 +432,7 @@ impl EventFileSchema {
         WRITER_MAP.write_csv::<EventFieldingPlay>(Self::EventFieldingPlay, game_context)?;
         WRITER_MAP.write_csv::<EventPitch>(Self::EventPitch, game_context)?;
         WRITER_MAP.write_csv::<EventPlateAppearance>(Self::EventPlateAppearance, game_context)?;
+        WRITER_MAP.write_csv::<EventComment>(Self::EventComment, game_context)?;
         // Write Game
         WRITER_MAP
             .get_csv(Self::Game)?

@@ -1133,6 +1133,7 @@ pub struct GameState {
     at_bat: LineupPosition,
     personnel: Personnel,
     weird_state: WeirdGameState,
+    comment_buffer: Option<String>
 }
 
 impl GameState {
@@ -1185,7 +1186,7 @@ impl GameState {
                         play, event_key,
                     )?,
                     play_info: EventFlag::from_play(play, event_key)?,
-                    comment: None,
+                    comment: state.comment_buffer.take(),
                     fielding_plays: play.stats.fielders_data.clone(),
                     out_on_play: play.stats.outs.clone(),
                 };
@@ -1199,6 +1200,7 @@ impl GameState {
                     event_key,
                 });
                 state.event_id += 1;
+                state.comment_buffer = None;
             }
         }
         // Set all remaining blank end_event_ids to final event
@@ -1247,6 +1249,7 @@ impl GameState {
             at_bat: LineupPosition::default(),
             personnel: Personnel::new(record_slice)?,
             weird_state: WeirdGameState::default(),
+            comment_buffer: None
         })
     }
 
@@ -1341,8 +1344,15 @@ impl GameState {
     }
 
     #[allow(clippy::unused_self)]
-    const fn update_on_comment(&self, _record: &str) {
-        // TODO
+    fn update_on_comment(&mut self, comment: &str) {
+        let cleaned_comment = comment.trim().replace('$', "");
+        match self.comment_buffer {
+            Some(ref mut buffer) => {
+                buffer.push_str("\n");
+                buffer.push_str(cleaned_comment.as_str())
+            },
+            None => self.comment_buffer = Some(cleaned_comment.to_string()),
+        }
     }
 
     #[allow(clippy::unused_self)]
