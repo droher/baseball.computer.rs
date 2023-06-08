@@ -58,7 +58,7 @@ def parse_simple_files() -> None:
                 if fin.isfirstline() and strip_header:
                     continue
                 # Only grab gamelogs without event/boxscores
-                if "gamelog" in output_file.name and new_line[-2] != "N":
+                if "gamelog" in output_file.name and "N" not in new_line.rpartition(",")[-1]:
                     continue
                 if prepend_filename:
                     new_line = f"{year},{new_line}"
