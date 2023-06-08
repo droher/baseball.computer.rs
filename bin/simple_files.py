@@ -44,8 +44,7 @@ def parse_simple_files() -> None:
     def concat_files(input_path: Path, output_file: Path, glob: str = "*",
                      prepend_filename: bool = False,
                      strip_header: bool = False,
-                     check_dupes: bool = True,
-                     max_year: int = None):
+                     check_dupes: bool = True):
         files = [f for f in input_path.glob(glob) if f.is_file()]
 
         with open(output_file, 'wt') as fout, fileinput.input(files) as fin:
@@ -58,7 +57,8 @@ def parse_simple_files() -> None:
                     continue
                 if fin.isfirstline() and strip_header:
                     continue
-                if max_year and (not year.isdigit() or (int(year) > max_year)):
+                # Only grab gamelogs without event/boxscores
+                if "gamelog" in output_file.name and new_line[-2] != "N":
                     continue
                 if prepend_filename:
                     new_line = f"{year},{new_line}"
@@ -75,8 +75,7 @@ def parse_simple_files() -> None:
     subdirs = {subdir: retrosheet_base / subdir for subdir in RETROSHEET_SUBDIRS}
 
     print("Writing simple files...")
-    # Cut off gamelog after we start getting boxscores for every game
-    concat_files(subdirs["gamelog"], output_base / "gamelog.csv", glob="*.TXT", check_dupes=False, max_year=1900)
+    concat_files(subdirs["gamelog"], output_base / "gamelog.csv", glob="*.TXT", check_dupes=False)
     concat_files(subdirs["schedule"], output_base / "schedule.csv", glob="*.TXT")
     concat_files(subdirs["misc"], output_base / "park.csv", glob="parkcode.txt", strip_header=True)
     concat_files(subdirs["rosters"], output_base / "roster.csv", glob="*.ROS", prepend_filename=True)
