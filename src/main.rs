@@ -10,7 +10,7 @@
 #![allow(clippy::module_name_repetitions, clippy::significant_drop_tightening)]
 
 use arrow::record_batch::RecordBatch;
-use event_file::schemas::{EventComment, BoxScoreComment};
+use event_file::schemas::{BoxScoreComment, EventBaseState, EventComment};
 use glob::GlobError;
 use itertools::Itertools;
 use serde::Serialize;
@@ -258,7 +258,7 @@ enum EventFileSchema {
     GameEarnedRuns,
     Event,
     EventRaw,
-    EventStartingBaseState,
+    EventBaseState,
     EventBattedBallInfo,
     EventPlateAppearance,
     EventOut,
@@ -410,7 +410,7 @@ impl EventFileSchema {
         let mut w = WRITER_MAP.get_csv(Self::BoxScoreComment)?;
         for row in BoxScoreComment::from_record_slice(&game_context.game_id.id, record_slice) {
             w.serialize(row)?;
-        };
+        }
         // Write Lines/Events
         let game_id = game_context.game_id.id;
         let box_score_lines = record_slice
@@ -439,6 +439,7 @@ impl EventFileSchema {
         WRITER_MAP.write_csv::<EventPitch>(Self::EventPitch, game_context)?;
         WRITER_MAP.write_csv::<EventPlateAppearance>(Self::EventPlateAppearance, game_context)?;
         WRITER_MAP.write_csv::<EventComment>(Self::EventComment, game_context)?;
+        WRITER_MAP.write_csv::<EventBaseState>(Self::EventBaseState, game_context)?;
         // Write Game
         WRITER_MAP
             .get_csv(Self::Game)?
@@ -456,15 +457,6 @@ impl EventFileSchema {
         // Write GameFieldingAppearance
         let mut w = WRITER_MAP.get_csv(Self::GameFieldingAppearance)?;
         for row in &game_context.fielding_appearances {
-            w.serialize(row)?;
-        }
-        // Write EventStartingBaseState
-        let mut w = WRITER_MAP.get_csv(Self::EventStartingBaseState)?;
-        let base_states = game_context
-            .events
-            .iter()
-            .flat_map(|e| &e.context.starting_base_state);
-        for row in base_states {
             w.serialize(row)?;
         }
         // Write EventBattedBallInfo

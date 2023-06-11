@@ -596,31 +596,6 @@ impl GameContext {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
-pub struct EventStartingBaseState {
-    #[serde(skip_serializing_if = "skip_ids")]
-    pub event_key: EventKey,
-    #[serde(serialize_with = "arrow_hack")]
-    pub baserunner: BaseRunner,
-    pub runner_lineup_position: LineupPosition,
-    pub charged_to_pitcher_id: Pitcher,
-}
-
-impl EventStartingBaseState {
-    fn from_base_state(state: &BaseState, event_key: EventKey) -> Vec<Self> {
-        state
-            .get_bases()
-            .iter()
-            .map(|(baserunner, runner)| Self {
-                event_key,
-                baserunner,
-                runner_lineup_position: runner.lineup_position,
-                charged_to_pitcher_id: runner.charged_to,
-            })
-            .collect_vec()
-    }
-}
-
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningPlay {
     #[serde(skip_serializing_if = "skip_ids")]
@@ -759,7 +734,8 @@ pub struct EventContext {
     pub frame: InningFrame,
     pub at_bat: LineupPosition,
     pub outs: Outs,
-    pub starting_base_state: Vec<EventStartingBaseState>,
+    #[serde(skip)]
+    pub starting_base_state: BaseState,
     #[serde(serialize_with = "arrow_hack")]
     pub batter_hand: Hand,
     #[serde(serialize_with = "arrow_hack")]
@@ -778,6 +754,8 @@ pub struct EventResults {
     pub out_on_play: Vec<BaseRunner>,
     pub fielding_plays: Vec<FieldersData>,
     pub baserunning_advances: Vec<EventBaserunningAdvanceAttempt>,
+    #[serde(skip)]
+    pub ending_base_state: BaseState,
     pub play_info: Vec<EventFlag>,
     pub comment: Option<String>,
 }
@@ -1133,7 +1111,7 @@ pub struct GameState {
     at_bat: LineupPosition,
     personnel: Personnel,
     weird_state: WeirdGameState,
-    comment_buffer: Option<String>
+    comment_buffer: Option<String>,
 }
 
 impl GameState {
@@ -1159,9 +1137,12 @@ impl GameState {
             // TODO: Would be nice to clear this automatically rather than checking
             let (starting_base_state, starting_outs) =
                 if matches!(opt_play.map(|p| state.is_frame_flipped(p)), Some(Ok(true))) {
-                    (vec![], Outs::new(0).context("Unexpected outs bound error")?)
+                    (
+                        BaseState::default(),
+                        Outs::new(0).context("Unexpected outs bound error")?,
+                    )
                 } else {
-                    (EventStartingBaseState::from_base_state(&state.bases, event_key), state.outs)
+                    (state.bases.clone(), state.outs)
                 };
 
             state.update(record, opt_play)?;
@@ -1189,6 +1170,7 @@ impl GameState {
                     comment: state.comment_buffer.take(),
                     fielding_plays: play.stats.fielders_data.clone(),
                     out_on_play: play.stats.outs.clone(),
+                    ending_base_state: state.bases.clone(),
                 };
                 let line_number = line_offset + i;
                 events.push(Event {
@@ -1249,7 +1231,7 @@ impl GameState {
             at_bat: LineupPosition::default(),
             personnel: Personnel::new(record_slice)?,
             weird_state: WeirdGameState::default(),
-            comment_buffer: None
+            comment_buffer: None,
         })
     }
 
@@ -1353,7 +1335,7 @@ impl GameState {
                 // and comments that have one entry with structured data
                 buffer.push_str("$");
                 buffer.push_str(cleaned_comment.as_str())
-            },
+            }
             None => self.comment_buffer = Some(cleaned_comment.to_string()),
         }
     }
@@ -1394,7 +1376,7 @@ impl GameState {
 
 pub type Outs = BoundedUsize<0, 3>;
 
-#[derive(Debug, Eq, PartialEq, Default, Clone)]
+#[derive(Debug, Eq, PartialEq, Default, Clone, Serialize)]
 pub struct BaseState {
     bases: Map<BaseRunner, Runner>,
     scored: ArrayVec<Runner, 4>,
@@ -1569,7 +1551,7 @@ impl BaseState {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct Runner {
     pub lineup_position: LineupPosition,
     pub charged_to: Pitcher,
@@ -1582,6 +1564,18 @@ pub fn dummy() -> GameContext {
     let dummy_str8 = ArrayString::from("dummy").unwrap();
     let dummy_str16 = ArrayString::from("dummy").unwrap();
     let dummy_datetime = NaiveDateTime::from_timestamp_opt(0, 0).unwrap();
+    let dummy_base_state = BaseState {
+        bases: vec![(
+            BaseRunner::First,
+            Runner {
+                lineup_position: LineupPosition::PitcherWithDh,
+                charged_to: Pitcher::default(),
+            },
+        )]
+        .into_iter()
+        .collect(),
+        scored: ArrayVec::new(),
+    };
     GameContext {
         game_id: GameId {
             id: GameIdString::default(),
@@ -1667,12 +1661,7 @@ pub fn dummy() -> GameContext {
                 frame: InningFrame::Top,
                 at_bat: LineupPosition::PitcherWithDh,
                 outs: Outs::new(0).unwrap(),
-                starting_base_state: vec![EventStartingBaseState {
-                    event_key: 1,
-                    runner_lineup_position: LineupPosition::PitcherWithDh,
-                    charged_to_pitcher_id: dummy_str8,
-                    baserunner: BaseRunner::Batter,
-                }],
+                starting_base_state: dummy_base_state.clone(),
                 batter_hand: Hand::Right,
                 pitcher_hand: Hand::Right,
             },
@@ -1718,6 +1707,7 @@ pub fn dummy() -> GameContext {
                     fielding_play_type: FieldingPlayType::Assist,
                 }],
                 out_on_play: vec![BaseRunner::Batter],
+                ending_base_state: dummy_base_state.clone(),
             },
             line_number: 1,
             event_key: 2,

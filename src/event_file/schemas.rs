@@ -3,6 +3,7 @@ use arrayvec::ArrayString;
 use bounded_integer::BoundedU8;
 use chrono::{NaiveDate, NaiveDateTime};
 use either::Either;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -19,8 +20,8 @@ use crate::event_file::traits::{
     Player, RetrosheetVolunteer, Scorer, SequenceId, Side,
 };
 
-use super::game_state::PlateAppearanceResultType;
-use super::parser::{RecordSlice, MappedRecord};
+use super::game_state::{BaseState, PlateAppearanceResultType};
+use super::parser::{MappedRecord, RecordSlice};
 
 pub trait ContextToVec<'a>: Serialize + Sized {
     fn from_game_context(gc: &'a GameContext) -> Box<dyn Iterator<Item = Self> + 'a>;
@@ -271,6 +272,64 @@ impl ContextToVec<'_> for EventPlateAppearance {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
+pub enum EventBaseStateType {
+    Starting,
+    Ending,
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
+pub struct EventBaseState {
+    event_key: EventKey,
+    base_state_type: EventBaseStateType,
+    baserunner: BaseRunner,
+    runner_lineup_position: LineupPosition,
+    charged_to_pitcher_id: Pitcher,
+}
+
+impl EventBaseState {
+    fn from_base_state(
+        state: &BaseState,
+        event_key: EventKey,
+        base_state_type: EventBaseStateType,
+    ) -> Vec<Self> {
+        state
+            .get_bases()
+            .iter()
+            .map(|(baserunner, runner)| Self {
+                event_key,
+                baserunner,
+                base_state_type,
+                runner_lineup_position: runner.lineup_position,
+                charged_to_pitcher_id: runner.charged_to,
+            })
+            .collect_vec()
+    }
+}
+
+impl ContextToVec<'_> for EventBaseState {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
+        Box::from(
+            gc.events
+                .iter()
+                .flat_map(|e| {
+                    Self::from_base_state(
+                        &e.context.starting_base_state,
+                        e.event_key,
+                        EventBaseStateType::Starting,
+                    )
+                })
+                .chain(gc.events.iter().flat_map(|e| {
+                    Self::from_base_state(
+                        &e.results.ending_base_state,
+                        e.event_key,
+                        EventBaseStateType::Ending,
+                    )
+                })),
+        )
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventOut {
     event_key: EventKey,
     sequence_id: usize,
@@ -302,13 +361,10 @@ pub struct EventComment {
 impl ContextToVec<'_> for EventComment {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().flat_map(|e| {
-            e.results
-                .comment
-                .iter()
-                .map(move |c| Self {
-                    event_key: e.event_key,
-                    comment: c.clone(),
-                })
+            e.results.comment.iter().map(move |c| Self {
+                event_key: e.event_key,
+                comment: c.clone(),
+            })
         }))
     }
 }
