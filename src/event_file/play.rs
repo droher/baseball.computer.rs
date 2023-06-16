@@ -1678,6 +1678,29 @@ impl Count {
             strikes: ints.next().flatten().and_then(|s| Strikes::new(s as u8)),
         }
     }
+    
+    // One of the more annoying scorekeeping rules is that if a batter or pitcher is removed mid-count,
+    // the substituted player can still be credited/charged with the at-bat result, and the
+    // logic for that depends on both the count and the result.
+    pub fn is_old_pitcher_responsible_walk(&self) -> bool {
+        if let (Some(b), Some(s)) = (self.balls, self.strikes) {
+            b == 3 || (b == 2 && s <= 1)
+        } else {
+            // If we have no count info we just assume the new player is responsible
+            false
+        }
+    }
+
+    pub fn is_old_batter_responsible_strikeout(&self) -> bool {
+        self.strikes.map(|s| s == 2).unwrap_or_default()
+    }
+
+    /// Whether the count has > 0 balls + strikes.
+    pub fn has_any_pitches(&self) -> bool {
+        let balls: usize = self.balls.map(Into::into).unwrap_or_default();
+        let strikes: usize = self.strikes.map(Into::into).unwrap_or_default();
+        balls + strikes > 0
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -1746,11 +1769,6 @@ impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
             stats,
         })
     }
-}
-
-pub struct DerivedPlay {
-    pub parsed: ParsedPlay,
-    pub stats: PlayStats,
 }
 
 #[derive(Debug, Eq, PartialEq, Default, Clone, Hash)]

@@ -21,6 +21,7 @@ use crate::event_file::traits::{
 };
 
 use super::game_state::{BaseState, PlateAppearanceResultType};
+use super::misc::Hand;
 use super::parser::{MappedRecord, RecordSlice};
 
 pub trait ContextToVec<'a>: Serialize + Sized {
@@ -163,6 +164,10 @@ pub struct Event {
     outs: Outs,
     count_balls: Option<u8>,
     count_strikes: Option<u8>,
+    specified_batter_hand: Option<Hand>,
+    specified_pitcher_hand: Option<Hand>,
+    strikeout_responsible_batter: Option<Player>,
+    walk_responsible_pitcher: Option<Player>,
 }
 
 impl ContextToVec<'_> for Event {
@@ -178,6 +183,10 @@ impl ContextToVec<'_> for Event {
             outs: e.context.outs,
             count_balls: e.results.count_at_event.balls.map(BoundedU8::get),
             count_strikes: e.results.count_at_event.strikes.map(BoundedU8::get),
+            specified_batter_hand: e.context.rare_attributes.batter_hand,
+            specified_pitcher_hand: e.context.rare_attributes.pitcher_hand,
+            strikeout_responsible_batter: e.context.rare_attributes.strikeout_responsible_batter,
+            walk_responsible_pitcher: e.context.rare_attributes.walk_responsible_pitcher,
         }))
     }
 }
@@ -284,6 +293,7 @@ pub struct EventBaseState {
     baserunner: BaseRunner,
     runner_lineup_position: LineupPosition,
     charged_to_pitcher_id: Pitcher,
+    reached_on_event_id: EventId,
 }
 
 impl EventBaseState {
@@ -301,6 +311,7 @@ impl EventBaseState {
                 base_state_type,
                 runner_lineup_position: runner.lineup_position,
                 charged_to_pitcher_id: runner.charged_to,
+                reached_on_event_id: runner.reached_on_event_id,
             })
             .collect_vec()
     }
@@ -355,14 +366,16 @@ impl ContextToVec<'_> for EventOut {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventComment {
     event_key: EventKey,
+    sequence_id: usize,
     comment: String,
 }
 
 impl ContextToVec<'_> for EventComment {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        Box::from(gc.events.iter().flat_map(|e| {
+        Box::from(gc.events.iter().enumerate().flat_map(|(i, e)| {
             e.results.comment.iter().map(move |c| Self {
                 event_key: e.event_key,
+                sequence_id: i + 1,
                 comment: c.clone(),
             })
         }))

@@ -16,6 +16,7 @@ use crate::event_file::traits::{
     Batter, Fielder, FieldingPosition, LineupPosition, Pitcher, Player, RetrosheetEventRecord, Side,
 };
 
+use super::play::BaseRunner;
 use super::schemas::GameIdString;
 
 pub type Comment = String;
@@ -164,7 +165,7 @@ impl TryFrom<&RetrosheetEventRecord> for RunnerAdjustment {
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct PitcherResponsibilityAdjustment {
     pub pitcher_id: Pitcher,
-    pub base: Base,
+    pub baserunner: BaseRunner,
 }
 
 impl TryFrom<&RetrosheetEventRecord> for PitcherResponsibilityAdjustment {
@@ -175,7 +176,7 @@ impl TryFrom<&RetrosheetEventRecord> for PitcherResponsibilityAdjustment {
 
         Ok(Self {
             pitcher_id: str_to_tinystr(record[1])?,
-            base: Base::from_str(record[2])?,
+            baserunner: BaseRunner::from_str(record[2])?,
         })
     }
 }

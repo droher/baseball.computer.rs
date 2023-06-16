@@ -736,10 +736,8 @@ pub struct EventContext {
     pub outs: Outs,
     #[serde(skip)]
     pub starting_base_state: BaseState,
-    #[serde(serialize_with = "arrow_hack")]
-    pub batter_hand: Hand,
-    #[serde(serialize_with = "arrow_hack")]
-    pub pitcher_hand: Hand,
+    #[serde(flatten)]
+    pub rare_attributes: RareAttributes,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
@@ -757,7 +755,7 @@ pub struct EventResults {
     #[serde(skip)]
     pub ending_base_state: BaseState,
     pub play_info: Vec<EventFlag>,
-    pub comment: Option<String>,
+    pub comment: Vec<String>,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
@@ -795,16 +793,23 @@ impl Event {
     }
 }
 
-/// This tracks the more unusual/miscellaneous elements of the state of the game,
+/// This tracks unusual/miscellaneous elements,
 /// such as batters batting from an unexpected side or a substitution in the middle of
 /// an at-bat. Further exceptions should go here as they come up.
-#[derive(Default, Debug, Eq, PartialEq, Clone)]
-pub struct WeirdGameState {
-    batter_hand: Option<Hand>,
-    pitcher_hand: Option<Hand>,
-    // TODO
-    responsible_batter: Option<Player>,
-    responsible_pitcher: Option<Player>,
+#[derive(Default, Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
+pub struct RareAttributes {
+    #[serde(serialize_with = "arrow_hack")]
+    pub batter_hand: Option<Hand>,
+    #[serde(serialize_with = "arrow_hack")]
+    pub pitcher_hand: Option<Hand>,
+    // In the case of a mid-PA substitution, the
+    // credit for the result of the PA cannot be determined mid-PA
+    // because the result itself is part of the determination.
+    // In order to provide a priori credit, we can provide the answers
+    // for each possible case. (Only strikeouts/walks need this treatment,
+    // since all other results are credited to the new player).
+    pub strikeout_responsible_batter: Option<Player>,
+    pub walk_responsible_pitcher: Option<Player>,
 }
 
 /// Keeps track of the current players on the field at any given point
@@ -1105,13 +1110,14 @@ pub struct GameState {
     event_id: EventId,
     inning: Inning,
     frame: InningFrame,
+    count: Count,
     batting_side: Side,
     outs: Outs,
     bases: BaseState,
     at_bat: LineupPosition,
     personnel: Personnel,
-    weird_state: WeirdGameState,
-    comment_buffer: Option<String>,
+    unusual_state: RareAttributes,
+    comment_buffer: Vec<String>,
 }
 
 impl GameState {
@@ -1144,6 +1150,8 @@ impl GameState {
                 } else {
                     (state.bases.clone(), state.outs)
                 };
+            // Unusual game state also needs to be grabbed before updating state
+            let rare_attributes = state.unusual_state.clone();
 
             state.update(record, opt_play)?;
             if let Some(play) = opt_play {
@@ -1154,8 +1162,7 @@ impl GameState {
                     at_bat: state.at_bat,
                     outs: starting_outs,
                     starting_base_state,
-                    batter_hand: state.weird_state.batter_hand.unwrap_or_default(),
-                    pitcher_hand: state.weird_state.pitcher_hand.unwrap_or_default(),
+                    rare_attributes,
                 };
                 let results = EventResults {
                     count_at_event: play.count,
@@ -1167,7 +1174,7 @@ impl GameState {
                         play, event_key,
                     )?,
                     play_info: EventFlag::from_play(play, event_key)?,
-                    comment: state.comment_buffer.take(),
+                    comment: state.comment_buffer,
                     fielding_plays: play.stats.fielders_data.clone(),
                     out_on_play: play.stats.outs.clone(),
                     ending_base_state: state.bases.clone(),
@@ -1182,7 +1189,7 @@ impl GameState {
                     event_key,
                 });
                 state.event_id += 1;
-                state.comment_buffer = None;
+                state.comment_buffer = vec![]; // Clear comment buffer
             }
         }
         // Set all remaining blank end_event_ids to final event
@@ -1225,13 +1232,14 @@ impl GameState {
             event_id: EventId::new(1).context("Unexpected event ID bound error")?,
             inning: 1,
             frame: InningFrame::Top,
+            count: Count::default(),
             batting_side,
             outs: Outs::new(0).context("Unexpected outs bound error")?,
             bases: BaseState::default(),
             at_bat: LineupPosition::default(),
             personnel: Personnel::new(record_slice)?,
-            weird_state: WeirdGameState::default(),
-            comment_buffer: None,
+            unusual_state: RareAttributes::default(),
+            comment_buffer: vec![],
         })
     }
 
@@ -1280,29 +1288,51 @@ impl GameState {
             play,
             batter_lineup_position,
             pitcher,
+            self.event_id,
         )?;
 
+        let is_mid_plate_appearance = play.stats.plate_appearance.is_none() && new_outs < 3;
+
+        match is_mid_plate_appearance {
+            true => {
+                self.count = play.count;
+                // Hand adjustments are reset in all circumstances, including mid-PA
+                self.unusual_state.batter_hand = None;
+                self.unusual_state.pitcher_hand = None;
+            }
+            false => {
+                self.count = Count::default();
+                // All unusual state characteristics are reset on a new PA
+                self.unusual_state = RareAttributes::default();
+            }
+        }
         self.inning = play.inning;
         self.frame = new_frame;
         self.batting_side = play.batting_side;
         self.outs = new_outs;
         self.bases = new_base_state;
         self.at_bat = batter_lineup_position;
-        self.weird_state = WeirdGameState::default();
 
         Ok(())
     }
 
     fn update_on_substitution(&mut self, record: &SubstitutionRecord) -> Result<()> {
+        if record.lineup_position == self.at_bat && record.side == self.batting_side && self.count.is_old_batter_responsible_strikeout() {
+            let batter = self.personnel.get_at_position(record.side, PositionType::Lineup(record.lineup_position))?.player;
+            self.unusual_state.strikeout_responsible_batter = Some(batter);
+        }
+        else if record.fielding_position == FieldingPosition::Pitcher && record.side != self.batting_side && self.count.is_old_pitcher_responsible_walk() {
+            self.unusual_state.walk_responsible_pitcher = Some(self.personnel.pitcher(record.side)?);
+        };
         self.personnel.update_on_substitution(record, self.event_id)
     }
 
     fn update_on_bat_hand_adjustment(&mut self, record: &BatHandAdjustment) {
-        self.weird_state.batter_hand = Some(record.hand);
+        self.unusual_state.batter_hand = Some(record.hand);
     }
 
     fn update_on_pitch_hand_adjustment(&mut self, record: &PitchHandAdjustment) {
-        self.weird_state.batter_hand = Some(record.hand);
+        self.unusual_state.batter_hand = Some(record.hand);
     }
 
     fn update_on_runner_adjustment(&mut self, record: &RunnerAdjustment) -> Result<()> {
@@ -1320,42 +1350,31 @@ impl GameState {
             .get_current_lineup_appearance(&tracked_runner)?
             .lineup_position;
         let pitcher = self.personnel.pitcher(self.batting_side.flip())?;
-        self.bases = BaseState::new_inning_tiebreaker(runner_pos, pitcher);
+        self.bases = BaseState::new_inning_tiebreaker(runner_pos, pitcher, self.event_id);
 
         Ok(())
     }
 
-    #[allow(clippy::unused_self)]
     fn update_on_comment(&mut self, comment: &str) {
-        let cleaned_comment = comment.trim().replace('$', "");
-        match self.comment_buffer {
-            Some(ref mut buffer) => {
-                // Need some delimiting character to handle both
-                // comments that are split across multiple lines
-                // and comments that have one entry with structured data
-                buffer.push_str("$");
-                buffer.push_str(cleaned_comment.as_str())
-            }
-            None => self.comment_buffer = Some(cleaned_comment.to_string()),
-        }
+        self.comment_buffer.push(comment.trim().replace('$', ""));
     }
 
-    #[allow(clippy::unused_self)]
-    const fn update_on_pitcher_responsibility_adjustment(
-        &self,
-        _record: &PitcherResponsibilityAdjustment,
-    ) {
-        // TODO
+    fn update_on_pitcher_responsibility_adjustment(&mut self, record: &PitcherResponsibilityAdjustment) -> Result<()> {
+       let mut runner = self.bases.get_runner(record.baserunner).context("Pitcher responsibility adjustment for non-existent runner")?.clone();
+       runner.charged_to = record.pitcher_id;
+       self.bases.set_runner(record.baserunner, runner);
+       Ok(())
     }
 
     pub fn update(&mut self, record: &MappedRecord, play: Option<&PlayRecord>) -> Result<()> {
         match record {
+            // We've already pulled the play record out before the call to this function
             MappedRecord::Play(_) => {
                 if let Some(cp) = play {
                     self.update_on_play(cp)
                         .with_context(|| anyhow!("Failed to parse play {:?}", cp))
                 } else {
-                    bail!("Expected cached play but got None")
+                    bail!("Expected play but got None")
                 }
             }?,
             MappedRecord::Substitution(r) => self.update_on_substitution(r)?,
@@ -1365,13 +1384,15 @@ impl GameState {
             MappedRecord::LineupAdjustment(_) => (),
             MappedRecord::RunnerAdjustment(r) => self.update_on_runner_adjustment(r)?,
             MappedRecord::PitcherResponsibilityAdjustment(r) => {
-                self.update_on_pitcher_responsibility_adjustment(r);
+                self.update_on_pitcher_responsibility_adjustment(r)?;
             }
             MappedRecord::Comment(r) => self.update_on_comment(r),
             _ => {}
         };
+
         Ok(())
     }
+
 }
 
 pub type Outs = BoundedUsize<0, 3>;
@@ -1383,11 +1404,12 @@ pub struct BaseState {
 }
 
 impl BaseState {
-    pub fn new_inning_tiebreaker(new_runner: LineupPosition, current_pitcher: Pitcher) -> Self {
+    pub fn new_inning_tiebreaker(new_runner: LineupPosition, current_pitcher: Pitcher, event_id: EventId) -> Self {
         let mut state = Self::default();
         let runner = Runner {
             lineup_position: new_runner,
             charged_to: current_pitcher,
+            reached_on_event_id: event_id,
         };
         state.bases.insert(BaseRunner::Second, runner);
         state
@@ -1477,6 +1499,7 @@ impl BaseState {
         play: &PlayRecord,
         batter_lineup_position: LineupPosition,
         pitcher: Option<Pitcher>,
+        event_id: EventId,
     ) -> Result<Self> {
         let mut new_state = if start_inning {
             Self::default()
@@ -1537,6 +1560,7 @@ impl BaseState {
             let new_runner = Runner {
                 lineup_position: batter_lineup_position,
                 charged_to: some_pitcher,
+                reached_on_event_id: event_id,
             };
             match a.to {
                 _ if a.is_out() || end_inning => {}
@@ -1555,6 +1579,7 @@ impl BaseState {
 pub struct Runner {
     pub lineup_position: LineupPosition,
     pub charged_to: Pitcher,
+    pub reached_on_event_id: EventId
 }
 
 /// Returns a dummy version of `GameContext` that
@@ -1569,7 +1594,8 @@ pub fn dummy() -> GameContext {
             BaseRunner::First,
             Runner {
                 lineup_position: LineupPosition::PitcherWithDh,
-                charged_to: Pitcher::default(),
+                charged_to: dummy_str8,
+                reached_on_event_id: EventId::new(1).unwrap(),
             },
         )]
         .into_iter()
@@ -1662,8 +1688,12 @@ pub fn dummy() -> GameContext {
                 at_bat: LineupPosition::PitcherWithDh,
                 outs: Outs::new(0).unwrap(),
                 starting_base_state: dummy_base_state.clone(),
-                batter_hand: Hand::Right,
-                pitcher_hand: Hand::Right,
+                rare_attributes: RareAttributes {
+                    batter_hand: Some(Hand::Left),
+                    pitcher_hand: Some(Hand::Left),
+                    strikeout_responsible_batter: Some(dummy_str8),
+                    walk_responsible_pitcher: Some(dummy_str8),
+                },
             },
             results: EventResults {
                 count_at_event: Count {
@@ -1701,7 +1731,7 @@ pub fn dummy() -> GameContext {
                     sequence_id: SequenceId::new(1).unwrap(),
                     flag: String::from("dummy"),
                 }],
-                comment: Some(String::from("dummy")),
+                comment: vec![String::from("dummy")],
                 fielding_plays: vec![FieldersData {
                     fielding_position: FieldingPosition::Pitcher,
                     fielding_play_type: FieldingPlayType::Assist,
