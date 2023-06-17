@@ -10,7 +10,7 @@ use std::sync::Arc;
 use anyhow::{bail, Context, Error, Result};
 use arrayvec::ArrayVec;
 use bounded_integer::BoundedU8;
-use fixed_map::Key;
+use fixed_map::{Key, Set};
 use lazy_regex::{regex, Lazy};
 use lazy_static::lazy_static;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -124,6 +124,10 @@ impl FieldersData {
 
     fn errors(fielders_datas: &[Self]) -> PositionVec {
         Self::filter_by_type(fielders_datas, FieldingPlayType::Error)
+    }
+
+    fn fielders_choices(fielders_datas: &[Self]) -> PositionVec {
+        Self::filter_by_type(fielders_datas, FieldingPlayType::FieldersChoice)
     }
 
     const fn unknown_putout() -> Self {
@@ -626,6 +630,16 @@ impl PlateAppearanceType {
                         | OutAtBatType::FieldersChoice,
                     ..
                 })
+        )
+    }
+
+    pub const fn is_fielders_choice(&self) -> bool {
+        matches!(
+            self,
+            Self::BattingOut(BattingOut {
+                out_type: OutAtBatType::FieldersChoice,
+                ..
+            })
         )
     }
 }
@@ -1678,7 +1692,7 @@ impl Count {
             strikes: ints.next().flatten().and_then(|s| Strikes::new(s as u8)),
         }
     }
-    
+
     // One of the more annoying scorekeeping rules is that if a batter or pitcher is removed mid-count,
     // the substituted player can still be credited/charged with the at-bat result, and the
     // logic for that depends on both the count and the result.
@@ -1873,6 +1887,29 @@ impl ParsedPlay {
         } else {
             Ok(full_outs)
         }
+    }
+
+    /// How to ID for our purposes:
+    /// 1) Any non-batter outs included in the main play, e.g. 64(1)
+    /// 2) The first baserunning-advance out on a fielders choice, e.g. FC1.2X3
+    /// These are mutually exclusive, as FCs will not include outs in the main play
+    /// Note: the overwhelming majority of these are forceouts, but a good number of
+    /// fielders-choice outs are tags (otherwise they probably would have been
+    /// specified as a forceout).
+    pub fn batter_caused_baserunning_outs(&self) -> Vec<BaseRunner> {
+        let first_failed_advance = self
+            .explicit_advances
+            .iter()
+            .find(|ra| ra.is_out())
+            .map(|ra| ra.baserunner);
+        // Make it a Set so Batter is easy to remove
+        let mut out_set: Set<BaseRunner> = match self.plate_appearance() {
+            Some(pa) if pa.is_fielders_choice() => first_failed_advance.into_iter().collect(),
+            Some(pa) => pa.implicit_out().into_iter().collect(),
+            None => Set::new(),
+        };
+        out_set.remove(BaseRunner::Batter);
+        out_set.into_iter().collect()
     }
 
     pub fn runs(&self) -> Vec<BaseRunner> {
@@ -2084,6 +2121,7 @@ pub struct PlayStats {
     pub putouts: PositionVec,
     pub assists: PositionVec,
     pub errors: PositionVec,
+    pub fielders_choices: PositionVec,
     pub outs: Vec<BaseRunner>,
     pub advances: Vec<RunnerAdvance>,
     pub runs: Vec<BaseRunner>,
@@ -2092,6 +2130,7 @@ pub struct PlayStats {
     pub plate_appearance: Option<PlateAppearanceType>,
     pub contact_description: Option<ContactDescription>,
     pub hit_to_fielder: Option<FieldingPosition>,
+    pub batter_caused_baserunning_outs: Vec<BaseRunner>,
 }
 
 impl TryFrom<&ParsedPlay> for PlayStats {
@@ -2099,10 +2138,12 @@ impl TryFrom<&ParsedPlay> for PlayStats {
 
     fn try_from(parsed_play: &ParsedPlay) -> Result<Self> {
         let fielders_data = parsed_play.fielders_data();
+
         Ok(Self {
             putouts: FieldersData::putouts(&fielders_data),
             assists: FieldersData::assists(&fielders_data),
             errors: FieldersData::errors(&fielders_data),
+            fielders_choices: FieldersData::fielders_choices(&fielders_data),
             fielders_data,
             outs: parsed_play.outs()?,
             advances: parsed_play.advances().collect(),
@@ -2112,6 +2153,7 @@ impl TryFrom<&ParsedPlay> for PlayStats {
             plate_appearance: parsed_play.plate_appearance().cloned(),
             contact_description: parsed_play.contact_description().copied(),
             hit_to_fielder: parsed_play.hit_to_fielder(),
+            batter_caused_baserunning_outs: parsed_play.batter_caused_baserunning_outs(),
         })
     }
 }

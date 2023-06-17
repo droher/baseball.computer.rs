@@ -190,7 +190,6 @@ impl PlateAppearanceResultType {
     }
 }
 
-// TODO: Add weird game state info to flags
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventFlag {
     #[serde(skip_serializing_if = "skip_ids")]
@@ -302,7 +301,6 @@ impl From<&RecordSlice> for GameSetting {
                 InfoRecord::WindSpeed(x) => setting.wind_speed_mph = *x,
                 InfoRecord::Attendance(x) => setting.attendance = *x,
                 InfoRecord::Park(x) => setting.park_id = *x,
-                // TODO: Season, GameType
                 _ => {}
             }
         }
@@ -1275,11 +1273,6 @@ impl GameState {
         let new_frame = self.get_new_frame(play)?;
         let new_outs = self.outs_after_play(play)?;
 
-        // In the case of certain double switches, there is no pitcher of record,
-        // which is fine because we only need to track the pitcher of record for
-        // runner responsibility, which would not change on a no-play.
-        let pitcher = self.personnel.pitcher(play.batting_side.flip()).ok();
-
         let batter_lineup_position = self.personnel.at_bat(play)?;
 
         let new_base_state = self.bases.new_base_state(
@@ -1287,7 +1280,6 @@ impl GameState {
             new_outs == 3,
             play,
             batter_lineup_position,
-            pitcher,
             self.event_id,
         )?;
 
@@ -1317,12 +1309,21 @@ impl GameState {
     }
 
     fn update_on_substitution(&mut self, record: &SubstitutionRecord) -> Result<()> {
-        if record.lineup_position == self.at_bat && record.side == self.batting_side && self.count.is_old_batter_responsible_strikeout() {
-            let batter = self.personnel.get_at_position(record.side, PositionType::Lineup(record.lineup_position))?.player;
+        if record.lineup_position == self.at_bat
+            && record.side == self.batting_side
+            && self.count.is_old_batter_responsible_strikeout()
+        {
+            let batter = self
+                .personnel
+                .get_at_position(record.side, PositionType::Lineup(record.lineup_position))?
+                .player;
             self.unusual_state.strikeout_responsible_batter = Some(batter);
-        }
-        else if record.fielding_position == FieldingPosition::Pitcher && record.side != self.batting_side && self.count.is_old_pitcher_responsible_walk() {
-            self.unusual_state.walk_responsible_pitcher = Some(self.personnel.pitcher(record.side)?);
+        } else if record.fielding_position == FieldingPosition::Pitcher
+            && record.side != self.batting_side
+            && self.count.is_old_pitcher_responsible_walk()
+        {
+            self.unusual_state.walk_responsible_pitcher =
+                Some(self.personnel.pitcher(record.side)?);
         };
         self.personnel.update_on_substitution(record, self.event_id)
     }
@@ -1349,8 +1350,7 @@ impl GameState {
             .personnel
             .get_current_lineup_appearance(&tracked_runner)?
             .lineup_position;
-        let pitcher = self.personnel.pitcher(self.batting_side.flip())?;
-        self.bases = BaseState::new_inning_tiebreaker(runner_pos, pitcher, self.event_id);
+        self.bases = BaseState::new_inning_tiebreaker(runner_pos, self.event_id);
 
         Ok(())
     }
@@ -1359,11 +1359,18 @@ impl GameState {
         self.comment_buffer.push(comment.trim().replace('$', ""));
     }
 
-    fn update_on_pitcher_responsibility_adjustment(&mut self, record: &PitcherResponsibilityAdjustment) -> Result<()> {
-       let mut runner = self.bases.get_runner(record.baserunner).context("Pitcher responsibility adjustment for non-existent runner")?.clone();
-       runner.charged_to = record.pitcher_id;
-       self.bases.set_runner(record.baserunner, runner);
-       Ok(())
+    fn update_on_pitcher_responsibility_adjustment(
+        &mut self,
+        record: &PitcherResponsibilityAdjustment,
+    ) -> Result<()> {
+        let mut runner = self
+            .bases
+            .get_runner(record.baserunner)
+            .context("Pitcher responsibility adjustment for non-existent runner")?
+            .clone();
+        runner.explicit_pitcher_charge = Some(record.pitcher_id);
+        self.bases.set_runner(record.baserunner, runner);
+        Ok(())
     }
 
     pub fn update(&mut self, record: &MappedRecord, play: Option<&PlayRecord>) -> Result<()> {
@@ -1392,7 +1399,6 @@ impl GameState {
 
         Ok(())
     }
-
 }
 
 pub type Outs = BoundedUsize<0, 3>;
@@ -1404,12 +1410,13 @@ pub struct BaseState {
 }
 
 impl BaseState {
-    pub fn new_inning_tiebreaker(new_runner: LineupPosition, current_pitcher: Pitcher, event_id: EventId) -> Self {
+    pub fn new_inning_tiebreaker(new_runner: LineupPosition, event_id: EventId) -> Self {
         let mut state = Self::default();
         let runner = Runner {
             lineup_position: new_runner,
-            charged_to: current_pitcher,
             reached_on_event_id: event_id,
+            charge_event_id: event_id,
+            explicit_pitcher_charge: None,
         };
         state.bases.insert(BaseRunner::Second, runner);
         state
@@ -1445,6 +1452,10 @@ impl BaseState {
 
     fn set_runner(&mut self, baserunner: BaseRunner, runner: Runner) {
         self.bases.insert(baserunner, runner);
+    }
+
+    fn iter_in_reverse_order(&mut self) -> impl Iterator<Item = (BaseRunner, &mut Runner)> {
+        self.bases.iter_mut().sorted_by(|(a, _), (b, _)| b.cmp(a))
     }
 
     fn get_advance_from_baserunner(
@@ -1485,11 +1496,26 @@ impl BaseState {
     }
 
     ///  Accounts for Rule 9.16(g) regarding the assignment of trailing
-    ///  baserunners as inherited if they reach on a fielder's choice
-    ///  in which an inherited runner is forced out 🙃
-    const fn update_runner_charges(self, _play: &PlayRecord) -> Self {
-        // TODO: This
-        self
+    ///  baserunners as inherited if they advance on a fielder's choice 🙃.
+    ///  Returns the charge_event_id of the new batter, if applicable.
+    fn update_runner_charges(&mut self, play: &PlayRecord) -> Result<Option<EventId>> {
+        let mut charge_event_id = None;
+        for out_baserunner in &play.stats.batter_caused_baserunning_outs {
+            let out_runner = self
+                .get_runner(*out_baserunner)
+                .context("No runner on base")?;
+            charge_event_id = Some(out_runner.charge_event_id);
+            for (baserunner, runner) in self.iter_in_reverse_order() {
+                if baserunner < *out_baserunner {
+                    let new_charge_event_id = runner.charge_event_id;
+                    // This is a safe unwrap because it has to be Some to reach this code
+                    runner.charge_event_id = charge_event_id.unwrap();
+                    charge_event_id = Some(new_charge_event_id);
+                }
+            }
+        }
+
+        Ok(charge_event_id)
     }
 
     pub(crate) fn new_base_state(
@@ -1498,7 +1524,6 @@ impl BaseState {
         end_inning: bool,
         play: &PlayRecord,
         batter_lineup_position: LineupPosition,
-        pitcher: Option<Pitcher>,
         event_id: EventId,
     ) -> Result<Self> {
         let mut new_state = if start_inning {
@@ -1509,6 +1534,10 @@ impl BaseState {
                 scored: ArrayVec::new(),
             }
         };
+        let batter_charge_event_id = if !start_inning {
+            new_state.update_runner_charges(play)?
+        }
+        else { None };
 
         // Cover cases where outs are not included in advance information
         for out in &play.stats.outs {
@@ -1554,13 +1583,11 @@ impl BaseState {
             }
         }
         if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Batter, play) {
-            let some_pitcher = pitcher.ok_or_else(|| {
-                anyhow!("A pitcher ID must be provided if the batter reached base")
-            })?;
             let new_runner = Runner {
                 lineup_position: batter_lineup_position,
-                charged_to: some_pitcher,
                 reached_on_event_id: event_id,
+                charge_event_id: batter_charge_event_id.unwrap_or(event_id),
+                explicit_pitcher_charge: None,
             };
             match a.to {
                 _ if a.is_out() || end_inning => {}
@@ -1571,15 +1598,22 @@ impl BaseState {
                 b => new_state.set_runner(BaseRunner::from_current_base(b), new_runner),
             }
         }
-        Ok(new_state.update_runner_charges(play))
+        Ok(new_state)
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct Runner {
     pub lineup_position: LineupPosition,
-    pub charged_to: Pitcher,
-    pub reached_on_event_id: EventId
+    pub reached_on_event_id: EventId,
+    /// This differs from the `reached_on` field in the event of a force-out
+    /// or fielder's choice. The reason we track event ID instead of
+    /// the pitcher is so that we can compute run assignments for any
+    /// fielder in the same way.
+    pub charge_event_id: EventId,
+    /// However, there are some cases where the pitcher is explicitly
+    /// charged with the baserunner.
+    pub explicit_pitcher_charge: Option<Pitcher>,
 }
 
 /// Returns a dummy version of `GameContext` that
@@ -1594,8 +1628,9 @@ pub fn dummy() -> GameContext {
             BaseRunner::First,
             Runner {
                 lineup_position: LineupPosition::PitcherWithDh,
-                charged_to: dummy_str8,
+                explicit_pitcher_charge: Some(dummy_str8),
                 reached_on_event_id: EventId::new(1).unwrap(),
+                charge_event_id: EventId::new(1).unwrap(),
             },
         )]
         .into_iter()

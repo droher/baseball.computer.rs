@@ -153,7 +153,7 @@ impl PitchSequenceItem {
                 }
                 _ => {}
             }
-            // TODO: Log this as a warning once I implement proper spans
+            // TODO: Log unrecognized types as a warning once I implement proper spans
             let pitch_type = PitchType::from_str(&c.to_string()).unwrap_or_default();
             pitch.update_pitch_type(pitch_type);
 

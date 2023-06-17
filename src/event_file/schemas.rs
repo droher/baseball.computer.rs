@@ -292,7 +292,7 @@ pub struct EventBaseState {
     base_state_type: EventBaseStateType,
     baserunner: BaseRunner,
     runner_lineup_position: LineupPosition,
-    charged_to_pitcher_id: Pitcher,
+    charge_event_id: EventId,
     reached_on_event_id: EventId,
 }
 
@@ -310,7 +310,7 @@ impl EventBaseState {
                 baserunner,
                 base_state_type,
                 runner_lineup_position: runner.lineup_position,
-                charged_to_pitcher_id: runner.charged_to,
+                charge_event_id: runner.charge_event_id,
                 reached_on_event_id: runner.reached_on_event_id,
             })
             .collect_vec()
@@ -362,6 +362,8 @@ impl ContextToVec<'_> for EventOut {
         }))
     }
 }
+
+pub struct EventRun {}
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventComment {
