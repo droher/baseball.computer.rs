@@ -1396,7 +1396,7 @@ impl GameState {
             .get_runner(record.baserunner)
             .context("Pitcher responsibility adjustment for non-existent runner")?
             .clone();
-        runner.explicit_pitcher_charge = Some(record.pitcher_id);
+        runner.explicit_charged_pitcher_id = Some(record.pitcher_id);
         self.bases.set_runner(record.baserunner, runner);
         Ok(())
     }
@@ -1444,7 +1444,7 @@ impl BaseState {
             lineup_position: new_runner,
             reached_on_event_id: event_id,
             charge_event_id: event_id,
-            explicit_pitcher_charge: None,
+            explicit_charged_pitcher_id: None,
         };
         state.bases.insert(BaseRunner::Second, runner);
         state
@@ -1616,7 +1616,7 @@ impl BaseState {
                 lineup_position: batter_lineup_position,
                 reached_on_event_id: event_id,
                 charge_event_id: batter_charge_event_id.unwrap_or(event_id),
-                explicit_pitcher_charge: None,
+                explicit_charged_pitcher_id: None,
             };
             match a.to {
                 _ if a.is_out() || end_inning => {}
@@ -1642,7 +1642,7 @@ pub struct Runner {
     pub charge_event_id: EventId,
     /// However, there are some cases where the pitcher is explicitly
     /// charged with the baserunner.
-    pub explicit_pitcher_charge: Option<Pitcher>,
+    pub explicit_charged_pitcher_id: Option<Pitcher>,
 }
 
 /// Returns a dummy version of `GameContext` that
@@ -1657,7 +1657,7 @@ pub fn dummy() -> GameContext {
             BaseRunner::First,
             Runner {
                 lineup_position: LineupPosition::PitcherWithDh,
-                explicit_pitcher_charge: Some(dummy_str8),
+                explicit_charged_pitcher_id: Some(dummy_str8),
                 reached_on_event_id: EventId::new(1).unwrap(),
                 charge_event_id: EventId::new(1).unwrap(),
             },

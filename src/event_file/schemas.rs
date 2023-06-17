@@ -294,6 +294,7 @@ pub struct EventBaseState {
     runner_lineup_position: LineupPosition,
     charge_event_id: EventId,
     reached_on_event_id: EventId,
+    explicit_charged_pitcher_id: Option<Player>,
 }
 
 impl EventBaseState {
@@ -312,6 +313,7 @@ impl EventBaseState {
                 runner_lineup_position: runner.lineup_position,
                 charge_event_id: runner.charge_event_id,
                 reached_on_event_id: runner.reached_on_event_id,
+                explicit_charged_pitcher_id: runner.explicit_charged_pitcher_id,
             })
             .collect_vec()
     }
