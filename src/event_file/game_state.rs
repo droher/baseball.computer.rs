@@ -22,9 +22,9 @@ use crate::event_file::misc::{
 };
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::play::{
-    Base, BaseRunner, BaserunningPlayType, ContactType, Count, EarnedRunStatus, FieldersData,
-    FieldingData, HitType, ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType,
-    PlateAppearanceType, PlayModifier, PlayRecord, PlayType, RunnerAdvance,
+    Base, BaseRunner, BaserunningPlayType, ContactType, Count, FieldersData, FieldingData, HitType,
+    ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType,
+    PlayModifier, PlayRecord, PlayType, RunnerAdvance, UnearnedRunStatus,
 };
 use crate::event_file::traits::{
     FieldingPosition, Inning, LineupPosition, Matchup, Pitcher, Player, RetrosheetVolunteer,
@@ -678,7 +678,6 @@ impl EventBattedBallInfo {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-#[allow(clippy::struct_excessive_bools)]
 pub struct EventBaserunningAdvanceAttempt {
     #[serde(skip_serializing_if = "skip_ids")]
     pub event_key: EventKey,
@@ -691,8 +690,6 @@ pub struct EventBaserunningAdvanceAttempt {
     pub is_successful: bool,
     pub advanced_on_error_flag: bool,
     pub explicit_out_flag: bool,
-    pub rbi_flag: bool,
-    pub team_unearned_flag: bool,
 }
 
 impl EventBaserunningAdvanceAttempt {
@@ -714,10 +711,39 @@ impl EventBaserunningAdvanceAttempt {
                     advanced_on_error_flag,
                     explicit_out_flag,
                     is_successful,
-                    rbi_flag: play.stats.rbi.contains(&ra.baserunner),
-                    team_unearned_flag: ra.earned_run_status()
-                        == Some(EarnedRunStatus::TeamUnearned),
                 })
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
+pub struct EventRun {
+    #[serde(skip_serializing_if = "skip_ids")]
+    pub event_key: EventKey,
+    #[serde(serialize_with = "arrow_hack")]
+    pub runner: BaseRunner,
+    pub rbi_flag: bool,
+    #[serde(serialize_with = "arrow_hack")]
+    pub explicit_unearned_run_status: Option<UnearnedRunStatus>,
+}
+
+impl EventRun {
+    fn from_play(play: &PlayRecord, event_key: EventKey) -> Vec<Self> {
+        play.stats
+            .advances
+            .iter()
+            .filter_map(|ra| {
+                if play.stats.runs.contains(&ra.baserunner) {
+                    Some(Self {
+                        event_key,
+                        runner: ra.baserunner,
+                        rbi_flag: play.stats.rbi.contains(&ra.baserunner),
+                        explicit_unearned_run_status: ra.unearned_run_status(),
+                    })
+                } else {
+                    None
+                }
             })
             .collect()
     }
@@ -750,6 +776,7 @@ pub struct EventResults {
     pub out_on_play: Vec<BaseRunner>,
     pub fielding_plays: Vec<FieldersData>,
     pub baserunning_advances: Vec<EventBaserunningAdvanceAttempt>,
+    pub runs: Vec<EventRun>,
     #[serde(skip)]
     pub ending_base_state: BaseState,
     pub play_info: Vec<EventFlag>,
@@ -1171,6 +1198,7 @@ impl GameState {
                     baserunning_advances: EventBaserunningAdvanceAttempt::from_play(
                         play, event_key,
                     )?,
+                    runs: EventRun::from_play(play, event_key),
                     play_info: EventFlag::from_play(play, event_key)?,
                     comment: state.comment_buffer,
                     fielding_plays: play.stats.fielders_data.clone(),
@@ -1536,8 +1564,9 @@ impl BaseState {
         };
         let batter_charge_event_id = if !start_inning {
             new_state.update_runner_charges(play)?
-        }
-        else { None };
+        } else {
+            None
+        };
 
         // Cover cases where outs are not included in advance information
         for out in &play.stats.outs {
@@ -1758,8 +1787,12 @@ pub fn dummy() -> GameContext {
                     is_successful: true,
                     advanced_on_error_flag: true,
                     explicit_out_flag: true,
+                }],
+                runs: vec![EventRun {
+                    event_key: 1,
+                    runner: BaseRunner::Batter,
                     rbi_flag: true,
-                    team_unearned_flag: true,
+                    explicit_unearned_run_status: Some(UnearnedRunStatus::TeamUnearned),
                 }],
                 play_info: vec![EventFlag {
                     event_key: 1,

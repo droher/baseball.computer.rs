@@ -262,6 +262,7 @@ enum EventFileSchema {
     EventBattedBallInfo,
     EventPlateAppearance,
     EventOut,
+    EventRun,
     EventFieldingPlay,
     EventBaserunningAdvanceAttempt,
     EventBaserunningPlay,
@@ -475,6 +476,12 @@ impl EventFileSchema {
             .iter()
             .flat_map(|e| &e.results.baserunning_advances);
         for row in advance_attempts {
+            w.serialize(row)?;
+        }
+        // Write EventRun
+        let mut w = WRITER_MAP.get_csv(Self::EventRun)?;
+        let runs = game_context.events.iter().flat_map(|e| &e.results.runs);
+        for row in runs {
             w.serialize(row)?;
         }
         // Write EventBaserunningPlay

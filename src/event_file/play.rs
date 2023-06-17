@@ -264,8 +264,8 @@ impl Default for InningFrame {
     }
 }
 
-#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash)]
-pub enum EarnedRunStatus {
+#[derive(Debug, EnumString, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub enum UnearnedRunStatus {
     #[strum(serialize = "UR")]
     Unearned,
     #[strum(serialize = "TUR")]
@@ -681,7 +681,7 @@ impl TryFrom<(&str, &str)> for PlateAppearanceType {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub struct BaserunningFieldingInfo {
     fielders_data: Vec<FieldersData>,
-    unearned_run: Option<EarnedRunStatus>,
+    unearned_run: Option<UnearnedRunStatus>,
 }
 
 impl From<Captures<'_>> for BaserunningFieldingInfo {
@@ -697,9 +697,9 @@ impl From<Captures<'_>> for BaserunningFieldingInfo {
 
         let unearned_run = captures.name("unearned_run").map(|s| {
             if s.as_str().contains('T') {
-                EarnedRunStatus::TeamUnearned
+                UnearnedRunStatus::TeamUnearned
             } else {
-                EarnedRunStatus::Unearned
+                UnearnedRunStatus::Unearned
             }
         });
 
@@ -1103,9 +1103,12 @@ impl RunnerAdvance {
             .find_map(RunnerAdvanceModifier::rbi_status)
     }
 
-    /// Following Chadwick's lead, I currently make no effort to determine earned/unearned run
+    /// BEVENT/Chadwick do not determine earned/unearned run
     /// status on a given play unless it is specified explicitly.
-    pub fn earned_run_status(&self) -> Option<EarnedRunStatus> {
+    /// We won't make an attempt in this library, but it should be possible
+    /// to make some (occasionally arbitrary) determination downstream
+    /// through deduction.
+    pub fn unearned_run_status(&self) -> Option<UnearnedRunStatus> {
         self.modifiers
             .iter()
             .find_map(RunnerAdvanceModifier::unearned_status)
@@ -1172,10 +1175,10 @@ pub enum RunnerAdvanceModifier {
 }
 
 impl RunnerAdvanceModifier {
-    const fn unearned_status(&self) -> Option<EarnedRunStatus> {
+    const fn unearned_status(&self) -> Option<UnearnedRunStatus> {
         match self {
-            Self::UnearnedRun => Some(EarnedRunStatus::Unearned),
-            Self::TeamUnearnedRun => Some(EarnedRunStatus::TeamUnearned),
+            Self::UnearnedRun => Some(UnearnedRunStatus::Unearned),
+            Self::TeamUnearnedRun => Some(UnearnedRunStatus::TeamUnearned),
             _ => None,
         }
     }
@@ -1918,7 +1921,7 @@ impl ParsedPlay {
 
     pub fn team_unearned_runs(&self) -> Vec<BaseRunner> {
         self.filtered_baserunners(|ra: &RunnerAdvance| {
-            ra.scored() && ra.earned_run_status() == Some(EarnedRunStatus::TeamUnearned)
+            ra.scored() && ra.unearned_run_status() == Some(UnearnedRunStatus::TeamUnearned)
         })
         .collect()
     }
