@@ -11,7 +11,7 @@ use lazy_regex::{regex, Lazy};
 use regex::Regex;
 use serde::Serialize;
 use strum_macros::AsRefStr;
-use tracing::warn;
+use tracing::{warn, debug};
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::InfoRecord;
@@ -205,6 +205,11 @@ impl RetrosheetReader {
             .push(MappedRecord::GameId(self.current_game_id));
         loop {
             let did_read = self.reader.read_record(&mut self.current_record)?;
+            // Some Retrosheet files end with the "substitute" char, best to skip it
+            if self.current_record.as_slice() == "\u{001A}" {
+                debug!("Found substitute char in file {}", self.file_info.filename);
+                continue
+            }
             if !did_read {
                 return Ok(false);
             }
