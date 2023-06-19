@@ -160,7 +160,7 @@ impl Default for WindDirection {
 }
 
 pub type Team = ArrayString<8>;
-pub type Park = ArrayString<8>;
+pub type Park = ArrayString<16>;
 
 #[derive(
     Debug,
@@ -180,6 +180,7 @@ pub type Park = ArrayString<8>;
 pub enum DayNight {
     Day,
     Night,
+    #[strum(serialize = "unknown", serialize = "")]
     Unknown,
 }
 impl Default for DayNight {

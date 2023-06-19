@@ -1699,7 +1699,7 @@ pub fn dummy() -> GameContext {
             precipitation: Precipitation::Unknown,
             wind_direction: WindDirection::Unknown,
             season: Season(1990),
-            park_id: dummy_str8,
+            park_id: dummy_str16,
             temperature_fahrenheit: Some(1),
             attendance: Some(1),
             wind_speed_mph: Some(1),
