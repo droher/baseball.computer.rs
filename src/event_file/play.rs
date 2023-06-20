@@ -642,6 +642,16 @@ impl PlateAppearanceType {
             })
         )
     }
+
+    pub const fn reached_on_error(&self) -> bool {
+        matches!(
+            self,
+            Self::BattingOut(BattingOut {
+                out_type: OutAtBatType::ReachedOnError,
+                ..
+            })
+        )
+    }
 }
 
 impl ImplicitPlayResults for PlateAppearanceType {
@@ -970,6 +980,13 @@ impl PlayType {
             _ => false,
         }
     }
+
+    pub fn reached_on_error(&self) -> bool {
+        match self {
+            Self::PlateAppearance(pt) => pt.reached_on_error(),
+            _ => false,
+        }
+    }
 }
 
 impl FieldingData for PlayType {
@@ -1095,7 +1112,7 @@ impl RunnerAdvance {
     /// When a run scores, whether or not it counts as an RBI for the batter cannot be determined
     /// from the `RunnerAdvance` data alone *unless it is explicitly given*. For instance, an non-annotated
     /// run-scoring play on a force out is usually an RBI, but if a DP modifier is present, then
-    /// no RBI is awarded. As a result, the final RBI logic determination must occur at the Play
+    /// no RBI is awarded. As a result, the final RBI logic determination can't occur here.
     /// level.
     pub fn explicit_rbi_status(&self) -> Option<RbiStatus> {
         self.modifiers
@@ -1975,15 +1992,26 @@ impl ParsedPlay {
         })
     }
 
+    // Determines whether runs that score on the play should be RBIs unless explicitly stated otherwise,
+    // or non-RBIs unless explicitly stated otherwise.
     fn default_rbi_status(&self) -> RbiStatus {
         let has_rbi_eligible_play = self.main_plays.iter().any(PlayType::is_rbi_eligible);
-        if has_rbi_eligible_play && !self.is_gidp() {
+        // RBIs may only occur on ROEs if a runner scores from third
+        let ineligible_error = self.reached_on_error()
+            && !self
+                .advances()
+                .any(|ra| ra.baserunner == BaseRunner::Third && ra.scored());
+
+        if has_rbi_eligible_play && !self.is_gidp() && !ineligible_error {
             RbiStatus::Rbi
         } else {
             RbiStatus::NoRbi
         }
     }
 
+    // There is still some additional filtering work to do
+    // that requires knowledge of how many outs are at the start of the play
+    // TODO: Either add outs-at-start info to plays or talk to Retrosheet about changing
     pub fn rbi(&self) -> Vec<BaseRunner> {
         let default_filter = {
             |ra: &RunnerAdvance| ra.scored() && ra.explicit_rbi_status() != Some(RbiStatus::NoRbi)
@@ -2028,6 +2056,10 @@ impl ParsedPlay {
 
     pub fn home_run(&self) -> bool {
         self.main_plays.iter().any(PlayType::home_run)
+    }
+
+    pub fn reached_on_error(&self) -> bool {
+        self.main_plays.iter().any(PlayType::reached_on_error)
     }
 
     pub fn plate_appearance(&self) -> Option<&PlateAppearanceType> {
