@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
@@ -1058,11 +1059,15 @@ impl Personnel {
     ) -> Result<()> {
         let original_fielder =
             self.get_at_position(sub.side, PositionType::Fielding(sub.fielding_position));
-        match original_fielder {
-            Ok(p) if p.player == sub.player => return Ok(()),
-            Ok(p) => self.get_current_fielding_appearance(&p)?.end_event_id = Some(event_id - 1),
-            Err(_) => {}
-        };
+        if let Ok(p) = original_fielder {
+            if p.player == sub.player {
+                return Ok(());
+            }
+            let current_appearance = self.get_current_fielding_appearance(&p)?;
+            if current_appearance.fielding_position == sub.fielding_position {
+                current_appearance.end_event_id = Some(event_id - 1);
+            }
+        }
         let new_fielder: TrackedPlayer = (
             sub.player,
             sub.lineup_position == LineupPosition::PitcherWithDh,
