@@ -1093,18 +1093,31 @@ impl Personnel {
     /// into the field or the pitcher into a non-pitching position.
     /// This will be a safe no-op if the game in question isn't using a DH.
     fn update_on_dh_vacancy(&mut self, sub: &SubstitutionRecord, event_id: EventId) -> Result<()> {
-        let non_batting_pitcher = self.get_at_position(
-            sub.side,
-            PositionType::Lineup(LineupPosition::PitcherWithDh),
-        );
-        let dh = self.get_at_position(
-            sub.side,
-            PositionType::Fielding(FieldingPosition::DesignatedHitter),
-        );
-        if let Ok(p) = non_batting_pitcher {
+        let non_batting_pitcher = self
+            .get_at_position(
+                sub.side,
+                PositionType::Lineup(LineupPosition::PitcherWithDh),
+            )
+            .ok();
+        let dh = self
+            .get_at_position(
+                sub.side,
+                PositionType::Fielding(FieldingPosition::DesignatedHitter),
+            )
+            .ok()
+            .and_then(|tp| {
+                // If the DH vacancy is being created by moving having the DH
+                // come into pitch, we don't need to end their fielding appearance
+                if sub.fielding_position == FieldingPosition::Pitcher {
+                    None
+                } else {
+                    Some(tp)
+                }
+            });
+        if let Some(p) = non_batting_pitcher {
             self.get_current_lineup_appearance(&p)?.end_event_id = Some(event_id - 1);
         }
-        if let Ok(p) = dh {
+        if let Some(p) = dh {
             self.get_current_fielding_appearance(&p)?.end_event_id = Some(event_id - 1);
         }
         Ok(())
