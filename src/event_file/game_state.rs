@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
@@ -1012,14 +1011,18 @@ impl Personnel {
         let original_batter =
             self.get_at_position(sub.side, PositionType::Lineup(sub.lineup_position));
 
-        match original_batter {
-            // If this substitution is the DH/PH/PR being brought in to field, no substitution takes place
-            Ok(p) if p.player == sub.player => return Ok(()),
-            Ok(p) => self.get_current_lineup_appearance(&p)?.end_event_id = Some(event_id - 1),
-            // There should almost always be an original batter, but in
-            // the extremely rare case of a courtesy runner, there might not be.
-            Err(_) => {}
-        };
+        if let Ok(p) = original_batter {
+            let current_appearance: &mut GameLineupAppearance =
+                self.get_current_lineup_appearance(&p)?;
+
+            if p.player == sub.player && current_appearance.lineup_position == sub.lineup_position {
+                return Ok(());
+            }
+
+            if current_appearance.lineup_position == sub.lineup_position {
+                current_appearance.end_event_id = Some(event_id - 1);
+            }
+        }
 
         let new_player: TrackedPlayer = (
             sub.player,
