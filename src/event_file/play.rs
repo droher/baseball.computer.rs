@@ -1277,7 +1277,20 @@ impl RunnerAdvanceModifier {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize, AsRefStr)]
+#[derive(
+    Debug,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    EnumString,
+    Copy,
+    Clone,
+    Hash,
+    Serialize,
+    Deserialize,
+    AsRefStr,
+)]
 pub enum HitStrength {
     #[strum(serialize = "+")]
     Hard,
@@ -1292,7 +1305,20 @@ impl Default for HitStrength {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize, AsRefStr)]
+#[derive(
+    Debug,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    EnumString,
+    Copy,
+    Clone,
+    Hash,
+    Serialize,
+    Deserialize,
+    AsRefStr,
+)]
 pub enum HitDepth {
     #[strum(serialize = "S")]
     Shallow,
@@ -1309,7 +1335,20 @@ impl Default for HitDepth {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Hash, Serialize, Deserialize, AsRefStr)]
+#[derive(
+    Debug,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    EnumString,
+    Copy,
+    Clone,
+    Hash,
+    Serialize,
+    Deserialize,
+    AsRefStr,
+)]
 pub enum HitAngle {
     #[strum(serialize = "F")]
     Foul,
@@ -1396,7 +1435,7 @@ impl HitLocationGeneral {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct HitLocation {
     pub general_location: HitLocationGeneral,
     pub depth: HitDepth,
@@ -1441,7 +1480,7 @@ impl TryFrom<&str> for HitLocation {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct ContactDescription {
     pub contact_type: ContactType,
     pub location: Option<HitLocation>,
@@ -1514,7 +1553,7 @@ impl Default for ContactType {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, EnumString, Clone, Hash, Display)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, EnumString, Clone, Hash, Display, Serialize)]
 pub enum PlayModifier {
     ContactDescription(ContactDescription),
     #[strum(serialize = "AP")]
