@@ -1105,6 +1105,12 @@ impl RunnerAdvance {
         self.to == Base::Home && !self.is_out()
     }
 
+    pub fn advanced_on_error(&self) -> bool {
+        self.fielders_data()
+            .iter()
+            .any(|fd| fd.fielding_play_type == FieldingPlayType::Error)
+    }
+
     pub fn is_this_that_one_time_jean_segura_ran_in_reverse(&self) -> bool {
         BaseRunner::from_target_base(self.to) < self.baserunner
     }
@@ -2014,7 +2020,11 @@ impl ParsedPlay {
     // TODO: Either add outs-at-start info to plays or talk to Retrosheet about changing
     pub fn rbi(&self) -> Vec<BaseRunner> {
         let default_filter = {
-            |ra: &RunnerAdvance| ra.scored() && ra.explicit_rbi_status() != Some(RbiStatus::NoRbi)
+            |ra: &RunnerAdvance| {
+                ra.scored()
+                    && ra.explicit_rbi_status() != Some(RbiStatus::NoRbi)
+                    && !ra.advanced_on_error()
+            }
         };
         let no_default_filter = {
             |ra: &RunnerAdvance| ra.scored() && ra.explicit_rbi_status() == Some(RbiStatus::Rbi)
