@@ -1020,10 +1020,9 @@ impl ImplicitPlayResults for PlayType {
 
 impl PlayType {
     pub fn is_rbi_eligible(&self) -> bool {
-        if let Self::PlateAppearance(pt) = self {
-            !pt.is_strikeout()
-        } else {
-            true
+        match self {
+            Self::PlateAppearance(p) => !p.is_strikeout(),
+            _ => false,
         }
     }
 
