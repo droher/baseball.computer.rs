@@ -11,6 +11,7 @@ use anyhow::{bail, Context, Error, Result};
 use arrayvec::ArrayVec;
 use bounded_integer::BoundedU8;
 use fixed_map::{Key, Set};
+use itertools::Itertools;
 use lazy_regex::{regex, Lazy};
 use lazy_static::lazy_static;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -2002,13 +2003,7 @@ impl ParsedPlay {
     // or non-RBIs unless explicitly stated otherwise.
     fn default_rbi_status(&self) -> RbiStatus {
         let has_rbi_eligible_play = self.main_plays.iter().any(PlayType::is_rbi_eligible);
-        // RBIs may only occur on ROEs if a runner scores from third
-        let ineligible_error = self.reached_on_error()
-            && !self
-                .advances()
-                .any(|ra| ra.baserunner == BaseRunner::Third && ra.scored());
-
-        if has_rbi_eligible_play && !self.is_gidp() && !ineligible_error {
+        if has_rbi_eligible_play && !self.is_gidp() {
             RbiStatus::Rbi
         } else {
             RbiStatus::NoRbi
@@ -2019,21 +2014,18 @@ impl ParsedPlay {
     // that requires knowledge of how many outs are at the start of the play
     // TODO: Either add outs-at-start info to plays or talk to Retrosheet about changing
     pub fn rbi(&self) -> Vec<BaseRunner> {
-        let default_filter = {
-            |ra: &RunnerAdvance| {
-                ra.scored()
-                    && ra.explicit_rbi_status() != Some(RbiStatus::NoRbi)
-                    && !ra.advanced_on_error()
-            }
-        };
-        let no_default_filter = {
-            |ra: &RunnerAdvance| ra.scored() && ra.explicit_rbi_status() == Some(RbiStatus::Rbi)
-        };
-        let rbis = match self.default_rbi_status() {
-            RbiStatus::Rbi => self.filtered_baserunners(default_filter),
-            RbiStatus::NoRbi => self.filtered_baserunners(no_default_filter),
-        };
-        rbis.collect()
+        self.advances()
+            .filter(|ra| match self.default_rbi_status() {
+                RbiStatus::Rbi => {
+                    ra.scored()
+                        && ra.explicit_rbi_status() != Some(RbiStatus::NoRbi)
+                        && !ra.advanced_on_error()
+                        && (ra.baserunner == BaseRunner::Third || !self.reached_on_error())
+                }
+                RbiStatus::NoRbi => ra.scored() && ra.explicit_rbi_status() == Some(RbiStatus::Rbi),
+            })
+            .map(|ra| ra.baserunner)
+            .collect_vec()
     }
 
     pub fn passed_ball(&self) -> bool {
