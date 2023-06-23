@@ -1689,6 +1689,23 @@ impl PlayModifier {
         ]
     }
 
+    // Certain modifiers are related to a specific contact type
+    // which means that an explicit contact type may be omitted from the play.
+    const fn implicit_contact_type(&self) -> Option<ContactType> {
+        match self {
+            Self::BuntGroundIntoDoublePlay => Some(ContactType::GroundBallBunt),
+            Self::BuntPoppedIntoDoublePlay => Some(ContactType::PopUpBunt),
+            Self::FlyBallDoublePlay => Some(ContactType::Fly),
+            Self::GroundBallDoublePlay => Some(ContactType::GroundBall),
+            Self::GroundBallTriplePlay => Some(ContactType::GroundBall),
+            Self::LinedIntoDoublePlay => Some(ContactType::LineDrive),
+            Self::LinedIntoTriplePlay => Some(ContactType::LineDrive),
+            // At the moment, not including sac flies, as the "fly" doesn't really
+            // refer to the contact type (could also be a line drive)
+            _ => None,
+        }
+    }
+
     fn multi_out_play(&self) -> Option<usize> {
         if Self::double_plays().contains(self) {
             Some(2)
@@ -2068,10 +2085,23 @@ impl ParsedPlay {
         })
     }
 
+    pub fn hit_type(&self) -> Option<HitType> {
+        self.plate_appearance().and_then(|pa| match pa {
+            PlateAppearanceType::Hit(h) => Some(h.hit_type),
+            _ => None,
+        })
+    }
+
+    fn implicit_contact_type(&self) -> Option<ContactType> {
+        self.modifiers
+            .iter()
+            .find_map(PlayModifier::implicit_contact_type)
+    }
+
     pub fn contact_description(&self) -> Option<ContactDescription> {
         // Contact type and location be located in either the same modifier
         // or separate modifiers. If separate, they need to be combined.
-        let contact_type = self.modifiers.iter().find_map(|pm| {
+        let explicit_contact_type = self.modifiers.iter().find_map(|pm| {
             if let PlayModifier::ContactDescription(cd) = pm {
                 cd.contact_type
             } else {
@@ -2085,6 +2115,7 @@ impl ParsedPlay {
                 None
             }
         });
+        let contact_type = explicit_contact_type.or(self.implicit_contact_type());
         if contact_type.is_some() || location.is_some() {
             Some(ContactDescription {
                 contact_type,
