@@ -1503,19 +1503,12 @@ impl TryFrom<&str> for HitLocation {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize, Default,
+)]
 pub struct ContactDescription {
-    pub contact_type: ContactType,
+    pub contact_type: Option<ContactType>,
     pub location: Option<HitLocation>,
-}
-
-impl Default for ContactDescription {
-    fn default() -> Self {
-        Self {
-            contact_type: ContactType::Unknown,
-            location: None,
-        }
-    }
 }
 
 impl TryFrom<(&str, &str)> for ContactDescription {
@@ -1523,8 +1516,11 @@ impl TryFrom<(&str, &str)> for ContactDescription {
 
     fn try_from(tup: (&str, &str)) -> Result<Self> {
         let (contact, loc) = tup;
-        let contact_type = ContactType::from_str(contact)?;
+        let contact_type = ContactType::from_str(contact).ok();
         let location = HitLocation::try_from(loc).ok();
+        if contact_type.is_none() && location.is_none() {
+            bail!("Contact description should have at least one of contact type or location, but neither were found")
+        }
         Ok(Self {
             contact_type,
             location,
@@ -1565,14 +1561,13 @@ pub enum ContactType {
     LineDrive,
     #[strum(serialize = "P")]
     PopFly,
-    #[strum(serialize = "")]
     Unknown,
-    None,
+    NoContact,
 }
 
 impl Default for ContactType {
     fn default() -> Self {
-        Self::None
+        Self::Unknown
     }
 }
 
@@ -2073,14 +2068,31 @@ impl ParsedPlay {
         })
     }
 
-    pub fn contact_description(&self) -> Option<&ContactDescription> {
-        self.modifiers.iter().find_map(|pm| {
+    pub fn contact_description(&self) -> Option<ContactDescription> {
+        // Contact type and location be located in either the same modifier
+        // or separate modifiers. If separate, they need to be combined.
+        let contact_type = self.modifiers.iter().find_map(|pm| {
             if let PlayModifier::ContactDescription(cd) = pm {
-                Some(cd)
+                cd.contact_type
             } else {
                 None
             }
-        })
+        });
+        let location = self.modifiers.iter().find_map(|pm| {
+            if let PlayModifier::ContactDescription(cd) = pm {
+                cd.location
+            } else {
+                None
+            }
+        });
+        if contact_type.is_some() || location.is_some() {
+            Some(ContactDescription {
+                contact_type,
+                location,
+            })
+        } else {
+            None
+        }
     }
 
     // Primary fielder of a ball in play. For outs, this is the first fielder in the play string.
@@ -2226,7 +2238,7 @@ impl TryFrom<&ParsedPlay> for PlayStats {
             team_unearned_runs: parsed_play.team_unearned_runs(),
             rbi: parsed_play.rbi(),
             plate_appearance: parsed_play.plate_appearance().cloned(),
-            contact_description: parsed_play.contact_description().copied(),
+            contact_description: parsed_play.contact_description(),
             hit_to_fielder: parsed_play.hit_to_fielder(),
             batter_caused_baserunning_outs: parsed_play.batter_caused_baserunning_outs(),
         })

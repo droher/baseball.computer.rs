@@ -664,7 +664,7 @@ impl EventBattedBallInfo {
                     let location = contact_description.location.unwrap_or_default();
                     Some(Self {
                         event_key,
-                        contact: contact_description.contact_type,
+                        contact: contact_description.contact_type.unwrap_or_default(),
                         hit_to_fielder: play.stats.hit_to_fielder.unwrap_or_default(),
                         general_location: location.general_location,
                         depth: location.depth,
