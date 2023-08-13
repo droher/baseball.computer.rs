@@ -1219,8 +1219,8 @@ impl FieldingData for RunnerAdvanceModifier {
     fn fielders_data(&self) -> Vec<FieldersData> {
         match self {
             Self::Putout { putout, assists } => [
-                vec![FieldersData::new(*putout, FieldingPlayType::Putout)],
                 FieldersData::from_vec(assists, FieldingPlayType::Assist),
+                vec![FieldersData::new(*putout, FieldingPlayType::Putout)],
             ]
             .concat(),
             Self::AdvancedOnError { assists, error } => [
