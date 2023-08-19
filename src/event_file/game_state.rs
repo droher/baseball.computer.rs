@@ -192,7 +192,7 @@ impl PlateAppearanceResultType {
 pub struct EventFlag {
     event_key: EventKey,
     sequence_id: SequenceId,
-    flag: PlayModifier,
+    flag: String,
 }
 
 impl EventFlag {
@@ -206,7 +206,7 @@ impl EventFlag {
                 Ok(Self {
                     event_key,
                     sequence_id: SequenceId::new(i + 1).context("Invalid sequence ID")?,
-                    flag: pm.clone(),
+                    flag: pm.flag_string(),
                 })
             })
             .collect()
@@ -1776,7 +1776,7 @@ pub fn dummy() -> GameContext {
                 play_info: vec![EventFlag {
                     event_key: 1,
                     sequence_id: SequenceId::new(1).unwrap(),
-                    flag: PlayModifier::AppealPlay,
+                    flag: String::from("dummy")
                 }],
                 comment: vec![String::from("dummy")],
                 fielding_plays: vec![FieldersData {

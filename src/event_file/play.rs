@@ -1568,7 +1568,7 @@ impl Default for ContactType {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, EnumString, Clone, Hash, Display, Serialize)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, EnumString, Clone, Hash)]
 pub enum PlayModifier {
     ContactDescription(ContactDescription),
     #[strum(serialize = "AP")]
@@ -1665,6 +1665,10 @@ impl PlayModifier {
     pub fn is_valid_event_type(&self) -> bool {
         let dummy = &Self::ContactDescription(ContactDescription::default());
         discriminant(dummy) != discriminant(self)
+    }
+
+    pub fn flag_string(&self) -> String {
+        format!("{:?}", self)
     }
 
     const fn double_plays() -> [Self; 6] {
