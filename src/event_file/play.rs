@@ -27,8 +27,6 @@ use crate::event_file::traits::{
     Batter, FieldingPlayType, FieldingPosition, Inning, RetrosheetEventRecord, Side,
 };
 
-use super::misc::arrow_hack;
-
 // Sorry
 pub static OUT_REGEX: &Lazy<Regex> = regex!(
     r"^(?P<a1>(?:[0-9]?)+)(?P<po1>[0-9])(?:\((?P<runner1>[B123])\))?((?P<a2>(?:[0-9]?)+)(?P<po2>[0-9])(?:\((?P<runner2>[B123])\))?)?((?P<a3>(?:[0-9]?)+)(?P<po3>[0-9])(?:\((?P<runner3>[B123])\))?)?$"
@@ -77,7 +75,6 @@ fn preallocated_cache<K: Hash + Eq, V: Clone>(size: usize) -> Arc<Cache<K, Arc<V
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 pub struct FieldersData {
     pub fielding_position: FieldingPosition,
-    #[serde(serialize_with = "arrow_hack")]
     pub fielding_play_type: FieldingPlayType,
 }
 

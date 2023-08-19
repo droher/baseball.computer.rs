@@ -4,10 +4,9 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Error, Result};
 use bimap::BiMap;
-use itertools::Itertools;
 use num_traits::PrimInt;
 use regex::{Match, Regex};
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumString};
 use tracing::warn;
 
@@ -226,37 +225,4 @@ pub fn to_str_vec(match_vec: Vec<Option<Match>>) -> Vec<&str> {
         .into_iter()
         .filter_map(|o| o.map(|m| m.as_str()))
         .collect()
-}
-
-#[inline]
-pub fn arrow_hack<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
-where
-    T: Serialize + Debug,
-    S: Serializer,
-{
-    let s = serde_json::to_string(value).map_err(|e| {
-        serde::ser::Error::custom(format!("Error serializing {value:?} to JSON string: {e}",))
-    })?;
-    Serialize::serialize(s.trim_matches('"'), serializer)
-}
-
-#[inline]
-#[allow(clippy::unwrap_used)]
-pub fn arrow_hack_vec<T, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
-where
-    T: Serialize,
-    S: Serializer,
-{
-    // Get JSON Strings on each T in value and then convert them as strs
-    let s = value
-        .iter()
-        .map(|t| serde_json::to_string(t).unwrap())
-        .collect_vec();
-    let s = s.iter().map(|s| s.trim_matches('"')).collect_vec();
-    Serialize::serialize(&s, serializer)
-}
-
-#[inline]
-pub const fn skip_ids<T>(_: &T) -> bool {
-    false
 }

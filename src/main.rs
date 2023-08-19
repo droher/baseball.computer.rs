@@ -9,37 +9,24 @@
 )]
 #![allow(clippy::module_name_repetitions, clippy::significant_drop_tightening)]
 
-use arrow::record_batch::RecordBatch;
 use event_file::schemas::{BoxScoreComment, EventBaseState, EventComment};
 use glob::GlobError;
-use itertools::Itertools;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::fs::File;
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard};
 use std::time::Instant;
 
 use anyhow::{anyhow, bail, Context, Result};
-use arrow::datatypes::{Field, Schema};
 use clap::Parser;
 use csv::{Writer, WriterBuilder};
 use either::Either;
 use fixed_map::{Key, Map};
 use lazy_static::lazy_static;
-use parquet::{
-    arrow::ArrowWriter,
-    basic::{Compression, Encoding, GzipLevel},
-    file::properties::{EnabledStatistics, WriterProperties, WriterVersion},
-    schema::types::ColumnPath,
-};
 use rayon::prelude::*;
-use serde_arrow::{
-    arrow::{serialize_into_arrays, serialize_into_fields},
-    schema::TracingOptions,
-};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use tracing::{debug, error, info, warn, Level};
@@ -49,7 +36,6 @@ use event_file::game_state::GameContext;
 use event_file::parser::RetrosheetReader;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
-use crate::event_file::game_state::dummy;
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
 use crate::event_file::schemas::{
@@ -94,80 +80,9 @@ impl ThreadSafeCsvWriter {
     }
 }
 
-struct ThreadSafeParquetWriter {
-    // The reason this is an Option is because we need to be able to take ownership of the writer
-    // at closing time, and take() is a reasonable way to do that if we're not giving it back.
-    writer: Mutex<Option<ArrowWriter<File>>>,
-    fields: Vec<Field>,
-    schema: Arc<Schema>,
-}
-
-impl ThreadSafeParquetWriter {
-    fn arrow_fields() -> Result<Vec<Field>> {
-        let dummy_vec = vec![dummy()];
-        serialize_into_fields(&dummy_vec, TracingOptions::default())
-            .context("Failed to serialize dummy record")
-    }
-
-    fn writer_props() -> WriterProperties {
-        let event_key_path = vec!["events", "list", "element", "event_key"]
-            .into_iter()
-            .map(String::from)
-            .collect_vec();
-        WriterProperties::builder()
-            .set_compression(Compression::GZIP(GzipLevel::default()))
-            .set_writer_version(WriterVersion::PARQUET_2_0)
-            .set_statistics_enabled(EnabledStatistics::Page)
-            // Each row is very large, so group size needs to be smaller than normal
-            .set_max_row_group_size(10000)
-            .set_column_dictionary_enabled(ColumnPath::new(event_key_path.clone()), false)
-            .set_column_encoding(
-                ColumnPath::new(event_key_path),
-                Encoding::DELTA_BINARY_PACKED,
-            )
-            .build()
-    }
-
-    pub fn new() -> Result<Self> {
-        let fields = Self::arrow_fields()?;
-        let schema = Arc::new(Schema::new(fields.clone()));
-
-        let parquet_file = File::create("arrow/game.parquet")?;
-        let props = Self::writer_props();
-        let writer = ArrowWriter::try_new(parquet_file, schema.clone(), Some(props))?;
-        Ok(Self {
-            writer: Mutex::new(Some(writer)),
-            fields,
-            schema,
-        })
-    }
-
-    #[allow(clippy::expect_used)]
-    fn write(&self, contexts: &[GameContext]) -> Result<()> {
-        let array = serialize_into_arrays(&self.fields, contexts)?;
-        let record_batch = RecordBatch::try_new(self.schema.clone(), array)?;
-        let mut guard = self.writer.lock().expect("Failed to acquire writer lock");
-        let writer = guard.as_mut().context("Writer not found")?;
-        writer.write(&record_batch)?;
-        Ok(())
-    }
-
-    #[allow(clippy::expect_used)]
-    fn close(&self) {
-        let w = self
-            .writer
-            .lock()
-            .expect("Failed to acquire writer lock")
-            .take()
-            .expect("Writer not found");
-        w.close().expect("Failed to close writer");
-    }
-}
-
 struct WriterMap {
     output_prefix: PathBuf,
     map: Map<EventFileSchema, ThreadSafeCsvWriter>,
-    parquet_writer: ThreadSafeParquetWriter,
 }
 
 impl WriterMap {
@@ -180,13 +95,10 @@ impl WriterMap {
         Self {
             output_prefix: output_prefix.to_path_buf(),
             map,
-            parquet_writer: ThreadSafeParquetWriter::new()
-                .expect("Failed to create parquet writer"),
         }
     }
 
     fn flush_all(&self) -> Result<Vec<()>> {
-        self.parquet_writer.close();
         self.map
             .iter()
             .par_bridge()
@@ -204,10 +116,6 @@ impl WriterMap {
             .get(schema)
             .context("Failed to initialize writer for schema")?
             .csv()
-    }
-
-    fn write_parquet(&self, contexts: &[GameContext]) -> Result<()> {
-        self.parquet_writer.write(contexts)
     }
 
     fn write_csv<'a, C: ContextToVec<'a>>(
@@ -319,7 +227,6 @@ impl EventFileSchema {
         debug!("Processing file {}", file_info.filename);
 
         let mut game_ids = Vec::with_capacity(81);
-        let mut contexts = vec![];
 
         for (game_num, record_vec_result) in reader.enumerate() {
             if let Err(e) = record_vec_result {
@@ -352,9 +259,7 @@ impl EventFileSchema {
             } else {
                 Self::write_play_by_play_files(&game_context)?;
             }
-            contexts.push(game_context);
         }
-        WRITER_MAP.write_parquet(&contexts)?;
         Ok(game_ids)
     }
 

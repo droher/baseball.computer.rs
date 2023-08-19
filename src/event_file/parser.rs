@@ -22,8 +22,6 @@ use crate::event_file::misc::{
 use crate::event_file::play::PlayRecord;
 use crate::event_file::traits::{GameType, RetrosheetEventRecord};
 
-use super::misc::arrow_hack;
-
 pub type RecordSlice = [MappedRecord];
 
 pub static ALL_STAR_GAME: &Lazy<Regex> = regex!(r"[0-9]{4}AS\.EVE$");
@@ -63,9 +61,7 @@ impl AccountType {
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize)]
 pub struct FileInfo {
     pub filename: ArrayString<20>,
-    #[serde(serialize_with = "arrow_hack")]
     pub game_type: GameType,
-    #[serde(serialize_with = "arrow_hack")]
     pub account_type: AccountType,
     pub file_index: usize,
 }
