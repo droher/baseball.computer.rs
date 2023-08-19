@@ -29,7 +29,7 @@ def get_prebuilt_csvs() -> None:
      .read_csv("https://www.retrosheet.org/CurrentNames.csv", names=franchise_header, parse_dates=["date_start", "date_end"])
      .to_parquet("retrosheet_simple/franchise.parquet", index=False)
      )
-    databank_files = ["Appearances", "Batting", "Fielding", "Pitching", "People"]
+    databank_files = ["Appearances", "Batting", "Fielding", "FieldingOF", "Pitching", "People"]
     DATABANK_PATH.mkdir(exist_ok=True)
     for f in databank_files:
         github_url = f"https://raw.githubusercontent.com/chadwickbureau/baseballdatabank/master/core/{f}.csv"
