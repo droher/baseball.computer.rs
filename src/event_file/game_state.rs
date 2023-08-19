@@ -15,7 +15,6 @@ use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
     Team, UmpireAssignment, UmpirePosition, WindDirection,
 };
-use crate::event_file::misc::arrow_hack;
 use crate::event_file::misc::{
     BatHandAdjustment, EarnedRunRecord, GameId, Hand, PitchHandAdjustment,
     PitcherResponsibilityAdjustment, RunnerAdjustment, SubstitutionRecord,
@@ -32,7 +31,6 @@ use crate::event_file::traits::{
 };
 use crate::AccountType;
 
-use super::misc::{arrow_hack_vec, skip_ids};
 use super::pitch_sequence::{PitchSequence, PitchSequenceItem, PitchType};
 use super::play::{HitAngle, HitDepth, HitLocationGeneral, HitStrength};
 use super::schemas::GameIdString;
@@ -192,12 +190,9 @@ impl PlateAppearanceResultType {
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Serialize)]
 pub struct EventFlag {
-    #[serde(skip_serializing_if = "skip_ids")]
     event_key: EventKey,
-    #[serde(skip_serializing_if = "skip_ids")]
     sequence_id: SequenceId,
-    #[serde(serialize_with = "arrow_hack")]
-    flag: PlayModifier,
+    flag: String,
 }
 
 impl EventFlag {
@@ -211,7 +206,7 @@ impl EventFlag {
                 Ok(Self {
                     event_key,
                     sequence_id: SequenceId::new(i + 1).context("Invalid sequence ID")?,
-                    flag: pm.clone(),
+                    flag: pm.flag_string(),
                 })
             })
             .collect()
@@ -228,19 +223,12 @@ struct League(String);
 pub struct GameSetting {
     pub date: NaiveDate,
     pub start_time: Option<NaiveTime>,
-    #[serde(serialize_with = "arrow_hack")]
     pub doubleheader_status: DoubleheaderStatus,
-    #[serde(serialize_with = "arrow_hack")]
     pub time_of_day: DayNight,
-    #[serde(serialize_with = "arrow_hack")]
     pub bat_first_side: Side,
-    #[serde(serialize_with = "arrow_hack")]
     pub sky: Sky,
-    #[serde(serialize_with = "arrow_hack")]
     pub field_condition: FieldCondition,
-    #[serde(serialize_with = "arrow_hack")]
     pub precipitation: Precipitation,
-    #[serde(serialize_with = "arrow_hack")]
     pub wind_direction: WindDirection,
     pub season: Season,
     pub park_id: Park,
@@ -312,7 +300,6 @@ impl From<&RecordSlice> for GameSetting {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize, Default)]
 pub struct GameMetadata {
     pub scorer: Option<Scorer>,
-    #[serde(serialize_with = "arrow_hack")]
     pub how_scored: HowScored,
     pub inputter: Option<RetrosheetVolunteer>,
     pub translator: Option<RetrosheetVolunteer>,
@@ -348,7 +335,6 @@ impl From<&RecordSlice> for GameMetadata {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GameUmpire {
     pub game_id: GameIdString,
-    #[serde(serialize_with = "arrow_hack")]
     pub position: UmpirePosition,
     pub umpire_id: Option<Umpire>,
 }
@@ -440,13 +426,10 @@ impl From<&[MappedRecord]> for GameResults {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub struct GameLineupAppearance {
-    #[serde(skip_serializing_if = "skip_ids")]
     pub game_id: GameIdString,
     pub player_id: Player,
-    #[serde(serialize_with = "arrow_hack")]
     pub side: Side,
     pub lineup_position: LineupPosition,
-    #[serde(serialize_with = "arrow_hack")]
     pub entered_game_as: EnteredGameAs,
     pub start_event_id: EventId,
     pub end_event_id: Option<EventId>,
@@ -480,10 +463,8 @@ impl GameLineupAppearance {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Copy)]
 pub struct GameFieldingAppearance {
-    #[serde(skip_serializing_if = "skip_ids")]
     pub game_id: GameIdString,
     pub player_id: Player,
-    #[serde(serialize_with = "arrow_hack")]
     pub side: Side,
     pub fielding_position: FieldingPosition,
     pub start_event_id: EventId,
@@ -597,13 +578,9 @@ impl GameContext {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningPlay {
-    #[serde(skip_serializing_if = "skip_ids")]
     pub event_key: EventKey,
-    #[serde(skip_serializing_if = "skip_ids")]
     pub sequence_id: SequenceId,
-    #[serde(serialize_with = "arrow_hack")]
     pub baserunning_play_type: BaserunningPlayType,
-    #[serde(serialize_with = "arrow_hack")]
     pub baserunner: Option<BaseRunner>,
 }
 
@@ -637,18 +614,12 @@ impl EventBaserunningPlay {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Default)]
 pub struct EventBattedBallInfo {
-    #[serde(skip_serializing_if = "skip_ids")]
     pub event_key: EventKey,
-    #[serde(serialize_with = "arrow_hack")]
     pub contact: ContactType,
     pub hit_to_fielder: FieldingPosition,
-    #[serde(serialize_with = "arrow_hack")]
     pub general_location: HitLocationGeneral,
-    #[serde(serialize_with = "arrow_hack")]
     pub depth: HitDepth,
-    #[serde(serialize_with = "arrow_hack")]
     pub angle: HitAngle,
-    #[serde(serialize_with = "arrow_hack")]
     pub strength: HitStrength,
 }
 
@@ -680,13 +651,9 @@ impl EventBattedBallInfo {
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventBaserunningAdvanceAttempt {
-    #[serde(skip_serializing_if = "skip_ids")]
     pub event_key: EventKey,
-    #[serde(skip_serializing_if = "skip_ids")]
     pub sequence_id: SequenceId,
-    #[serde(serialize_with = "arrow_hack")]
     pub baserunner: BaseRunner,
-    #[serde(serialize_with = "arrow_hack")]
     pub attempted_advance_to: Base,
     pub is_successful: bool,
     pub advanced_on_error_flag: bool,
@@ -720,12 +687,9 @@ impl EventBaserunningAdvanceAttempt {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct EventRun {
-    #[serde(skip_serializing_if = "skip_ids")]
     pub event_key: EventKey,
-    #[serde(serialize_with = "arrow_hack")]
     pub runner: BaseRunner,
     pub rbi_flag: bool,
-    #[serde(serialize_with = "arrow_hack")]
     pub explicit_unearned_run_status: Option<UnearnedRunStatus>,
 }
 
@@ -753,9 +717,7 @@ impl EventRun {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct EventContext {
     pub inning: u8,
-    #[serde(serialize_with = "arrow_hack")]
     pub batting_side: Side,
-    #[serde(serialize_with = "arrow_hack")]
     pub frame: InningFrame,
     pub at_bat: LineupPosition,
     pub outs: Outs,
@@ -769,11 +731,9 @@ pub struct EventContext {
 pub struct EventResults {
     pub count_at_event: Count,
     pub pitch_sequence: Arc<PitchSequence>,
-    #[serde(serialize_with = "arrow_hack")]
     pub plate_appearance: Option<PlateAppearanceResultType>,
     pub batted_ball_info: Option<EventBattedBallInfo>,
     pub plays_at_base: Vec<EventBaserunningPlay>,
-    #[serde(serialize_with = "arrow_hack_vec")]
     pub out_on_play: Vec<BaseRunner>,
     pub fielding_plays: Vec<FieldersData>,
     pub baserunning_advances: Vec<EventBaserunningAdvanceAttempt>,
@@ -791,7 +751,6 @@ pub struct Event {
     pub event_key: EventKey,
     pub context: EventContext,
     pub results: EventResults,
-    #[serde(skip_serializing_if = "skip_ids")]
     pub line_number: usize,
 }
 
@@ -824,9 +783,7 @@ impl Event {
 /// an at-bat. Further exceptions should go here as they come up.
 #[derive(Default, Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub struct RareAttributes {
-    #[serde(serialize_with = "arrow_hack")]
     pub batter_hand: Option<Hand>,
-    #[serde(serialize_with = "arrow_hack")]
     pub pitcher_hand: Option<Hand>,
     // In the case of a mid-PA substitution, the
     // credit for the result of the PA cannot be determined mid-PA
@@ -1819,7 +1776,7 @@ pub fn dummy() -> GameContext {
                 play_info: vec![EventFlag {
                     event_key: 1,
                     sequence_id: SequenceId::new(1).unwrap(),
-                    flag: PlayModifier::AppealPlay,
+                    flag: String::from("dummy")
                 }],
                 comment: vec![String::from("dummy")],
                 fielding_plays: vec![FieldersData {
