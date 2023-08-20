@@ -11,6 +11,7 @@
 
 use event_file::schemas::{BoxScoreComment, EventBaseState, EventComment};
 use glob::GlobError;
+use itertools::Itertools;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::fs::File;
@@ -453,6 +454,16 @@ impl FileProcessor {
         EventFileSchema::write(reader, parsed_games)
     }
 
+    fn contains_nlb_dupes(path: &PathBuf) -> bool {
+        let s = path.to_str().unwrap_or_default();
+        if s.ends_with(".EVR") {
+            s.contains("allas") || s.contains("allpost")
+        }
+        else {
+            false
+        }
+    }
+
     pub fn par_process_files(&mut self, account_type: AccountType) -> Result<()> {
         // Box score accounts are expected to be duplicates so we don't need to check against them
         let parsed_games = if account_type == AccountType::BoxScore {
@@ -462,6 +473,8 @@ impl FileProcessor {
         };
         let mut files = account_type
             .glob(&self.opt.input)?
+            // TODO: Remove once we remove NLB AS dupes        
+            .filter_ok(|p| !Self::contains_nlb_dupes(p))
             .collect::<Result<Vec<PathBuf>, GlobError>>()?;
         files.par_sort();
         let file_count = files.len();
