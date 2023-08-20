@@ -160,18 +160,28 @@ impl TryFrom<&str> for FieldingPosition {
 }
 
 #[derive(
-    Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize, AsRefStr,
+    Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize, AsRefStr, EnumString
 )]
+#[strum(serialize_all = "lowercase")]
 pub enum GameType {
-    SpringTraining,
+    Exhibition,
+    Preseason,
+    #[strum(serialize = "regular")]
     RegularSeason,
+    #[strum(serialize = "allstar")]
     AllStarGame,
+    #[strum(serialize = "playoff")]
+    TiebreakerPlayoff,
+    #[strum(serialize = "wildcard")]
     WildCardSeries,
     DivisionSeries,
+    #[strum(serialize = "lcs")]
     LeagueChampionshipSeries,
     WorldSeries,
     NegroLeagues,
-    Other,
+    #[strum(serialize = "championship")]
+    OtherChampionship,
+    Unknown,
 }
 
 #[derive(

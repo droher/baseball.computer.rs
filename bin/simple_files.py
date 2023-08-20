@@ -11,11 +11,11 @@ from sqlalchemy import Integer, SmallInteger, Float, String, CHAR, Text, Boolean
 from sqlalchemy import Table as AlchemyTable
 from sqlalchemy.sql.type_api import TypeEngine
 
-RETROSHEET_PATH = Path("retrosheet")
+RETROSHEET_PATH = Path("retrosheet/alldata")
 OUTPUT_PATH = Path("retrosheet_simple")
 DATABANK_PATH = Path("baseballdatabank")
 
-RETROSHEET_SUBDIRS = "gamelog", "schedule", "misc", "rosters"
+RETROSHEET_SUBDIRS = "gamelogs", "schedule", "rosters"
 FILES = "gamelog", "schedule", "park", "roster"
 
 # MS-DOS eof character that needs to be specially handled in some files
@@ -75,9 +75,9 @@ def parse_simple_files() -> None:
     subdirs = {subdir: retrosheet_base / subdir for subdir in RETROSHEET_SUBDIRS}
 
     print("Writing simple files...")
-    concat_files(subdirs["gamelog"], output_base / "gamelog.csv", glob="*.TXT", check_dupes=False)
+    concat_files(subdirs["gamelogs"], output_base / "gamelog.csv", glob="*.txt", check_dupes=False)
     concat_files(subdirs["schedule"], output_base / "schedule.csv", glob="*.TXT")
-    concat_files(subdirs["misc"], output_base / "park.csv", glob="parkcode.txt", strip_header=True)
+    concat_files(retrosheet_base, output_base / "park.csv", glob="ballparks.csv", strip_header=True)
     concat_files(subdirs["rosters"], output_base / "roster.csv", glob="*.ROS", prepend_filename=True)
 
 

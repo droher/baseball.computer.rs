@@ -11,7 +11,7 @@ use lazy_regex::{regex, Lazy};
 use regex::Regex;
 use serde::Serialize;
 use strum_macros::AsRefStr;
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use crate::event_file::info::InfoRecord;
@@ -20,7 +20,7 @@ use crate::event_file::misc::{
     PitcherResponsibilityAdjustment, RunnerAdjustment, StartRecord, SubstitutionRecord,
 };
 use crate::event_file::play::PlayRecord;
-use crate::event_file::traits::{GameType, RetrosheetEventRecord};
+use crate::event_file::traits::RetrosheetEventRecord;
 
 pub type RecordSlice = [MappedRecord];
 
@@ -61,7 +61,6 @@ impl AccountType {
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize)]
 pub struct FileInfo {
     pub filename: ArrayString<20>,
-    pub game_type: GameType,
     pub account_type: AccountType,
     pub file_index: usize,
 }
@@ -78,31 +77,9 @@ impl FileInfo {
             .map_err(|_| anyhow!("Capacity error converting {raw_filename} to array string"))?;
         Ok(Self {
             filename,
-            game_type: Self::game_type(&raw_filename),
             account_type: Self::account_type(&raw_filename),
             file_index,
         })
-    }
-
-    fn game_type(s: &str) -> GameType {
-        if REGULAR_SEASON.is_match(s) {
-            GameType::RegularSeason
-        } else if ALL_STAR_GAME.is_match(s) {
-            GameType::AllStarGame
-        } else if WORLD_SERIES.is_match(s) {
-            GameType::WorldSeries
-        } else if LCS.is_match(s) {
-            GameType::LeagueChampionshipSeries
-        } else if DIVISION_SERIES.is_match(s) {
-            GameType::DivisionSeries
-        } else if WILD_CARD.is_match(s) {
-            GameType::WildCardSeries
-        } else if NEGRO_LEAGUES.is_match(s) {
-            GameType::NegroLeagues
-        } else {
-            warn!("Could not determine game type given filename {s}");
-            GameType::Other
-        }
     }
 
     pub fn account_type(s: &str) -> AccountType {
@@ -218,9 +195,9 @@ impl RetrosheetReader {
                 Ok(m) => self.current_record_vec.push(m),
                 Err(_) => {
                     return Err(anyhow!(
-                        "Error during game {} -- Error reading record: {:?}",
+                        "Error during game {} -- Error reading record: {}",
                         &self.current_game_id.id,
-                        &self.current_record.iter().collect::<Vec<&str>>()
+                        &self.current_record.iter().collect::<Vec<&str>>().join(",")
                     ))
                 }
             }

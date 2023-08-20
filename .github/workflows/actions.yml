@@ -39,9 +39,9 @@ jobs:
           key: retrosheet-${{ steps.sha.outputs.sha }}
 
       - if: steps.cache.outputs.cache-hit != 'true'
-        run: wget https://github.com/droher/retrosheet/archive/master.zip -O retrosheet.zip
+        run: wget https://github.com/droher/retrosheet-mirror/archive/master.zip -O retrosheet.zip
       - if: steps.cache.outputs.cache-hit != 'true'
-        run: unzip retrosheet.zip && mv retrosheet-* retrosheet
+        run: unzip retrosheet-mirror.zip && mv retrosheet-* retrosheet
 
   simple_files:
     name: Parse simple files

@@ -12,6 +12,8 @@ use crate::event_file::traits::{
     Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire,
 };
 
+use super::traits::GameType;
+
 #[derive(
     Debug,
     Eq,
@@ -293,6 +295,7 @@ pub enum InfoRecord {
     StartTime(Option<NaiveTime>),
     DayNight(DayNight),
     UseDh(bool),
+    GameType(GameType),
     HomeTeamBatsFirst(bool),
     PitchDetail(PitchDetail),
     UmpireAssignment(UmpireAssignment),
@@ -374,6 +377,7 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
             "sky" => Self::Sky(Sky::from_str(value)?),
             "winddir" => Self::WindDirection(WindDirection::from_str(value)?),
             "howscored" => Self::HowScored(HowScored::from_str(value)?),
+            "gametype" => Self::GameType(GameType::from_str(value)?),
             "howentered" => Self::HowEntered,
 
             "windspeed" => Self::WindSpeed(parse_positive_int::<u8>(value)),

@@ -223,6 +223,7 @@ struct League(String);
 pub struct GameSetting {
     pub date: NaiveDate,
     pub start_time: Option<NaiveTime>,
+    pub game_type: GameType,
     pub doubleheader_status: DoubleheaderStatus,
     pub time_of_day: DayNight,
     pub bat_first_side: Side,
@@ -243,6 +244,7 @@ impl Default for GameSetting {
         Self {
             date: NaiveDate::from_num_days_from_ce_opt(0).unwrap_or_default(),
             doubleheader_status: DoubleheaderStatus::default(),
+            game_type: GameType::Unknown,
             start_time: Option::default(),
             time_of_day: DayNight::default(),
             use_dh: false,
@@ -279,6 +281,7 @@ impl From<&RecordSlice> for GameSetting {
                 InfoRecord::StartTime(x) => setting.start_time = *x,
                 InfoRecord::DayNight(x) => setting.time_of_day = *x,
                 InfoRecord::UseDh(x) => setting.use_dh = *x,
+                InfoRecord::GameType(x) => setting.game_type = *x,
                 InfoRecord::HomeTeamBatsFirst(x) => {
                     setting.bat_first_side = if *x { Side::Home } else { Side::Away }
                 }
@@ -1373,7 +1376,7 @@ impl GameState {
         let mut runner = self
             .bases
             .get_runner(record.baserunner)
-            .context("Pitcher responsibility adjustment for non-existent runner")?
+            .context(anyhow!("Pitcher responsibility adjustment for non-existent runner: {:?}", record))?
             .clone();
         runner.explicit_charged_pitcher_id = Some(record.pitcher_id);
         self.bases.set_runner(record.baserunner, runner);
@@ -1651,7 +1654,6 @@ pub fn dummy() -> GameContext {
         },
         file_info: FileInfo {
             filename: ArrayString::from("dummy").unwrap(),
-            game_type: GameType::RegularSeason,
             account_type: AccountType::BoxScore,
             file_index: 0,
         },
@@ -1670,6 +1672,7 @@ pub fn dummy() -> GameContext {
         setting: GameSetting {
             date: NaiveDate::MIN,
             start_time: Some(NaiveTime::default()),
+            game_type: GameType::RegularSeason,
             doubleheader_status: DoubleheaderStatus::DoubleHeaderGame1,
             time_of_day: DayNight::Day,
             bat_first_side: Side::Away,
