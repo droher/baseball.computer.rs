@@ -65,9 +65,15 @@ def parse_simple_files() -> None:
                 if new_line in lines:
                     print(f"Duplicate row in {fin.filename()}: {new_line.strip()}")
                     continue
+                # TODO: Fix NLB roster file shape in raw data
+                if "roster" in output_file.name and len(new_line.split(",")) == 7:
+                    new_line = new_line.strip() + ","
+                elif "roster" in output_file.name and len(new_line.split(",")) < 7:
+                    print("Skipping row with missing data: " + new_line.strip())
+                    continue
                 if check_dupes:
                     lines.add(new_line)
-                fout.write(new_line)
+                fout.write(new_line.strip() + "\n")
 
     retrosheet_base = Path(RETROSHEET_PATH)
     output_base = Path(OUTPUT_PATH)
