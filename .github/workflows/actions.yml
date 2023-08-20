@@ -30,7 +30,7 @@ jobs:
       sha: ${{ steps.sha.outputs.sha }}
     steps:
       - id: sha
-        run: echo "::set-output name=sha::$(git ls-remote https://github.com/droher/retrosheet master)"
+        run: echo "::set-output name=sha::$(git ls-remote https://github.com/droher/retrosheet-mirror main)"
 
       - uses: actions/cache@v3
         id: cache
@@ -39,9 +39,9 @@ jobs:
           key: retrosheet-${{ steps.sha.outputs.sha }}
 
       - if: steps.cache.outputs.cache-hit != 'true'
-        run: wget https://github.com/droher/retrosheet-mirror/archive/master.zip -O retrosheet.zip
+        run: wget https://github.com/droher/retrosheet-mirror/archive/main.zip -O retrosheet.zip
       - if: steps.cache.outputs.cache-hit != 'true'
-        run: unzip retrosheet-mirror.zip && mv retrosheet-* retrosheet
+        run: unzip retrosheet.zip && mv retrosheet-* retrosheet
 
   simple_files:
     name: Parse simple files
