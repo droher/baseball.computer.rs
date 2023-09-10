@@ -236,6 +236,15 @@ impl BaseRunner {
             Base::Home => Self::Batter,
         }
     }
+
+    pub const fn to_current_base(&self) -> Option<Base> {
+        match self {
+            Self::Batter => None,
+            Self::First => Some(Base::First),
+            Self::Second => Some(Base::Second),
+            Self::Third => Some(Base::Third),
+        }
+    }
 }
 
 #[derive(

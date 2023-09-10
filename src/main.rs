@@ -9,7 +9,7 @@
 )]
 #![allow(clippy::module_name_repetitions, clippy::significant_drop_tightening)]
 
-use event_file::schemas::{BoxScoreComment, EventBaseState, EventComment};
+use event_file::schemas::{BoxScoreComments, EventBaserunners, EventComments, EventPitchSequences};
 use glob::GlobError;
 use itertools::Itertools;
 use serde::Serialize;
@@ -40,8 +40,8 @@ use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
 use crate::event_file::schemas::{
-    BoxScoreLineScore, BoxScoreWritableRecord, ContextToVec, Event, EventAudit, EventFieldingPlay,
-    EventOut, EventPitch, EventPlateAppearance, Game, GameEarnedRuns, GameTeam,
+    BoxScoreLineScores, BoxScoreWritableRecord, ContextToVec, Events, EventAudit, EventFieldingPlays,
+    Games, GameEarnedRuns,
 };
 use crate::event_file::traits::{GameType, EVENT_KEY_BUFFER};
 
@@ -159,29 +159,19 @@ struct FileInfo {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash, Display, EnumIter, Key)]
 #[strum(serialize_all = "snake_case")]
 enum EventFileSchema {
-    Game,
-    GameTeam,
-    GameUmpire,
-    GameLineupAppearance,
-    GameFieldingAppearance,
+    Games,
+    GameLineupAppearances,
+    GameFieldingAppearances,
     GameEarnedRuns,
-    Event,
-    EventRaw,
-    EventBaseState,
-    EventBattedBallInfo,
-    EventPlateAppearance,
-    EventOut,
-    EventRun,
+    Events,
+    EventAudit,
+    EventBaserunners,
     EventFieldingPlay,
-    EventBaserunningAdvanceAttempt,
-    EventBaserunningPlay,
-    EventPitch,
-    EventFlag,
-    EventComment,
-    BoxScoreGame,
-    BoxScoreTeam,
-    BoxScoreUmpire,
-    BoxScoreLineScore,
+    EventPitchSequences,
+    EventFlags,
+    EventComments,
+    BoxScoreGames,
+    BoxScoreLineScores,
     BoxScoreBattingLines,
     BoxScorePitchingLines,
     BoxScoreFieldingLines,
@@ -196,7 +186,7 @@ enum EventFileSchema {
     BoxScoreHomeRuns,
     BoxScoreStolenBases,
     BoxScoreCaughtStealing,
-    BoxScoreComment,
+    BoxScoreComments,
 }
 
 impl EventFileSchema {
@@ -292,15 +282,8 @@ impl EventFileSchema {
     fn write_box_score_files(game_context: &GameContext, record_slice: &RecordSlice) -> Result<()> {
         // Write Game
         WRITER_MAP
-            .get_csv(Self::BoxScoreGame)?
-            .serialize(Game::from(game_context))?;
-        // Write BoxScoreTeam
-        WRITER_MAP.write_csv::<GameTeam>(Self::BoxScoreTeam, game_context)?;
-        // Write GameUmpire
-        let mut w = WRITER_MAP.get_csv(Self::BoxScoreUmpire)?;
-        for row in &game_context.umpires {
-            w.serialize(row)?;
-        }
+            .get_csv(Self::BoxScoreGames)?
+            .serialize(Games::from(game_context))?;
         // Write Linescores
         let line_scores = record_slice
             .iter()
@@ -308,14 +291,14 @@ impl EventFileSchema {
                 MappedRecord::LineScore(ls) => Some(ls),
                 _ => None,
             })
-            .flat_map(|ls| BoxScoreLineScore::transform_line_score(game_context.game_id.id, ls));
-        let mut w = WRITER_MAP.get_csv(Self::BoxScoreLineScore)?;
+            .flat_map(|ls| BoxScoreLineScores::transform_line_score(game_context.game_id.id, ls));
+        let mut w = WRITER_MAP.get_csv(Self::BoxScoreLineScores)?;
         for row in line_scores {
             w.serialize(row)?;
         }
         // Write Comments
-        let mut w = WRITER_MAP.get_csv(Self::BoxScoreComment)?;
-        for row in BoxScoreComment::from_record_slice(&game_context.game_id.id, record_slice) {
+        let mut w = WRITER_MAP.get_csv(Self::BoxScoreComments)?;
+        for row in BoxScoreComments::from_record_slice(&game_context.game_id.id, record_slice) {
             w.serialize(row)?;
         }
         // Write Lines/Events
@@ -337,70 +320,29 @@ impl EventFileSchema {
 
     fn write_play_by_play_files(game_context: &GameContext) -> Result<()> {
         // Write schemas directly serializable from GameContext
-        WRITER_MAP.write_csv::<GameTeam>(Self::GameTeam, game_context)?;
         WRITER_MAP.write_csv::<GameEarnedRuns>(Self::GameEarnedRuns, game_context)?;
-        WRITER_MAP.write_csv::<Event>(Self::Event, game_context)?;
-        WRITER_MAP.write_csv::<EventAudit>(Self::EventRaw, game_context)?;
-        WRITER_MAP.write_csv::<EventOut>(Self::EventOut, game_context)?;
-        WRITER_MAP.write_csv::<EventFieldingPlay>(Self::EventFieldingPlay, game_context)?;
-        WRITER_MAP.write_csv::<EventPitch>(Self::EventPitch, game_context)?;
-        WRITER_MAP.write_csv::<EventPlateAppearance>(Self::EventPlateAppearance, game_context)?;
-        WRITER_MAP.write_csv::<EventComment>(Self::EventComment, game_context)?;
-        WRITER_MAP.write_csv::<EventBaseState>(Self::EventBaseState, game_context)?;
+        WRITER_MAP.write_csv::<Events>(Self::Events, game_context)?;
+        WRITER_MAP.write_csv::<EventAudit>(Self::EventAudit, game_context)?;
+        WRITER_MAP.write_csv::<EventFieldingPlays>(Self::EventFieldingPlay, game_context)?;
+        WRITER_MAP.write_csv::<EventPitchSequences>(Self::EventPitchSequences, game_context)?;
+        WRITER_MAP.write_csv::<EventComments>(Self::EventComments, game_context)?;
+        WRITER_MAP.write_csv::<EventBaserunners>(Self::EventBaserunners, game_context)?;
         // Write Game
         WRITER_MAP
-            .get_csv(Self::Game)?
-            .serialize(Game::from(game_context))?;
-        // Write GameUmpire
-        let mut w = WRITER_MAP.get_csv(Self::GameUmpire)?;
-        for row in &game_context.umpires {
-            w.serialize(row)?;
-        }
+            .get_csv(Self::Games)?
+            .serialize(Games::from(game_context))?;
         // Write GameLineupAppearance
-        let mut w = WRITER_MAP.get_csv(Self::GameLineupAppearance)?;
+        let mut w = WRITER_MAP.get_csv(Self::GameLineupAppearances)?;
         for row in &game_context.lineup_appearances {
             w.serialize(row)?;
         }
         // Write GameFieldingAppearance
-        let mut w = WRITER_MAP.get_csv(Self::GameFieldingAppearance)?;
+        let mut w = WRITER_MAP.get_csv(Self::GameFieldingAppearances)?;
         for row in &game_context.fielding_appearances {
             w.serialize(row)?;
         }
-        // Write EventBattedBallInfo
-        let mut w = WRITER_MAP.get_csv(Self::EventBattedBallInfo)?;
-        let pa = game_context
-            .events
-            .iter()
-            .filter_map(|e| e.results.batted_ball_info.as_ref());
-        for row in pa {
-            w.serialize(row)?;
-        }
-        // Write EventBaserunningAdvanceAttempt
-        let mut w = WRITER_MAP.get_csv(Self::EventBaserunningAdvanceAttempt)?;
-        let advance_attempts = game_context
-            .events
-            .iter()
-            .flat_map(|e| &e.results.baserunning_advances);
-        for row in advance_attempts {
-            w.serialize(row)?;
-        }
-        // Write EventRun
-        let mut w = WRITER_MAP.get_csv(Self::EventRun)?;
-        let runs = game_context.events.iter().flat_map(|e| &e.results.runs);
-        for row in runs {
-            w.serialize(row)?;
-        }
-        // Write EventBaserunningPlay
-        let mut w = WRITER_MAP.get_csv(Self::EventBaserunningPlay)?;
-        let baserunning_plays = game_context
-            .events
-            .iter()
-            .flat_map(|e| &e.results.plays_at_base);
-        for row in baserunning_plays {
-            w.serialize(row)?;
-        }
         //Write EventFlag
-        let mut w = WRITER_MAP.get_csv(Self::EventFlag)?;
+        let mut w = WRITER_MAP.get_csv(Self::EventFlags)?;
         let event_flags = game_context
             .events
             .iter()

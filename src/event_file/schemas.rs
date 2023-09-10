@@ -3,7 +3,6 @@ use arrayvec::ArrayString;
 use bounded_integer::BoundedU8;
 use chrono::{NaiveDate, NaiveDateTime};
 use either::Either;
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -17,12 +16,14 @@ use crate::event_file::pitch_sequence::PitchType;
 use crate::event_file::play::{Base, BaseRunner, InningFrame};
 use crate::event_file::traits::{
     EventKey, FieldingPlayType, FieldingPosition, GameType, Inning, LineupPosition, Pitcher,
-    Player, RetrosheetVolunteer, Scorer, SequenceId, Side,
+    Player, RetrosheetVolunteer, Scorer, SequenceId, Side, Umpire,
 };
 
-use super::game_state::{BaseState, PlateAppearanceResultType};
+use super::game_state::{PlateAppearanceResultType, Event as E, GameLineupAppearance};
+use super::info::UmpirePosition;
 use super::misc::Hand;
 use super::parser::{AccountType, MappedRecord, RecordSlice};
+use super::play::{ContactType, HitLocationGeneral, HitStrength, HitDepth, HitAngle, BaserunningPlayType};
 
 pub trait ContextToVec<'a>: Serialize + Sized {
     fn from_game_context(gc: &'a GameContext) -> Box<dyn Iterator<Item = Self> + 'a>;
@@ -31,7 +32,7 @@ pub trait ContextToVec<'a>: Serialize + Sized {
 pub type GameIdString = ArrayString<12>;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct Game<'a> {
+pub struct Games<'a> {
     game_id: GameIdString,
     date: NaiveDate,
     start_time: Option<NaiveDateTime>,
@@ -63,9 +64,17 @@ pub struct Game<'a> {
     date_edited: Option<NaiveDateTime>,
     account_type: AccountType,
     game_key: EventKey,
+    away_team_id: Team,
+    home_team_id: Team,
+    umpire_home_id: Option<Umpire>,
+    umpire_first_id: Option<Umpire>,
+    umpire_second_id: Option<Umpire>,
+    umpire_third_id: Option<Umpire>,
+    umpire_left_id: Option<Umpire>,
+    umpire_right_id: Option<Umpire>,
 }
 
-impl<'a> From<&'a GameContext> for Game<'a> {
+impl<'a> From<&'a GameContext> for Games<'a> {
     fn from(gc: &'a GameContext) -> Self {
         let setting = &gc.setting;
         let results = &gc.results;
@@ -104,34 +113,15 @@ impl<'a> From<&'a GameContext> for Game<'a> {
             date_inputted: gc.metadata.date_inputted,
             date_edited: gc.metadata.date_edited,
             account_type: gc.file_info.account_type,
+            away_team_id: gc.teams.away,
+            home_team_id: gc.teams.home,
+            umpire_home_id: gc.umpires.iter().find(|u| u.position == UmpirePosition::Home).and_then(|u| u.umpire_id),
+            umpire_first_id: gc.umpires.iter().find(|u| u.position == UmpirePosition::First).and_then(|u| u.umpire_id),
+            umpire_second_id: gc.umpires.iter().find(|u| u.position == UmpirePosition::Second).and_then(|u| u.umpire_id),
+            umpire_third_id: gc.umpires.iter().find(|u| u.position == UmpirePosition::Third).and_then(|u| u.umpire_id),
+            umpire_left_id: gc.umpires.iter().find(|u| u.position == UmpirePosition::LeftField).and_then(|u| u.umpire_id),
+            umpire_right_id: gc.umpires.iter().find(|u| u.position == UmpirePosition::RightField).and_then(|u| u.umpire_id),
         }
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct GameTeam {
-    game_id: GameIdString,
-    team_id: Team,
-    side: Side,
-}
-
-impl ContextToVec<'_> for GameTeam {
-    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self>> {
-        Box::from(
-            vec![
-                Self {
-                    game_id: gc.game_id.id,
-                    team_id: gc.teams.away,
-                    side: Side::Away,
-                },
-                Self {
-                    game_id: gc.game_id.id,
-                    team_id: gc.teams.home,
-                    side: Side::Home,
-                },
-            ]
-            .into_iter(),
-        )
     }
 }
 
@@ -155,24 +145,36 @@ impl ContextToVec<'_> for GameEarnedRuns {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct Event {
+pub struct Events {
     game_id: GameIdString,
     event_id: EventId,
     event_key: EventKey,
     batting_side: Side,
     inning: u8,
     frame: InningFrame,
-    at_bat: LineupPosition,
+    batter_lineup_position: LineupPosition,
+    batter_id: Player,
+    pitcher_id: Player,
     outs: Outs,
     count_balls: Option<u8>,
     count_strikes: Option<u8>,
     specified_batter_hand: Option<Hand>,
     specified_pitcher_hand: Option<Hand>,
-    strikeout_responsible_batter: Option<Player>,
-    walk_responsible_pitcher: Option<Player>,
+    strikeout_responsible_batter_id: Option<Player>,
+    walk_responsible_pitcher_id: Option<Player>,
+    plate_appearance_result: Option<PlateAppearanceResultType>,
+    batted_contact_type: Option<ContactType>,
+    batted_to_fielder: Option<FieldingPosition>,
+    batted_location_general: HitLocationGeneral,
+    batted_location_depth: HitDepth,
+    batted_location_angle: HitAngle,
+    batted_location_strength: HitStrength,
+    outs_on_play: usize,
+    runs_on_play: usize,
+    runs_batted_in: usize,
 }
 
-impl ContextToVec<'_> for Event {
+impl ContextToVec<'_> for Events {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().map(move |e| Self {
             game_id: gc.game_id.id,
@@ -181,23 +183,35 @@ impl ContextToVec<'_> for Event {
             batting_side: e.context.batting_side,
             inning: e.context.inning,
             frame: e.context.frame,
-            at_bat: e.context.at_bat,
+            batter_lineup_position: e.context.at_bat,
+            batter_id: e.context.batter_id,
+            pitcher_id: e.context.pitcher_id,
             outs: e.context.outs,
             count_balls: e.results.count_at_event.balls.map(BoundedU8::get),
             count_strikes: e.results.count_at_event.strikes.map(BoundedU8::get),
             specified_batter_hand: e.context.rare_attributes.batter_hand,
             specified_pitcher_hand: e.context.rare_attributes.pitcher_hand,
-            strikeout_responsible_batter: e.context.rare_attributes.strikeout_responsible_batter,
-            walk_responsible_pitcher: e.context.rare_attributes.walk_responsible_pitcher,
+            strikeout_responsible_batter_id: e.context.rare_attributes.strikeout_responsible_batter,
+            walk_responsible_pitcher_id: e.context.rare_attributes.walk_responsible_pitcher,
+            plate_appearance_result: e.results.plate_appearance,
+            batted_contact_type: e.results.batted_ball_info.as_ref().map(|i| i.contact),
+            batted_to_fielder: e.results.batted_ball_info.as_ref().map(|i| i.hit_to_fielder),
+            batted_location_general: e.results.batted_ball_info.as_ref().map(|i| i.general_location).unwrap_or_default(),
+            batted_location_depth: e.results.batted_ball_info.as_ref().map(|i| i.depth).unwrap_or_default(),
+            batted_location_angle: e.results.batted_ball_info.as_ref().map(|i| i.angle).unwrap_or_default(),
+            batted_location_strength: e.results.batted_ball_info.as_ref().map(|i| i.strength).unwrap_or_default(),
+            outs_on_play: e.results.out_on_play.len(),
+            runs_on_play: e.results.runs.len(),
+            runs_batted_in: e.results.runs.iter().filter(|r| r.rbi_flag).count(),
         }))
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventAudit {
-    event_key: EventKey,
     game_id: GameIdString,
     event_id: EventId,
+    event_key: EventKey,
     filename: ArrayString<20>,
     line_number: usize,
 }
@@ -215,7 +229,9 @@ impl ContextToVec<'_> for EventAudit {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventPitch {
+pub struct EventPitchSequences {
+    game_id: GameIdString,
+    event_id: EventId,
     event_key: EventKey,
     sequence_id: SequenceId,
     sequence_item: PitchType,
@@ -224,10 +240,12 @@ pub struct EventPitch {
     catcher_pickoff_attempt_at_base: Option<Base>,
 }
 
-impl ContextToVec<'_> for EventPitch {
+impl ContextToVec<'_> for EventPitchSequences {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        let pitch_sequences = gc.events.iter().flat_map(|e| {
+        let pitch_sequences = gc.events.iter().flat_map(move |e| {
             e.results.pitch_sequence.iter().map(move |psi| Self {
+                game_id: gc.game_id.id,
+                event_id: e.event_id,
                 event_key: e.event_key,
                 sequence_id: psi.sequence_id,
                 sequence_item: psi.pitch_type,
@@ -241,21 +259,25 @@ impl ContextToVec<'_> for EventPitch {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventFieldingPlay {
+pub struct EventFieldingPlays {
+    game_id: GameIdString,
+    event_id: EventId,
     event_key: EventKey,
     sequence_id: usize,
     fielding_position: FieldingPosition,
     fielding_play: FieldingPlayType,
 }
 
-impl ContextToVec<'_> for EventFieldingPlay {
+impl ContextToVec<'_> for EventFieldingPlays {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        Box::from(gc.events.iter().flat_map(|e| {
+        Box::from(gc.events.iter().flat_map(move |e| {
             e.results
                 .fielding_plays
                 .iter()
                 .enumerate()
                 .map(move |(i, fp)| Self {
+                    game_id: gc.game_id.id,
+                    event_id: e.event_id,
                     event_key: e.event_key,
                     sequence_id: i + 1,
                     fielding_position: fp.fielding_position,
@@ -266,117 +288,124 @@ impl ContextToVec<'_> for EventFieldingPlay {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventPlateAppearance {
+pub struct EventBaserunners {
+    game_id: GameIdString,
+    event_id: EventId,
     event_key: EventKey,
-    plate_appearance_result: PlateAppearanceResultType,
-}
-
-impl ContextToVec<'_> for EventPlateAppearance {
-    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        Box::from(gc.events.iter().filter_map(|e| {
-            e.results.plate_appearance.map(|pa| Self {
-                event_key: e.event_key,
-                plate_appearance_result: pa,
-            })
-        }))
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub enum EventBaseStateType {
-    Starting,
-    Ending,
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventBaseState {
-    event_key: EventKey,
-    base_state_type: EventBaseStateType,
     baserunner: BaseRunner,
     runner_lineup_position: LineupPosition,
+    runner_id: Player,
     charge_event_id: EventId,
-    reached_on_event_id: EventId,
+    reached_on_event_id: Option<EventId>,
     explicit_charged_pitcher_id: Option<Player>,
+    attempted_advance_to_base: Option<Base>,
+    baserunning_play_type: Option<BaserunningPlayType>,
+    is_out: bool,
+    base_end: Option<Base>,
+    advanced_on_error_flag: bool,
+    explicit_out_flag: bool,
+    run_scored_flag: bool,
+    rbi_flag: bool,
 }
 
-impl EventBaseState {
-    fn from_base_state(
-        state: &BaseState,
-        event_key: EventKey,
-        base_state_type: EventBaseStateType,
-    ) -> Vec<Self> {
-        state
-            .get_bases()
+impl EventBaserunners {
+    fn runner(game_context: &GameContext, event: &E, baserunner: BaseRunner) -> Result<Option<Self>> {
+        // Baserunning plays involve the runner if he's specifically mentioned or there is no runner mentioned
+        let baserunning_play_type = event.results
+            .plays_at_base
             .iter()
-            .map(|(baserunner, runner)| Self {
-                event_key,
+            .find_map(|p| if p.baserunner.unwrap_or(baserunner) == baserunner { Some(p.baserunning_play_type) } else { None });
+        let starting_state = event.context.starting_base_state.get_runner(baserunner);
+        let advance = event.results
+            .baserunning_advances
+            .iter()
+            .find(|a| a.baserunner == baserunner);
+        Ok(match (starting_state, advance) {
+            (Some(ss), Some(a)) => Some(Self {
+                game_id: game_context.game_id.id,
+                event_id: event.event_id,
+                event_key: event.event_key,
                 baserunner,
-                base_state_type,
-                runner_lineup_position: runner.lineup_position,
-                charge_event_id: runner.charge_event_id,
-                reached_on_event_id: runner.reached_on_event_id,
-                explicit_charged_pitcher_id: runner.explicit_charged_pitcher_id,
-            })
-            .collect_vec()
+                runner_lineup_position: ss.lineup_position,
+                runner_id: GameLineupAppearance::get_at_event(&game_context.lineup_appearances, ss.lineup_position, event.event_id)?.player_id,
+                charge_event_id: ss.charge_event_id,
+                reached_on_event_id: Some(ss.reached_on_event_id),
+                explicit_charged_pitcher_id: ss.explicit_charged_pitcher_id,
+                attempted_advance_to_base: Some(a.attempted_advance_to),
+                baserunning_play_type: baserunning_play_type,
+                is_out: !a.is_successful,
+                base_end: if a.is_successful { Some(a.attempted_advance_to) } else { None },
+                advanced_on_error_flag: a.advanced_on_error_flag,
+                explicit_out_flag: a.explicit_out_flag,
+                run_scored_flag: a.run_scored_flag,
+                rbi_flag: a.rbi_flag,
+            }),
+            // Runner was on base but stayed put
+            (Some(ss), None) => Some(Self {
+                game_id: game_context.game_id.id,
+                event_id: event.event_id,
+                event_key: event.event_key,
+                baserunner,
+                runner_lineup_position: ss.lineup_position,
+                runner_id: GameLineupAppearance::get_at_event(&game_context.lineup_appearances, ss.lineup_position, event.event_id)?.player_id,
+                charge_event_id: ss.charge_event_id,
+                reached_on_event_id: Some(ss.reached_on_event_id),
+                explicit_charged_pitcher_id: ss.explicit_charged_pitcher_id,
+                attempted_advance_to_base: None,
+                baserunning_play_type: None,
+                is_out: false,
+                base_end: baserunner.to_current_base(),
+                advanced_on_error_flag: false,
+                explicit_out_flag: false,
+                run_scored_flag: false,
+                rbi_flag: false,
+                }),
+            // Batter if there was a play involving him
+            (None, Some(a)) => Some(Self {
+                game_id: game_context.game_id.id,
+                event_id: event.event_id,
+                event_key: event.event_key,
+                baserunner,
+                runner_lineup_position: event.context.at_bat,
+                runner_id: event.context.batter_id,
+                charge_event_id: event.event_id,
+                reached_on_event_id: None,
+                explicit_charged_pitcher_id: None,
+                attempted_advance_to_base: Some(a.attempted_advance_to),
+                // Batter could be involved on baserunning play for K+WP,PO,
+                baserunning_play_type: baserunning_play_type,
+                is_out: !a.is_successful,
+                base_end: if a.is_successful { Some(a.attempted_advance_to) } else { None },
+                advanced_on_error_flag: a.advanced_on_error_flag,
+                explicit_out_flag: a.explicit_out_flag,
+                run_scored_flag: a.run_scored_flag,
+                rbi_flag: a.rbi_flag,
+            }),
+            (None, None) => None,
+        })
     }
+
 }
 
-impl ContextToVec<'_> for EventBaseState {
+impl ContextToVec<'_> for EventBaserunners {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(
-            gc.events
+            [BaseRunner::Batter, BaseRunner::First, BaseRunner::Second, BaseRunner::Third]
                 .iter()
-                .flat_map(|e| {
-                    Self::from_base_state(
-                        &e.context.starting_base_state,
-                        e.event_key,
-                        EventBaseStateType::Starting,
-                    )
-                })
-                .chain(gc.events.iter().flat_map(|e| {
-                    Self::from_base_state(
-                        &e.results.ending_base_state,
-                        e.event_key,
-                        EventBaseStateType::Ending,
-                    )
-                })),
+                .filter_map(move |&b| Self::runner(gc, gc.events.last()?, b).transpose())
+                .flatten(),
         )
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-pub struct EventOut {
-    event_key: EventKey,
-    sequence_id: usize,
-    baserunner_out: BaseRunner,
-}
-
-impl ContextToVec<'_> for EventOut {
-    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        Box::from(gc.events.iter().flat_map(|e| {
-            e.results
-                .out_on_play
-                .iter()
-                .enumerate()
-                .map(move |(i, br)| Self {
-                    event_key: e.event_key,
-                    sequence_id: i + 1,
-                    baserunner_out: *br,
-                })
-        }))
-    }
-}
-
-pub struct EventRun {}
-
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct EventComment {
+pub struct EventComments {
     event_key: EventKey,
     sequence_id: usize,
     comment: String,
 }
 
-impl ContextToVec<'_> for EventComment {
+impl ContextToVec<'_> for EventComments {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().enumerate().flat_map(|(i, e)| {
             e.results.comment.iter().map(move |c| Self {
@@ -389,13 +418,13 @@ impl ContextToVec<'_> for EventComment {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct BoxScoreComment {
+pub struct BoxScoreComments {
     game_id: GameIdString,
     sequence_id: usize,
     comment: String,
 }
 
-impl BoxScoreComment {
+impl BoxScoreComments {
     pub fn from_record_slice(game_id: &GameIdString, slice: &RecordSlice) -> Vec<Self> {
         let mut comments = vec![];
         let mut sequence_id = 1;
@@ -445,14 +474,14 @@ impl BoxScoreWritableRecord<'_> {
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct BoxScoreLineScore {
+pub struct BoxScoreLineScores {
     pub game_id: GameIdString,
     pub side: Side,
     pub inning: Inning,
     pub runs: u8,
 }
 
-impl BoxScoreLineScore {
+impl BoxScoreLineScores {
     #[allow(clippy::cast_possible_truncation)]
     pub fn transform_line_score(
         game_id: GameIdString,

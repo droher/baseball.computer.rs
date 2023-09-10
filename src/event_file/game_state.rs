@@ -439,6 +439,16 @@ pub struct GameLineupAppearance {
 }
 
 impl GameLineupAppearance {
+    pub fn get_at_event(appearances: &[Self], position: LineupPosition, event_id: EventId) -> Result<Self> {
+        appearances.iter().find(|a| {
+            a.lineup_position == position
+                && a.start_event_id <= event_id
+                && a.end_event_id.map_or(true, |end| end >= event_id)
+        })
+        .copied()
+        .context("Could not find lineup appearance")
+    }
+
     fn new_starter(
         player: Player,
         lineup_position: LineupPosition,
@@ -661,9 +671,15 @@ pub struct EventBaserunningAdvanceAttempt {
     pub is_successful: bool,
     pub advanced_on_error_flag: bool,
     pub explicit_out_flag: bool,
+    pub run_scored_flag: bool,
+    pub rbi_flag: bool,
 }
 
 impl EventBaserunningAdvanceAttempt {
+    pub fn scored(&self) -> bool {
+        self.is_successful && self.attempted_advance_to == Base::Home
+    }
+
     fn from_play(play: &PlayRecord, event_key: EventKey) -> Result<Vec<Self>> {
         play.stats
             .advances
@@ -674,6 +690,8 @@ impl EventBaserunningAdvanceAttempt {
                     FieldersData::find_error(ra.fielders_data().as_slice()).is_some();
                 let is_successful = !ra.is_out();
                 let explicit_out_flag = ra.out_or_error;
+                let run_scored_flag = play.stats.runs.contains(&ra.baserunner);
+                let rbi_flag = play.stats.rbi.contains(&ra.baserunner);
                 Ok(Self {
                     event_key,
                     sequence_id: SequenceId::new(i + 1).context("Could not create sequence ID")?,
@@ -682,6 +700,8 @@ impl EventBaserunningAdvanceAttempt {
                     advanced_on_error_flag,
                     explicit_out_flag,
                     is_successful,
+                    run_scored_flag,
+                    rbi_flag,
                 })
             })
             .collect()
@@ -723,6 +743,8 @@ pub struct EventContext {
     pub batting_side: Side,
     pub frame: InningFrame,
     pub at_bat: LineupPosition,
+    pub batter_id: Player,
+    pub pitcher_id: Player,
     pub outs: Outs,
     #[serde(skip)]
     pub starting_base_state: BaseState,
@@ -1167,6 +1189,8 @@ impl GameState {
                     batting_side: state.batting_side,
                     frame: state.frame,
                     at_bat: state.at_bat,
+                    batter_id: play.batter,
+                    pitcher_id: state.personnel.pitcher(state.batting_side.flip())?,
                     outs: starting_outs,
                     starting_base_state,
                     rare_attributes,
@@ -1435,15 +1459,15 @@ impl BaseState {
         state
     }
 
-    pub const fn get_bases(&self) -> &Map<BaseRunner, Runner> {
-        &self.bases
+    pub fn get_from_position(&self, position: LineupPosition) -> Option<&Runner> {
+        self.bases.iter().find_map(|(_, runner)| if runner.lineup_position == position { Some(runner) } else { None })
     }
 
     fn num_runners_on_base(&self) -> usize {
         self.bases.len()
     }
 
-    fn get_runner(&self, baserunner: BaseRunner) -> Option<&Runner> {
+    pub fn get_runner(&self, baserunner: BaseRunner) -> Option<&Runner> {
         self.bases.get(baserunner)
     }
 
@@ -1735,6 +1759,8 @@ pub fn dummy() -> GameContext {
                 batting_side: Side::Away,
                 frame: InningFrame::Top,
                 at_bat: LineupPosition::PitcherWithDh,
+                batter_id: dummy_str8,
+                pitcher_id: dummy_str8,
                 outs: Outs::new(0).unwrap(),
                 starting_base_state: dummy_base_state.clone(),
                 rare_attributes: RareAttributes {
@@ -1772,6 +1798,8 @@ pub fn dummy() -> GameContext {
                     is_successful: true,
                     advanced_on_error_flag: true,
                     explicit_out_flag: true,
+                    run_scored_flag: true,
+                    rbi_flag: true,
                 }],
                 runs: vec![EventRun {
                     event_key: 1,
