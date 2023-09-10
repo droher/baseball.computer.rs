@@ -160,7 +160,18 @@ impl TryFrom<&str> for FieldingPosition {
 }
 
 #[derive(
-    Ord, PartialOrd, Debug, Eq, PartialEq, Copy, Clone, Hash, Serialize, Deserialize, AsRefStr, EnumString
+    Ord,
+    PartialOrd,
+    Debug,
+    Eq,
+    PartialEq,
+    Copy,
+    Clone,
+    Hash,
+    Serialize,
+    Deserialize,
+    AsRefStr,
+    EnumString,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum GameType {

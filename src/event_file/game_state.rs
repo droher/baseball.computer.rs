@@ -244,7 +244,7 @@ impl Default for GameSetting {
         Self {
             date: NaiveDate::from_num_days_from_ce_opt(0).unwrap_or_default(),
             doubleheader_status: DoubleheaderStatus::default(),
-            game_type: GameType::Unknown,
+            game_type: GameType::RegularSeason,
             start_time: Option::default(),
             time_of_day: DayNight::default(),
             use_dh: false,
@@ -1376,7 +1376,10 @@ impl GameState {
         let mut runner = self
             .bases
             .get_runner(record.baserunner)
-            .context(anyhow!("Pitcher responsibility adjustment for non-existent runner: {:?}", record))?
+            .context(anyhow!(
+                "Pitcher responsibility adjustment for non-existent runner: {:?}",
+                record
+            ))?
             .clone();
         runner.explicit_charged_pitcher_id = Some(record.pitcher_id);
         self.bases.set_runner(record.baserunner, runner);
@@ -1779,7 +1782,7 @@ pub fn dummy() -> GameContext {
                 play_info: vec![EventFlag {
                     event_key: 1,
                     sequence_id: SequenceId::new(1).unwrap(),
-                    flag: String::from("dummy")
+                    flag: String::from("dummy"),
                 }],
                 comment: vec![String::from("dummy")],
                 fielding_plays: vec![FieldersData {

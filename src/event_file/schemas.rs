@@ -22,7 +22,7 @@ use crate::event_file::traits::{
 
 use super::game_state::{BaseState, PlateAppearanceResultType};
 use super::misc::Hand;
-use super::parser::{MappedRecord, RecordSlice};
+use super::parser::{AccountType, MappedRecord, RecordSlice};
 
 pub trait ContextToVec<'a>: Serialize + Sized {
     fn from_game_context(gc: &'a GameContext) -> Box<dyn Iterator<Item = Self> + 'a>;
@@ -61,6 +61,7 @@ pub struct Game<'a> {
     translator: Option<RetrosheetVolunteer>,
     date_inputted: Option<NaiveDateTime>,
     date_edited: Option<NaiveDateTime>,
+    account_type: AccountType,
     game_key: EventKey,
 }
 
@@ -102,6 +103,7 @@ impl<'a> From<&'a GameContext> for Game<'a> {
             translator: gc.metadata.translator,
             date_inputted: gc.metadata.date_inputted,
             date_edited: gc.metadata.date_edited,
+            account_type: gc.file_info.account_type,
         }
     }
 }

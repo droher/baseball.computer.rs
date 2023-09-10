@@ -9,7 +9,7 @@ use csv::{Reader, ReaderBuilder, StringRecord};
 use glob::{glob, Paths, PatternError};
 use lazy_regex::{regex, Lazy};
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use strum_macros::AsRefStr;
 use tracing::debug;
 
@@ -35,7 +35,7 @@ pub static PLAY_BY_PLAY: &Lazy<Regex> = regex!(r".*\.EV[ANF]?");
 pub static DERIVED: &Lazy<Regex> = regex!(r".*\.ED[ANF]?");
 pub static BOX_SCORE: &Lazy<Regex> = regex!(r".*\.EB[ANF]?");
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, AsRefStr)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, AsRefStr, Deserialize)]
 pub enum AccountType {
     PlayByPlay,
     Deduced,

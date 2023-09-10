@@ -458,8 +458,7 @@ impl FileProcessor {
         let s = path.to_str().unwrap_or_default();
         if s.ends_with(".EVR") {
             s.contains("allas") || s.contains("allpost")
-        }
-        else {
+        } else {
             false
         }
     }
@@ -473,7 +472,7 @@ impl FileProcessor {
         };
         let mut files = account_type
             .glob(&self.opt.input)?
-            // TODO: Remove once we remove NLB AS dupes        
+            // TODO: Remove once we remove NLB AS dupes
             .filter_ok(|p| !Self::contains_nlb_dupes(p))
             .collect::<Result<Vec<PathBuf>, GlobError>>()?;
         files.par_sort();

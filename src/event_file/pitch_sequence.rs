@@ -7,7 +7,6 @@ use strum_macros::{AsRefStr, EnumString};
 use crate::event_file::play::Base;
 use crate::event_file::traits::SequenceId;
 
-
 #[derive(
     Debug,
     Ord,
