@@ -19,11 +19,13 @@ use crate::event_file::traits::{
     Player, RetrosheetVolunteer, Scorer, SequenceId, Side, Umpire,
 };
 
-use super::game_state::{PlateAppearanceResultType, Event as E, GameLineupAppearance};
+use super::game_state::{Event as E, GameLineupAppearance, PlateAppearanceResultType};
 use super::info::UmpirePosition;
 use super::misc::Hand;
 use super::parser::{AccountType, MappedRecord, RecordSlice};
-use super::play::{ContactType, HitLocationGeneral, HitStrength, HitDepth, HitAngle, BaserunningPlayType};
+use super::play::{
+    BaserunningPlayType, ContactType, HitAngle, HitDepth, HitLocationGeneral, HitStrength,
+};
 
 pub trait ContextToVec<'a>: Serialize + Sized {
     fn from_game_context(gc: &'a GameContext) -> Box<dyn Iterator<Item = Self> + 'a>;
@@ -115,12 +117,36 @@ impl<'a> From<&'a GameContext> for Games<'a> {
             account_type: gc.file_info.account_type,
             away_team_id: gc.teams.away,
             home_team_id: gc.teams.home,
-            umpire_home_id: gc.umpires.iter().find(|u| u.position == UmpirePosition::Home).and_then(|u| u.umpire_id),
-            umpire_first_id: gc.umpires.iter().find(|u| u.position == UmpirePosition::First).and_then(|u| u.umpire_id),
-            umpire_second_id: gc.umpires.iter().find(|u| u.position == UmpirePosition::Second).and_then(|u| u.umpire_id),
-            umpire_third_id: gc.umpires.iter().find(|u| u.position == UmpirePosition::Third).and_then(|u| u.umpire_id),
-            umpire_left_id: gc.umpires.iter().find(|u| u.position == UmpirePosition::LeftField).and_then(|u| u.umpire_id),
-            umpire_right_id: gc.umpires.iter().find(|u| u.position == UmpirePosition::RightField).and_then(|u| u.umpire_id),
+            umpire_home_id: gc
+                .umpires
+                .iter()
+                .find(|u| u.position == UmpirePosition::Home)
+                .and_then(|u| u.umpire_id),
+            umpire_first_id: gc
+                .umpires
+                .iter()
+                .find(|u| u.position == UmpirePosition::First)
+                .and_then(|u| u.umpire_id),
+            umpire_second_id: gc
+                .umpires
+                .iter()
+                .find(|u| u.position == UmpirePosition::Second)
+                .and_then(|u| u.umpire_id),
+            umpire_third_id: gc
+                .umpires
+                .iter()
+                .find(|u| u.position == UmpirePosition::Third)
+                .and_then(|u| u.umpire_id),
+            umpire_left_id: gc
+                .umpires
+                .iter()
+                .find(|u| u.position == UmpirePosition::LeftField)
+                .and_then(|u| u.umpire_id),
+            umpire_right_id: gc
+                .umpires
+                .iter()
+                .find(|u| u.position == UmpirePosition::RightField)
+                .and_then(|u| u.umpire_id),
         }
     }
 }
@@ -155,6 +181,8 @@ pub struct Events {
     batter_lineup_position: LineupPosition,
     batter_id: Player,
     pitcher_id: Player,
+    batting_team_id: Team,
+    fielding_team_id: Team,
     outs: Outs,
     count_balls: Option<u8>,
     count_strikes: Option<u8>,
@@ -176,33 +204,70 @@ pub struct Events {
 
 impl ContextToVec<'_> for Events {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        Box::from(gc.events.iter().map(move |e| Self {
-            game_id: gc.game_id.id,
-            event_id: e.event_id,
-            event_key: e.event_key,
-            batting_side: e.context.batting_side,
-            inning: e.context.inning,
-            frame: e.context.frame,
-            batter_lineup_position: e.context.at_bat,
-            batter_id: e.context.batter_id,
-            pitcher_id: e.context.pitcher_id,
-            outs: e.context.outs,
-            count_balls: e.results.count_at_event.balls.map(BoundedU8::get),
-            count_strikes: e.results.count_at_event.strikes.map(BoundedU8::get),
-            specified_batter_hand: e.context.rare_attributes.batter_hand,
-            specified_pitcher_hand: e.context.rare_attributes.pitcher_hand,
-            strikeout_responsible_batter_id: e.context.rare_attributes.strikeout_responsible_batter,
-            walk_responsible_pitcher_id: e.context.rare_attributes.walk_responsible_pitcher,
-            plate_appearance_result: e.results.plate_appearance,
-            batted_contact_type: e.results.batted_ball_info.as_ref().map(|i| i.contact),
-            batted_to_fielder: e.results.batted_ball_info.as_ref().map(|i| i.hit_to_fielder),
-            batted_location_general: e.results.batted_ball_info.as_ref().map(|i| i.general_location).unwrap_or_default(),
-            batted_location_depth: e.results.batted_ball_info.as_ref().map(|i| i.depth).unwrap_or_default(),
-            batted_location_angle: e.results.batted_ball_info.as_ref().map(|i| i.angle).unwrap_or_default(),
-            batted_location_strength: e.results.batted_ball_info.as_ref().map(|i| i.strength).unwrap_or_default(),
-            outs_on_play: e.results.out_on_play.len(),
-            runs_on_play: e.results.runs.len(),
-            runs_batted_in: e.results.runs.iter().filter(|r| r.rbi_flag).count(),
+        Box::from(gc.events.iter().map(move |e| {
+            Self {
+                game_id: gc.game_id.id,
+                event_id: e.event_id,
+                event_key: e.event_key,
+                batting_side: e.context.batting_side,
+                inning: e.context.inning,
+                frame: e.context.frame,
+                batter_lineup_position: e.context.at_bat,
+                batter_id: e.context.batter_id,
+                pitcher_id: e.context.pitcher_id,
+                batting_team_id: match e.context.batting_side {
+                    Side::Away => gc.teams.away,
+                    Side::Home => gc.teams.home,
+                },
+                fielding_team_id: match e.context.batting_side {
+                    Side::Away => gc.teams.home,
+                    Side::Home => gc.teams.away,
+                },
+                outs: e.context.outs,
+                count_balls: e.results.count_at_event.balls.map(BoundedU8::get),
+                count_strikes: e.results.count_at_event.strikes.map(BoundedU8::get),
+                specified_batter_hand: e.context.rare_attributes.batter_hand,
+                specified_pitcher_hand: e.context.rare_attributes.pitcher_hand,
+                strikeout_responsible_batter_id: e
+                    .context
+                    .rare_attributes
+                    .strikeout_responsible_batter,
+                walk_responsible_pitcher_id: e.context.rare_attributes.walk_responsible_pitcher,
+                plate_appearance_result: e.results.plate_appearance,
+                batted_contact_type: e.results.batted_ball_info.as_ref().map(|i| i.contact),
+                batted_to_fielder: e
+                    .results
+                    .batted_ball_info
+                    .as_ref()
+                    .map(|i| i.hit_to_fielder),
+                batted_location_general: e
+                    .results
+                    .batted_ball_info
+                    .as_ref()
+                    .map(|i| i.general_location)
+                    .unwrap_or_default(),
+                batted_location_depth: e
+                    .results
+                    .batted_ball_info
+                    .as_ref()
+                    .map(|i| i.depth)
+                    .unwrap_or_default(),
+                batted_location_angle: e
+                    .results
+                    .batted_ball_info
+                    .as_ref()
+                    .map(|i| i.angle)
+                    .unwrap_or_default(),
+                batted_location_strength: e
+                    .results
+                    .batted_ball_info
+                    .as_ref()
+                    .map(|i| i.strength)
+                    .unwrap_or_default(),
+                outs_on_play: e.results.out_on_play.len(),
+                runs_on_play: e.results.runs.len(),
+                runs_batted_in: e.results.runs.iter().filter(|r| r.rbi_flag).count(),
+            }
         }))
     }
 }
@@ -309,32 +374,46 @@ pub struct EventBaserunners {
 }
 
 impl EventBaserunners {
-    fn runner(game_context: &GameContext, event: &E, baserunner: BaseRunner) -> Result<Option<Self>> {
+    fn runner(game_context: &GameContext, event: &E, baserunner: BaseRunner) -> Option<Self> {
         // Baserunning plays involve the runner if he's specifically mentioned or there is no runner mentioned
-        let baserunning_play_type = event.results
-            .plays_at_base
-            .iter()
-            .find_map(|p| if p.baserunner.unwrap_or(baserunner) == baserunner { Some(p.baserunning_play_type) } else { None });
+        let baserunning_play_type = event.results.plays_at_base.iter().find_map(|p| {
+            if p.baserunner.unwrap_or(baserunner) == baserunner {
+                Some(p.baserunning_play_type)
+            } else {
+                None
+            }
+        });
         let starting_state = event.context.starting_base_state.get_runner(baserunner);
-        let advance = event.results
+        let advance = event
+            .results
             .baserunning_advances
             .iter()
             .find(|a| a.baserunner == baserunner);
-        Ok(match (starting_state, advance) {
+        match (starting_state, advance) {
             (Some(ss), Some(a)) => Some(Self {
                 game_id: game_context.game_id.id,
                 event_id: event.event_id,
                 event_key: event.event_key,
                 baserunner,
                 runner_lineup_position: ss.lineup_position,
-                runner_id: GameLineupAppearance::get_at_event(&game_context.lineup_appearances, ss.lineup_position, event.event_id)?.player_id,
+                runner_id: GameLineupAppearance::get_at_event(
+                    &game_context.lineup_appearances,
+                    ss.lineup_position,
+                    event.event_id,
+                )
+                .unwrap()
+                .player_id,
                 charge_event_id: ss.charge_event_id,
                 reached_on_event_id: Some(ss.reached_on_event_id),
                 explicit_charged_pitcher_id: ss.explicit_charged_pitcher_id,
                 attempted_advance_to_base: Some(a.attempted_advance_to),
                 baserunning_play_type: baserunning_play_type,
                 is_out: !a.is_successful,
-                base_end: if a.is_successful { Some(a.attempted_advance_to) } else { None },
+                base_end: if a.is_successful {
+                    Some(a.attempted_advance_to)
+                } else {
+                    None
+                },
                 advanced_on_error_flag: a.advanced_on_error_flag,
                 explicit_out_flag: a.explicit_out_flag,
                 run_scored_flag: a.run_scored_flag,
@@ -347,7 +426,13 @@ impl EventBaserunners {
                 event_key: event.event_key,
                 baserunner,
                 runner_lineup_position: ss.lineup_position,
-                runner_id: GameLineupAppearance::get_at_event(&game_context.lineup_appearances, ss.lineup_position, event.event_id)?.player_id,
+                runner_id: GameLineupAppearance::get_at_event(
+                    &game_context.lineup_appearances,
+                    ss.lineup_position,
+                    event.event_id,
+                )
+                .unwrap()
+                .player_id,
                 charge_event_id: ss.charge_event_id,
                 reached_on_event_id: Some(ss.reached_on_event_id),
                 explicit_charged_pitcher_id: ss.explicit_charged_pitcher_id,
@@ -359,7 +444,7 @@ impl EventBaserunners {
                 explicit_out_flag: false,
                 run_scored_flag: false,
                 rbi_flag: false,
-                }),
+            }),
             // Batter if there was a play involving him
             (None, Some(a)) => Some(Self {
                 game_id: game_context.game_id.id,
@@ -375,31 +460,41 @@ impl EventBaserunners {
                 // Batter could be involved on baserunning play for K+WP,PO,
                 baserunning_play_type: baserunning_play_type,
                 is_out: !a.is_successful,
-                base_end: if a.is_successful { Some(a.attempted_advance_to) } else { None },
+                base_end: if a.is_successful {
+                    Some(a.attempted_advance_to)
+                } else {
+                    None
+                },
                 advanced_on_error_flag: a.advanced_on_error_flag,
                 explicit_out_flag: a.explicit_out_flag,
                 run_scored_flag: a.run_scored_flag,
                 rbi_flag: a.rbi_flag,
             }),
             (None, None) => None,
-        })
+        }
     }
-
 }
 
 impl ContextToVec<'_> for EventBaserunners {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        Box::from(
-            [BaseRunner::Batter, BaseRunner::First, BaseRunner::Second, BaseRunner::Third]
-                .iter()
-                .filter_map(move |&b| Self::runner(gc, gc.events.last()?, b).transpose())
-                .flatten(),
-        )
+        let runners = [
+            BaseRunner::Batter,
+            BaseRunner::First,
+            BaseRunner::Second,
+            BaseRunner::Third,
+        ];
+        Box::from(gc.events.iter().flat_map(move |e| {
+            runners
+                .into_iter()
+                .filter_map(move |r| Self::runner(gc, e, r))
+        }))
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EventComments {
+    game_id: GameIdString,
+    event_id: EventId,
     event_key: EventKey,
     sequence_id: usize,
     comment: String,
@@ -407,8 +502,10 @@ pub struct EventComments {
 
 impl ContextToVec<'_> for EventComments {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
-        Box::from(gc.events.iter().enumerate().flat_map(|(i, e)| {
+        Box::from(gc.events.iter().enumerate().flat_map(move |(i, e)| {
             e.results.comment.iter().map(move |c| Self {
+                game_id: gc.game_id.id,
+                event_id: e.event_id,
                 event_key: e.event_key,
                 sequence_id: i + 1,
                 comment: c.clone(),

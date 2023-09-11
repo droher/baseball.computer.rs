@@ -439,14 +439,20 @@ pub struct GameLineupAppearance {
 }
 
 impl GameLineupAppearance {
-    pub fn get_at_event(appearances: &[Self], position: LineupPosition, event_id: EventId) -> Result<Self> {
-        appearances.iter().find(|a| {
-            a.lineup_position == position
-                && a.start_event_id <= event_id
-                && a.end_event_id.map_or(true, |end| end >= event_id)
-        })
-        .copied()
-        .context("Could not find lineup appearance")
+    pub fn get_at_event(
+        appearances: &[Self],
+        position: LineupPosition,
+        event_id: EventId,
+    ) -> Result<Self> {
+        appearances
+            .iter()
+            .find(|a| {
+                a.lineup_position == position
+                    && a.start_event_id <= event_id
+                    && a.end_event_id.map_or(true, |end| end >= event_id)
+            })
+            .copied()
+            .context("Could not find lineup appearance")
     }
 
     fn new_starter(
@@ -1460,7 +1466,13 @@ impl BaseState {
     }
 
     pub fn get_from_position(&self, position: LineupPosition) -> Option<&Runner> {
-        self.bases.iter().find_map(|(_, runner)| if runner.lineup_position == position { Some(runner) } else { None })
+        self.bases.iter().find_map(|(_, runner)| {
+            if runner.lineup_position == position {
+                Some(runner)
+            } else {
+                None
+            }
+        })
     }
 
     fn num_runners_on_base(&self) -> usize {

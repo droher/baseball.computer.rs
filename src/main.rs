@@ -40,8 +40,8 @@ use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
 use crate::event_file::schemas::{
-    BoxScoreLineScores, BoxScoreWritableRecord, ContextToVec, Events, EventAudit, EventFieldingPlays,
-    Games, GameEarnedRuns,
+    BoxScoreLineScores, BoxScoreWritableRecord, ContextToVec, EventAudit, EventFieldingPlays,
+    Events, GameEarnedRuns, Games,
 };
 use crate::event_file::traits::{GameType, EVENT_KEY_BUFFER};
 
