@@ -1670,6 +1670,7 @@ pub struct Runner {
 /// has at least one entry in each of its Vecs
 #[allow(clippy::pedantic, clippy::nursery, clippy::unwrap_used)]
 pub fn dummy() -> GameContext {
+    let team = ArrayString::from("ABC").unwrap();
     let dummy_str8 = ArrayString::from("dummy").unwrap();
     let dummy_str16 = ArrayString::from("dummy").unwrap();
     let dummy_datetime = NaiveDateTime::from_timestamp_opt(0, 0).unwrap();
@@ -1705,8 +1706,8 @@ pub fn dummy() -> GameContext {
             date_edited: Some(dummy_datetime),
         },
         teams: Matchup {
-            away: dummy_str8,
-            home: dummy_str8,
+            away: team,
+            home: team,
         },
         setting: GameSetting {
             date: NaiveDate::MIN,

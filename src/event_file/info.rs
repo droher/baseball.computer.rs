@@ -161,7 +161,7 @@ impl Default for WindDirection {
     }
 }
 
-pub type Team = ArrayString<8>;
+pub type Team = ArrayString<3>;
 pub type Park = ArrayString<16>;
 
 #[derive(
