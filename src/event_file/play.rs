@@ -790,7 +790,6 @@ impl BaserunningPlayType {
             Self::StolenBase
                 | Self::CaughtStealing
                 | Self::PickedOffCaughtStealing
-                | Self::DefensiveIndifference
         )
     }
 }
