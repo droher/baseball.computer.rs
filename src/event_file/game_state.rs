@@ -1475,6 +1475,13 @@ impl BaseState {
         })
     }
 
+    pub fn get_base_state(&self) -> u8 {
+        // Integer representation of the base state with each binary digit representing a base
+        self.get_first().is_some() as u8
+            | (self.get_second().is_some() as u8) << 1
+            | (self.get_third().is_some() as u8) << 2
+    }
+
     fn num_runners_on_base(&self) -> usize {
         self.bases.len()
     }
