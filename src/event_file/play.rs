@@ -245,6 +245,15 @@ impl BaseRunner {
             Self::Third => Some(Base::Third),
         }
     }
+
+    pub const fn to_next_base(&self) -> Base {
+        match self {
+            Self::Batter => Base::First,
+            Self::First => Base::Second,
+            Self::Second => Base::Third,
+            Self::Third => Base::Home,
+        }
+    }
 }
 
 #[derive(
@@ -774,6 +783,18 @@ pub enum BaserunningPlayType {
     AdvancedOnError,
 }
 
+impl BaserunningPlayType {
+    pub const fn is_attempted_stolen_base(self) -> bool {
+        matches!(
+            self,
+            Self::StolenBase
+                | Self::CaughtStealing
+                | Self::PickedOffCaughtStealing
+                | Self::DefensiveIndifference
+        )
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct BaserunningPlay {
     pub baserunning_play_type: BaserunningPlayType,
@@ -797,13 +818,8 @@ impl BaserunningPlay {
             .unwrap_or_default()
     }
 
-    fn is_attempted_stolen_base(&self) -> bool {
-        [
-            BaserunningPlayType::StolenBase,
-            BaserunningPlayType::CaughtStealing,
-            BaserunningPlayType::PickedOffCaughtStealing,
-        ]
-        .contains(&self.baserunning_play_type)
+    pub const fn is_attempted_stolen_base(&self) -> bool {
+        self.baserunning_play_type.is_attempted_stolen_base()
     }
 
     pub fn baserunner(&self) -> Option<BaseRunner> {

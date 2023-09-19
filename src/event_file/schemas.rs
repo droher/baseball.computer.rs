@@ -385,6 +385,14 @@ impl EventBaserunners {
                 None
             }
         });
+        let attempted_sb = baserunning_play_type
+            .map(|p| p.is_attempted_stolen_base())
+            .unwrap_or_default();
+        let picked_off = match baserunning_play_type {
+            Some(BaserunningPlayType::PickedOff) => true,
+            _ => false,
+        };
+
         let starting_state = event.context.starting_base_state.get_runner(baserunner);
         let advance = event
             .results
@@ -421,7 +429,7 @@ impl EventBaserunners {
                 run_scored_flag: a.run_scored_flag,
                 rbi_flag: a.rbi_flag,
             }),
-            // Runner was on base but stayed put
+            // Runner was on base but either stayed put or got CS
             (Some(ss), None) => Some(Self {
                 game_id: game_context.game_id.id,
                 event_id: event.event_id,
@@ -438,12 +446,21 @@ impl EventBaserunners {
                 charge_event_id: ss.charge_event_id,
                 reached_on_event_id: Some(ss.reached_on_event_id),
                 explicit_charged_pitcher_id: ss.explicit_charged_pitcher_id,
-                attempted_advance_to_base: None,
-                baserunning_play_type: None,
-                is_out: false,
-                base_end: baserunner.to_current_base(),
+                attempted_advance_to_base: if attempted_sb {
+                    Some(baserunner.to_next_base())
+                } else {
+                    None
+                },
+                baserunning_play_type,
+                // If attempted_sb/pickoff is true but there's no advance, it's an out
+                is_out: attempted_sb || picked_off,
+                base_end: if attempted_sb || picked_off {
+                    None
+                } else {
+                    baserunner.to_current_base()
+                },
                 advanced_on_error_flag: false,
-                explicit_out_flag: false,
+                explicit_out_flag: attempted_sb,
                 run_scored_flag: false,
                 rbi_flag: false,
             }),
