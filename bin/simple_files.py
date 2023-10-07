@@ -125,7 +125,7 @@ def write_files() -> None:
 
         read_options = pcsv.ReadOptions(column_names=column_names, block_size=1000000000)
         parse_options = pcsv.ParseOptions(newlines_in_values=True)
-        convert_options = pcsv.ConvertOptions(column_types=arrow_schema, timestamp_parsers=["%Y%m%d", "%Y-%m-%d"],
+        convert_options = pcsv.ConvertOptions(column_types=arrow_schema, timestamp_parsers=["%Y%m%d", "%Y-%m-%d", "%m/%d/%Y"],
                                               true_values=["1", "T"], false_values=["0", "F"], strings_can_be_null=True)
 
         table = pcsv.read_csv(extract_file, read_options=read_options, parse_options=parse_options,
