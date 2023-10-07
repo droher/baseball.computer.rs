@@ -16,7 +16,7 @@ OUTPUT_PATH = Path("retrosheet_simple")
 DATABANK_PATH = Path("baseballdatabank")
 
 RETROSHEET_SUBDIRS = "gamelogs", "schedule", "rosters"
-FILES = "gamelog", "schedule", "park", "roster"
+FILES = "gamelog", "schedule", "park", "roster", "bio"
 
 # MS-DOS eof character that needs to be specially handled in some files
 DOS_EOF = chr(26)
@@ -84,6 +84,7 @@ def parse_simple_files() -> None:
     concat_files(subdirs["gamelogs"], output_base / "gamelog.csv", glob="*.txt", check_dupes=False)
     concat_files(subdirs["schedule"], output_base / "schedule.csv", glob="*.TXT")
     concat_files(retrosheet_base, output_base / "park.csv", glob="ballparks.csv", strip_header=True)
+    concat_files(retrosheet_base, output_base / "bio.csv", glob="biofile.csv", strip_header=True)
     concat_files(subdirs["rosters"], output_base / "roster.csv", glob="*.ROS", prepend_filename=True)
 
 
