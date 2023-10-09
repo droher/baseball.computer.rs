@@ -181,7 +181,9 @@ impl PlateAppearanceResultType {
                 OutAtBatType::FieldersChoice => Self::FieldersChoice,
                 OutAtBatType::InPlayOut if is_sac_fly => Self::SacrificeFly,
                 OutAtBatType::InPlayOut if is_sac_hit => Self::SacrificeHit,
-                OutAtBatType::InPlayOut if bo.implicit_advance().is_some() => Self::ReachedOnError,
+                // This can still include plays in which the batter reaches base,
+                // such as FOs not recorded as FCs. It should result in an out
+                // unless an error is made on another runner.
                 OutAtBatType::InPlayOut => Self::InPlayOut,
             },
         }
