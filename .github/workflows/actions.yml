@@ -110,3 +110,14 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET }}
           AWS_DEFAULT_REGION: auto
+
+  purge_cache:
+    name: Purge Cloudflare cache
+    needs: [pbp, simple_files]
+    runs-on: ubuntu-22.04
+    steps:
+      - run: |
+          curl -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE }}/purge_cache" \
+            -H "Authorization: Bearer ${{ secrets.PURGE_CACHE_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything": true}'
