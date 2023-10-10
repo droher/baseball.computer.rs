@@ -22,7 +22,7 @@ use crate::event_file::misc::{
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::play::{
     Base, BaseRunner, BaserunningPlayType, ContactType, Count, FieldersData, FieldingData, HitType,
-    ImplicitPlayResults, InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType,
+    InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType,
     PlayModifier, PlayRecord, PlayType, RunnerAdvance, UnearnedRunStatus,
 };
 use crate::event_file::traits::{
@@ -445,11 +445,13 @@ impl GameLineupAppearance {
         appearances: &[Self],
         position: LineupPosition,
         event_id: EventId,
+        side: Side,
     ) -> Result<Self> {
         appearances
             .iter()
             .find(|a| {
                 a.lineup_position == position
+                    && a.side == side
                     && a.start_event_id <= event_id
                     && a.end_event_id.map_or(true, |end| end >= event_id)
             })

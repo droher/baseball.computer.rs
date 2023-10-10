@@ -410,6 +410,7 @@ impl EventBaserunners {
                     &game_context.lineup_appearances,
                     ss.lineup_position,
                     event.event_id,
+                    event.context.batting_side
                 )
                 .unwrap()
                 .player_id,
@@ -440,6 +441,7 @@ impl EventBaserunners {
                     &game_context.lineup_appearances,
                     ss.lineup_position,
                     event.event_id,
+                    event.context.batting_side
                 )
                 .unwrap()
                 .player_id,
