@@ -35,8 +35,8 @@ def get_prebuilt_csvs() -> None:
         github_url = f"https://raw.githubusercontent.com/chadwickbureau/baseballdatabank/master/core/{f}.csv"
         df = pandas.read_csv(github_url)
         if "yearID" in df.columns:
-            # Filter out all years after 1900
-            df = df[df["yearID"] <= 1900]
+            # Filter out all years after 1919
+            df = df[df["yearID"] < 1920]
         df.to_parquet(f"baseballdatabank/{f.lower()}.parquet", index=False)
 
 
