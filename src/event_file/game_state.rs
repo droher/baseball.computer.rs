@@ -32,7 +32,7 @@ use crate::event_file::traits::{
 use crate::AccountType;
 
 use super::pitch_sequence::{PitchSequence, PitchSequenceItem, PitchType};
-use super::play::{HitAngle, HitDepth, HitLocationGeneral, HitStrength};
+use super::play::{HitAngle, HitDepth, HitLocationGeneral, HitStrength, RunnerAdvanceModifier};
 use super::schemas::GameIdString;
 use super::traits::{EventKey, FieldingPlayType, GameType};
 
@@ -683,6 +683,7 @@ pub struct EventBaserunningAdvanceAttempt {
     pub explicit_out_flag: bool,
     pub run_scored_flag: bool,
     pub rbi_flag: bool,
+    pub team_unearned_flag: bool
 }
 
 impl EventBaserunningAdvanceAttempt {
@@ -702,6 +703,7 @@ impl EventBaserunningAdvanceAttempt {
                 let explicit_out_flag = ra.out_or_error;
                 let run_scored_flag = play.stats.runs.contains(&ra.baserunner);
                 let rbi_flag = play.stats.rbi.contains(&ra.baserunner);
+                let team_unearned_flag = ra.modifiers.contains(&RunnerAdvanceModifier::TeamUnearnedRun);
                 Ok(Self {
                     event_key,
                     sequence_id: SequenceId::new(i + 1).context("Could not create sequence ID")?,
@@ -712,6 +714,7 @@ impl EventBaserunningAdvanceAttempt {
                     is_successful,
                     run_scored_flag,
                     rbi_flag,
+                    team_unearned_flag
                 })
             })
             .collect()
@@ -727,6 +730,11 @@ pub struct EventRun {
 }
 
 impl EventRun {
+    pub fn is_team_unearned_run(&self) -> bool {
+        self.explicit_unearned_run_status
+            .map_or(false, |s| s == UnearnedRunStatus::TeamUnearned)
+    }
+
     fn from_play(play: &PlayRecord, event_key: EventKey) -> Vec<Self> {
         play.stats
             .advances
@@ -1824,6 +1832,7 @@ pub fn dummy() -> GameContext {
                     explicit_out_flag: true,
                     run_scored_flag: true,
                     rbi_flag: true,
+                    team_unearned_flag: true,
                 }],
                 runs: vec![EventRun {
                     event_key: 1,
