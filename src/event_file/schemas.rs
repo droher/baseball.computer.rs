@@ -194,10 +194,10 @@ pub struct Events {
     plate_appearance_result: Option<PlateAppearanceResultType>,
     batted_contact_type: Option<ContactType>,
     batted_to_fielder: Option<FieldingPosition>,
-    batted_location_general: HitLocationGeneral,
-    batted_location_depth: HitDepth,
-    batted_location_angle: HitAngle,
-    batted_location_strength: HitStrength,
+    batted_location_general: Option<HitLocationGeneral>,
+    batted_location_depth: Option<HitDepth>,
+    batted_location_angle: Option<HitAngle>,
+    batted_location_strength: Option<HitStrength>,
     outs_on_play: usize,
     runs_on_play: usize,
     runs_batted_in: usize,
@@ -207,6 +207,7 @@ pub struct Events {
 impl ContextToVec<'_> for Events {
     fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
         Box::from(gc.events.iter().map(move |e| {
+            let batted_ball_info = e.results.batted_ball_info.as_ref();
             Self {
                 game_id: gc.game_id.id,
                 event_id: e.event_id,
@@ -237,36 +238,16 @@ impl ContextToVec<'_> for Events {
                     .strikeout_responsible_batter,
                 walk_responsible_pitcher_id: e.context.rare_attributes.walk_responsible_pitcher,
                 plate_appearance_result: e.results.plate_appearance,
-                batted_contact_type: e.results.batted_ball_info.as_ref().map(|i| i.contact),
-                batted_to_fielder: e
-                    .results
-                    .batted_ball_info
-                    .as_ref()
-                    .map(|i| i.hit_to_fielder),
-                batted_location_general: e
-                    .results
-                    .batted_ball_info
-                    .as_ref()
-                    .map(|i| i.general_location)
-                    .unwrap_or_default(),
-                batted_location_depth: e
-                    .results
-                    .batted_ball_info
-                    .as_ref()
-                    .map(|i| i.depth)
-                    .unwrap_or_default(),
-                batted_location_angle: e
-                    .results
-                    .batted_ball_info
-                    .as_ref()
-                    .map(|i| i.angle)
-                    .unwrap_or_default(),
-                batted_location_strength: e
-                    .results
-                    .batted_ball_info
-                    .as_ref()
-                    .map(|i| i.strength)
-                    .unwrap_or_default(),
+                batted_contact_type: e.results.batted_ball_info.as_ref().map(|i: &super::game_state::EventBattedBallInfo| i.contact),
+                batted_to_fielder: batted_ball_info.and_then(|i| i.hit_to_fielder),
+                batted_location_general: batted_ball_info
+                    .map(|i| i.general_location),
+                batted_location_depth: batted_ball_info
+                    .map(|i| i.depth),
+                batted_location_angle: batted_ball_info
+                    .map(|i| i.angle),
+                batted_location_strength: batted_ball_info
+                    .map(|i| i.strength),
                 outs_on_play: e.results.out_on_play.len(),
                 runs_on_play: e.results.runs.len(),
                 runs_batted_in: e.results.runs.iter().filter(|r| r.rbi_flag).count(),

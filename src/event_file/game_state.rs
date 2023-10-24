@@ -154,6 +154,21 @@ impl PlateAppearanceResultType {
         })
     }
 
+    pub fn is_in_play(&self) -> bool {
+        matches!(
+            self,
+            Self::Single
+                | Self::Double
+                | Self::Triple
+                | Self::InsideTheParkHomeRun
+                | Self::InPlayOut
+                | Self::FieldersChoice
+                | Self::ReachedOnError
+                | Self::SacrificeFly
+                | Self::SacrificeHit
+        )
+    }
+
     fn from_internal(plate_appearance: &PlateAppearanceType, modifiers: &[PlayModifier]) -> Self {
         let is_sac_fly = modifiers.iter().any(|m| m == &PlayModifier::SacrificeFly);
         let is_sac_hit = modifiers.iter().any(|m| m == &PlayModifier::SacrificeHit);
@@ -639,7 +654,7 @@ impl EventBaserunningPlay {
 pub struct EventBattedBallInfo {
     pub event_key: EventKey,
     pub contact: ContactType,
-    pub hit_to_fielder: FieldingPosition,
+    pub hit_to_fielder: Option<FieldingPosition>,
     pub general_location: HitLocationGeneral,
     pub depth: HitDepth,
     pub angle: HitAngle,
@@ -656,10 +671,22 @@ impl EventBattedBallInfo {
                     // the ball was hit in play but we don't have any data on it
                     let contact_description = play.stats.contact_description.unwrap_or_default();
                     let location = contact_description.location.unwrap_or_default();
+                    // Fielder can be None for home runs/ground rule doubles,
+                    // but in other cases it should be explicitly marked as Unknown if missing
+                    let has_fielder = match pa {
+                        PlateAppearanceType::Hit(h) if h.hit_type == HitType::HomeRun => play.parsed.modifiers.iter().any(|m| m == &PlayModifier::InsideTheParkHomeRun),
+                        PlateAppearanceType::Hit(h) => h.hit_type != HitType::GroundRuleDouble,
+                        _ => true,
+                    };
+                    let hit_to_fielder = if has_fielder {
+                        Some(play.stats.hit_to_fielder.unwrap_or_default())
+                    } else {
+                        play.stats.hit_to_fielder
+                    };
                     Some(Self {
                         event_key,
                         contact: contact_description.contact_type.unwrap_or_default(),
-                        hit_to_fielder: play.stats.hit_to_fielder.unwrap_or_default(),
+                        hit_to_fielder,
                         general_location: location.general_location,
                         depth: location.depth,
                         angle: location.angle,

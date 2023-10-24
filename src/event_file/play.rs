@@ -1370,12 +1370,13 @@ pub enum HitDepth {
     Deep,
     #[strum(serialize = "XD")]
     ExtraDeep,
+    Default,
     Unknown,
 }
 
 impl Default for HitDepth {
     fn default() -> Self {
-        Self::Unknown
+        Self::Default
     }
 }
 
@@ -1404,12 +1405,13 @@ pub enum HitAngle {
     Left,
     #[strum(serialize = "R")]
     Right,
+    Default,
     Unknown,
 }
 
 impl Default for HitAngle {
     fn default() -> Self {
-        Self::Unknown
+        Self::Default
     }
 }
 
@@ -2153,14 +2155,15 @@ impl ParsedPlay {
 
     // Primary fielder of a ball in play. For outs, this is the first fielder in the play string.
     // For hits, this is the first fielder after the hit type indicator, e.g. the `8` in `S8`.
-    // This data point is particularly important as it's very well populated historically and
+    // This data point is particularly important as it's very well-populated historically and
     // serves as a good fallback for hit location, which is usually not present.
     // Some hit strings clearly indicate a deflection e.g. `S17`, but others may be
     // an irregular recording of a hit location, e.g. `S48` to mean shallow center.
     // We take the first fielder regardless, but may be worth another look.
+    // Additionally, some fielders' choices only specify the fielder in the runner advance.
     // TODO: Investigate possible irregular hit location storage
     pub fn hit_to_fielder(&self) -> Option<FieldingPosition> {
-        self.main_plays.iter().find_map(|pt| match pt {
+        let main_fielder = self.main_plays.iter().find_map(|pt| match pt {
             PlayType::PlateAppearance(PlateAppearanceType::Hit(h)) => {
                 h.positions_hit_to.get(0).copied()
             }
@@ -2172,7 +2175,11 @@ impl ParsedPlay {
                     .and_then(|fp| fp.fielders_data.get(0).map(|fd| fd.fielding_position))
             }
             _ => None,
-        })
+        });
+        let advance_fielder = self
+            .advances()
+            .find_map(|ra| ra.fielders_data().get(0).map(|fd| fd.fielding_position));
+        main_fielder.or(advance_fielder)
     }
 }
 
