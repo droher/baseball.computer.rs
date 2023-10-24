@@ -22,8 +22,8 @@ use crate::event_file::misc::{
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::play::{
     Base, BaseRunner, BaserunningPlayType, ContactType, Count, FieldersData, FieldingData, HitType,
-    InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType,
-    PlayModifier, PlayRecord, PlayType, RunnerAdvance, UnearnedRunStatus,
+    InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, PlayModifier, PlayRecord,
+    PlayType, RunnerAdvance, UnearnedRunStatus,
 };
 use crate::event_file::traits::{
     FieldingPosition, Inning, LineupPosition, Matchup, Pitcher, Player, RetrosheetVolunteer,
@@ -674,7 +674,11 @@ impl EventBattedBallInfo {
                     // Fielder can be None for home runs/ground rule doubles,
                     // but in other cases it should be explicitly marked as Unknown if missing
                     let has_fielder = match pa {
-                        PlateAppearanceType::Hit(h) if h.hit_type == HitType::HomeRun => play.parsed.modifiers.iter().any(|m| m == &PlayModifier::InsideTheParkHomeRun),
+                        PlateAppearanceType::Hit(h) if h.hit_type == HitType::HomeRun => play
+                            .parsed
+                            .modifiers
+                            .iter()
+                            .any(|m| m == &PlayModifier::InsideTheParkHomeRun),
                         PlateAppearanceType::Hit(h) => h.hit_type != HitType::GroundRuleDouble,
                         _ => true,
                     };
@@ -710,7 +714,7 @@ pub struct EventBaserunningAdvanceAttempt {
     pub explicit_out_flag: bool,
     pub run_scored_flag: bool,
     pub rbi_flag: bool,
-    pub team_unearned_flag: bool
+    pub team_unearned_flag: bool,
 }
 
 impl EventBaserunningAdvanceAttempt {
@@ -730,7 +734,9 @@ impl EventBaserunningAdvanceAttempt {
                 let explicit_out_flag = ra.out_or_error;
                 let run_scored_flag = play.stats.runs.contains(&ra.baserunner);
                 let rbi_flag = play.stats.rbi.contains(&ra.baserunner);
-                let team_unearned_flag = ra.modifiers.contains(&RunnerAdvanceModifier::TeamUnearnedRun);
+                let team_unearned_flag = ra
+                    .modifiers
+                    .contains(&RunnerAdvanceModifier::TeamUnearnedRun);
                 Ok(Self {
                     event_key,
                     sequence_id: SequenceId::new(i + 1).context("Could not create sequence ID")?,
@@ -741,7 +747,7 @@ impl EventBaserunningAdvanceAttempt {
                     is_successful,
                     run_scored_flag,
                     rbi_flag,
-                    team_unearned_flag
+                    team_unearned_flag,
                 })
             })
             .collect()

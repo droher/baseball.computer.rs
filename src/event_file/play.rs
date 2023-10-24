@@ -787,9 +787,7 @@ impl BaserunningPlayType {
     pub const fn is_attempted_stolen_base(self) -> bool {
         matches!(
             self,
-            Self::StolenBase
-                | Self::CaughtStealing
-                | Self::PickedOffCaughtStealing
+            Self::StolenBase | Self::CaughtStealing | Self::PickedOffCaughtStealing
         )
     }
 }
