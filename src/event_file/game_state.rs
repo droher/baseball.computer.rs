@@ -671,14 +671,18 @@ impl EventBattedBallInfo {
                     // the ball was hit in play but we don't have any data on it
                     let contact_description = play.stats.contact_description.unwrap_or_default();
                     let location = contact_description.location.unwrap_or_default();
-                    // Fielder can be None for home runs/ground rule doubles,
+                    // Fielder can be None for home runs/ground rule doubles/fan interference,
                     // but in other cases it should be explicitly marked as Unknown if missing
+                    let no_fielder_modifiers = [
+                        PlayModifier::FanInterference,
+                        PlayModifier::InsideTheParkHomeRun,
+                    ];
                     let has_fielder = match pa {
                         PlateAppearanceType::Hit(h) if h.hit_type == HitType::HomeRun => play
                             .parsed
                             .modifiers
                             .iter()
-                            .any(|m| m == &PlayModifier::InsideTheParkHomeRun),
+                            .any(|m| no_fielder_modifiers.contains(m)),
                         PlateAppearanceType::Hit(h) => h.hit_type != HitType::GroundRuleDouble,
                         _ => true,
                     };

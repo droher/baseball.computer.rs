@@ -2158,7 +2158,6 @@ impl ParsedPlay {
     // Some hit strings clearly indicate a deflection e.g. `S17`, but others may be
     // an irregular recording of a hit location, e.g. `S48` to mean shallow center.
     // We take the first fielder regardless, but may be worth another look.
-    // Additionally, some fielders' choices only specify the fielder in the runner advance.
     // TODO: Investigate possible irregular hit location storage
     pub fn hit_to_fielder(&self) -> Option<FieldingPosition> {
         let main_fielder = self.main_plays.iter().find_map(|pt| match pt {
@@ -2174,10 +2173,16 @@ impl ParsedPlay {
             }
             _ => None,
         });
+        // Some fielders' choices only specify the fielder in the runner advance.
         let advance_fielder = self
             .advances()
             .find_map(|ra| ra.fielders_data().get(0).map(|fd| fd.fielding_position));
-        main_fielder.or(advance_fielder)
+        // If main_fielder is None or FieldingPosition::Unkown, use advance_fielder
+        if main_fielder.unwrap_or_default() == FieldingPosition::Unknown {
+            advance_fielder
+        } else {
+            main_fielder
+        }
     }
 }
 
