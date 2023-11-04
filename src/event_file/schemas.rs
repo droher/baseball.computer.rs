@@ -197,7 +197,7 @@ pub struct Events {
     batted_location_general: Option<HitLocationGeneral>,
     batted_location_depth: Option<HitDepth>,
     batted_location_angle: Option<HitAngle>,
-    batted_location_strength: Option<HitStrength>,
+    batted_contact_strength: Option<HitStrength>,
     outs_on_play: usize,
     runs_on_play: usize,
     runs_batted_in: usize,
@@ -247,7 +247,7 @@ impl ContextToVec<'_> for Events {
                 batted_location_general: batted_ball_info.map(|i| i.general_location),
                 batted_location_depth: batted_ball_info.map(|i| i.depth),
                 batted_location_angle: batted_ball_info.map(|i| i.angle),
-                batted_location_strength: batted_ball_info.map(|i| i.strength),
+                batted_contact_strength: batted_ball_info.map(|i| i.strength),
                 outs_on_play: e.results.out_on_play.len(),
                 runs_on_play: e.results.runs.len(),
                 runs_batted_in: e.results.runs.iter().filter(|r| r.rbi_flag).count(),
@@ -579,7 +579,7 @@ impl BoxScoreWritableRecord<'_> {
     }
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Eq, PartialEq, Serialize, Clone)]
 pub struct BoxScoreLineScores {
     pub game_id: GameIdString,
     pub side: Side,

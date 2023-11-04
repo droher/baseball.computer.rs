@@ -16,6 +16,7 @@ use serde::Serialize;
 use std::collections::HashSet;
 use std::fs::File;
 use std::hash::Hash;
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard};
@@ -52,6 +53,35 @@ const ABOUT: &str = "Creates structured datasets from raw Retrosheet files.";
 lazy_static! {
     static ref OUTPUT_ROOT: PathBuf = get_output_root(&Opt::parse());
     static ref WRITER_MAP: WriterMap = WriterMap::new(&OUTPUT_ROOT);
+    static ref JSON_WRITER: ThreadSafeJsonWriter = ThreadSafeJsonWriter::new();
+}
+
+struct ThreadSafeJsonWriter {
+    json: Mutex<BufWriter<File>>,
+}
+
+impl ThreadSafeJsonWriter {
+    #[allow(clippy::expect_used)]
+    pub fn new() -> Self {
+        let output_path = OUTPUT_ROOT.join("games.jsonl");
+        debug!("Creating file {}", output_path.display());
+        let file = BufWriter::new(File::create(output_path).expect("Failed to create file"));
+        Self {
+            json: Mutex::new(file),
+        }
+    }
+
+    pub fn json(&self) -> Result<MutexGuard<BufWriter<File>>> {
+        self.json
+            .lock()
+            .map_err(|e| anyhow!("Failed to acquire writer lock: {}", e))
+    }
+
+    pub fn flush(&self) -> Result<()> {
+        let mut json = self.json()?;
+        json.flush()?;
+        Ok(())
+    }
 }
 
 struct ThreadSafeCsvWriter {
@@ -213,6 +243,7 @@ impl EventFileSchema {
     fn write(
         reader: RetrosheetReader,
         parsed_games: Option<&HashSet<GameId>>,
+        use_json: bool,
     ) -> Result<Vec<GameId>> {
         let file_info = reader.file_info;
         debug!("Processing file {}", file_info.filename);
@@ -245,7 +276,11 @@ impl EventFileSchema {
                 );
                 continue;
             }
-            if game_context.file_info.account_type == AccountType::BoxScore {
+            if use_json {
+                let mut json_writer = JSON_WRITER.json()?;
+                serde_json::to_writer(&mut *json_writer, &game_context)?;
+                json_writer.write("\n".as_bytes())?;
+            } else if game_context.file_info.account_type == AccountType::BoxScore {
                 Self::write_box_score_files(&game_context, record_slice)?;
             } else {
                 Self::write_play_by_play_files(&game_context)?;
@@ -362,6 +397,9 @@ struct Opt {
 
     #[arg(short, long)]
     output_dir: PathBuf,
+
+    #[arg(short, long)]
+    json: bool,
 }
 
 #[allow(clippy::expect_used)]
@@ -391,9 +429,10 @@ impl FileProcessor {
         input_path: &PathBuf,
         parsed_games: Option<&HashSet<GameId>>,
         file_index: usize,
+        use_json: bool,
     ) -> Result<Vec<GameId>> {
         let reader = RetrosheetReader::new(input_path, file_index)?;
-        EventFileSchema::write(reader, parsed_games)
+        EventFileSchema::write(reader, parsed_games, use_json)
     }
 
     fn contains_nlb_dupes(path: &PathBuf) -> bool {
@@ -422,7 +461,14 @@ impl FileProcessor {
         let games = files
             .into_par_iter()
             .enumerate()
-            .map(|(i, f)| Self::process_file(&f, parsed_games, (self.index + i) * EVENT_KEY_BUFFER))
+            .map(|(i, f)| {
+                Self::process_file(
+                    &f,
+                    parsed_games,
+                    (self.index + i) * EVENT_KEY_BUFFER,
+                    self.opt.json,
+                )
+            })
             .collect::<Result<Vec<Vec<GameId>>>>()?;
         self.index += file_count;
         let games = games.iter().flatten();
@@ -441,6 +487,7 @@ impl FileProcessor {
         self.par_process_files(AccountType::BoxScore)?;
 
         WRITER_MAP.flush_all()?;
+        JSON_WRITER.flush()?;
         Ok(())
     }
 }

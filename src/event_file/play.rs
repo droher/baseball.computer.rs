@@ -45,7 +45,7 @@ pub static MAIN_PLAY_FIELDING_REGEX: &Lazy<Regex> = regex!(r"[0-9]");
 pub static BASERUNNING_PLAY_FIELDING_REGEX: &Lazy<Regex> = regex!(r"[123H]");
 pub static MODIFIER_DIVIDER_REGEX: &Lazy<Regex> = regex!(r"[+\-0-9]");
 pub static HIT_LOCATION_GENERAL_REGEX: &Lazy<Regex> = regex!(r"[0-9]+");
-pub static HIT_LOCATION_STRENGTH_REGEX: &Lazy<Regex> = regex!(r"[0-9]+");
+pub static HIT_LOCATION_STRENGTH_REGEX: &Lazy<Regex> = regex!(r"[+-]");
 pub static HIT_LOCATION_ANGLE_REGEX: &Lazy<Regex> = regex!(r"[FMLR]");
 pub static HIT_LOCATION_DEPTH_REGEX: &Lazy<Regex> = regex!(r"(D|S|XD)");
 
@@ -1338,12 +1338,13 @@ pub enum HitStrength {
     Hard,
     #[strum(serialize = "-")]
     Soft,
+    Default,
     Unknown,
 }
 
 impl Default for HitStrength {
     fn default() -> Self {
-        Self::Unknown
+        Self::Default
     }
 }
 
@@ -2205,6 +2206,7 @@ impl TryFrom<&str> for ParsedPlay {
     type Error = Error;
 
     fn try_from(raw_play: &str) -> Result<Self> {
+        // TODO: Properly process exclamation point -- it's a bit diff
         let value = &*STRIP_CHARS_REGEX.replace_all(raw_play, "");
         if value.is_empty() {
             return Ok(Self::default());

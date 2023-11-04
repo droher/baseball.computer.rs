@@ -31,6 +31,7 @@ use crate::event_file::traits::{
 };
 use crate::AccountType;
 
+use super::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use super::pitch_sequence::{PitchSequence, PitchSequenceItem, PitchType};
 use super::play::{HitAngle, HitDepth, HitLocationGeneral, HitStrength, RunnerAdvanceModifier};
 use super::schemas::GameIdString;
@@ -552,6 +553,38 @@ impl GameFieldingAppearance {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
+pub struct BoxScoreData {
+    pub lines: Vec<BoxScoreLine>,
+    pub events: Vec<BoxScoreEvent>,
+    pub line_scores: Vec<LineScore>,
+    pub comments: Vec<String>,
+}
+
+impl BoxScoreData {
+    fn from_record_slice(slice: &RecordSlice) -> Result<Self> {
+        let mut lines = Vec::new();
+        let mut events = Vec::new();
+        let mut line_scores = Vec::new();
+        let mut comments = Vec::new();
+        for record in slice.iter() {
+            match record {
+                MappedRecord::BoxScoreLine(bsl) => lines.push(*bsl),
+                MappedRecord::BoxScoreEvent(bse) => events.push(bse.clone()),
+                MappedRecord::LineScore(bsls) => line_scores.push(bsls.clone()),
+                MappedRecord::Comment(c) => comments.push(c.clone()),
+                _ => {}
+            }
+        }
+        Ok(Self {
+            lines,
+            events,
+            line_scores,
+            comments,
+        })
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct GameContext {
     #[serde(flatten)]
     pub game_id: GameId,
@@ -566,6 +599,8 @@ pub struct GameContext {
     pub events: Vec<Event>,
     pub line_offset: usize,
     pub event_key_offset: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub box_score_data: Option<BoxScoreData>,
 }
 
 impl GameContext {
@@ -582,6 +617,11 @@ impl GameContext {
         let umpires = GameUmpire::from_record_slice(record_slice)?;
         let results = GameResults::try_from(record_slice)?;
         let event_key_offset = Self::event_key_offset(file_info, game_num)?;
+        let box_score_data = if file_info.account_type == AccountType::BoxScore {
+            Some(BoxScoreData::from_record_slice(record_slice)?)
+        } else {
+            None
+        };
 
         let (events, lineup_appearances, fielding_appearances) =
             if file_info.account_type == AccountType::BoxScore {
@@ -604,6 +644,7 @@ impl GameContext {
             events,
             line_offset,
             event_key_offset,
+            box_score_data,
         })
     }
 
@@ -1895,5 +1936,11 @@ pub fn dummy() -> GameContext {
         }],
         line_offset: 1,
         event_key_offset: 3,
+        box_score_data: Some(BoxScoreData {
+            lines: vec![],
+            events: vec![],
+            line_scores: vec![],
+            comments: vec![],
+        }),
     }
 }

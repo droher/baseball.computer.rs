@@ -609,7 +609,7 @@ impl TryFrom<&RetrosheetEventRecord> for TeamMiscellaneousLine {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize)]
 pub enum BoxScoreLine {
     BattingLine(BattingLine),
     PinchHittingLine(PinchHittingLine),
