@@ -448,37 +448,70 @@ impl TryFrom<&str> for FieldingPlay {
     type Error = Error;
 
     fn try_from(value: &str) -> Result<Self> {
-        let to_vec = |matches: Vec<Option<Match>>| {
-            FieldingPosition::fielding_vec(&to_str_vec(matches).join(""))
+        let to_fielding_data = |m: Option<Match>, fielding_play_type: FieldingPlayType| {
+            let fielder_vec =
+                FieldingPosition::fielding_vec(m.map(|m| m.as_str()).unwrap_or_default());
+            FieldersData::from_vec(&fielder_vec, fielding_play_type)
         };
-        let to_fielding_data =
-            |matches: Vec<Option<Match>>, fielding_play_type: FieldingPlayType| {
-                FieldersData::from_vec(&to_vec(matches), fielding_play_type)
-            };
 
         if value.parse::<u32>().is_ok() {
             return Ok(Self::from(FieldingPosition::fielding_vec(value)));
         } else if let Some(captures) = OUT_REGEX.captures(value) {
-            let assist_matches = vec![
+            let mut fielders_data = vec![];
+            let assist_matches = [
                 captures.name("a1"),
                 captures.name("a2"),
                 captures.name("a3"),
             ];
-            let putout_matches = vec![
+            let putout_matches = [
                 captures.name("po1"),
                 captures.name("po2"),
                 captures.name("po3"),
             ];
+            fielders_data.extend(to_fielding_data(
+                assist_matches[0],
+                FieldingPlayType::Assist,
+            ));
+            fielders_data.extend(to_fielding_data(
+                putout_matches[0],
+                FieldingPlayType::Putout,
+            ));
+            // In a double or triple play, the fielder from the previous putout gets an assist on the next putout
+            // unless they are the same fielder (e.g. 4-6-6: first putout is assisted, second is unassisted)
+            if putout_matches[1].is_some() && putout_matches[0] != putout_matches[1] {
+                fielders_data.extend(to_fielding_data(
+                    putout_matches[0],
+                    FieldingPlayType::Assist,
+                ));
+            }
+            fielders_data.extend(to_fielding_data(
+                assist_matches[1],
+                FieldingPlayType::Assist,
+            ));
+            fielders_data.extend(to_fielding_data(
+                putout_matches[1],
+                FieldingPlayType::Putout,
+            ));
+            if putout_matches[2].is_some() && putout_matches[1] != putout_matches[2] {
+                fielders_data.extend(to_fielding_data(
+                    putout_matches[1],
+                    FieldingPlayType::Assist,
+                ));
+            }
+            fielders_data.extend(to_fielding_data(
+                assist_matches[2],
+                FieldingPlayType::Assist,
+            ));
+            fielders_data.extend(to_fielding_data(
+                putout_matches[2],
+                FieldingPlayType::Putout,
+            ));
+
             let runner_matches = vec![
                 captures.name("runner1"),
                 captures.name("runner2"),
                 captures.name("runner3"),
             ];
-            let fielders_data = [
-                to_fielding_data(assist_matches, FieldingPlayType::Assist),
-                to_fielding_data(putout_matches, FieldingPlayType::Putout),
-            ]
-            .concat();
 
             let runners_out = to_str_vec(runner_matches)
                 .into_iter()
@@ -490,8 +523,8 @@ impl TryFrom<&str> for FieldingPlay {
             });
         } else if let Some(captures) = REACHED_ON_ERROR_REGEX.captures(value) {
             let fielders_data = [
-                to_fielding_data(vec![captures.name("a1")], FieldingPlayType::Assist),
-                to_fielding_data(vec![captures.name("e")], FieldingPlayType::Error),
+                to_fielding_data(captures.name("a1"), FieldingPlayType::Assist),
+                to_fielding_data(captures.name("e"), FieldingPlayType::Error),
             ]
             .concat();
 
