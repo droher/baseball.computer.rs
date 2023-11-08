@@ -2144,6 +2144,12 @@ impl ParsedPlay {
         })
     }
 
+    pub fn strikeout(&self) -> bool {
+        self.plate_appearance()
+            .map(|pa| pa.is_strikeout())
+            .unwrap_or_default()
+    }
+
     pub fn hit_type(&self) -> Option<HitType> {
         self.plate_appearance().and_then(|pa| match pa {
             PlateAppearanceType::Hit(h) => Some(h.hit_type),
@@ -2222,7 +2228,8 @@ impl ParsedPlay {
 
 impl FieldingData for ParsedPlay {
     fn fielders_data(&self) -> Vec<FieldersData> {
-        self.main_plays
+        let mut data = self
+            .main_plays
             .iter()
             .flat_map(FieldingData::fielders_data)
             .chain(self.modifiers.iter().flat_map(PlayModifier::fielders_data))
@@ -2231,7 +2238,14 @@ impl FieldingData for ParsedPlay {
                     .iter()
                     .flat_map(RunnerAdvance::fielders_data),
             )
-            .collect()
+            .collect_vec();
+        // This is a hack to get around the irregular dropped third strike notation of
+        // "K.BX1(23)" instead of the normal "K23". The initial catcher putout should be removed
+        // whenever a batter advance is specified.
+        if self.strikeout() && self.explicit_baserunners().contains(&BaseRunner::Batter) {
+            data.remove(0);
+        }
+        data
     }
 }
 
