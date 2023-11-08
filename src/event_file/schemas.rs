@@ -365,6 +365,7 @@ pub struct EventBaserunners {
 
 impl EventBaserunners {
     fn runner(game_context: &GameContext, event: &E, baserunner: BaseRunner) -> Option<Self> {
+        let is_out = event.results.out_on_play.iter().any(|o| o == &baserunner);
         // Baserunning plays involve the runner if he's specifically mentioned or there is no runner mentioned
         let baserunning_play_type = event.results.plays_at_base.iter().find_map(|p| {
             if p.baserunner.unwrap_or(baserunner) == baserunner {
@@ -407,7 +408,7 @@ impl EventBaserunners {
                 explicit_charged_pitcher_id: ss.explicit_charged_pitcher_id,
                 attempted_advance_to_base: Some(a.attempted_advance_to),
                 baserunning_play_type: baserunning_play_type,
-                is_out: !a.is_successful,
+                is_out,
                 base_end: if a.is_successful {
                     Some(a.attempted_advance_to)
                 } else {
@@ -442,8 +443,7 @@ impl EventBaserunners {
                     None
                 },
                 baserunning_play_type,
-                // If attempted_sb/pickoff is true but there's no advance, it's an out
-                is_out: attempted_sb || picked_off,
+                is_out,
                 base_end: if attempted_sb || picked_off {
                     None
                 } else {
@@ -468,7 +468,7 @@ impl EventBaserunners {
                 attempted_advance_to_base: Some(a.attempted_advance_to),
                 // Batter could be involved on baserunning play for K+WP,PO,
                 baserunning_play_type: baserunning_play_type,
-                is_out: !a.is_successful,
+                is_out,
                 base_end: if a.is_successful {
                     Some(a.attempted_advance_to)
                 } else {
