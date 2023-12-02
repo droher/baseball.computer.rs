@@ -19,7 +19,7 @@ def file_to_data_frame_to_parquet(local_file: str, parquet_file: str) -> None:
                         column_encoding={'event_key': 'DELTA_BINARY_PACKED'})
 
 if __name__ == "__main__":
-    for f in glob.glob("data/*.csv"):
+    for f in glob.glob("csv/*.csv"):
         print(f)
         try:
             fname = f.split("/")[-1].split(".")[0]
