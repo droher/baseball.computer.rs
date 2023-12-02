@@ -30,8 +30,8 @@ def get_prebuilt_csvs() -> None:
      .to_parquet("retrosheet_simple/franchise.parquet", index=False)
      )
     databank_files = ["Appearances", "Batting", "Fielding", "FieldingOF", "Pitching", "People"]
+    DATABANK_PATH.mkdir(exist_ok=True)
     # Remove this until repo yank gets resolved
-    # DATABANK_PATH.mkdir(exist_ok=True)
     # for f in databank_files:
     #     github_url = f"https://raw.githubusercontent.com/chadwickbureau/baseballdatabank/master/core/{f}.csv"
     #     df = pandas.read_csv(github_url)
