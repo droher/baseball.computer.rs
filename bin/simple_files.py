@@ -11,11 +11,11 @@ from sqlalchemy import Integer, SmallInteger, Float, String, CHAR, Text, Boolean
 from sqlalchemy import Table as AlchemyTable
 from sqlalchemy.sql.type_api import TypeEngine
 
-RETROSHEET_PATH = Path("retrosheet/alldata")
+RETROSHEET_PATH = Path("retrosheet")
 OUTPUT_PATH = Path("retrosheet_simple")
 DATABANK_PATH = Path("baseballdatabank")
 
-RETROSHEET_SUBDIRS = "gamelogs", "schedule", "rosters"
+RETROSHEET_SUBDIRS = "gamelogs", "schedules", "rosters"
 FILES = "gamelog", "schedule", "park", "roster", "bio"
 
 # MS-DOS eof character that needs to be specially handled in some files
@@ -30,14 +30,15 @@ def get_prebuilt_csvs() -> None:
      .to_parquet("retrosheet_simple/franchise.parquet", index=False)
      )
     databank_files = ["Appearances", "Batting", "Fielding", "FieldingOF", "Pitching", "People"]
-    DATABANK_PATH.mkdir(exist_ok=True)
-    for f in databank_files:
-        github_url = f"https://raw.githubusercontent.com/chadwickbureau/baseballdatabank/master/core/{f}.csv"
-        df = pandas.read_csv(github_url)
-        if "yearID" in df.columns:
-            # Filter out all years after 1919
-            df = df[df["yearID"] < 1920]
-        df.to_parquet(f"baseballdatabank/{f.lower()}.parquet", index=False)
+    # Remove this until repo yank gets resolved
+    # DATABANK_PATH.mkdir(exist_ok=True)
+    # for f in databank_files:
+    #     github_url = f"https://raw.githubusercontent.com/chadwickbureau/baseballdatabank/master/core/{f}.csv"
+    #     df = pandas.read_csv(github_url)
+    #     if "yearID" in df.columns:
+    #         # Filter out all years after 1919
+    #         df = df[df["yearID"] < 1920]
+    #     df.to_parquet(f"baseballdatabank/{f.lower()}.parquet", index=False)
 
 
 def parse_simple_files() -> None:
@@ -45,14 +46,15 @@ def parse_simple_files() -> None:
                      prepend_filename: bool = False,
                      strip_header: bool = False,
                      check_dupes: bool = True):
-        files = [f for f in input_path.glob(glob) if f.is_file()]
-
+        files = sorted([f for f in input_path.glob(glob) if f.is_file()])
+        print(f"Found {len(files)} files in {input_path}")
         with open(output_file, 'wt') as fout, fileinput.input(files) as fin:
             lines = set()
             for line in fin:
                 year = Path(fin.filename()).stem[-4:]
                 # Remove DOS EOF character (CRTL+Z)
                 new_line = line.strip(DOS_EOF)
+                original_line = new_line
                 if not new_line or new_line.isspace():
                     continue
                 if fin.isfirstline() and strip_header:
@@ -63,13 +65,14 @@ def parse_simple_files() -> None:
                 if prepend_filename:
                     new_line = f"{year},{new_line}"
                 if new_line in lines:
-                    print(f"Duplicate row in {fin.filename()}: {new_line.strip()}")
+                    print(f"Duplicate row in {fin.filename()}: {original_line.strip()}")
                     continue
                 # TODO: Fix NLB roster file shape in raw data
                 if "roster" in output_file.name and len(new_line.split(",")) == 7:
+                    print(f"Fixing row in file {fin.filename()} with missing data: " + original_line.strip())
                     new_line = new_line.strip() + ","
                 elif "roster" in output_file.name and len(new_line.split(",")) < 7:
-                    print("Skipping row with missing data: " + new_line.strip())
+                    print(f"Skipping row in file {fin.filename()} with missing data: " + original_line.strip())
                     continue
                 if check_dupes:
                     lines.add(new_line)
@@ -81,8 +84,8 @@ def parse_simple_files() -> None:
     subdirs = {subdir: retrosheet_base / subdir for subdir in RETROSHEET_SUBDIRS}
 
     print("Writing simple files...")
-    concat_files(subdirs["gamelogs"], output_base / "gamelog.csv", glob="*.txt", check_dupes=False)
-    concat_files(subdirs["schedule"], output_base / "schedule.csv", glob="*.TXT")
+    concat_files(subdirs["gamelogs"], output_base / "gamelog.csv", glob="*.txt", check_dupes=True)
+    concat_files(subdirs["schedules"], output_base / "schedule.csv", glob="*.csv", check_dupes=True, strip_header=True)
     concat_files(retrosheet_base, output_base / "park.csv", glob="ballparks.csv", strip_header=True)
     concat_files(retrosheet_base, output_base / "bio.csv", glob="biofile.csv", strip_header=True)
     concat_files(subdirs["rosters"], output_base / "roster.csv", glob="*.ROS", prepend_filename=True)

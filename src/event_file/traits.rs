@@ -465,8 +465,8 @@ impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
             }
         });
         Ok(Self {
-            away: *away_team.context("Could not find away team info in records")?,
-            home: *home_team.context("Could not find home team info in records")?,
+            away: *away_team.context("Could not find away team info in info records")?,
+            home: *home_team.context("Could not find home team info in info records")?,
         })
     }
 }

@@ -6,5 +6,8 @@ output
 perf.data*
 arrow/
 data/
+event/
 csv/
 parquet/
+baseballdatabank/
+misc/

@@ -628,7 +628,7 @@ impl GameContext {
                 (vec![], vec![], vec![])
             } else {
                 GameState::create_events(record_slice, line_offset, event_key_offset)
-                    .with_context(|| anyhow!("Could not parse game {}", game_id.id))?
+                    .with_context(|| anyhow!("Could not parse events"))?
             };
 
         Ok(Self {

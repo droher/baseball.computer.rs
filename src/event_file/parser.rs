@@ -195,7 +195,8 @@ impl RetrosheetReader {
                 Ok(m) => self.current_record_vec.push(m),
                 Err(_) => {
                     return Err(anyhow!(
-                        "Error during game {} -- Error reading record: {}",
+                        "Error file {} during game {} -- Error reading record: {}",
+                        &self.file_info.filename,
                         &self.current_game_id.id,
                         &self.current_record.iter().collect::<Vec<&str>>().join(",")
                     ))

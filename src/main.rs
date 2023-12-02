@@ -40,6 +40,7 @@ use event_file::parser::RetrosheetReader;
 use crate::event_file::box_score::{BoxScoreEvent, BoxScoreLine};
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{AccountType, MappedRecord, RecordSlice};
+use crate::event_file::play::print_cache_info;
 use crate::event_file::schemas::{
     BoxScoreLineScores, BoxScoreWritableRecord, ContextToVec, EventAudit, EventFieldingPlays,
     Events, GameEarnedRuns, Games,
@@ -261,7 +262,11 @@ impl EventFileSchema {
             let game_context_result =
                 GameContext::new(record_slice, file_info, record_vec.line_offset, game_num);
             if let Err(e) = game_context_result {
-                error!("{:?}", e);
+                let game_id = if let Some(MappedRecord::GameId(id)) = record_slice.get(0) {
+                    id.id.as_str()
+                } else { "unknown" };
+                let filename = file_info.filename.as_str();
+                error!("Error initializing game {game_id} in file {filename}: {:?}", e);
                 continue;
             }
             let game_context = game_context_result?;
@@ -508,4 +513,5 @@ fn main() {
 
     let end = start.elapsed();
     info!("Elapsed: {:?}", end);
+    print_cache_info();
 }

@@ -2360,25 +2360,21 @@ impl TryFrom<&ParsedPlay> for PlayStats {
     }
 }
 
+fn cache_hit_rate(cache: &Cache<String, Arc<impl Hash + Eq>>, name: &str) -> String {
+    let (hits, misses) = (cache.hits(), cache.misses());
+    format!(
+        "{}: {} hits, {} misses, {:.2}% hit rate",
+        name,
+        hits,
+        misses,
+        hits as f64 / (hits + misses) as f64 * 100.0
+    )
+}
+
 pub fn print_cache_info() {
-    println!(
-        "RAW_PLAY_CACHE: {:?}",
-        (PARSED_PLAY_CACHE.hits(), PARSED_PLAY_CACHE.misses())
-    );
-    println!(
-        "MAIN_PLAY_CACHE: {:?}",
-        (MAIN_PLAY_CACHE.hits(), MAIN_PLAY_CACHE.misses())
-    );
-    println!(
-        "PLAY_MODIFIER_CACHE: {:?}",
-        (PLAY_MODIFIER_CACHE.hits(), PLAY_MODIFIER_CACHE.misses())
-    );
-    println!(
-        "RUNNER_ADVANCES_CACHE: {:?}",
-        (RUNNER_ADVANCES_CACHE.hits(), RUNNER_ADVANCES_CACHE.misses())
-    );
-    println!(
-        "PLAY_STATS_CACHE: {:?}",
-        (PLAY_STATS_CACHE.hits(), PLAY_STATS_CACHE.misses())
-    );
+    println!("{}", cache_hit_rate(&PARSED_PLAY_CACHE, "PARSED_PLAY_CACHE"));
+    println!("{}", cache_hit_rate(&MAIN_PLAY_CACHE, "MAIN_PLAY_CACHE"));
+    println!("{}", cache_hit_rate(&PLAY_MODIFIER_CACHE, "PLAY_MODIFIER_CACHE"));
+    println!("{}", cache_hit_rate(&RUNNER_ADVANCES_CACHE, "RUNNER_ADVANCES_CACHE"));
+    println!("{}", cache_hit_rate(&PLAY_STATS_CACHE, "PLAY_STATS_CACHE"));
 }
