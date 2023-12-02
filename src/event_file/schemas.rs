@@ -65,6 +65,7 @@ pub struct Games<'a> {
     date_inputted: Option<NaiveDateTime>,
     date_edited: Option<NaiveDateTime>,
     account_type: AccountType,
+    filename: &'a str,
     game_key: EventKey,
     away_team_id: Team,
     home_team_id: Team,
@@ -115,6 +116,7 @@ impl<'a> From<&'a GameContext> for Games<'a> {
             date_inputted: gc.metadata.date_inputted,
             date_edited: gc.metadata.date_edited,
             account_type: gc.file_info.account_type,
+            filename: gc.file_info.filename.as_str(),
             away_team_id: gc.teams.away,
             home_team_id: gc.teams.home,
             umpire_home_id: gc

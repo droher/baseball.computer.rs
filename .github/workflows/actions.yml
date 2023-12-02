@@ -67,10 +67,11 @@ jobs:
           aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
             retrosheet_simple s3://timeball/misc \
             --exclude '*' --include '*.parquet' --delete
-          {# TODO: Add back after databank is restored
-          aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
-            baseballdatabank s3://timeball/baseballdatabank \
-            --exclude '*' --include '*.parquet' --delete #}
+
+      # TODO: Add back after databank is restored
+      # aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
+      # baseballdatabank s3://timeball/baseballdatabank \
+      # --exclude '*' --include '*.parquet' --delete #}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET }}
