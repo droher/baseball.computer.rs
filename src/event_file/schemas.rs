@@ -204,6 +204,7 @@ pub struct Events {
     runs_on_play: usize,
     runs_batted_in: usize,
     team_unearned_runs: usize,
+    no_play_flag: bool
 }
 
 impl ContextToVec<'_> for Events {
@@ -259,6 +260,7 @@ impl ContextToVec<'_> for Events {
                     .iter()
                     .filter(|r| r.is_team_unearned_run())
                     .count(),
+                no_play_flag: e.results.no_play_flag,
             }
         }))
     }

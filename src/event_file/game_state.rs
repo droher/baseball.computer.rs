@@ -863,6 +863,7 @@ pub struct EventResults {
     pub ending_base_state: BaseState,
     pub play_info: Vec<EventFlag>,
     pub comment: Vec<String>,
+    pub no_play_flag: bool,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
@@ -1306,6 +1307,7 @@ impl GameState {
                     fielding_plays: play.stats.fielders_data.clone(),
                     out_on_play: play.stats.outs.clone(),
                     ending_base_state: state.bases.clone(),
+                    no_play_flag: play.stats.no_play_flag,
                 };
                 let line_number = line_offset + i;
                 events.push(Event {
@@ -1930,6 +1932,7 @@ pub fn dummy() -> GameContext {
                 }],
                 out_on_play: vec![BaseRunner::Batter],
                 ending_base_state: dummy_base_state.clone(),
+                no_play_flag: false,
             },
             line_number: 1,
             event_key: 2,

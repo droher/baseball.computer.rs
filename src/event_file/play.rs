@@ -2333,6 +2333,7 @@ pub struct PlayStats {
     pub contact_description: Option<ContactDescription>,
     pub hit_to_fielder: Option<FieldingPosition>,
     pub batter_caused_baserunning_outs: Vec<BaseRunner>,
+    pub no_play_flag: bool,
 }
 
 impl TryFrom<&ParsedPlay> for PlayStats {
@@ -2356,6 +2357,7 @@ impl TryFrom<&ParsedPlay> for PlayStats {
             contact_description: parsed_play.contact_description(),
             hit_to_fielder: parsed_play.hit_to_fielder(),
             batter_caused_baserunning_outs: parsed_play.batter_caused_baserunning_outs(),
+            no_play_flag: parsed_play.no_play(),
         })
     }
 }
