@@ -21,7 +21,7 @@ use crate::event_file::misc::{
 };
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::play::{
-    Base, BaseRunner, BaserunningPlayType, ContactType, Count, FieldersData, FieldingData, HitType,
+    Base, BaseRunner, BaserunningPlayType, Trajectory, Count, FieldersData, FieldingData, HitType,
     InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, PlayModifier, PlayRecord,
     PlayType, RunnerAdvance, UnearnedRunStatus,
 };
@@ -33,7 +33,7 @@ use crate::AccountType;
 
 use super::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use super::pitch_sequence::{PitchSequence, PitchSequenceItem, PitchType};
-use super::play::{HitAngle, HitDepth, HitLocationGeneral, HitStrength, RunnerAdvanceModifier};
+use super::play::{BattedBallAngle, BattedBallDepth, BattedBallLocationGeneral, BattedBallStrength, RunnerAdvanceModifier};
 use super::schemas::GameIdString;
 use super::traits::{EventKey, FieldingPlayType, GameType};
 
@@ -694,12 +694,12 @@ impl EventBaserunningPlay {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Default)]
 pub struct EventBattedBallInfo {
     pub event_key: EventKey,
-    pub contact: ContactType,
+    pub trajectory: Trajectory,
     pub hit_to_fielder: Option<FieldingPosition>,
-    pub general_location: HitLocationGeneral,
-    pub depth: HitDepth,
-    pub angle: HitAngle,
-    pub strength: HitStrength,
+    pub general_location: BattedBallLocationGeneral,
+    pub depth: BattedBallDepth,
+    pub angle: BattedBallAngle,
+    pub strength: BattedBallStrength,
 }
 
 impl EventBattedBallInfo {
@@ -734,7 +734,7 @@ impl EventBattedBallInfo {
                     };
                     Some(Self {
                         event_key,
-                        contact: contact_description.contact_type.unwrap_or_default(),
+                        trajectory: contact_description.trajectory.unwrap_or_default(),
                         hit_to_fielder,
                         general_location: location.general_location,
                         depth: location.depth,
@@ -874,6 +874,7 @@ pub struct Event {
     pub context: EventContext,
     pub results: EventResults,
     pub line_number: usize,
+    pub raw_play: Arc<String>
 }
 
 impl Event {
@@ -1317,6 +1318,7 @@ impl GameState {
                     results,
                     line_number,
                     event_key,
+                    raw_play: play.raw.clone()
                 });
                 state.event_id += 1;
                 state.comment_buffer = vec![]; // Clear comment buffer
@@ -1936,6 +1938,7 @@ pub fn dummy() -> GameContext {
             },
             line_number: 1,
             event_key: 2,
+            raw_play: Arc::new(String::from("dummy")),
         }],
         line_offset: 1,
         event_key_offset: 3,

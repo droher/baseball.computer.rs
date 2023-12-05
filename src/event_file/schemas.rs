@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{bail, Context, Result};
 use arrayvec::ArrayString;
 use bounded_integer::BoundedU8;
@@ -24,7 +26,7 @@ use super::info::UmpirePosition;
 use super::misc::Hand;
 use super::parser::{AccountType, MappedRecord, RecordSlice};
 use super::play::{
-    BaserunningPlayType, ContactType, HitAngle, HitDepth, HitLocationGeneral, HitStrength,
+    BaserunningPlayType, Trajectory, BattedBallAngle, BattedBallDepth, BattedBallLocationGeneral, BattedBallStrength,
 };
 
 pub trait ContextToVec<'a>: Serialize + Sized {
@@ -194,12 +196,12 @@ pub struct Events {
     strikeout_responsible_batter_id: Option<Player>,
     walk_responsible_pitcher_id: Option<Player>,
     plate_appearance_result: Option<PlateAppearanceResultType>,
-    batted_contact_type: Option<ContactType>,
+    batted_trajectory: Option<Trajectory>,
     batted_to_fielder: Option<FieldingPosition>,
-    batted_location_general: Option<HitLocationGeneral>,
-    batted_location_depth: Option<HitDepth>,
-    batted_location_angle: Option<HitAngle>,
-    batted_contact_strength: Option<HitStrength>,
+    batted_location_general: Option<BattedBallLocationGeneral>,
+    batted_location_depth: Option<BattedBallDepth>,
+    batted_location_angle: Option<BattedBallAngle>,
+    batted_contact_strength: Option<BattedBallStrength>,
     outs_on_play: usize,
     runs_on_play: usize,
     runs_batted_in: usize,
@@ -241,11 +243,11 @@ impl ContextToVec<'_> for Events {
                     .strikeout_responsible_batter,
                 walk_responsible_pitcher_id: e.context.rare_attributes.walk_responsible_pitcher,
                 plate_appearance_result: e.results.plate_appearance,
-                batted_contact_type: e
+                batted_trajectory: e
                     .results
                     .batted_ball_info
                     .as_ref()
-                    .map(|i: &super::game_state::EventBattedBallInfo| i.contact),
+                    .map(|i: &super::game_state::EventBattedBallInfo| i.trajectory),
                 batted_to_fielder: batted_ball_info.and_then(|i| i.hit_to_fielder),
                 batted_location_general: batted_ball_info.map(|i| i.general_location),
                 batted_location_depth: batted_ball_info.map(|i| i.depth),
@@ -273,6 +275,7 @@ pub struct EventAudit {
     event_key: EventKey,
     filename: ArrayString<20>,
     line_number: usize,
+    raw_play: Arc<String>,
 }
 
 impl ContextToVec<'_> for EventAudit {
@@ -283,6 +286,7 @@ impl ContextToVec<'_> for EventAudit {
             event_key: e.event_key,
             filename: gc.file_info.filename,
             line_number: e.line_number,
+            raw_play: e.raw_play.clone()
         }))
     }
 }

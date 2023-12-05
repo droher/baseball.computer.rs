@@ -50,6 +50,8 @@ pub static HIT_LOCATION_ANGLE_REGEX: &Lazy<Regex> = regex!(r"[FMLR]");
 pub static HIT_LOCATION_DEPTH_REGEX: &Lazy<Regex> = regex!(r"(D|S|XD)");
 
 lazy_static! {
+    static ref RAW_PLAY_CACHE: Arc<Cache<String, Arc<String>>> =
+        preallocated_cache::<String, String>(10000);
     static ref PARSED_PLAY_CACHE: Arc<Cache<String, Arc<ParsedPlay>>> =
         preallocated_cache::<String, ParsedPlay>(10000);
     static ref MAIN_PLAY_CACHE: Arc<Cache<String, Arc<Vec<PlayType>>>> =
@@ -1366,7 +1368,7 @@ impl RunnerAdvanceModifier {
     Deserialize,
     AsRefStr,
 )]
-pub enum HitStrength {
+pub enum BattedBallStrength {
     #[strum(serialize = "+")]
     Hard,
     #[strum(serialize = "-")]
@@ -1375,7 +1377,7 @@ pub enum HitStrength {
     Unknown,
 }
 
-impl Default for HitStrength {
+impl Default for BattedBallStrength {
     fn default() -> Self {
         Self::Default
     }
@@ -1395,7 +1397,7 @@ impl Default for HitStrength {
     Deserialize,
     AsRefStr,
 )]
-pub enum HitDepth {
+pub enum BattedBallDepth {
     #[strum(serialize = "S")]
     Shallow,
     #[strum(serialize = "D")]
@@ -1406,7 +1408,7 @@ pub enum HitDepth {
     Unknown,
 }
 
-impl Default for HitDepth {
+impl Default for BattedBallDepth {
     fn default() -> Self {
         Self::Default
     }
@@ -1426,7 +1428,7 @@ impl Default for HitDepth {
     Deserialize,
     AsRefStr,
 )]
-pub enum HitAngle {
+pub enum BattedBallAngle {
     #[strum(serialize = "F")]
     Foul,
     #[strum(serialize = "M")]
@@ -1441,7 +1443,7 @@ pub enum HitAngle {
     Unknown,
 }
 
-impl Default for HitAngle {
+impl Default for BattedBallAngle {
     fn default() -> Self {
         Self::Default
     }
@@ -1461,7 +1463,7 @@ impl Default for HitAngle {
     Deserialize,
     AsRefStr,
 )]
-pub enum HitLocationGeneral {
+pub enum BattedBallLocationGeneral {
     #[strum(serialize = "1")]
     Pitcher,
     #[strum(serialize = "13")]
@@ -1501,54 +1503,54 @@ pub enum HitLocationGeneral {
     Unknown,
 }
 
-impl Default for HitLocationGeneral {
+impl Default for BattedBallLocationGeneral {
     fn default() -> Self {
         Self::Unknown
     }
 }
 
-impl HitLocationGeneral {
+impl BattedBallLocationGeneral {
     const fn is_middle_position(self) -> bool {
         matches!(self, Self::Catcher | Self::Center)
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize)]
-pub struct HitLocation {
-    pub general_location: HitLocationGeneral,
-    pub depth: HitDepth,
-    pub angle: HitAngle,
-    pub strength: HitStrength,
+pub struct BattedBallLocation {
+    pub general_location: BattedBallLocationGeneral,
+    pub depth: BattedBallDepth,
+    pub angle: BattedBallAngle,
+    pub strength: BattedBallStrength,
 }
 
-impl Default for HitLocation {
+impl Default for BattedBallLocation {
     fn default() -> Self {
         Self {
-            general_location: HitLocationGeneral::Unknown,
-            depth: HitDepth::Unknown,
-            angle: HitAngle::Unknown,
-            strength: HitStrength::Unknown,
+            general_location: BattedBallLocationGeneral::Unknown,
+            depth: BattedBallDepth::Unknown,
+            angle: BattedBallAngle::Unknown,
+            strength: BattedBallStrength::Unknown,
         }
     }
 }
 
-impl TryFrom<&str> for HitLocation {
+impl TryFrom<&str> for BattedBallLocation {
     type Error = Error;
 
     fn try_from(value: &str) -> Result<Self> {
         let as_str = { |re: &Regex| re.find(value).map_or("", |m| m.as_str()) };
         // If there's no general location found, that's unexpected behavior and
         // we should short-circuit, but other missing info is expected
-        let general_location = HitLocationGeneral::from_str(as_str(HIT_LOCATION_GENERAL_REGEX))?;
+        let general_location = BattedBallLocationGeneral::from_str(as_str(HIT_LOCATION_GENERAL_REGEX))?;
         // "L" is usually used for foul line, but for CF and C it means towards the left
         let angle = if general_location.is_middle_position() && value.contains('L') {
-            HitAngle::Left
+            BattedBallAngle::Left
         } else {
-            HitAngle::from_str(as_str(HIT_LOCATION_ANGLE_REGEX)).unwrap_or_default()
+            BattedBallAngle::from_str(as_str(HIT_LOCATION_ANGLE_REGEX)).unwrap_or_default()
         };
-        let depth = HitDepth::from_str(as_str(HIT_LOCATION_DEPTH_REGEX)).unwrap_or_default();
+        let depth = BattedBallDepth::from_str(as_str(HIT_LOCATION_DEPTH_REGEX)).unwrap_or_default();
         let strength =
-            HitStrength::from_str(as_str(HIT_LOCATION_STRENGTH_REGEX)).unwrap_or_default();
+            BattedBallStrength::from_str(as_str(HIT_LOCATION_STRENGTH_REGEX)).unwrap_or_default();
         Ok(Self {
             general_location,
             depth,
@@ -1562,8 +1564,8 @@ impl TryFrom<&str> for HitLocation {
     Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize, Default,
 )]
 pub struct ContactDescription {
-    pub contact_type: Option<ContactType>,
-    pub location: Option<HitLocation>,
+    pub trajectory: Option<Trajectory>,
+    pub location: Option<BattedBallLocation>,
 }
 
 impl TryFrom<(&str, &str)> for ContactDescription {
@@ -1571,13 +1573,13 @@ impl TryFrom<(&str, &str)> for ContactDescription {
 
     fn try_from(tup: (&str, &str)) -> Result<Self> {
         let (contact, loc) = tup;
-        let contact_type = ContactType::from_str(contact).ok();
-        let location = HitLocation::try_from(loc).ok();
-        if contact_type.is_none() && location.is_none() {
-            bail!("Contact description should have at least one of contact type or location, but neither were found")
+        let trajectory = Trajectory::from_str(contact).ok();
+        let location = BattedBallLocation::try_from(loc).ok();
+        if trajectory.is_none() && location.is_none() {
+            bail!("Contact description should have at least one of trajectory or location, but neither were found")
         }
         Ok(Self {
-            contact_type,
+            trajectory,
             location,
         })
     }
@@ -1597,7 +1599,7 @@ impl TryFrom<(&str, &str)> for ContactDescription {
     Deserialize,
     AsRefStr,
 )]
-pub enum ContactType {
+pub enum Trajectory {
     #[strum(serialize = "B")]
     UnspecifiedBunt,
     #[strum(serialize = "BP")]
@@ -1620,7 +1622,7 @@ pub enum ContactType {
     NoContact,
 }
 
-impl Default for ContactType {
+impl Default for Trajectory {
     fn default() -> Self {
         Self::Unknown
     }
@@ -1748,19 +1750,19 @@ impl PlayModifier {
         ]
     }
 
-    // Certain modifiers are related to a specific contact type
-    // which means that an explicit contact type may be omitted from the play.
-    const fn implicit_contact_type(&self) -> Option<ContactType> {
+    // Certain modifiers are related to a specific trajectory
+    // which means that an explicit trajectory may be omitted from the play.
+    const fn implicit_trajectory(&self) -> Option<Trajectory> {
         match self {
-            Self::BuntGroundIntoDoublePlay => Some(ContactType::GroundBallBunt),
-            Self::BuntPoppedIntoDoublePlay => Some(ContactType::PopUpBunt),
-            Self::FlyBallDoublePlay => Some(ContactType::Fly),
-            Self::GroundBallDoublePlay => Some(ContactType::GroundBall),
-            Self::GroundBallTriplePlay => Some(ContactType::GroundBall),
-            Self::LinedIntoDoublePlay => Some(ContactType::LineDrive),
-            Self::LinedIntoTriplePlay => Some(ContactType::LineDrive),
+            Self::BuntGroundIntoDoublePlay => Some(Trajectory::GroundBallBunt),
+            Self::BuntPoppedIntoDoublePlay => Some(Trajectory::PopUpBunt),
+            Self::FlyBallDoublePlay => Some(Trajectory::Fly),
+            Self::GroundBallDoublePlay => Some(Trajectory::GroundBall),
+            Self::GroundBallTriplePlay => Some(Trajectory::GroundBall),
+            Self::LinedIntoDoublePlay => Some(Trajectory::LineDrive),
+            Self::LinedIntoTriplePlay => Some(Trajectory::LineDrive),
             // At the moment, not including sac flies, as the "fly" doesn't really
-            // refer to the contact type (could also be a line drive)
+            // refer to the trajectory (could also be a line drive)
             _ => None,
         }
     }
@@ -1862,10 +1864,19 @@ pub struct PlayRecord {
     pub pitch_sequence: Arc<PitchSequence>,
     pub parsed: Arc<ParsedPlay>,
     pub stats: Arc<PlayStats>,
+    pub raw: Arc<String>,
 }
 
 impl PlayRecord {
-    fn store_parsed_play(raw_play: &str) -> Result<(Arc<ParsedPlay>, Arc<PlayStats>)> {
+    fn store_parsed_play(raw_play: &str) -> Result<(Arc<String>, Arc<ParsedPlay>, Arc<PlayStats>)> {
+        let arced_raw_play = RAW_PLAY_CACHE.get(raw_play).map_or_else(
+            || {
+                let raw = Arc::new(raw_play.to_string());
+                RAW_PLAY_CACHE.insert(raw_play.to_string(), raw.clone());
+                Ok::<Arc<String>, Error>(raw)
+            },
+            Ok,
+        )?;
         let parsed_play = PARSED_PLAY_CACHE.get(raw_play).map_or_else(
             || {
                 let parsed = Arc::new(ParsedPlay::try_from(raw_play)?);
@@ -1882,7 +1893,7 @@ impl PlayRecord {
             },
             Ok,
         )?;
-        Ok((parsed_play, stats))
+        Ok((arced_raw_play, parsed_play, stats))
     }
 
     fn get_pitch_sequence(sequence: &str) -> Result<Arc<PitchSequence>> {
@@ -1902,7 +1913,7 @@ impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let record = record.deserialize::<[&str; 7]>(None)?;
-        let (parsed, stats) = Self::store_parsed_play(record[6])?;
+        let (raw, parsed, stats) = Self::store_parsed_play(record[6])?;
 
         Ok(Self {
             inning: record[1].parse::<Inning>()?,
@@ -1917,6 +1928,7 @@ impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
             },
             parsed,
             stats,
+            raw
         })
     }
 }
@@ -2157,18 +2169,18 @@ impl ParsedPlay {
         })
     }
 
-    fn implicit_contact_type(&self) -> Option<ContactType> {
+    fn implicit_trajectory(&self) -> Option<Trajectory> {
         self.modifiers
             .iter()
-            .find_map(PlayModifier::implicit_contact_type)
+            .find_map(PlayModifier::implicit_trajectory)
     }
 
     pub fn contact_description(&self) -> Option<ContactDescription> {
-        // Contact type and location be located in either the same modifier
+        // Trajectory and location be located in either the same modifier
         // or separate modifiers. If separate, they need to be combined.
-        let explicit_contact_type = self.modifiers.iter().find_map(|pm| {
+        let explicit_trajectory = self.modifiers.iter().find_map(|pm| {
             if let PlayModifier::ContactDescription(cd) = pm {
-                cd.contact_type
+                cd.trajectory
             } else {
                 None
             }
@@ -2180,10 +2192,10 @@ impl ParsedPlay {
                 None
             }
         });
-        let contact_type = explicit_contact_type.or(self.implicit_contact_type());
-        if contact_type.is_some() || location.is_some() {
+        let trajectory = explicit_trajectory.or(self.implicit_trajectory());
+        if trajectory.is_some() || location.is_some() {
             Some(ContactDescription {
-                contact_type,
+                trajectory,
                 location,
             })
         } else {
@@ -2374,6 +2386,7 @@ fn cache_hit_rate(cache: &Cache<String, Arc<impl Hash + Eq>>, name: &str) -> Str
 }
 
 pub fn print_cache_info() {
+    println!("{}", cache_hit_rate(&RAW_PLAY_CACHE, "RAW_PLAY_CACHE"));
     println!("{}", cache_hit_rate(&PARSED_PLAY_CACHE, "PARSED_PLAY_CACHE"));
     println!("{}", cache_hit_rate(&MAIN_PLAY_CACHE, "MAIN_PLAY_CACHE"));
     println!("{}", cache_hit_rate(&PLAY_MODIFIER_CACHE, "PLAY_MODIFIER_CACHE"));
