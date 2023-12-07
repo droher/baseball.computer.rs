@@ -1617,7 +1617,7 @@ pub enum Trajectory {
     #[strum(serialize = "L")]
     LineDrive,
     #[strum(serialize = "P")]
-    PopFly,
+    PopUp,
     Unknown,
     NoContact,
 }
