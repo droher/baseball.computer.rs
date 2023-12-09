@@ -118,8 +118,15 @@ jobs:
     needs: [pbp, simple_files]
     runs-on: ubuntu-22.04
     steps:
+      # baseball.computer
       - run: |
           curl -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE }}/purge_cache" \
+            -H "Authorization: Bearer ${{ secrets.PURGE_CACHE_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything": true}'
+      # timeball
+      - run: |
+          curl -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_TIMEBALL }}/purge_cache" \
             -H "Authorization: Bearer ${{ secrets.PURGE_CACHE_TOKEN }}" \
             -H "Content-Type: application/json" \
             --data '{"purge_everything": true}'
