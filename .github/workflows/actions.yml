@@ -18,7 +18,7 @@ jobs:
           key: cargo-${{ hashFiles('**/Cargo.lock') }}
       - uses: actions/cache@v3
         with:
-          path: target/release/baseball.computer.rs
+          path: target/release/baseball-computer
           key: build-${{ github.run_id }}
 
       - run: cargo build --release
@@ -91,10 +91,10 @@ jobs:
 
       - uses: actions/cache@v3
         with:
-          path: target/release/baseball.computer.rs
+          path: target/release/baseball-computer
           key: build-${{ github.run_id }}
       - run: mkdir csv parquet arrow
-      - run: ./target/release/baseball.computer.rs -i retrosheet -o csv
+      - run: ./target/release/baseball-computer -i retrosheet -o csv
 
       - uses: actions/cache@v3
         with:
