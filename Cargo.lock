@@ -142,7 +142,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "boxball-rs"
+name = "baseball-computer"
 version = "0.0.1"
 dependencies = [
  "anyhow",
