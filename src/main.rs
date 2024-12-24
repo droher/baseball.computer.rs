@@ -264,9 +264,14 @@ impl EventFileSchema {
             if let Err(e) = game_context_result {
                 let game_id = if let Some(MappedRecord::GameId(id)) = record_slice.get(0) {
                     id.id.as_str()
-                } else { "unknown" };
+                } else {
+                    "unknown"
+                };
                 let filename = file_info.filename.as_str();
-                error!("Error initializing game {game_id} in file {filename}: {:?}", e);
+                error!(
+                    "Error initializing game {game_id} in file {filename}: {:?}",
+                    e
+                );
                 continue;
             }
             let game_context = game_context_result?;

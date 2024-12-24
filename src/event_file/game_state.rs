@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, bail, Context, Error, Result};
 use arrayvec::{ArrayString, ArrayVec};
 use bounded_integer::{BoundedU8, BoundedUsize};
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
 use fixed_map::{Key, Map};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -21,9 +21,9 @@ use crate::event_file::misc::{
 };
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::play::{
-    Base, BaseRunner, BaserunningPlayType, Trajectory, Count, FieldersData, FieldingData, HitType,
-    InningFrame, OtherPlateAppearance, OutAtBatType, PlateAppearanceType, PlayModifier, PlayRecord,
-    PlayType, RunnerAdvance, UnearnedRunStatus,
+    Base, BaseRunner, BaserunningPlayType, Count, FieldersData, FieldingData, HitType, InningFrame,
+    OtherPlateAppearance, OutAtBatType, PlateAppearanceType, PlayModifier, PlayRecord, PlayType,
+    RunnerAdvance, Trajectory, UnearnedRunStatus,
 };
 use crate::event_file::traits::{
     FieldingPosition, Inning, LineupPosition, Matchup, Pitcher, Player, RetrosheetVolunteer,
@@ -33,7 +33,10 @@ use crate::AccountType;
 
 use super::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use super::pitch_sequence::{PitchSequence, PitchSequenceItem, PitchType};
-use super::play::{BattedBallAngle, BattedBallDepth, BattedBallLocationGeneral, BattedBallStrength, RunnerAdvanceModifier};
+use super::play::{
+    BattedBallAngle, BattedBallDepth, BattedBallLocationGeneral, BattedBallStrength,
+    RunnerAdvanceModifier,
+};
 use super::schemas::GameIdString;
 use super::traits::{EventKey, FieldingPlayType, GameType};
 
@@ -874,7 +877,7 @@ pub struct Event {
     pub context: EventContext,
     pub results: EventResults,
     pub line_number: usize,
-    pub raw_play: Arc<String>
+    pub raw_play: Arc<String>,
 }
 
 impl Event {
@@ -1318,7 +1321,7 @@ impl GameState {
                     results,
                     line_number,
                     event_key,
-                    raw_play: play.raw.clone()
+                    raw_play: play.raw.clone(),
                 });
                 state.event_id += 1;
                 state.comment_buffer = vec![]; // Clear comment buffer
@@ -1774,7 +1777,7 @@ pub fn dummy() -> GameContext {
     let team = ArrayString::from("ABC").unwrap();
     let dummy_str8 = ArrayString::from("dummy").unwrap();
     let dummy_str16 = ArrayString::from("dummy").unwrap();
-    let dummy_datetime = NaiveDateTime::from_timestamp_opt(0, 0).unwrap();
+    let dummy_datetime = DateTime::from_timestamp(0, 0).unwrap().naive_utc();
     let dummy_base_state = BaseState {
         bases: vec![(
             BaseRunner::First,

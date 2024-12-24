@@ -26,7 +26,8 @@ use super::info::UmpirePosition;
 use super::misc::Hand;
 use super::parser::{AccountType, MappedRecord, RecordSlice};
 use super::play::{
-    BaserunningPlayType, Trajectory, BattedBallAngle, BattedBallDepth, BattedBallLocationGeneral, BattedBallStrength,
+    BaserunningPlayType, BattedBallAngle, BattedBallDepth, BattedBallLocationGeneral,
+    BattedBallStrength, Trajectory,
 };
 
 pub trait ContextToVec<'a>: Serialize + Sized {
@@ -206,7 +207,7 @@ pub struct Events {
     runs_on_play: usize,
     runs_batted_in: usize,
     team_unearned_runs: usize,
-    no_play_flag: bool
+    no_play_flag: bool,
 }
 
 impl ContextToVec<'_> for Events {
@@ -286,7 +287,7 @@ impl ContextToVec<'_> for EventAudit {
             event_key: e.event_key,
             filename: gc.file_info.filename,
             line_number: e.line_number,
-            raw_play: e.raw_play.clone()
+            raw_play: e.raw_play.clone(),
         }))
     }
 }

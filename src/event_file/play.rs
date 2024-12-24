@@ -1541,7 +1541,8 @@ impl TryFrom<&str> for BattedBallLocation {
         let as_str = { |re: &Regex| re.find(value).map_or("", |m| m.as_str()) };
         // If there's no general location found, that's unexpected behavior and
         // we should short-circuit, but other missing info is expected
-        let general_location = BattedBallLocationGeneral::from_str(as_str(HIT_LOCATION_GENERAL_REGEX))?;
+        let general_location =
+            BattedBallLocationGeneral::from_str(as_str(HIT_LOCATION_GENERAL_REGEX))?;
         // "L" is usually used for foul line, but for CF and C it means towards the left
         let angle = if general_location.is_middle_position() && value.contains('L') {
             BattedBallAngle::Left
@@ -1928,7 +1929,7 @@ impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
             },
             parsed,
             stats,
-            raw
+            raw,
         })
     }
 }
@@ -2387,9 +2388,18 @@ fn cache_hit_rate(cache: &Cache<String, Arc<impl Hash + Eq>>, name: &str) -> Str
 
 pub fn print_cache_info() {
     println!("{}", cache_hit_rate(&RAW_PLAY_CACHE, "RAW_PLAY_CACHE"));
-    println!("{}", cache_hit_rate(&PARSED_PLAY_CACHE, "PARSED_PLAY_CACHE"));
+    println!(
+        "{}",
+        cache_hit_rate(&PARSED_PLAY_CACHE, "PARSED_PLAY_CACHE")
+    );
     println!("{}", cache_hit_rate(&MAIN_PLAY_CACHE, "MAIN_PLAY_CACHE"));
-    println!("{}", cache_hit_rate(&PLAY_MODIFIER_CACHE, "PLAY_MODIFIER_CACHE"));
-    println!("{}", cache_hit_rate(&RUNNER_ADVANCES_CACHE, "RUNNER_ADVANCES_CACHE"));
+    println!(
+        "{}",
+        cache_hit_rate(&PLAY_MODIFIER_CACHE, "PLAY_MODIFIER_CACHE")
+    );
+    println!(
+        "{}",
+        cache_hit_rate(&RUNNER_ADVANCES_CACHE, "RUNNER_ADVANCES_CACHE")
+    );
     println!("{}", cache_hit_rate(&PLAY_STATS_CACHE, "PLAY_STATS_CACHE"));
 }
