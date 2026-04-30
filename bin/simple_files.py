@@ -1,3 +1,4 @@
+import csv as stdcsv
 import fileinput
 from pathlib import Path
 from typing import Dict, Type, Iterator, List, Tuple
@@ -10,6 +11,28 @@ from pyarrow import parquet as pq
 from sqlalchemy import Integer, SmallInteger, Float, String, CHAR, Text, Boolean, Date, DateTime
 from sqlalchemy import Table as AlchemyTable
 from sqlalchemy.sql.type_api import TypeEngine
+
+# Retrosheet added a `park_id` column to schedule files starting in 2024
+# (e.g. SEO01 for the 2024 Seoul series). The published `boxball-schemas`
+# 0.0.8 still describes the legacy 12-column shape. Override here so the
+# output Parquet matches the modern shape; pad legacy rows with an empty
+# park_id so all rows have 13 columns.
+SCHEDULE_COLUMNS_13 = [
+    ("date", "timestamp[ms]"),
+    ("double_header", "int16"),
+    ("day_of_week", "str"),
+    ("visiting_team", "str"),
+    ("visiting_team_league", "str"),
+    ("visiting_team_game_number", "int16"),
+    ("home_team", "str"),
+    ("home_team_league", "str"),
+    ("home_team_game_number", "int32"),
+    ("day_night", "str"),
+    ("park_id", "str"),
+    ("postponement_indicator", "str"),
+    ("makeup_dates", "str"),
+]
+SCHEDULE_PARK_INSERT_AT = 10  # index of park_id, between day_night and postponement_indicator
 
 RETROSHEET_PATH = Path("retrosheet")
 OUTPUT_PATH = Path("retrosheet_simple")
@@ -91,6 +114,27 @@ def parse_simple_files() -> None:
     concat_files(retrosheet_base, output_base / "bio.csv", glob="biofile.csv", strip_header=True)
     concat_files(subdirs["rosters"], output_base / "roster.csv", glob="*.ROS", prepend_filename=True)
 
+    # Pad legacy 12-col schedule rows so the file is uniformly 13 cols.
+    pad_schedule_csv(output_base / "schedule.csv")
+
+
+def pad_schedule_csv(path: Path) -> None:
+    """Insert an empty park_id column for any legacy 12-col schedule row."""
+    tmp = path.with_suffix(".csv.tmp")
+    padded = 0
+    with path.open(newline="") as fin, tmp.open("w", newline="") as fout:
+        reader = stdcsv.reader(fin)
+        writer = stdcsv.writer(fout, quoting=stdcsv.QUOTE_MINIMAL)
+        for row in reader:
+            if len(row) == 12:
+                row.insert(SCHEDULE_PARK_INSERT_AT, "")
+                padded += 1
+            elif len(row) != 13:
+                raise ValueError(f"Unexpected schedule row width {len(row)}: {row!r}")
+            writer.writerow(row)
+    tmp.replace(path)
+    print(f"Padded {padded} legacy schedule rows to 13 columns")
+
 
 sql_type_lookup: Dict[Type[TypeEngine], str] = {
     Integer: 'int32',
@@ -111,6 +155,12 @@ def get_fields(table: AlchemyTable) -> List[Tuple[str, str]]:
     return [(name, sql_type_lookup[type(dtype)]) for name, dtype in cols]
 
 
+def fields_for(name: str, table: AlchemyTable) -> List[Tuple[str, str]]:
+    if name == "schedule":
+        return list(SCHEDULE_COLUMNS_13)
+    return get_fields(table)
+
+
 def write_files() -> None:
     """
     Creates a Parquet file for each table in the schema.
@@ -124,8 +174,9 @@ def write_files() -> None:
         extract_file = OUTPUT_PATH / f"{name}.csv"
         parquet_file = OUTPUT_PATH / f"{name}.parquet"
 
-        arrow_schema = pa.schema(get_fields(table))
-        column_names = [name for name, dtype in get_fields(table)]
+        fields = fields_for(name, table)
+        arrow_schema = pa.schema(fields)
+        column_names = [col_name for col_name, _ in fields]
 
         read_options = pcsv.ReadOptions(column_names=column_names, block_size=1000000000)
         parse_options = pcsv.ParseOptions(newlines_in_values=True)
