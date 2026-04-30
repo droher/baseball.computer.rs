@@ -2403,3 +2403,316 @@ pub fn print_cache_info() {
     );
     println!("{}", cache_hit_rate(&PLAY_STATS_CACHE, "PLAY_STATS_CACHE"));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(raw: &str) -> ParsedPlay {
+        ParsedPlay::try_from(raw).unwrap_or_else(|e| panic!("parse failed for {raw}: {e:?}"))
+    }
+
+    fn stats(raw: &str) -> PlayStats {
+        let pp = parse(raw);
+        PlayStats::try_from(&pp).unwrap_or_else(|e| panic!("stats failed for {raw}: {e:?}"))
+    }
+
+    fn pa_type(pp: &ParsedPlay) -> Option<PlateAppearanceType> {
+        pp.main_plays.iter().find_map(|p| match p {
+            PlayType::PlateAppearance(pa) => Some(pa.clone()),
+            _ => None,
+        })
+    }
+
+    // -- Count --
+
+    #[test]
+    fn count_parses_balls_strikes() {
+        let c = Count::new("32");
+        assert_eq!(c.balls.map(u8::from), Some(3));
+        assert_eq!(c.strikes.map(u8::from), Some(2));
+        assert!(c.has_any_pitches());
+    }
+
+    #[test]
+    fn count_empty_string_has_no_pitches() {
+        let c = Count::new("");
+        assert_eq!(c.balls, None);
+        assert_eq!(c.strikes, None);
+        assert!(!c.has_any_pitches());
+    }
+
+    #[test]
+    fn count_question_marks_yield_none() {
+        // Retrosheet uses `??` when the count is unknown — must not be parsed
+        // as digits and must report no pitches thrown.
+        let c = Count::new("??");
+        assert_eq!(c.balls, None);
+        assert_eq!(c.strikes, None);
+        assert!(!c.has_any_pitches());
+    }
+
+    #[test]
+    fn count_old_pitcher_responsible_walk_logic() {
+        assert!(Count::new("30").is_old_pitcher_responsible_walk());
+        assert!(Count::new("21").is_old_pitcher_responsible_walk());
+        assert!(Count::new("20").is_old_pitcher_responsible_walk());
+        assert!(!Count::new("22").is_old_pitcher_responsible_walk());
+        assert!(!Count::new("00").is_old_pitcher_responsible_walk());
+    }
+
+    #[test]
+    fn count_old_batter_responsible_strikeout_requires_two_strikes() {
+        assert!(Count::new("02").is_old_batter_responsible_strikeout());
+        assert!(Count::new("32").is_old_batter_responsible_strikeout());
+        assert!(!Count::new("01").is_old_batter_responsible_strikeout());
+        assert!(!Count::new("").is_old_batter_responsible_strikeout());
+    }
+
+    // -- BaseRunner --
+
+    #[test]
+    fn baserunner_target_and_current_base_round_trip() {
+        for base in [Base::First, Base::Second, Base::Third] {
+            let br = BaseRunner::from_current_base(base);
+            assert_eq!(br.to_current_base(), Some(base));
+        }
+        assert_eq!(
+            BaseRunner::from_current_base(Base::Home),
+            BaseRunner::Batter
+        );
+    }
+
+    #[test]
+    fn baserunner_to_next_base_advances_one() {
+        assert_eq!(BaseRunner::Batter.to_next_base(), Base::First);
+        assert_eq!(BaseRunner::First.to_next_base(), Base::Second);
+        assert_eq!(BaseRunner::Second.to_next_base(), Base::Third);
+        assert_eq!(BaseRunner::Third.to_next_base(), Base::Home);
+    }
+
+    #[test]
+    fn baserunner_from_target_base_inverts_to_next_base() {
+        for br in [
+            BaseRunner::Batter,
+            BaseRunner::First,
+            BaseRunner::Second,
+            BaseRunner::Third,
+        ] {
+            assert_eq!(BaseRunner::from_target_base(br.to_next_base()), br);
+        }
+    }
+
+    #[test]
+    fn inning_frame_flip_is_involution() {
+        assert_eq!(InningFrame::Top.flip(), InningFrame::Bottom);
+        assert_eq!(InningFrame::Top.flip().flip(), InningFrame::Top);
+    }
+
+    // -- ParsedPlay (canonical Retrosheet examples) --
+
+    #[test]
+    fn empty_play_has_no_main_plays() {
+        let pp = parse("");
+        assert!(pp.main_plays.is_empty());
+        assert!(pp.no_play());
+    }
+
+    #[test]
+    fn no_play_marker_parses_as_no_play() {
+        let pp = parse("NP");
+        assert!(pp.no_play());
+    }
+
+    #[test]
+    fn single_to_left_field_is_a_single() {
+        let pp = parse("S7");
+        let pa = pa_type(&pp).expect("plate appearance present");
+        match pa {
+            PlateAppearanceType::Hit(h) => assert_eq!(h.hit_type, HitType::Single),
+            other => panic!("expected single, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn home_run_is_home_run() {
+        let pp = parse("HR/F9");
+        let pa = pa_type(&pp).expect("plate appearance present");
+        match pa {
+            PlateAppearanceType::Hit(h) => assert_eq!(h.hit_type, HitType::HomeRun),
+            other => panic!("expected HR, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn strikeout_marks_as_at_bat_and_not_rbi_eligible() {
+        let pp = parse("K");
+        let pa = pa_type(&pp).expect("plate appearance present");
+        assert!(pa.is_strikeout());
+        assert!(pa.is_at_bat());
+        for p in pp.main_plays.iter() {
+            assert!(!p.is_rbi_eligible());
+        }
+    }
+
+    #[test]
+    fn walk_is_not_at_bat() {
+        let pp = parse("W");
+        let pa = pa_type(&pp).expect("plate appearance present");
+        assert!(!pa.is_at_bat());
+    }
+
+    #[test]
+    fn hit_by_pitch_flag_set() {
+        let pp = parse("HP");
+        assert!(pp.main_plays.iter().any(PlayType::hit_by_pitch));
+    }
+
+    #[test]
+    fn ground_out_six_four_three_records_putout_and_assists() {
+        // 6-4-3: shortstop to second baseman to first baseman, putout at first.
+        let s = stats("64(1)3/GDP");
+        // Last fielder in the chain is the putout man.
+        assert!(s.putouts.contains(&FieldingPosition::FirstBaseman));
+        // Earlier fielders log assists.
+        assert!(s.assists.contains(&FieldingPosition::Shortstop));
+        assert!(s.assists.contains(&FieldingPosition::SecondBaseman));
+    }
+
+    #[test]
+    fn fly_out_to_center_records_single_putout() {
+        let s = stats("8/F");
+        assert_eq!(s.putouts, vec![FieldingPosition::CenterFielder]);
+        assert!(s.assists.is_empty());
+    }
+
+    #[test]
+    fn reached_on_error_flagged() {
+        let pp = parse("E6");
+        assert!(pp.main_plays.iter().any(PlayType::reached_on_error));
+    }
+
+    #[test]
+    fn home_run_flag_set() {
+        let pp = parse("HR/F89");
+        assert!(pp.main_plays.iter().any(PlayType::home_run));
+    }
+
+    #[test]
+    fn stolen_base_recognized_as_baserunning_play() {
+        let pp = parse("SB2");
+        assert_eq!(pp.stolen_base_plays().len(), 1);
+    }
+
+    #[test]
+    fn double_with_runners_records_advances_to_home() {
+        // Double, runner on second scores, runner on first scores.
+        let s = stats("D7/L7D.2-H;1-H");
+        let runs: Vec<_> = s.runs.iter().copied().collect();
+        assert!(runs.contains(&BaseRunner::Second));
+        assert!(runs.contains(&BaseRunner::First));
+    }
+
+    #[test]
+    fn unknown_fielder_normalizes_to_fielder_zero() {
+        // The UNKNOWN_FIELDER_REGEX (`999*|\?`) replaces unknown-fielder markers
+        // with "0" (FieldingPosition::Unknown). Must parse without panicking.
+        let _ = parse("99");
+        let _ = parse("?");
+        let _ = parse("999");
+    }
+
+    #[test]
+    fn passed_ball_recognized() {
+        let pp = parse("PB");
+        assert!(pp.main_plays.iter().any(PlayType::passed_ball));
+    }
+
+    #[test]
+    fn wild_pitch_recognized() {
+        let pp = parse("WP");
+        assert!(pp.main_plays.iter().any(PlayType::wild_pitch));
+    }
+
+    #[test]
+    fn balk_recognized() {
+        let pp = parse("BK");
+        assert!(pp.main_plays.iter().any(PlayType::balk));
+    }
+
+    #[test]
+    fn caught_stealing_is_baserunning_play() {
+        let pp = parse("CS2(26)");
+        assert!(pp
+            .main_plays
+            .iter()
+            .any(|p| matches!(p, PlayType::BaserunningPlay(_))));
+    }
+
+    #[test]
+    fn strikeout_with_passed_ball_compound_play() {
+        // K+PB: strikeout reaches first via passed ball.
+        let pp = parse("K+PB.B-1");
+        assert!(pp
+            .main_plays
+            .iter()
+            .any(|p| matches!(p, PlayType::PlateAppearance(pa) if pa.is_strikeout())));
+        assert!(pp.main_plays.iter().any(PlayType::passed_ball));
+    }
+
+    // -- PlayStats invariants --
+
+    #[test]
+    fn outs_count_does_not_exceed_three() {
+        // No play should produce more than 3 outs (triple play is the max).
+        for raw in ["K", "S7", "HR", "64(1)3/GDP", "8/F", "53/G5.1X2(54)"] {
+            let s = stats(raw);
+            assert!(
+                s.outs.len() <= 3,
+                "play {raw} produced {} outs",
+                s.outs.len()
+            );
+        }
+    }
+
+    #[test]
+    fn run_count_does_not_exceed_four_per_play() {
+        // Maximum runs on a single play is 4 (grand slam).
+        for raw in ["HR.3-H;2-H;1-H", "S7.2-H;1-H", "D7/L7D.2-H;1-H"] {
+            let s = stats(raw);
+            assert!(
+                s.runs.len() <= 4,
+                "play {raw} produced {} runs",
+                s.runs.len()
+            );
+        }
+    }
+
+    #[test]
+    fn home_run_grand_slam_yields_four_runs() {
+        let s = stats("HR/F.3-H;2-H;1-H");
+        assert_eq!(s.runs.len(), 4);
+        // Batter is also one of the scorers.
+        assert!(s.runs.contains(&BaseRunner::Batter));
+    }
+
+    #[test]
+    fn stats_caches_warm_for_repeated_input() {
+        // Same play parsed twice yields equal results — cache must not corrupt.
+        let s1 = stats("64(1)3/GDP");
+        let s2 = stats("64(1)3/GDP");
+        assert_eq!(s1.putouts, s2.putouts);
+        assert_eq!(s1.assists, s2.assists);
+        assert_eq!(s1.outs, s2.outs);
+    }
+
+    // -- Hit / HitType --
+
+    #[test]
+    fn hit_type_implicit_advance_lands_on_correct_base() {
+        assert_eq!(HitType::Single.implicit_advance().unwrap().to, Base::First);
+        assert_eq!(HitType::Double.implicit_advance().unwrap().to, Base::Second);
+        assert_eq!(HitType::Triple.implicit_advance().unwrap().to, Base::Third);
+        assert_eq!(HitType::HomeRun.implicit_advance().unwrap().to, Base::Home);
+    }
+}

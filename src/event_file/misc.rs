@@ -226,3 +226,95 @@ pub fn to_str_vec(match_vec: Vec<Option<Match>>) -> Vec<&str> {
         .filter_map(|o| o.map(|m| m.as_str()))
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use csv::StringRecord;
+    use lazy_regex::regex;
+
+    fn rec(fields: &[&str]) -> StringRecord {
+        StringRecord::from(fields.to_vec())
+    }
+
+    #[test]
+    fn parse_positive_int_rejects_zero_and_invalid() {
+        assert_eq!(parse_positive_int::<u8>("5"), Some(5));
+        assert_eq!(parse_positive_int::<u8>("0"), None);
+        assert_eq!(parse_positive_int::<u8>(""), None);
+        assert_eq!(parse_positive_int::<u8>("abc"), None);
+    }
+
+    #[test]
+    fn parse_non_negative_int_keeps_zero_rejects_unparseable() {
+        // Non-negativity is enforced by `T::from_str`, not the helper itself.
+        // Callers always use unsigned types, so negative inputs fail to parse.
+        assert_eq!(parse_non_negative_int::<u32>("0"), Some(0));
+        assert_eq!(parse_non_negative_int::<u32>("1234"), Some(1234));
+        assert_eq!(parse_non_negative_int::<u32>("-1"), None);
+        assert_eq!(parse_non_negative_int::<u32>("xx"), None);
+        // Confirm the function is generic and the negative rejection comes from
+        // unsigned `from_str` — with `i32`, `-1` is accepted.
+        assert_eq!(parse_non_negative_int::<i32>("-1"), Some(-1));
+    }
+
+    #[test]
+    fn digit_vec_extracts_only_digit_chars() {
+        assert_eq!(digit_vec("1a2b3"), vec![1u8, 2, 3]);
+        assert_eq!(digit_vec(""), Vec::<u8>::new());
+        assert_eq!(digit_vec("987"), vec![9u8, 8, 7]);
+    }
+
+    #[test]
+    fn regex_split_returns_prefix_and_optional_match() {
+        let re = regex!(r"/.*");
+        let (head, tail) = regex_split("S9/L", re);
+        assert_eq!(head, "S9");
+        assert_eq!(tail, Some("/L"));
+
+        let (head, tail) = regex_split("S9", re);
+        assert_eq!(head, "S9");
+        assert_eq!(tail, None);
+
+        // Match at index 0 yields an empty prefix.
+        let (head, tail) = regex_split("/L", re);
+        assert_eq!(head, "");
+        assert_eq!(tail, Some("/L"));
+    }
+
+    #[test]
+    fn hand_parses_known_codes() {
+        assert_eq!(Hand::from_str("L").unwrap(), Hand::Left);
+        assert_eq!(Hand::from_str("R").unwrap(), Hand::Right);
+        assert!(Hand::from_str("X").is_err());
+        assert_eq!(Hand::default(), Hand::Default);
+    }
+
+    #[test]
+    fn earned_run_record_parses_data_er() {
+        let record = rec(&["data", "er", "smitj001", "3"]);
+        let parsed = EarnedRunRecord::try_from(&record).unwrap();
+        assert_eq!(parsed.earned_runs, 3);
+    }
+
+    #[test]
+    fn earned_run_record_rejects_non_er_data_type() {
+        let record = rec(&["data", "xx", "smitj001", "3"]);
+        assert!(EarnedRunRecord::try_from(&record).is_err());
+    }
+
+    #[test]
+    fn appearance_record_parses_start() {
+        let record = rec(&["start", "smitj001", "Joe Smith", "1", "3", "5"]);
+        let app = AppearanceRecord::try_from(&record).unwrap();
+        assert_eq!(app.player_name, "Joe Smith");
+        assert_eq!(app.side, Side::Home);
+    }
+
+    #[test]
+    fn game_id_parses_id_record() {
+        let record = rec(&["id", "BOS202404010"]);
+        let id = GameId::try_from(&record).unwrap();
+        assert_eq!(id.id.as_str(), "BOS202404010");
+    }
+}

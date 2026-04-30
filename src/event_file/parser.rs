@@ -259,3 +259,149 @@ impl TryFrom<&RetrosheetEventRecord> for MappedRecord {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use csv::StringRecord;
+
+    fn rec(fields: &[&str]) -> StringRecord {
+        StringRecord::from(fields.to_vec())
+    }
+
+    #[test]
+    fn play_by_play_extensions_are_classified_correctly() {
+        for s in ["2024BOS.EVN", "2024NYA.EVA", "1939NL.EVF"] {
+            assert_eq!(FileInfo::account_type(s), AccountType::PlayByPlay);
+        }
+    }
+
+    #[test]
+    fn box_score_extensions_are_classified_correctly() {
+        for s in ["2024BOS.EBA", "2024NYA.EBN", "1948.EBR"] {
+            assert_eq!(FileInfo::account_type(s), AccountType::BoxScore);
+        }
+    }
+
+    #[test]
+    fn deduced_extensions_are_classified_correctly() {
+        for s in ["2024BOS.EDA", "2024NYA.EDN", "1938.EDF"] {
+            assert_eq!(FileInfo::account_type(s), AccountType::Deduced);
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "Unexpected file naming convention")]
+    fn unexpected_extension_panics() {
+        FileInfo::account_type("README.txt");
+    }
+
+    #[test]
+    fn account_type_glob_picks_only_matching_extensions() {
+        use std::fs::File;
+
+        // Standalone tempdir under the system temp root — we don't pull in `tempfile`
+        // here (it's a dev-dep used by integration tests, not unit tests).
+        let dir = std::env::temp_dir().join(format!("baseball_glob_test_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in [
+            "a.EVA", "b.EVN", "c.EBA", "d.EBN", "e.EDA", "f.EDN", "g.txt",
+        ] {
+            File::create(dir.join(name)).unwrap();
+        }
+
+        let collect = |at: AccountType| -> Vec<String> {
+            let mut names: Vec<String> = at
+                .glob(&dir)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter_map(|p| p.file_name().and_then(|s| s.to_str().map(String::from)))
+                .collect();
+            names.sort();
+            names
+        };
+
+        assert_eq!(collect(AccountType::PlayByPlay), vec!["a.EVA", "b.EVN"]);
+        assert_eq!(collect(AccountType::BoxScore), vec!["c.EBA", "d.EBN"]);
+        assert_eq!(collect(AccountType::Deduced), vec!["e.EDA", "f.EDN"]);
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn mapped_record_classifies_each_record_kind() {
+        assert!(matches!(
+            MappedRecord::try_from(&rec(&["id", "BOS202404010"])).unwrap(),
+            MappedRecord::GameId(_)
+        ));
+        assert_eq!(
+            MappedRecord::try_from(&rec(&["version", "2"])).unwrap(),
+            MappedRecord::Version
+        );
+        assert!(matches!(
+            MappedRecord::try_from(&rec(&["info", "visteam", "BOS"])).unwrap(),
+            MappedRecord::Info(_)
+        ));
+        assert!(matches!(
+            MappedRecord::try_from(&rec(&["start", "smitj001", "Joe Smith", "0", "1", "5"]))
+                .unwrap(),
+            MappedRecord::Start(_)
+        ));
+        assert!(matches!(
+            MappedRecord::try_from(&rec(&["sub", "doej101", "Joe Doe", "1", "1", "5"])).unwrap(),
+            MappedRecord::Substitution(_)
+        ));
+        assert!(matches!(
+            MappedRecord::try_from(&rec(&["play", "1", "0", "smitj001", "00", "", "S7"])).unwrap(),
+            MappedRecord::Play(_)
+        ));
+        assert!(matches!(
+            MappedRecord::try_from(&rec(&["data", "er", "smitj001", "3"])).unwrap(),
+            MappedRecord::EarnedRun(_)
+        ));
+        assert!(matches!(
+            MappedRecord::try_from(&rec(&["com", "some comment"])).unwrap(),
+            MappedRecord::Comment(_)
+        ));
+    }
+
+    #[test]
+    fn mapped_record_unknown_line_type_errors() {
+        assert!(MappedRecord::try_from(&rec(&["bogus", "x"])).is_err());
+    }
+
+    #[test]
+    fn mapped_record_dispatches_box_score_kinds() {
+        // Stat lines route through BoxScoreLine.
+        let r = rec(&[
+            "stat", "bline", "smitj001", "1", "5", "1", "4", "1", "1", "0", "0", "1", "0", "0",
+            "0", "0", "1", "0", "0", "0", "0", "0", "0",
+        ]);
+        assert!(matches!(
+            MappedRecord::try_from(&r).unwrap(),
+            MappedRecord::BoxScoreLine(_)
+        ));
+
+        // Line scores route through LineScore.
+        let r = rec(&["line", "0", "0", "1", "0", "2", "0", "0", "1", "0", "0"]);
+        assert!(matches!(
+            MappedRecord::try_from(&r).unwrap(),
+            MappedRecord::LineScore(_)
+        ));
+
+        // Box-score events route through BoxScoreEvent.
+        let r = rec(&["event", "hpline", "0", "pitch001", "batt001", ""]);
+        assert!(matches!(
+            MappedRecord::try_from(&r).unwrap(),
+            MappedRecord::BoxScoreEvent(_)
+        ));
+    }
+
+    #[test]
+    fn play_by_play_regex_distinguishes_from_box_score() {
+        assert!(PLAY_BY_PLAY.is_match("2024BOS.EVN"));
+        assert!(!PLAY_BY_PLAY.is_match("2024BOS.EBN"));
+        assert!(BOX_SCORE.is_match("2024BOS.EBN"));
+    }
+}

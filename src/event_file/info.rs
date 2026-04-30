@@ -412,3 +412,163 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Datelike, Timelike};
+    use csv::StringRecord;
+
+    fn rec(fields: &[&str]) -> StringRecord {
+        StringRecord::from(fields.to_vec())
+    }
+
+    #[test]
+    fn parses_visiting_and_home_team() {
+        let r = rec(&["info", "visteam", "BOS"]);
+        match InfoRecord::try_from(&r).unwrap() {
+            InfoRecord::VisitingTeam(t) => assert_eq!(t.as_str(), "BOS"),
+            other => panic!("unexpected variant: {other:?}"),
+        }
+        let r = rec(&["info", "hometeam", "NYA"]);
+        match InfoRecord::try_from(&r).unwrap() {
+            InfoRecord::HomeTeam(t) => assert_eq!(t.as_str(), "NYA"),
+            other => panic!("unexpected variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_iso_game_date() {
+        let r = rec(&["info", "date", "2024/04/01"]);
+        match InfoRecord::try_from(&r).unwrap() {
+            InfoRecord::GameDate(d) => {
+                assert_eq!(d.year(), 2024);
+                assert_eq!(d.month(), 4);
+                assert_eq!(d.day(), 1);
+            }
+            other => panic!("unexpected variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_doubleheader_status() {
+        let r = rec(&["info", "number", "2"]);
+        assert_eq!(
+            InfoRecord::try_from(&r).unwrap(),
+            InfoRecord::DoubleheaderStatus(DoubleheaderStatus::DoubleHeaderGame2)
+        );
+    }
+
+    #[test]
+    fn parses_daynight_field() {
+        let r = rec(&["info", "daynight", "night"]);
+        assert_eq!(
+            InfoRecord::try_from(&r).unwrap(),
+            InfoRecord::DayNight(DayNight::Night)
+        );
+    }
+
+    #[test]
+    fn parses_usedh_case_insensitive() {
+        let r = rec(&["info", "usedh", "TRUE"]);
+        assert_eq!(InfoRecord::try_from(&r).unwrap(), InfoRecord::UseDh(true));
+        let r = rec(&["info", "usedh", "false"]);
+        assert_eq!(InfoRecord::try_from(&r).unwrap(), InfoRecord::UseDh(false));
+    }
+
+    #[test]
+    fn parses_starttime_with_padded_format() {
+        let r = rec(&["info", "starttime", "1:05PM"]);
+        match InfoRecord::try_from(&r).unwrap() {
+            InfoRecord::StartTime(Some(t)) => {
+                assert_eq!(t.hour(), 13);
+                assert_eq!(t.minute(), 5);
+            }
+            other => panic!("unexpected variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unparseable_starttime_yields_none() {
+        let r = rec(&["info", "starttime", ""]);
+        assert_eq!(
+            InfoRecord::try_from(&r).unwrap(),
+            InfoRecord::StartTime(None)
+        );
+        let r = rec(&["info", "starttime", "garbage"]);
+        assert_eq!(
+            InfoRecord::try_from(&r).unwrap(),
+            InfoRecord::StartTime(None)
+        );
+    }
+
+    #[test]
+    fn windspeed_filters_zero_and_negative() {
+        let r = rec(&["info", "windspeed", "0"]);
+        assert_eq!(
+            InfoRecord::try_from(&r).unwrap(),
+            InfoRecord::WindSpeed(None)
+        );
+        let r = rec(&["info", "windspeed", "10"]);
+        assert_eq!(
+            InfoRecord::try_from(&r).unwrap(),
+            InfoRecord::WindSpeed(Some(10))
+        );
+    }
+
+    #[test]
+    fn attendance_keeps_zero() {
+        let r = rec(&["info", "attendance", "0"]);
+        assert_eq!(
+            InfoRecord::try_from(&r).unwrap(),
+            InfoRecord::Attendance(Some(0))
+        );
+        let r = rec(&["info", "attendance", "32500"]);
+        assert_eq!(
+            InfoRecord::try_from(&r).unwrap(),
+            InfoRecord::Attendance(Some(32500))
+        );
+    }
+
+    #[test]
+    fn parses_umpire_assignment() {
+        let r = rec(&["info", "umphome", "doej101"]);
+        match InfoRecord::try_from(&r).unwrap() {
+            InfoRecord::UmpireAssignment(u) => {
+                assert_eq!(u.position, UmpirePosition::Home);
+                assert_eq!(u.umpire.unwrap().as_str(), "doej101");
+            }
+            other => panic!("unexpected variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unknown_info_type_errors() {
+        let r = rec(&["info", "made_up_field", "value"]);
+        assert!(InfoRecord::try_from(&r).is_err());
+    }
+
+    #[test]
+    fn fieldcond_alias_fieldcon_works() {
+        let r = rec(&["info", "fieldcon", "wet"]);
+        assert_eq!(
+            InfoRecord::try_from(&r).unwrap(),
+            InfoRecord::FieldCondition(FieldCondition::Wet)
+        );
+    }
+
+    #[test]
+    fn parses_inputtime_datetime() {
+        let r = rec(&["info", "inputtime", "2024/09/22 3:40PM"]);
+        match InfoRecord::try_from(&r).unwrap() {
+            InfoRecord::InputDate(Some(dt)) => {
+                assert_eq!(dt.year(), 2024);
+                assert_eq!(dt.month(), 9);
+                assert_eq!(dt.day(), 22);
+                assert_eq!(dt.hour(), 15);
+                assert_eq!(dt.minute(), 40);
+            }
+            other => panic!("unexpected variant: {other:?}"),
+        }
+    }
+}

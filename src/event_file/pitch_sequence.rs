@@ -177,3 +177,97 @@ impl PitchSequenceItem {
         Ok(pitches)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn types(seq: &PitchSequence) -> Vec<PitchType> {
+        seq.iter().map(|p| p.pitch_type).collect()
+    }
+
+    #[test]
+    fn empty_string_yields_empty_sequence() {
+        let s = PitchSequenceItem::new_pitch_sequence("").unwrap();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn basic_pitches_map_to_expected_types() {
+        let s = PitchSequenceItem::new_pitch_sequence("BCSFX").unwrap();
+        assert_eq!(
+            types(&s),
+            vec![
+                PitchType::Ball,
+                PitchType::CalledStrike,
+                PitchType::SwingingStrike,
+                PitchType::Foul,
+                PitchType::InPlay,
+            ]
+        );
+    }
+
+    #[test]
+    fn unknown_char_becomes_unrecognized_default() {
+        let s = PitchSequenceItem::new_pitch_sequence("Z").unwrap();
+        assert_eq!(types(&s), vec![PitchType::Unrecognized]);
+    }
+
+    #[test]
+    fn dot_truncates_to_rightmost_segment() {
+        // PA spans events; only the segment after the last "." should be kept.
+        let s = PitchSequenceItem::new_pitch_sequence("BB.CX").unwrap();
+        assert_eq!(types(&s), vec![PitchType::CalledStrike, PitchType::InPlay]);
+    }
+
+    #[test]
+    fn multiple_dots_keep_only_final_segment() {
+        let s = PitchSequenceItem::new_pitch_sequence("B.C.SX").unwrap();
+        assert_eq!(
+            types(&s),
+            vec![PitchType::SwingingStrike, PitchType::InPlay]
+        );
+    }
+
+    #[test]
+    fn star_marks_blocked_by_catcher_on_following_pitch() {
+        let s = PitchSequenceItem::new_pitch_sequence("B*BC").unwrap();
+        assert_eq!(
+            types(&s),
+            vec![PitchType::Ball, PitchType::Ball, PitchType::CalledStrike]
+        );
+        assert!(!s[0].blocked_by_catcher);
+        assert!(s[1].blocked_by_catcher);
+        assert!(!s[2].blocked_by_catcher);
+    }
+
+    #[test]
+    fn arrow_marks_runners_going_on_following_pitch() {
+        let s = PitchSequenceItem::new_pitch_sequence(">CX").unwrap();
+        assert_eq!(types(&s), vec![PitchType::CalledStrike, PitchType::InPlay]);
+        assert!(s[0].runners_going);
+        assert!(!s[1].runners_going);
+    }
+
+    #[test]
+    fn plus_records_catcher_pickoff_to_base() {
+        let s = PitchSequenceItem::new_pitch_sequence("B+2C").unwrap();
+        // "B" picks up the "+2" as a catcher pickoff to second base.
+        assert_eq!(s[0].catcher_pickoff_attempt, Some(Base::Second));
+        assert_eq!(s[1].catcher_pickoff_attempt, None);
+    }
+
+    #[test]
+    fn plus_followed_by_non_base_char_yields_no_pickoff() {
+        // "X" is not a valid base ("1", "2", "3", "H"); pickoff is None.
+        let s = PitchSequenceItem::new_pitch_sequence("B+X").unwrap();
+        assert_eq!(s[0].catcher_pickoff_attempt, None);
+    }
+
+    #[test]
+    fn sequence_ids_are_one_indexed_and_contiguous() {
+        let s = PitchSequenceItem::new_pitch_sequence("BCFSX").unwrap();
+        let ids: Vec<usize> = s.iter().map(|p| p.sequence_id.get()).collect();
+        assert_eq!(ids, vec![1, 2, 3, 4, 5]);
+    }
+}

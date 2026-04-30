@@ -6,7 +6,9 @@ use arrayref::array_ref;
 use arrayvec::ArrayString;
 use serde::{Deserialize, Serialize};
 
-use crate::event_file::misc::{parse_non_negative_int, parse_positive_int, str_to_tinystr, Defense, Lineup};
+use crate::event_file::misc::{
+    parse_non_negative_int, parse_positive_int, str_to_tinystr, Defense, Lineup,
+};
 use crate::event_file::traits::{
     Batter, Fielder, FieldingPosition, Inning, LineupPosition, Pitcher, RetrosheetEventRecord, Side,
 };
@@ -899,5 +901,137 @@ impl TryFrom<&RetrosheetEventRecord> for BoxScoreEvent {
             Self::Unrecognized => bail!("Unrecognized box score event type"),
             _ => Ok(mapped),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use csv::StringRecord;
+
+    fn rec(fields: &[&str]) -> StringRecord {
+        StringRecord::from(fields.to_vec())
+    }
+
+    #[test]
+    fn batting_line_stats_required_fields_must_parse() {
+        let arr: [&str; 17] = [
+            "3", "1", "2", "0", "0", "0", "1", "0", "0", "0", "1", "0", "1", "0", "0", "0", "0",
+        ];
+        let s = BattingLineStats::try_from(&arr).unwrap();
+        assert_eq!(s.at_bats, 3);
+        assert_eq!(s.runs, 1);
+        assert_eq!(s.hits, 2);
+        assert_eq!(s.walks, Some(1));
+        assert_eq!(s.strikeouts, Some(1));
+    }
+
+    #[test]
+    fn batting_line_stats_treats_unparseable_optional_as_none() {
+        let arr: [&str; 17] = [
+            "3", "1", "2", "-1", "x", "", "1", "", "", "", "", "", "", "", "", "", "",
+        ];
+        let s = BattingLineStats::try_from(&arr).unwrap();
+        assert_eq!(s.doubles, None);
+        assert_eq!(s.triples, None);
+        assert_eq!(s.home_runs, None);
+        assert_eq!(s.rbi, Some(1));
+    }
+
+    #[test]
+    fn batting_line_stats_required_fields_fail_on_invalid() {
+        let arr: [&str; 17] = [
+            "x", "1", "2", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0",
+        ];
+        assert!(BattingLineStats::try_from(&arr).is_err());
+    }
+
+    #[test]
+    fn batting_line_round_trips_identity_fields() {
+        // BattingLine::default()'s optional stats are None, but writing them as 0 in the record
+        // and parsing back produces Some(0). Compare only the identity fields.
+        let original = BattingLine::new(
+            "smitj001".parse().unwrap(),
+            Side::Home,
+            LineupPosition::Third,
+            1,
+        );
+        let record: RetrosheetEventRecord = original.into();
+        let parsed = BattingLine::try_from(&record).unwrap();
+        assert_eq!(parsed.batter_id, original.batter_id);
+        assert_eq!(parsed.side, original.side);
+        assert_eq!(parsed.lineup_position, original.lineup_position);
+        assert_eq!(
+            parsed.nth_player_at_position,
+            original.nth_player_at_position
+        );
+        assert_eq!(parsed.batting_stats.at_bats, 0);
+        assert_eq!(parsed.batting_stats.hits, 0);
+    }
+
+    #[test]
+    fn defense_line_round_trips_through_record() {
+        let original = DefenseLine::new(
+            "doej101".parse().unwrap(),
+            Side::Away,
+            FieldingPosition::Shortstop,
+            1,
+        );
+        let record: RetrosheetEventRecord = original.into();
+        let parsed = DefenseLine::try_from(&record).unwrap();
+        assert_eq!(parsed.fielder_id, original.fielder_id);
+        assert_eq!(parsed.fielding_position, original.fielding_position);
+        assert_eq!(parsed.side, original.side);
+    }
+
+    #[test]
+    fn pinch_running_line_round_trips_through_record() {
+        let original = PinchRunningLine::new("runn001".parse().unwrap(), Some(7), Side::Home);
+        let record: RetrosheetEventRecord = original.into();
+        let parsed = PinchRunningLine::try_from(&record).unwrap();
+        assert_eq!(parsed, original);
+    }
+
+    #[test]
+    fn box_score_line_dispatches_on_stat_type() {
+        let r = rec(&[
+            "stat", "bline", "smitj001", "1", "5", "1", "4", "1", "1", "0", "0", "1", "0", "0",
+            "0", "0", "1", "0", "0", "0", "0", "0", "0",
+        ]);
+        match BoxScoreLine::try_from(&r).unwrap() {
+            BoxScoreLine::BattingLine(_) => {}
+            other => panic!("expected BattingLine, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn box_score_line_unknown_type_errors() {
+        let r = rec(&["stat", "made_up", "smitj001"]);
+        assert!(BoxScoreLine::try_from(&r).is_err());
+    }
+
+    #[test]
+    fn box_score_event_dispatches_on_event_type() {
+        let r = rec(&["event", "hpline", "0", "pitch001", "batt001", ""]);
+        match BoxScoreEvent::try_from(&r).unwrap() {
+            BoxScoreEvent::HitByPitch(_) => {}
+            other => panic!("expected HitByPitch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn line_score_parses_team_innings() {
+        let r = rec(&["line", "0", "0", "1", "0", "2", "0", "0", "1", "0", "0"]);
+        let ls = LineScore::try_from(&r).unwrap();
+        assert_eq!(ls.side, Side::Away);
+        assert_eq!(ls.line_score.iter().sum::<u8>(), 4);
+    }
+
+    #[test]
+    fn fielding_play_line_joins_fielders() {
+        let r = rec(&["event", "dpline", "1", "6", "4", "3"]);
+        let fp = FieldingPlayLine::try_from(&r).unwrap();
+        assert_eq!(fp.defense_side, Side::Home);
+        assert_eq!(fp.fielders, "6-4-3");
     }
 }

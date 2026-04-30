@@ -470,3 +470,127 @@ impl TryFrom<&Vec<InfoRecord>> for Matchup<Team> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+    use strum::IntoEnumIterator;
+
+    #[test]
+    fn lineup_position_round_trips_through_str() {
+        for pos in [
+            LineupPosition::PitcherWithDh,
+            LineupPosition::First,
+            LineupPosition::Fifth,
+            LineupPosition::Ninth,
+        ] {
+            let s = pos.retrosheet_string();
+            assert_eq!(LineupPosition::try_from(s.as_str()).unwrap(), pos);
+        }
+    }
+
+    #[test]
+    fn lineup_position_next_wraps_at_ninth() {
+        assert_eq!(LineupPosition::Ninth.next().unwrap(), LineupPosition::First);
+        assert_eq!(
+            LineupPosition::First.next().unwrap(),
+            LineupPosition::Second
+        );
+    }
+
+    #[test]
+    fn lineup_position_next_errors_for_dh_pitcher() {
+        assert!(LineupPosition::PitcherWithDh.next().is_err());
+    }
+
+    #[test]
+    fn lineup_position_bats_in_lineup_excludes_pitcher_with_dh() {
+        assert!(!LineupPosition::PitcherWithDh.bats_in_lineup());
+        assert!(LineupPosition::First.bats_in_lineup());
+        assert!(LineupPosition::Ninth.bats_in_lineup());
+    }
+
+    #[test]
+    fn fielding_position_fielding_vec_maps_each_digit() {
+        let v = FieldingPosition::fielding_vec("643");
+        assert_eq!(
+            v,
+            vec![
+                FieldingPosition::Shortstop,
+                FieldingPosition::SecondBaseman,
+                FieldingPosition::FirstBaseman,
+            ]
+        );
+    }
+
+    #[test]
+    fn fielding_position_round_trips_through_str() {
+        for pos in FieldingPosition::iter() {
+            let s = pos.retrosheet_string();
+            // Every position parses back via TryFrom<&str>.
+            let back = FieldingPosition::try_from(s.as_str()).unwrap();
+            assert_eq!(pos, back);
+        }
+    }
+
+    #[test]
+    fn fielding_position_is_true_position_excludes_unknown_and_pinch() {
+        assert!(!FieldingPosition::Unknown.is_true_position());
+        assert!(!FieldingPosition::PinchHitter.is_true_position());
+        assert!(!FieldingPosition::PinchRunner.is_true_position());
+        assert!(FieldingPosition::Pitcher.is_true_position());
+        assert!(FieldingPosition::DesignatedHitter.is_true_position());
+    }
+
+    #[test]
+    fn side_flip_is_involution() {
+        assert_eq!(Side::Away.flip(), Side::Home);
+        assert_eq!(Side::Home.flip(), Side::Away);
+        assert_eq!(Side::Home.flip().flip(), Side::Home);
+    }
+
+    #[test]
+    fn side_retrosheet_str_round_trip() {
+        assert_eq!(
+            Side::from_str(Side::Away.retrosheet_str()).unwrap(),
+            Side::Away
+        );
+        assert_eq!(
+            Side::from_str(Side::Home.retrosheet_str()).unwrap(),
+            Side::Home
+        );
+    }
+
+    #[test]
+    fn game_type_parses_known_strings() {
+        assert_eq!(
+            GameType::from_str("regular").unwrap(),
+            GameType::RegularSeason
+        );
+        assert_eq!(
+            GameType::from_str("allstar").unwrap(),
+            GameType::AllStarGame
+        );
+        assert_eq!(
+            GameType::from_str("lcs").unwrap(),
+            GameType::LeagueChampionshipSeries
+        );
+        assert!(GameType::from_str("nope").is_err());
+    }
+
+    #[test]
+    fn matchup_get_returns_correct_side() {
+        let m = Matchup::new("away_val", "home_val");
+        assert_eq!(*m.get(Side::Away), "away_val");
+        assert_eq!(*m.get(Side::Home), "home_val");
+    }
+
+    #[test]
+    fn matchup_get_mut_allows_mutation() {
+        let mut m = Matchup::new(0, 0);
+        *m.get_mut(Side::Home) = 7;
+        assert_eq!(*m.get(Side::Home), 7);
+        assert_eq!(*m.get(Side::Away), 0);
+    }
+}
