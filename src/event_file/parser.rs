@@ -193,13 +193,16 @@ impl RetrosheetReader {
                     return Ok(true);
                 }
                 Ok(m) => self.current_record_vec.push(m),
-                Err(_) => {
+                Err(e) => {
+                    let line = self.reader.position().line();
                     return Err(anyhow!(
-                        "Error file {} during game {} -- Error reading record: {}",
+                        "Error file {} line {} during game {} -- Error reading record [{}]: {:#}",
                         &self.file_info.filename,
+                        line,
                         &self.current_game_id.id,
-                        &self.current_record.iter().collect::<Vec<&str>>().join(",")
-                    ))
+                        &self.current_record.iter().collect::<Vec<&str>>().join(","),
+                        e
+                    ));
                 }
             }
         }

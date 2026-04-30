@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Rust parser that turns raw [Retrosheet](https://www.retrosheet.org/) event/box-score files into structured CSVs (and optionally JSONL). Downstream, those CSVs are converted to Parquet and consumed by the `baseball.computer` dbt pipeline. Retrosheet's event format is a stateful text format — the parser maintains full per-game state (lineup, runners, outs, score) to derive every output column.
 
-**Status (2026-04-30):** Active. Legacy parser runs cleanly on current Retrosheet corpus (`alldata.zip` from retrosheet.org/downloads, ~208K games / 18.3M events in ~12s) modulo 6 known dead-ball-era game-level errors deferred for later: BSN191409102, BIR194806210, CIN191005260 (bad `data,er` record), SLN191008280, BSN191108240, WS1191105040 (bad play `5-3.2-3`). A `pest`-grammar rewrite remains an in-flight option but is not blocking. Confirm current direction with user before doing significant parser work.
+**Status (2026-04-30):** Active. Legacy parser runs cleanly on current Retrosheet corpus (`alldata.zip` from retrosheet.org/downloads, ~208K games / 18.3M events in ~12s) modulo two residual `WARN`s — BSN191409102's bogus `presadj` for an empty base (skipped, ER attribution for `oescj101` loses the override) and BIR194806210's `info,hometeam,BIR ` (whitespace stripped to fit `ArrayString<3>`). One game (ATN193807032 in `ngl_e/1938.EVR`) requires the idempotent fix-up applied by `uv run python bin/patch_known_corpus_bugs.py <retrosheet_dir>` before parsing — re-run it after every fresh download. The `info`-value trim is scoped to known string-typed fields (team/site/scorer/inputter/translator/wp/lp/save/gwrbi/umps); strict-parsed fields (date, numbers, bool, enum lookups) keep their original strict behavior so corrupt structured values still fail loudly. A `pest`-grammar rewrite remains an in-flight option but is not blocking. Confirm current direction with user before doing significant parser work.
 
 Upstream raw data lives in the sibling `retrosheet-mirror` repo (or `droher/retrosheet-mirror` on GitHub). Output Parquet files are published to Cloudflare R2 (`s3://timeball/event`, `s3://timeball/misc`) and feed the dbt project at `droher/baseball.computer`.
 
@@ -30,7 +30,7 @@ cargo clippy --all-targets   # lint level is strict — see main.rs
 cargo fmt
 ```
 
-Unit tests live as inline `#[cfg(test)] mod tests` blocks at the bottom of each `src/event_file/*.rs` module — they cover pitch sequence parsing, play parsing (`ParsedPlay::try_from`, `PlayStats` invariants), info records, box-score lines, and the `MappedRecord` dispatch. Integration tests in `tests/integration.rs` invoke the compiled binary against `tests/fixtures/events/` (small fixtures spanning All-Star, postseason wild card, deduced PBP, single-game box score) and assert schema-level invariants on the resulting CSV/JSONL — row counts, `event_key` uniqueness, `events → games` referential integrity, and rerun determinism. The fixtures are checked into the repo. Don't pin byte-for-byte snapshots — output ordering is non-deterministic via `rayon`, and per project rules tests should verify invariants, not hardcoded values.
+Unit tests live as inline `#[cfg(test)] mod tests` blocks at the bottom of each `src/event_file/*.rs` module — they cover pitch sequence parsing, play parsing (`ParsedPlay::try_from`, `PlayStats` invariants), info records, box-score lines, and the `MappedRecord` dispatch. Integration tests in `tests/integration.rs` invoke the compiled binary against `tests/fixtures/events/` (small fixtures spanning All-Star, postseason wild card, deduced PBP, single-game box score, plus dead-ball regression cases `1914_BSN.EVN` for bogus `presadj` and `1948_BIR.EBR` for trailing-space `info` values) and assert schema-level invariants on the resulting CSV/JSONL — row counts, `event_key` uniqueness, `events → games` referential integrity, and rerun determinism. The fixtures are checked into the repo. Don't pin byte-for-byte snapshots — output ordering is non-deterministic via `rayon`, and per project rules tests should verify invariants, not hardcoded values.
 
 Full-corpus validation remains the final gate: run the binary against the full Retrosheet corpus and diff Parquet output downstream. Before validating, run `uv run python bin/audit_codes.py <retrosheet_dir>` to surface any codes the parser silently maps to `Unrecognized`/`Unknown` (pitch chars, info keys/values, stat/event tags, record types). Exits non-zero if any code in the corpus is missing from the corresponding Rust enum — the audit caught the `A` pitch-clock-violation strike code that was silently dropped on the 2023+ corpus, and is the canonical way to detect new Retrosheet additions before they hit downstream.
 
@@ -41,8 +41,9 @@ Full-corpus validation remains the final gate: run the binary against the full R
 After the Rust parser writes CSVs, `bin/parquet.py` and `bin/simple_files.py` produce the Parquet files actually consumed downstream. Per global rules, run Python with `uv`:
 
 ```bash
-uv run python bin/parquet.py        # csv/*.csv -> parquet/*.parquet (zstd, dictionary, DELTA_BINARY_PACKED on event_key)
-uv run python bin/simple_files.py   # gamelog/schedule/park/roster/bio CSV concat + parquet
+uv run python bin/parquet.py                                # csv/*.csv -> parquet/*.parquet (zstd, dictionary, DELTA_BINARY_PACKED on event_key)
+uv run python bin/simple_files.py                           # gamelog/schedule/park/roster/bio CSV concat + parquet
+uv run python bin/patch_known_corpus_bugs.py <retrosheet>   # idempotent in-place fixes for game records the parser cannot resolve (currently only ATN193807032)
 ```
 
 `bin/requirements.txt` exists for CI; locally prefer `uv pip install -r bin/requirements.txt` over bare `pip`.

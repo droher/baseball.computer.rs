@@ -6,11 +6,13 @@
 //! of `EventFileSchema` variants drives output filenames); instead each test
 //! checks structural relationships that must hold for any valid run.
 //!
-//! Fixtures cover four account-type / game-type combinations:
+//! Fixtures cover six account-type / game-type combinations:
 //!   - 2024AS.EVE      — modern All-Star Game (PlayByPlay)
 //!   - 2014ALWC.EVE    — Wild Card postseason (PlayByPlay)
 //!   - 1959.EDA        — deduced play-by-play
 //!   - 1948_DET.EBA    — single box-score game
+//!   - 1914_BSN.EVN    — BSN191409102 PBP, exercises bogus `presadj` skip path
+//!   - 1948_BIR.EBR    — BIR194806210 box, exercises trailing-space `info` value
 
 use std::collections::HashMap;
 use std::fs;
@@ -67,10 +69,10 @@ fn json_mode_writes_one_line_per_play_by_play_game() {
     let path = out.path().join("games.jsonl");
     assert!(path.exists(), "games.jsonl missing");
     // JSON mode bypasses CSV and writes every game — PBP and box-score alike —
-    // to games.jsonl. 4 fixtures × 1 game each = 4 lines.
+    // to games.jsonl. 6 fixtures × 1 game each = 6 lines.
     let lines = count_lines(&path);
     assert_eq!(
-        lines, 4,
+        lines, 6,
         "expected one JSONL line per fixture game, got {lines}"
     );
 }
@@ -94,15 +96,49 @@ fn json_lines_are_valid_json_with_required_keys() {
 fn games_csv_has_one_row_per_pbp_fixture() {
     let out = run_parser(false);
     let games = read_csv_rows(&out.path().join("games.csv"));
-    // PBP fixtures only: allstar, postseason, deduced. Box score goes to box_score_games.csv.
+    // PBP fixtures: allstar, postseason, deduced, 1914_BSN. Box score fixtures
+    // (1948_DET, 1948_BIR) go to box_score_games.csv.
     assert_eq!(
         games.len(),
-        3,
-        "games.csv should have 3 rows, got {}",
+        4,
+        "games.csv should have 4 rows, got {}",
         games.len()
     );
     let box_games = read_csv_rows(&out.path().join("box_score_games.csv"));
-    assert_eq!(box_games.len(), 1);
+    assert_eq!(box_games.len(), 2);
+}
+
+#[test]
+fn dead_ball_fixtures_parse_resiliently() {
+    // 1914_BSN.EVN exercises a bogus `presadj` referencing an empty base —
+    // parser must skip with a warn instead of bailing the whole game.
+    // 1948_BIR.EBR has `info,hometeam,BIR ` (trailing space) — info parser
+    // must trim and accept the value.
+    let out = run_parser(false);
+    let pbp_games = read_csv_rows(&out.path().join("games.csv"));
+    let pbp_idx = pbp_games
+        .iter()
+        .position(|r| r.iter().any(|v| v == "BSN191409102"));
+    assert!(
+        pbp_idx.is_some(),
+        "BSN191409102 missing from games.csv — parser likely bailed on bogus presadj"
+    );
+    let box_games = read_csv_rows(&out.path().join("box_score_games.csv"));
+    let bir_idx = box_games
+        .iter()
+        .position(|r| r.iter().any(|v| v == "BIR194806210"));
+    assert!(
+        bir_idx.is_some(),
+        "BIR194806210 missing from box_score_games.csv — info-value trim regression"
+    );
+    // Confirm the trimmed home team really stuck (i.e. the row carries `BIR`,
+    // not whitespace-padded garbage).
+    let bir = &box_games[bir_idx.expect("bir row index")];
+    assert!(
+        bir.iter().any(|v| v == "BIR"),
+        "BIR194806210 row missing the trimmed `BIR` home team value: {:?}",
+        bir
+    );
 }
 
 #[test]

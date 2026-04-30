@@ -6,6 +6,7 @@ use arrayvec::ArrayString;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display, EnumString};
+use tracing::{debug, warn};
 
 use crate::event_file::misc::{parse_non_negative_int, parse_positive_int, str_to_tinystr};
 use crate::event_file::traits::{
@@ -352,7 +353,36 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
         let record = record.deserialize::<[&str; 3]>(None)?;
 
         let info_type = record[1];
-        let value = record[2];
+        let raw_value = record[2];
+        // Trim only the string-typed fields where surrounding whitespace
+        // historically appears in the corpus and would have been silently
+        // truncated or rejected. The strict parsers (date, numbers, bool,
+        // enum lookups like daynight/sky) keep their original behavior so a
+        // corrupt date never silently round-trips through a defensive
+        // `trim()`. Three-char team/site fields use `warn!` because untrimmed
+        // they'd overflow `ArrayString<3>` and crash the whole game (the
+        // BIR194806210 case); longer free-text fields (scorer/translator/etc)
+        // use `debug!` because they'd parse fine either way.
+        let value = match info_type {
+            "visteam" | "hometeam" | "site" => {
+                let trimmed = raw_value.trim();
+                if trimmed != raw_value {
+                    warn!(
+                        "Stripped whitespace from {info_type}={raw_value:?} (would overflow team/site capacity)"
+                    );
+                }
+                trimmed
+            }
+            "scorer" | "oscorer" | "inputter" | "translator" | "wp" | "lp" | "save" | "gwrbi"
+            | "umphome" | "ump1b" | "ump2b" | "ump3b" | "umplf" | "umprf" => {
+                let trimmed = raw_value.trim();
+                if trimmed != raw_value {
+                    debug!("Stripped whitespace from info value: {info_type}={raw_value:?}");
+                }
+                trimmed
+            }
+            _ => raw_value,
+        };
 
         let t8 = { || str_to_tinystr::<ArrayString<8>>(value) };
         let t16 = { || str_to_tinystr::<ArrayString<16>>(value) };
@@ -433,6 +463,22 @@ mod tests {
         let r = rec(&["info", "hometeam", "NYA"]);
         match InfoRecord::try_from(&r).unwrap() {
             InfoRecord::HomeTeam(t) => assert_eq!(t.as_str(), "NYA"),
+            other => panic!("unexpected variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn trims_whitespace_around_team_value() {
+        // Reproduces 1948.EBR `info,hometeam,BIR ` from BIR194806210, which
+        // overflowed the 3-char Team capacity before trimming was added.
+        let r = rec(&["info", "hometeam", "BIR "]);
+        match InfoRecord::try_from(&r).unwrap() {
+            InfoRecord::HomeTeam(t) => assert_eq!(t.as_str(), "BIR"),
+            other => panic!("unexpected variant: {other:?}"),
+        }
+        let r = rec(&["info", "visteam", "  PHA"]);
+        match InfoRecord::try_from(&r).unwrap() {
+            InfoRecord::VisitingTeam(t) => assert_eq!(t.as_str(), "PHA"),
             other => panic!("unexpected variant: {other:?}"),
         }
     }

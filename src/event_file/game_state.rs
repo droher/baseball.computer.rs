@@ -10,6 +10,7 @@ use fixed_map::{Key, Map};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display};
+use tracing::warn;
 
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
@@ -1504,18 +1505,21 @@ impl GameState {
     fn update_on_pitcher_responsibility_adjustment(
         &mut self,
         record: &PitcherResponsibilityAdjustment,
-    ) -> Result<()> {
-        let mut runner = self
-            .bases
-            .get_runner(record.baserunner)
-            .context(anyhow!(
-                "Pitcher responsibility adjustment for non-existent runner: {:?}",
+    ) {
+        // Real corpus contains adjustments that name a base with no runner
+        // (e.g. BSN191409102 in 1914BSN.EVN: `presadj,oescj101,1` after a
+        // half-inning where only 2B is occupied). Skip with a warning so the
+        // game still parses. ER attribution for that game loses the override
+        // but everything else is preserved.
+        let Some(mut runner) = self.bases.get_runner(record.baserunner).copied() else {
+            warn!(
+                "Skipping pitcher responsibility adjustment for non-existent runner: {:?}",
                 record
-            ))?
-            .clone();
+            );
+            return;
+        };
         runner.explicit_charged_pitcher_id = Some(record.pitcher_id);
         self.bases.set_runner(record.baserunner, runner);
-        Ok(())
     }
 
     pub fn update(&mut self, record: &MappedRecord, play: Option<&PlayRecord>) -> Result<()> {
@@ -1536,7 +1540,7 @@ impl GameState {
             MappedRecord::LineupAdjustment(_) => (),
             MappedRecord::RunnerAdjustment(r) => self.update_on_runner_adjustment(r)?,
             MappedRecord::PitcherResponsibilityAdjustment(r) => {
-                self.update_on_pitcher_responsibility_adjustment(r)?;
+                self.update_on_pitcher_responsibility_adjustment(r);
             }
             MappedRecord::Comment(r) => self.update_on_comment(r),
             _ => {}
