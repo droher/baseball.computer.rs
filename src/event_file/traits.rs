@@ -16,7 +16,12 @@ use crate::event_file::misc::digit_vec;
 use crate::event_file::parser::{MappedRecord, RecordSlice};
 
 pub const MAX_EVENTS_PER_GAME: usize = 255;
-pub const MAX_GAMES_PER_FILE: usize = 1000;
+// Box-score files (.EBA/.EBN) aggregate an entire league-season, hitting up to
+// ~1300 games (e.g. 1977.EBA = 1131, 2010.EBN = 1299). Reserve headroom so that
+// files with more games than `MAX_GAMES_PER_FILE` don't overflow into the next
+// file's `event_key` range. 3550 source files * 2000 games * 255 events fits in
+// i32 (~1.81B vs MAX 2.147B).
+pub const MAX_GAMES_PER_FILE: usize = 2000;
 pub const EVENT_KEY_BUFFER: usize = MAX_EVENTS_PER_GAME * MAX_GAMES_PER_FILE;
 
 pub type RetrosheetEventRecord = StringRecord;

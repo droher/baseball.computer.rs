@@ -243,6 +243,7 @@ impl EventFileSchema {
     fn write(
         reader: RetrosheetReader,
         parsed_games: Option<&HashSet<GameId>>,
+        in_pass_seen: Option<&Mutex<HashSet<GameId>>>,
         writer_map: &WriterMap,
         json_writer: Option<&ThreadSafeJsonWriter>,
     ) -> Result<Vec<GameId>> {
@@ -276,6 +277,7 @@ impl EventFileSchema {
             }
             let game_context = game_context_result?;
             game_ids.push(game_context.game_id);
+            // Cross-pass dedup: skip games seen in earlier passes.
             if parsed_games
                 .map(|pg| pg.contains(&game_context.game_id))
                 .unwrap_or_default()
@@ -285,6 +287,21 @@ impl EventFileSchema {
                     file_info.filename, &game_context.game_id.id
                 );
                 continue;
+            }
+            // Within-pass dedup: claim ownership atomically. The first file to
+            // see a game_id within this pass writes it; later occurrences (from
+            // a duplicate file or a duplicate within the same file) are skipped.
+            if let Some(seen) = in_pass_seen {
+                let mut guard = seen
+                    .lock()
+                    .map_err(|e| anyhow!("in-pass seen-set lock poisoned: {}", e))?;
+                if !guard.insert(game_context.game_id) {
+                    warn!(
+                        "File {} contains duplicate game {}, ignoring later occurrence",
+                        file_info.filename, &game_context.game_id.id
+                    );
+                    continue;
+                }
             }
             if let Some(jw) = json_writer {
                 let mut handle = jw.json()?;
@@ -427,7 +444,16 @@ fn get_output_root(opt: &Opt) -> Result<PathBuf> {
 struct FileProcessor {
     index: usize,
     opt: Opt,
-    game_ids: HashSet<GameId>,
+    // Game IDs seen during the PlayByPlay + Deduced passes. Used to skip
+    // duplicates across those two passes (a deduced file should not re-emit
+    // a game already seen in a PBP file).
+    pbp_game_ids: HashSet<GameId>,
+    // Game IDs seen during the BoxScore pass. Tracked separately because every
+    // PBP game also has a box-score row by design, and we want to write
+    // box_score_* tables for those. Cross-file dupes within the box-score pass
+    // (e.g. a Negro Leagues `.EBR` file shadowing a standard `.EBN` for the
+    // same game_id) are skipped.
+    box_game_ids: HashSet<GameId>,
     writer_map: WriterMap,
     json_writer: Option<ThreadSafeJsonWriter>,
 }
@@ -444,7 +470,8 @@ impl FileProcessor {
         Ok(Self {
             index: 0,
             opt,
-            game_ids: HashSet::with_capacity(200_000),
+            pbp_game_ids: HashSet::with_capacity(200_000),
+            box_game_ids: HashSet::with_capacity(250_000),
             writer_map,
             json_writer,
         })
@@ -453,12 +480,13 @@ impl FileProcessor {
     fn process_file(
         input_path: &PathBuf,
         parsed_games: Option<&HashSet<GameId>>,
+        in_pass_seen: Option<&Mutex<HashSet<GameId>>>,
         file_index: usize,
         writer_map: &WriterMap,
         json_writer: Option<&ThreadSafeJsonWriter>,
     ) -> Result<Vec<GameId>> {
         let reader = RetrosheetReader::new(input_path, file_index)?;
-        EventFileSchema::write(reader, parsed_games, writer_map, json_writer)
+        EventFileSchema::write(reader, parsed_games, in_pass_seen, writer_map, json_writer)
     }
 
     fn contains_nlb_dupes(path: &Path) -> bool {
@@ -471,11 +499,12 @@ impl FileProcessor {
     }
 
     pub fn par_process_files(&mut self, account_type: AccountType) -> Result<()> {
-        // Box score accounts are expected to be duplicates so we don't need to check against them
-        let parsed_games = if account_type == AccountType::BoxScore {
-            None
-        } else {
-            Some(&self.game_ids)
+        // Cross-pass dedup: PBP + Deduced share one set so the deduced pass
+        // skips PBP-covered games; BoxScore uses its own set since every PBP
+        // game also has a box-score row by design.
+        let parsed_games = match account_type {
+            AccountType::PlayByPlay | AccountType::Deduced => Some(&self.pbp_game_ids),
+            AccountType::BoxScore => Some(&self.box_game_ids),
         };
         let mut files = account_type
             .glob(&self.opt.input)?
@@ -487,6 +516,14 @@ impl FileProcessor {
         let writer_map = &self.writer_map;
         let json_writer = self.json_writer.as_ref();
         let base_index = self.index;
+        // Within-pass dedup: a single shared set claimed atomically per game.
+        // Catches both intra-file dups (same game_id twice in one file) and
+        // cross-file dups (same game_id in two files within a pass — e.g. an
+        // NLB `.EBR` shadowing a standard `.EBN`). The accumulated parsed_games
+        // sets are populated AFTER the pass, so cross-pass dedup alone wouldn't
+        // catch within-pass collisions.
+        let in_pass_seen: Mutex<HashSet<GameId>> =
+            Mutex::new(HashSet::with_capacity(file_count * 81));
         let games = files
             .into_par_iter()
             .enumerate()
@@ -494,6 +531,7 @@ impl FileProcessor {
                 Self::process_file(
                     &f,
                     parsed_games,
+                    Some(&in_pass_seen),
                     (base_index + i) * EVENT_KEY_BUFFER,
                     writer_map,
                     json_writer,
@@ -502,7 +540,10 @@ impl FileProcessor {
             .collect::<Result<Vec<Vec<GameId>>>>()?;
         self.index += file_count;
         let games = games.iter().flatten();
-        self.game_ids.extend(games);
+        match account_type {
+            AccountType::PlayByPlay | AccountType::Deduced => self.pbp_game_ids.extend(games),
+            AccountType::BoxScore => self.box_game_ids.extend(games),
+        }
         Ok(())
     }
 
