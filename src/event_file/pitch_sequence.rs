@@ -60,10 +60,12 @@ pub enum PitchType {
     SwingingStrike,
     #[strum(serialize = "T")]
     FoulTip,
-    #[strum(serialize = "U")]
+    #[strum(serialize = "U", serialize = "?")]
     Unknown,
     #[strum(serialize = "V")]
     AutomaticBall,
+    #[strum(serialize = "A")]
+    AutomaticStrike,
     #[strum(serialize = "X")]
     InPlay,
     #[strum(serialize = "Y")]
@@ -211,6 +213,31 @@ mod tests {
     fn unknown_char_becomes_unrecognized_default() {
         let s = PitchSequenceItem::new_pitch_sequence("Z").unwrap();
         assert_eq!(types(&s), vec![PitchType::Unrecognized]);
+    }
+
+    #[test]
+    fn pitch_clock_violation_chars_map_to_automatic_pitches() {
+        // V = automatic ball (pitcher violation), A = automatic strike (batter violation).
+        // Both introduced with MLB pitch clock in 2023.
+        let s = PitchSequenceItem::new_pitch_sequence("VA").unwrap();
+        assert_eq!(
+            types(&s),
+            vec![PitchType::AutomaticBall, PitchType::AutomaticStrike]
+        );
+    }
+
+    #[test]
+    fn question_mark_aliases_unknown_pitch() {
+        // Retrosheet uses '?' for an unknown pitch in an otherwise-known sequence.
+        let s = PitchSequenceItem::new_pitch_sequence("U?").unwrap();
+        assert_eq!(types(&s), vec![PitchType::Unknown, PitchType::Unknown]);
+    }
+
+    #[test]
+    fn pitch_type_from_str_accepts_canonical_and_alias_for_unknown() {
+        // Lock down the alias semantics independent of the iterator path.
+        assert_eq!(PitchType::from_str("U").unwrap(), PitchType::Unknown);
+        assert_eq!(PitchType::from_str("?").unwrap(), PitchType::Unknown);
     }
 
     #[test]
