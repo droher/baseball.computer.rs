@@ -12,3 +12,5 @@ parquet/
 baseballdatabank/
 misc/
 retrosheet_simple/
+.claude/
+alldata.zip
