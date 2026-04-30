@@ -22,6 +22,20 @@ jobs:
           key: build-${{ github.run_id }}
 
       - run: cargo build --release
+      - run: cargo test --release
+      - run: cargo fmt --all -- --check
+      # TODO: tighten to `-D warnings` once item 5 (clippy::all burndown) lands.
+      # Until then, pin the baseline so the count can only go down.
+      - name: clippy (non-blocking baseline)
+        run: |
+          set -o pipefail
+          cargo clippy --all-targets --release 2>&1 | tee clippy.log
+          errors=$(grep -cE '^error' clippy.log || true)
+          echo "clippy error count: $errors"
+          if [ "$errors" -gt 58 ]; then
+            echo "::error::clippy regressed: $errors > baseline 58"
+            exit 1
+          fi
 
   retrosheet:
     name: retrosheet
