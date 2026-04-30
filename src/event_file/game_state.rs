@@ -475,7 +475,7 @@ impl GameLineupAppearance {
                 a.lineup_position == position
                     && a.side == side
                     && a.start_event_id <= event_id
-                    && a.end_event_id.map_or(true, |end| end >= event_id)
+                    && a.end_event_id.is_none_or(|end| end >= event_id)
             })
             .copied()
             .context("Could not find lineup appearance")
@@ -618,10 +618,10 @@ impl GameContext {
     ) -> Result<Self> {
         let game_id = get_game_id(record_slice)?;
         let teams: Matchup<Team> = Matchup::try_from(record_slice)?;
-        let setting = GameSetting::try_from(record_slice)?;
-        let metadata = GameMetadata::try_from(record_slice)?;
+        let setting = GameSetting::from(record_slice);
+        let metadata = GameMetadata::from(record_slice);
         let umpires = GameUmpire::from_record_slice(record_slice)?;
-        let results = GameResults::try_from(record_slice)?;
+        let results = GameResults::from(record_slice);
         let event_key_offset = Self::event_key_offset(file_info, game_num)?;
         let box_score_data = if file_info.account_type == AccountType::BoxScore {
             Some(BoxScoreData::from_record_slice(record_slice)?)
@@ -816,7 +816,7 @@ pub struct EventRun {
 impl EventRun {
     pub fn is_team_unearned_run(&self) -> bool {
         self.explicit_unearned_run_status
-            .map_or(false, |s| s == UnearnedRunStatus::TeamUnearned)
+            .is_some_and(|s| s == UnearnedRunStatus::TeamUnearned)
     }
 
     fn from_play(play: &PlayRecord, event_key: EventKey) -> Vec<Self> {
@@ -1287,7 +1287,7 @@ impl GameState {
                     (state.bases.clone(), state.outs)
                 };
             // Unusual game state also needs to be grabbed before updating state
-            let rare_attributes = state.unusual_state.clone();
+            let rare_attributes = state.unusual_state;
 
             state.update(record, opt_play)?;
             if let Some(play) = opt_play {
