@@ -386,10 +386,7 @@ impl EventBaserunners {
         let attempted_sb = baserunning_play_type
             .map(|p| p.is_attempted_stolen_base())
             .unwrap_or_default();
-        let picked_off = match baserunning_play_type {
-            Some(BaserunningPlayType::PickedOff) => true,
-            _ => false,
-        };
+        let picked_off = matches!(baserunning_play_type, Some(BaserunningPlayType::PickedOff));
 
         let starting_state = event.context.starting_base_state.get_runner(baserunner);
         let advance = event
@@ -416,7 +413,7 @@ impl EventBaserunners {
                 reached_on_event_id: Some(ss.reached_on_event_id),
                 explicit_charged_pitcher_id: ss.explicit_charged_pitcher_id,
                 attempted_advance_to_base: Some(a.attempted_advance_to),
-                baserunning_play_type: baserunning_play_type,
+                baserunning_play_type,
                 is_out,
                 base_end: if a.is_successful {
                     Some(a.attempted_advance_to)
@@ -476,7 +473,7 @@ impl EventBaserunners {
                 explicit_charged_pitcher_id: None,
                 attempted_advance_to_base: Some(a.attempted_advance_to),
                 // Batter could be involved on baserunning play for K+WP,PO,
-                baserunning_play_type: baserunning_play_type,
+                baserunning_play_type,
                 is_out,
                 base_end: if a.is_successful {
                     Some(a.attempted_advance_to)
@@ -546,8 +543,8 @@ impl BoxScoreComments {
         for record in slice {
             if let MappedRecord::Comment(c) = record {
                 comments.push(Self {
-                    game_id: game_id.clone(),
-                    sequence_id: sequence_id,
+                    game_id: *game_id,
+                    sequence_id,
                     comment: c.clone(),
                 });
                 sequence_id += 1;

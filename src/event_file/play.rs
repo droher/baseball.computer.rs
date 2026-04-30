@@ -236,7 +236,7 @@ impl BaseRunner {
         }
     }
 
-    pub const fn to_current_base(&self) -> Option<Base> {
+    pub const fn to_current_base(self) -> Option<Base> {
         match self {
             Self::Batter => None,
             Self::First => Some(Base::First),
@@ -245,7 +245,7 @@ impl BaseRunner {
         }
     }
 
-    pub const fn to_next_base(&self) -> Base {
+    pub const fn to_next_base(self) -> Base {
         match self {
             Self::Batter => Base::First,
             Self::First => Base::Second,
@@ -256,10 +256,22 @@ impl BaseRunner {
 }
 
 #[derive(
-    Debug, Eq, PartialEq, EnumString, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize, AsRefStr,
+    Debug,
+    Default,
+    Eq,
+    PartialEq,
+    EnumString,
+    Copy,
+    Clone,
+    Ord,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    AsRefStr,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum InningFrame {
+    #[default]
     Top,
     Bottom,
 }
@@ -270,12 +282,6 @@ impl InningFrame {
             Self::Top => Self::Bottom,
             Self::Bottom => Self::Top,
         }
-    }
-}
-
-impl Default for InningFrame {
-    fn default() -> Self {
-        Self::Top
     }
 }
 
@@ -768,7 +774,7 @@ impl From<Captures<'_>> for BaserunningFieldingInfo {
         let mut fielders_data =
             FieldersData::from_vec(&get_capture("fielders"), FieldingPlayType::Assist);
 
-        if let Some(fp) = get_capture("error").get(0).copied() {
+        if let Some(fp) = get_capture("error").first().copied() {
             fielders_data.push(FieldersData::new(fp, FieldingPlayType::Error));
         } else if let Some(fd) = fielders_data.last_mut() {
             fd.fielding_play_type = FieldingPlayType::Putout;
@@ -971,7 +977,7 @@ impl TryFrom<(&str, &str)> for NoPlay {
             }),
             NoPlayType::ErrorOnFoul => Ok(Self {
                 no_play_type,
-                error: FieldingPosition::fielding_vec(last).get(0).copied(),
+                error: FieldingPosition::fielding_vec(last).first().copied(),
             }),
         }
     }
@@ -1089,13 +1095,10 @@ impl PlayType {
             let (first, last) = regex_split(value, MULTI_PLAY_REGEX);
             return Ok(Self::parse_main_play(first, false)?
                 .into_iter()
-                .chain(
-                    Self::parse_main_play(
-                        last.unwrap_or_default().get(1..).unwrap_or_default(),
-                        true,
-                    )?
-                    .into_iter(),
-                )
+                .chain(Self::parse_main_play(
+                    last.unwrap_or_default().get(1..).unwrap_or_default(),
+                    true,
+                )?)
                 .collect::<Vec<Self>>());
         }
         let (first, last) = regex_split(value, MAIN_PLAY_FIELDING_REGEX);
@@ -1323,7 +1326,7 @@ impl RunnerAdvanceModifier {
         let (first, last) = regex_split(value, NUMERIC_REGEX);
         let last = last.unwrap_or_default();
         let last_as_int_vec: PositionVec = FieldingPosition::fielding_vec(last);
-        let final_match = match first {
+        match first {
             "(INT" => Self::Interference(
                 last_as_int_vec
                     .first()
@@ -1353,13 +1356,13 @@ impl RunnerAdvanceModifier {
                 Self::Putout { assists, putout }
             }
             _ => Self::Unrecognized(value.into()),
-        };
-        final_match
+        }
     }
 }
 
 #[derive(
     Debug,
+    Default,
     Eq,
     PartialEq,
     Ord,
@@ -1377,18 +1380,14 @@ pub enum BattedBallStrength {
     Hard,
     #[strum(serialize = "-")]
     Soft,
+    #[default]
     Default,
     Unknown,
 }
 
-impl Default for BattedBallStrength {
-    fn default() -> Self {
-        Self::Default
-    }
-}
-
 #[derive(
     Debug,
+    Default,
     Eq,
     PartialEq,
     Ord,
@@ -1408,18 +1407,14 @@ pub enum BattedBallDepth {
     Deep,
     #[strum(serialize = "XD")]
     ExtraDeep,
+    #[default]
     Default,
     Unknown,
 }
 
-impl Default for BattedBallDepth {
-    fn default() -> Self {
-        Self::Default
-    }
-}
-
 #[derive(
     Debug,
+    Default,
     Eq,
     PartialEq,
     Ord,
@@ -1443,18 +1438,14 @@ pub enum BattedBallAngle {
     Left,
     #[strum(serialize = "R")]
     Right,
+    #[default]
     Default,
     Unknown,
 }
 
-impl Default for BattedBallAngle {
-    fn default() -> Self {
-        Self::Default
-    }
-}
-
 #[derive(
     Debug,
+    Default,
     Ord,
     PartialOrd,
     Eq,
@@ -1504,13 +1495,8 @@ pub enum BattedBallLocationGeneral {
     RightCenter,
     #[strum(serialize = "9")]
     Right,
+    #[default]
     Unknown,
-}
-
-impl Default for BattedBallLocationGeneral {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 impl BattedBallLocationGeneral {
@@ -1594,6 +1580,7 @@ impl TryFrom<(&str, &str)> for ContactDescription {
 
 #[derive(
     Debug,
+    Default,
     Ord,
     PartialOrd,
     Eq,
@@ -1625,14 +1612,9 @@ pub enum Trajectory {
     LineDrive,
     #[strum(serialize = "P")]
     PopUp,
+    #[default]
     Unknown,
     NoContact,
-}
-
-impl Default for Trajectory {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, EnumString, Clone, Hash)]
@@ -2047,7 +2029,8 @@ impl ParsedPlay {
     /// How to ID for our purposes:
     /// 1) Any non-batter outs included in the main play, e.g. 64(1)
     /// 2) The first baserunning-advance out on a fielders choice, e.g. FC1.2X3
-    /// These are mutually exclusive, as FCs will not include outs in the main play
+    ///
+    /// These are mutually exclusive, as FCs will not include outs in the main play.
     /// Note: the overwhelming majority of these are forceouts, but a good number of
     /// fielders-choice outs are tags (otherwise they probably would have been
     /// specified as a forceout).
@@ -2221,21 +2204,21 @@ impl ParsedPlay {
     pub fn hit_to_fielder(&self) -> Option<FieldingPosition> {
         let main_fielder = self.main_plays.iter().find_map(|pt| match pt {
             PlayType::PlateAppearance(PlateAppearanceType::Hit(h)) => {
-                h.positions_hit_to.get(0).copied()
+                h.positions_hit_to.first().copied()
             }
             PlayType::PlateAppearance(PlateAppearanceType::BattingOut(bo))
                 if bo.out_type != OutAtBatType::StrikeOut =>
             {
                 bo.fielding_play
                     .as_ref()
-                    .and_then(|fp| fp.fielders_data.get(0).map(|fd| fd.fielding_position))
+                    .and_then(|fp| fp.fielders_data.first().map(|fd| fd.fielding_position))
             }
             _ => None,
         });
         // Some fielders' choices only specify the fielder in the runner advance.
         let advance_fielder = self
             .advances()
-            .find_map(|ra| ra.fielders_data().get(0).map(|fd| fd.fielding_position));
+            .find_map(|ra| ra.fielders_data().first().map(|fd| fd.fielding_position));
         // If main_fielder is None or FieldingPosition::Unkown, use advance_fielder
         if main_fielder.unwrap_or_default() == FieldingPosition::Unknown {
             advance_fielder
@@ -2614,7 +2597,7 @@ mod tests {
     fn double_with_runners_records_advances_to_home() {
         // Double, runner on second scores, runner on first scores.
         let s = stats("D7/L7D.2-H;1-H");
-        let runs: Vec<_> = s.runs.iter().copied().collect();
+        let runs: Vec<_> = s.runs.to_vec();
         assert!(runs.contains(&BaseRunner::Second));
         assert!(runs.contains(&BaseRunner::First));
     }

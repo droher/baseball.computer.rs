@@ -7,7 +7,13 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-#![allow(clippy::module_name_repetitions, clippy::significant_drop_tightening)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::significant_drop_tightening,
+    // multiple_crate_versions reflects transitive deps (windows-sys, hashbrown,
+    // etc.) we don't directly control. Allow at the crate level.
+    clippy::multiple_crate_versions
+)]
 
 use event_file::schemas::{BoxScoreComments, EventBaserunners, EventComments, EventPitchSequences};
 use glob::GlobError;
@@ -256,7 +262,7 @@ impl EventFileSchema {
             let game_context_result =
                 GameContext::new(record_slice, file_info, record_vec.line_offset, game_num);
             if let Err(e) = game_context_result {
-                let game_id = if let Some(MappedRecord::GameId(id)) = record_slice.get(0) {
+                let game_id = if let Some(MappedRecord::GameId(id)) = record_slice.first() {
                     id.id.as_str()
                 } else {
                     "unknown"
@@ -455,7 +461,7 @@ impl FileProcessor {
         EventFileSchema::write(reader, parsed_games, writer_map, json_writer)
     }
 
-    fn contains_nlb_dupes(path: &PathBuf) -> bool {
+    fn contains_nlb_dupes(path: &Path) -> bool {
         let s = path.to_str().unwrap_or_default();
         if s.ends_with(".EVR") {
             s.contains("allas") || s.contains("allpost")

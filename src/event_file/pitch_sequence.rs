@@ -9,6 +9,7 @@ use crate::event_file::traits::SequenceId;
 
 #[derive(
     Debug,
+    Default,
     Ord,
     PartialOrd,
     Eq,
@@ -70,13 +71,8 @@ pub enum PitchType {
     InPlay,
     #[strum(serialize = "Y")]
     InPlayOnPitchout,
+    #[default]
     Unrecognized,
-}
-
-impl Default for PitchType {
-    fn default() -> Self {
-        Self::Unrecognized
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize, Hash)]

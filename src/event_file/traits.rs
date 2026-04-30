@@ -25,6 +25,7 @@ pub type SequenceId = BoundedUsize<1, MAX_EVENTS_PER_GAME>;
 pub type EventKey = i32;
 
 #[derive(
+    Default,
     Ord,
     PartialOrd,
     Debug,
@@ -42,6 +43,7 @@ pub type EventKey = i32;
 #[repr(u8)]
 pub enum LineupPosition {
     PitcherWithDh = 0,
+    #[default]
     First,
     Second,
     Third,
@@ -51,11 +53,6 @@ pub enum LineupPosition {
     Seventh,
     Eighth,
     Ninth,
-}
-impl Default for LineupPosition {
-    fn default() -> Self {
-        Self::First
-    }
 }
 
 impl LineupPosition {
@@ -92,6 +89,7 @@ impl TryFrom<&str> for LineupPosition {
 }
 
 #[derive(
+    Default,
     Ord,
     PartialOrd,
     Debug,
@@ -110,6 +108,7 @@ impl TryFrom<&str> for LineupPosition {
 )]
 #[repr(u8)]
 pub enum FieldingPosition {
+    #[default]
     Unknown = 0,
     Pitcher,
     Catcher,
@@ -142,11 +141,6 @@ impl FieldingPosition {
     pub fn retrosheet_string(self) -> String {
         let as_u8: u8 = self.into();
         as_u8.to_string()
-    }
-}
-impl Default for FieldingPosition {
-    fn default() -> Self {
-        Self::Unknown
     }
 }
 

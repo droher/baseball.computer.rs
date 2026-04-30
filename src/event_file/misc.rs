@@ -23,19 +23,16 @@ pub type Comment = String;
 /// Indicates the hands that the batter/pitcher are using. For the most part, this is not given
 /// explicitly, but occasionally the batter bats from a different side than his roster data
 /// indicates, and under very rare circumstances the pitcher can switch.
-#[derive(Debug, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize, AsRefStr)]
+#[derive(
+    Debug, Default, Eq, PartialEq, EnumString, Copy, Clone, Serialize, Deserialize, AsRefStr,
+)]
 pub enum Hand {
     #[strum(serialize = "L")]
     Left,
     #[strum(serialize = "R")]
     Right,
+    #[default]
     Default,
-}
-
-impl Default for Hand {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 #[derive(Ord, PartialOrd, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
