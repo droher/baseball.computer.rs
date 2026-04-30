@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{Error, Result, anyhow};
 use bimap::BiMap;
 use num_traits::PrimInt;
 use regex::{Match, Regex};
@@ -220,7 +220,7 @@ pub fn regex_split<'a>(s: &'a str, re: &'static Regex) -> (&'a str, Option<&'a s
 }
 
 #[inline]
-pub fn to_str_vec(match_vec: Vec<Option<Match>>) -> Vec<&str> {
+pub fn to_str_vec(match_vec: Vec<Option<Match<'_>>>) -> Vec<&str> {
     match_vec
         .into_iter()
         .filter_map(|o| o.map(|m| m.as_str()))

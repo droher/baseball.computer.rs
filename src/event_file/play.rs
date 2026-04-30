@@ -5,15 +5,14 @@ use std::hash::Hash;
 use std::iter::FromIterator;
 use std::mem::discriminant;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
-use anyhow::{bail, Context, Error, Result};
+use anyhow::{Context, Error, Result, bail};
 use arrayvec::ArrayVec;
 use bounded_integer::BoundedU8;
 use fixed_map::{Key, Set};
 use itertools::Itertools;
-use lazy_regex::{regex, Lazy};
-use lazy_static::lazy_static;
+use lazy_regex::{Lazy, regex};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use quick_cache::sync::Cache;
 use regex::{Captures, Match, Regex};
@@ -49,22 +48,20 @@ pub static HIT_LOCATION_STRENGTH_REGEX: &Lazy<Regex> = regex!(r"[+-]");
 pub static HIT_LOCATION_ANGLE_REGEX: &Lazy<Regex> = regex!(r"[FMLR]");
 pub static HIT_LOCATION_DEPTH_REGEX: &Lazy<Regex> = regex!(r"(D|S|XD)");
 
-lazy_static! {
-    static ref RAW_PLAY_CACHE: Arc<Cache<String, Arc<String>>> =
-        preallocated_cache::<String, String>(10000);
-    static ref PARSED_PLAY_CACHE: Arc<Cache<String, Arc<ParsedPlay>>> =
-        preallocated_cache::<String, ParsedPlay>(10000);
-    static ref MAIN_PLAY_CACHE: Arc<Cache<String, Arc<Vec<PlayType>>>> =
-        preallocated_cache::<String, Vec<PlayType>>(4000);
-    static ref PLAY_MODIFIER_CACHE: Arc<Cache<String, Arc<Vec<PlayModifier>>>> =
-        preallocated_cache::<String, Vec<PlayModifier>>(10000);
-    static ref RUNNER_ADVANCES_CACHE: Arc<Cache<String, Arc<Vec<RunnerAdvance>>>> =
-        preallocated_cache::<String, Vec<RunnerAdvance>>(10000);
-    static ref PLAY_STATS_CACHE: Arc<Cache<String, Arc<PlayStats>>> =
-        preallocated_cache::<String, PlayStats>(10000);
-    static ref PITCH_SEQUENCE_CACHE: Arc<Cache<String, Arc<PitchSequence>>> =
-        preallocated_cache::<String, PitchSequence>(10000);
-}
+static RAW_PLAY_CACHE: LazyLock<Arc<Cache<String, Arc<String>>>> =
+    LazyLock::new(|| preallocated_cache::<String, String>(10000));
+static PARSED_PLAY_CACHE: LazyLock<Arc<Cache<String, Arc<ParsedPlay>>>> =
+    LazyLock::new(|| preallocated_cache::<String, ParsedPlay>(10000));
+static MAIN_PLAY_CACHE: LazyLock<Arc<Cache<String, Arc<Vec<PlayType>>>>> =
+    LazyLock::new(|| preallocated_cache::<String, Vec<PlayType>>(4000));
+static PLAY_MODIFIER_CACHE: LazyLock<Arc<Cache<String, Arc<Vec<PlayModifier>>>>> =
+    LazyLock::new(|| preallocated_cache::<String, Vec<PlayModifier>>(10000));
+static RUNNER_ADVANCES_CACHE: LazyLock<Arc<Cache<String, Arc<Vec<RunnerAdvance>>>>> =
+    LazyLock::new(|| preallocated_cache::<String, Vec<RunnerAdvance>>(10000));
+static PLAY_STATS_CACHE: LazyLock<Arc<Cache<String, Arc<PlayStats>>>> =
+    LazyLock::new(|| preallocated_cache::<String, PlayStats>(10000));
+static PITCH_SEQUENCE_CACHE: LazyLock<Arc<Cache<String, Arc<PitchSequence>>>> =
+    LazyLock::new(|| preallocated_cache::<String, PitchSequence>(10000));
 
 /// Instantiates a new cache with the given size and preallocates the given number of entries.
 /// This reduces the number of allocations needed to insert new entries into the cache.
@@ -727,14 +724,18 @@ impl TryFrom<(&str, &str)> for PlateAppearanceType {
     type Error = Error;
 
     fn try_from(value: (&str, &str)) -> Result<Self> {
-        if let Ok(batting_out) = BattingOut::try_from(value) {
-            Ok(Self::BattingOut(batting_out))
-        } else if let Ok(hit) = Hit::try_from(value) {
-            Ok(Self::Hit(hit))
-        } else if let Ok(pa) = OtherPlateAppearance::from_str(value.0) {
-            Ok(Self::OtherPlateAppearance(pa))
-        } else {
-            bail!("Unable to parse plate appearance")
+        match BattingOut::try_from(value) {
+            Ok(batting_out) => Ok(Self::BattingOut(batting_out)),
+            _ => match Hit::try_from(value) {
+                Ok(hit) => Ok(Self::Hit(hit)),
+                _ => {
+                    if let Ok(pa) = OtherPlateAppearance::from_str(value.0) {
+                        Ok(Self::OtherPlateAppearance(pa))
+                    } else {
+                        bail!("Unable to parse plate appearance")
+                    }
+                }
+            },
         }
     }
 }
@@ -1101,14 +1102,17 @@ impl PlayType {
         let str_tuple = (first, last.unwrap_or_default());
         // Extra plays cannot be plate appearances and will produce false matches in some cases,
         // so we need to check for that in addition to the regex match.
-        if let (false, Ok(pa)) = (is_extra_play, PlateAppearanceType::try_from(str_tuple)) {
-            Ok(vec![Self::PlateAppearance(pa)])
-        } else if let Ok(br) = BaserunningPlay::try_from(value) {
-            Ok(vec![Self::BaserunningPlay(br)])
-        } else if let Ok(np) = NoPlay::try_from(str_tuple) {
-            Ok(vec![Self::NoPlay(np)])
-        } else {
-            bail!("Unable to parse play: {value}")
+        match (is_extra_play, PlateAppearanceType::try_from(str_tuple)) {
+            (false, Ok(pa)) => Ok(vec![Self::PlateAppearance(pa)]),
+            _ => match BaserunningPlay::try_from(value) {
+                Ok(br) => Ok(vec![Self::BaserunningPlay(br)]),
+                _ => match NoPlay::try_from(str_tuple) {
+                    Ok(np) => Ok(vec![Self::NoPlay(np)]),
+                    _ => {
+                        bail!("Unable to parse play: {value}")
+                    }
+                },
+            },
         }
     }
 }
@@ -1577,7 +1581,9 @@ impl TryFrom<(&str, &str)> for ContactDescription {
         let trajectory = Trajectory::from_str(contact).ok();
         let location = BattedBallLocation::try_from(loc).ok();
         if trajectory.is_none() && location.is_none() {
-            bail!("Contact description should have at least one of trajectory or location, but neither were found")
+            bail!(
+                "Contact description should have at least one of trajectory or location, but neither were found"
+            )
         }
         Ok(Self {
             trajectory,
@@ -2643,20 +2649,22 @@ mod tests {
     #[test]
     fn caught_stealing_is_baserunning_play() {
         let pp = parse("CS2(26)");
-        assert!(pp
-            .main_plays
-            .iter()
-            .any(|p| matches!(p, PlayType::BaserunningPlay(_))));
+        assert!(
+            pp.main_plays
+                .iter()
+                .any(|p| matches!(p, PlayType::BaserunningPlay(_)))
+        );
     }
 
     #[test]
     fn strikeout_with_passed_ball_compound_play() {
         // K+PB: strikeout reaches first via passed ball.
         let pp = parse("K+PB.B-1");
-        assert!(pp
-            .main_plays
-            .iter()
-            .any(|p| matches!(p, PlayType::PlateAppearance(pa) if pa.is_strikeout())));
+        assert!(
+            pp.main_plays
+                .iter()
+                .any(|p| matches!(p, PlayType::PlateAppearance(pa) if pa.is_strikeout()))
+        );
         assert!(pp.main_plays.iter().any(PlayType::passed_ball));
     }
 

@@ -1,13 +1,13 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use anyhow::{bail, Context, Error, Result};
+use anyhow::{Context, Error, Result, bail};
 use arrayref::array_ref;
 use arrayvec::ArrayString;
 use serde::{Deserialize, Serialize};
 
 use crate::event_file::misc::{
-    parse_non_negative_int, parse_positive_int, str_to_tinystr, Defense, Lineup,
+    Defense, Lineup, parse_non_negative_int, parse_positive_int, str_to_tinystr,
 };
 use crate::event_file::traits::{
     Batter, Fielder, FieldingPosition, Inning, LineupPosition, Pitcher, RetrosheetEventRecord, Side,

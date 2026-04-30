@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{Context, Error, Result, anyhow};
 use arrayvec::ArrayString;
 use bounded_integer::BoundedUsize;
 use csv::StringRecord;

@@ -3,11 +3,11 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{Context, Error, Result, anyhow};
 use arrayvec::ArrayString;
 use csv::{Reader, ReaderBuilder, StringRecord};
-use glob::{glob, Paths, PatternError};
-use lazy_regex::{regex, Lazy};
+use glob::{Paths, PatternError, glob};
+use lazy_regex::{Lazy, regex};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use strum_macros::AsRefStr;

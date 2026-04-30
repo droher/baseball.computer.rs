@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use arrayvec::ArrayString;
 use bounded_integer::BoundedU8;
 use chrono::{NaiveDate, NaiveDateTime};

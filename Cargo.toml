@@ -2,7 +2,8 @@
 name = "baseball-computer"
 version = "0.0.1"
 authors = ["David Roher <david.roher@gmail.com>"]
-edition = "2021"
+edition = "2024"
+rust-version = "1.94"
 description = "Creates structured datasets from raw Retrosheet files."
 license = "BSL-1.0"
 repository = "https://github.com/droher/baseball.computer.rs"
@@ -13,34 +14,33 @@ categories = ["command-line-utilities", "science"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = { version = "0.4.41", default-features = false, features = ["std", "clock", "serde"]}
-strum = "0.27.1"
-strum_macros = "0.27.1"
-csv = "1.3.1"
-anyhow = "1.0.98"
+chrono = { version = "0.4.44", default-features = false, features = ["std", "clock", "serde"]}
+strum = "0.28.0"
+strum_macros = "0.28.0"
+csv = "1.4.0"
+anyhow = "1.0.102"
 num-traits = "0.2.19"
 arrayref = "0.3.9"
 arrayvec = {version = "0.7.6", features = ["serde"]}
-lazy_static = "1.5.0"
-const_format = "0.2.34"
+const_format = "0.2.36"
 either = {version = "1.15.0", features = ["serde", "use_std"]}
-num_enum = "0.7.4"
+num_enum = "0.7.6"
 bimap = "0.6.3"
-clap = {version = "4.5.40", features = ["derive"]}
+clap = {version = "4.6.1", features = ["derive"]}
 itertools = "0.14.0"
-serde = {version = "1.0.219",  features = ["derive", "rc"]}
-serde_json = {version = "1.0.140", features = ["preserve_order"]}
-glob = "0.3.2"
-rayon = "1.10.0"
-tracing = "0.1.41"
-tracing-subscriber = "0.3.19"
+serde = {version = "1.0.228",  features = ["derive", "rc"]}
+serde_json = {version = "1.0.149", features = ["preserve_order"]}
+glob = "0.3.3"
+rayon = "1.12.0"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
 bounded-integer = {version = "0.5.8", features = ["types", "serde"]}
 serde_repr = "0.1.20"
-regex = {version = "1.11.1", default-features = false, features = ["std", "perf"]} # No need for unicode
-quick_cache = {version = "0.6.14", features = ["stats"]}
+regex = {version = "1.12.3", default-features = false, features = ["std", "perf"]} # No need for unicode
+quick_cache = {version = "0.6.21", features = ["stats"]}
 fixed-map = {version = "0.9.5", features = ["serde"]}
-lazy-regex = "3.4.1"
-flate2 = "1.1.2"
+lazy-regex = "3.6.0"
+flate2 = "1.1.9"
 
 [dev-dependencies]
-tempfile = "3.10"
+tempfile = "3.27"

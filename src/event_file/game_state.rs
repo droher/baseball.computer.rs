@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use anyhow::{anyhow, bail, Context, Error, Result};
+use anyhow::{Context, Error, Result, anyhow, bail};
 use arrayvec::{ArrayString, ArrayVec};
 use bounded_integer::{BoundedU8, BoundedUsize};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display};
 use tracing::warn;
 
+use crate::AccountType;
 use crate::event_file::info::{
     DayNight, DoubleheaderStatus, FieldCondition, HowScored, InfoRecord, Park, Precipitation, Sky,
     Team, UmpireAssignment, UmpirePosition, WindDirection,
@@ -27,10 +28,9 @@ use crate::event_file::play::{
     RunnerAdvance, Trajectory, UnearnedRunStatus,
 };
 use crate::event_file::traits::{
-    FieldingPosition, Inning, LineupPosition, Matchup, Pitcher, Player, RetrosheetVolunteer,
-    Scorer, SequenceId, Side, Umpire, MAX_EVENTS_PER_GAME,
+    FieldingPosition, Inning, LineupPosition, MAX_EVENTS_PER_GAME, Matchup, Pitcher, Player,
+    RetrosheetVolunteer, Scorer, SequenceId, Side, Umpire,
 };
-use crate::AccountType;
 
 use super::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
 use super::pitch_sequence::{PitchSequence, PitchSequenceItem, PitchType};
@@ -1710,39 +1710,60 @@ impl BaseState {
         if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Third, play) {
             new_state.clear_baserunner(BaseRunner::Third);
             if a.is_out() {
-            } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
-                return Err(e);
-            } else if let Some(r) = self.get_third() {
-                new_state.scored.push(*r);
+            } else {
+                match Self::check_integrity(self, &new_state, a) {
+                    Err(e) => {
+                        return Err(e);
+                    }
+                    _ => {
+                        if let Some(r) = self.get_third() {
+                            new_state.scored.push(*r);
+                        }
+                    }
+                }
             }
         }
         if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Second, play) {
             new_state.clear_baserunner(BaseRunner::Second);
             if a.is_out() {
-            } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
-                return Err(e);
-            } else if let (true, Some(r)) = (
-                a.is_this_that_one_time_jean_segura_ran_in_reverse(),
-                self.get_second(),
-            ) {
-                new_state.set_runner(BaseRunner::First, *r);
-            } else if let (Base::Third, Some(r)) = (a.to, self.get_second()) {
-                new_state.set_runner(BaseRunner::Third, *r);
-            } else if let (Base::Home, Some(r)) = (a.to, self.get_second()) {
-                new_state.scored.push(*r);
+            } else {
+                match Self::check_integrity(self, &new_state, a) {
+                    Err(e) => {
+                        return Err(e);
+                    }
+                    _ => {
+                        if let (true, Some(r)) = (
+                            a.is_this_that_one_time_jean_segura_ran_in_reverse(),
+                            self.get_second(),
+                        ) {
+                            new_state.set_runner(BaseRunner::First, *r);
+                        } else if let (Base::Third, Some(r)) = (a.to, self.get_second()) {
+                            new_state.set_runner(BaseRunner::Third, *r);
+                        } else if let (Base::Home, Some(r)) = (a.to, self.get_second()) {
+                            new_state.scored.push(*r);
+                        }
+                    }
+                }
             }
         }
         if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::First, play) {
             new_state.clear_baserunner(BaseRunner::First);
             if a.is_out() {
-            } else if let Err(e) = Self::check_integrity(self, &new_state, a) {
-                return Err(e);
-            } else if let (Base::Second, Some(r)) = (&a.to, self.get_first()) {
-                new_state.set_runner(BaseRunner::Second, *r);
-            } else if let (Base::Third, Some(r)) = (&a.to, self.get_first()) {
-                new_state.set_runner(BaseRunner::Third, *r);
-            } else if let (Base::Home, Some(r)) = (&a.to, self.get_first()) {
-                new_state.scored.push(*r);
+            } else {
+                match Self::check_integrity(self, &new_state, a) {
+                    Err(e) => {
+                        return Err(e);
+                    }
+                    _ => {
+                        if let (Base::Second, Some(r)) = (&a.to, self.get_first()) {
+                            new_state.set_runner(BaseRunner::Second, *r);
+                        } else if let (Base::Third, Some(r)) = (&a.to, self.get_first()) {
+                            new_state.set_runner(BaseRunner::Third, *r);
+                        } else if let (Base::Home, Some(r)) = (&a.to, self.get_first()) {
+                            new_state.scored.push(*r);
+                        }
+                    }
+                }
             }
         }
         if let Some(a) = Self::get_advance_from_baserunner(BaseRunner::Batter, play) {
@@ -1755,7 +1776,7 @@ impl BaseState {
             match a.to {
                 _ if a.is_out() || end_inning => {}
                 _ if new_state.target_base_occupied(a) => {
-                    return Err(anyhow!("Batter advanced to an occupied base"))
+                    return Err(anyhow!("Batter advanced to an occupied base"));
                 }
                 Base::Home => new_state.scored.push(new_runner),
                 b => new_state.set_runner(BaseRunner::from_current_base(b), new_runner),

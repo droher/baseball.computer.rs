@@ -19,19 +19,18 @@ use std::hash::Hash;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::time::Instant;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use csv::{Writer, WriterBuilder};
 use either::Either;
 use fixed_map::{Key, Map};
-use lazy_static::lazy_static;
 use rayon::prelude::*;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-use tracing::{debug, error, info, warn, Level};
+use tracing::{Level, debug, error, info, warn};
 use tracing_subscriber::FmtSubscriber;
 
 use event_file::game_state::GameContext;
@@ -45,17 +44,15 @@ use crate::event_file::schemas::{
     BoxScoreLineScores, BoxScoreWritableRecord, ContextToVec, EventAudit, EventFieldingPlays,
     Events, GameEarnedRuns, Games,
 };
-use crate::event_file::traits::{GameType, EVENT_KEY_BUFFER};
+use crate::event_file::traits::{EVENT_KEY_BUFFER, GameType};
 
 mod event_file;
 
 const ABOUT: &str = "Creates structured datasets from raw Retrosheet files.";
 
-lazy_static! {
-    static ref OUTPUT_ROOT: PathBuf = get_output_root(&Opt::parse());
-    static ref WRITER_MAP: WriterMap = WriterMap::new(&OUTPUT_ROOT);
-    static ref JSON_WRITER: ThreadSafeJsonWriter = ThreadSafeJsonWriter::new();
-}
+static OUTPUT_ROOT: LazyLock<PathBuf> = LazyLock::new(|| get_output_root(&Opt::parse()));
+static WRITER_MAP: LazyLock<WriterMap> = LazyLock::new(|| WriterMap::new(&OUTPUT_ROOT));
+static JSON_WRITER: LazyLock<ThreadSafeJsonWriter> = LazyLock::new(ThreadSafeJsonWriter::new);
 
 struct ThreadSafeJsonWriter {
     json: Mutex<BufWriter<File>>,
@@ -72,7 +69,7 @@ impl ThreadSafeJsonWriter {
         }
     }
 
-    pub fn json(&self) -> Result<MutexGuard<BufWriter<File>>> {
+    pub fn json(&self) -> Result<MutexGuard<'_, BufWriter<File>>> {
         self.json
             .lock()
             .map_err(|e| anyhow!("Failed to acquire writer lock: {}", e))
@@ -105,7 +102,7 @@ impl ThreadSafeCsvWriter {
         }
     }
 
-    pub fn csv(&self) -> Result<MutexGuard<Writer<File>>> {
+    pub fn csv(&self) -> Result<MutexGuard<'_, Writer<File>>> {
         self.csv
             .lock()
             .map_err(|e| anyhow!("Failed to acquire writer lock: {}", e))
@@ -143,7 +140,7 @@ impl WriterMap {
             .collect::<Result<Vec<()>>>()
     }
 
-    fn get_csv(&self, schema: EventFileSchema) -> Result<MutexGuard<Writer<File>>> {
+    fn get_csv(&self, schema: EventFileSchema) -> Result<MutexGuard<'_, Writer<File>>> {
         self.map
             .get(schema)
             .context("Failed to initialize writer for schema")?
