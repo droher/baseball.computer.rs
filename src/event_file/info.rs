@@ -17,6 +17,7 @@ use super::traits::GameType;
 
 #[derive(
     Debug,
+    Default,
     Eq,
     PartialEq,
     EnumString,
@@ -34,16 +35,13 @@ pub enum HowScored {
     Park,
     Tv,
     Radio,
+    #[default]
     Unknown,
-}
-impl Default for HowScored {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 #[derive(
     Debug,
+    Default,
     Eq,
     PartialEq,
     EnumString,
@@ -62,16 +60,13 @@ pub enum FieldCondition {
     Soaked,
     Wet,
     Damp,
+    #[default]
     Unknown,
-}
-impl Default for FieldCondition {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 #[derive(
     Debug,
+    Default,
     Eq,
     PartialEq,
     EnumString,
@@ -91,16 +86,13 @@ pub enum Precipitation {
     Showers,
     Snow,
     None,
+    #[default]
     Unknown,
-}
-impl Default for Precipitation {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 #[derive(
     Debug,
+    Default,
     Eq,
     PartialEq,
     EnumString,
@@ -120,16 +112,13 @@ pub enum Sky {
     Night,
     Overcast,
     Sunny,
+    #[default]
     Unknown,
-}
-impl Default for Sky {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 #[derive(
     Debug,
+    Default,
     Eq,
     PartialEq,
     EnumString,
@@ -154,12 +143,8 @@ pub enum WindDirection {
     ToCf,
     ToLf,
     ToRf,
+    #[default]
     Unknown,
-}
-impl Default for WindDirection {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 pub type Team = ArrayString<3>;
@@ -167,6 +152,7 @@ pub type Park = ArrayString<16>;
 
 #[derive(
     Debug,
+    Default,
     Eq,
     PartialEq,
     EnumString,
@@ -184,16 +170,13 @@ pub enum DayNight {
     Day,
     Night,
     #[strum(serialize = "unknown", serialize = "")]
+    #[default]
     Unknown,
-}
-impl Default for DayNight {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 #[derive(
     Debug,
+    Default,
     Eq,
     PartialEq,
     Ord,
@@ -208,6 +191,7 @@ impl Default for DayNight {
 )]
 pub enum DoubleheaderStatus {
     #[strum(serialize = "0")]
+    #[default]
     SingleGame,
     #[strum(serialize = "1")]
     DoubleHeaderGame1,
@@ -218,14 +202,10 @@ pub enum DoubleheaderStatus {
     #[strum(serialize = "4")]
     DoubleHeaderGame4,
 }
-impl Default for DoubleheaderStatus {
-    fn default() -> Self {
-        Self::SingleGame
-    }
-}
 
 #[derive(
     Debug,
+    Default,
     Eq,
     PartialEq,
     EnumString,
@@ -243,12 +223,8 @@ pub enum PitchDetail {
     Pitches,
     Count,
     None,
+    #[default]
     Unknown,
-}
-impl Default for PitchDetail {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 #[derive(

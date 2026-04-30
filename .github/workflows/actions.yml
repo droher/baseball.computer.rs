@@ -32,8 +32,8 @@ jobs:
           cargo clippy --all-targets --release 2>&1 | tee clippy.log
           errors=$(grep -cE '^error' clippy.log || true)
           echo "clippy error count: $errors"
-          if [ "$errors" -gt 58 ]; then
-            echo "::error::clippy regressed: $errors > baseline 58"
+          if [ "$errors" -gt 49 ]; then
+            echo "::error::clippy regressed: $errors > baseline 49"
             exit 1
           fi
 
