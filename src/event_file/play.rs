@@ -69,7 +69,7 @@ lazy_static! {
 /// Instantiates a new cache with the given size and preallocates the given number of entries.
 /// This reduces the number of allocations needed to insert new entries into the cache.
 fn preallocated_cache<K: Hash + Eq, V: Clone>(size: usize) -> Arc<Cache<K, Arc<V>>> {
-    let mut cache = Cache::new(size);
+    let cache = Cache::new(size);
     cache.reserve(size);
     Arc::new(cache)
 }

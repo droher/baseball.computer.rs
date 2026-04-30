@@ -410,7 +410,7 @@ impl EventBaserunners {
                     event.event_id,
                     event.context.batting_side,
                 )
-                .unwrap()
+                .expect(&game_context.game_id.id)
                 .player_id,
                 charge_event_id: ss.charge_event_id,
                 reached_on_event_id: Some(ss.reached_on_event_id),
@@ -441,7 +441,7 @@ impl EventBaserunners {
                     event.event_id,
                     event.context.batting_side,
                 )
-                .unwrap()
+                .expect(&game_context.game_id.id)
                 .player_id,
                 charge_event_id: ss.charge_event_id,
                 reached_on_event_id: Some(ss.reached_on_event_id),

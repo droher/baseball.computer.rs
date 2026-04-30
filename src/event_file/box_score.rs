@@ -6,7 +6,7 @@ use arrayref::array_ref;
 use arrayvec::ArrayString;
 use serde::{Deserialize, Serialize};
 
-use crate::event_file::misc::{parse_positive_int, str_to_tinystr, Defense, Lineup};
+use crate::event_file::misc::{parse_non_negative_int, parse_positive_int, str_to_tinystr, Defense, Lineup};
 use crate::event_file::traits::{
     Batter, Fielder, FieldingPosition, Inning, LineupPosition, Pitcher, RetrosheetEventRecord, Side,
 };
@@ -128,11 +128,11 @@ impl TryFrom<&RetrosheetEventRecord> for BattingLine {
 
     fn try_from(record: &RetrosheetEventRecord) -> Result<Self> {
         let arr = record.deserialize::<[&str; 23]>(None)?;
-        let p = parse_positive_int::<u8>;
+        let p = parse_non_negative_int::<u8>;
         Ok(Self {
             batter_id: str_to_tinystr(arr[2])?,
             side: Side::from_str(arr[3])?,
-            lineup_position: LineupPosition::try_from(arr[4])?,
+            lineup_position: LineupPosition::try_from(arr[4]).context("Invalid lineup position")?,
             nth_player_at_position: p(arr[5]).context("Invalid batting sequence position")?,
             batting_stats: BattingLineStats::try_from(array_ref![arr, 6, 17])?,
         })

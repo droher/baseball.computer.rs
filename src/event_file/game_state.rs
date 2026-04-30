@@ -56,13 +56,15 @@ enum PositionType {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 struct TrackedPlayer {
     pub player: Player,
+    pub side: Side,
     is_pitcher_with_dh: bool,
 }
 
-impl From<(Player, bool)> for TrackedPlayer {
-    fn from((player, is_starting_pitcher_with_dh): (Player, bool)) -> Self {
+impl From<(Player, Side, bool)> for TrackedPlayer {
+    fn from((player, side, is_starting_pitcher_with_dh): (Player, Side, bool)) -> Self {
         Self {
             player,
+            side,
             is_pitcher_with_dh: is_starting_pitcher_with_dh,
         }
     }
@@ -984,6 +986,7 @@ impl Personnel {
             );
             let player: TrackedPlayer = (
                 start.player,
+                start.side,
                 start.lineup_position == LineupPosition::PitcherWithDh,
             )
                 .into();
@@ -1037,7 +1040,7 @@ impl Personnel {
     }
 
     fn at_bat(&self, play: &PlayRecord) -> Result<LineupPosition> {
-        let player: TrackedPlayer = (play.batter, false).into();
+        let player: TrackedPlayer = (play.batter, play.batting_side, false).into();
         let position = self.get_player_lineup_position(play.batting_side, &player);
         if let Some(PositionType::Lineup(lp)) = position {
             Ok(lp)
@@ -1110,6 +1113,7 @@ impl Personnel {
 
         let new_player: TrackedPlayer = (
             sub.player,
+            sub.side,
             sub.lineup_position == LineupPosition::PitcherWithDh,
         )
             .into();
@@ -1157,6 +1161,7 @@ impl Personnel {
         }
         let new_fielder: TrackedPlayer = (
             sub.player,
+            sub.side,
             sub.lineup_position == LineupPosition::PitcherWithDh,
         )
             .into();
@@ -1482,7 +1487,7 @@ impl GameState {
             self.batting_side = self.batting_side.flip();
             self.outs = Outs::new(0).context("Unexpected outs bound error")?;
         }
-        let tracked_runner: TrackedPlayer = (record.runner_id, false).into();
+        let tracked_runner: TrackedPlayer = (record.runner_id, self.batting_side, false).into();
         let runner_pos = self
             .personnel
             .get_current_lineup_appearance(&tracked_runner)?
