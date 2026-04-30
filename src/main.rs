@@ -19,7 +19,7 @@ use std::hash::Hash;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{LazyLock, Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard};
 use std::time::Instant;
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -50,23 +50,21 @@ mod event_file;
 
 const ABOUT: &str = "Creates structured datasets from raw Retrosheet files.";
 
-static OUTPUT_ROOT: LazyLock<PathBuf> = LazyLock::new(|| get_output_root(&Opt::parse()));
-static WRITER_MAP: LazyLock<WriterMap> = LazyLock::new(|| WriterMap::new(&OUTPUT_ROOT));
-static JSON_WRITER: LazyLock<ThreadSafeJsonWriter> = LazyLock::new(ThreadSafeJsonWriter::new);
-
 struct ThreadSafeJsonWriter {
     json: Mutex<BufWriter<File>>,
 }
 
 impl ThreadSafeJsonWriter {
-    #[allow(clippy::expect_used)]
-    pub fn new() -> Self {
-        let output_path = OUTPUT_ROOT.join("games.jsonl");
+    pub fn new(output_root: &Path) -> Result<Self> {
+        let output_path = output_root.join("games.jsonl");
         debug!("Creating file {}", output_path.display());
-        let file = BufWriter::new(File::create(output_path).expect("Failed to create file"));
-        Self {
+        let file = BufWriter::new(
+            File::create(&output_path)
+                .with_context(|| format!("Failed to create {}", output_path.display()))?,
+        );
+        Ok(Self {
             json: Mutex::new(file),
-        }
+        })
     }
 
     pub fn json(&self) -> Result<MutexGuard<'_, BufWriter<File>>> {
@@ -87,19 +85,18 @@ struct ThreadSafeCsvWriter {
     has_header_written: AtomicBool,
 }
 impl ThreadSafeCsvWriter {
-    #[allow(clippy::expect_used)]
-    pub fn new(schema: EventFileSchema) -> Self {
+    pub fn new(schema: EventFileSchema, output_root: &Path) -> Result<Self> {
         let file_name = format!("{schema}.csv");
-        let output_path = OUTPUT_ROOT.join(file_name);
+        let output_path = output_root.join(file_name);
         debug!("Creating file {}", output_path.display());
         let csv = WriterBuilder::new()
             .has_headers(!schema.uses_custom_header())
-            .from_path(output_path)
-            .expect("Failed to create file");
-        Self {
+            .from_path(&output_path)
+            .with_context(|| format!("Failed to create {}", output_path.display()))?;
+        Ok(Self {
             csv: Mutex::new(csv),
             has_header_written: AtomicBool::new(!schema.uses_custom_header()),
-        }
+        })
     }
 
     pub fn csv(&self) -> Result<MutexGuard<'_, Writer<File>>> {
@@ -115,16 +112,15 @@ struct WriterMap {
 }
 
 impl WriterMap {
-    #[allow(clippy::expect_used)]
-    fn new(output_prefix: &Path) -> Self {
+    fn new(output_prefix: &Path) -> Result<Self> {
         let mut map = Map::new();
         for schema in EventFileSchema::iter() {
-            map.insert(schema, ThreadSafeCsvWriter::new(schema));
+            map.insert(schema, ThreadSafeCsvWriter::new(schema, output_prefix)?);
         }
-        Self {
+        Ok(Self {
             output_prefix: output_prefix.to_path_buf(),
             map,
-        }
+        })
     }
 
     fn flush_all(&self) -> Result<Vec<()>> {
@@ -241,7 +237,8 @@ impl EventFileSchema {
     fn write(
         reader: RetrosheetReader,
         parsed_games: Option<&HashSet<GameId>>,
-        use_json: bool,
+        writer_map: &WriterMap,
+        json_writer: Option<&ThreadSafeJsonWriter>,
     ) -> Result<Vec<GameId>> {
         let file_info = reader.file_info;
         debug!("Processing file {}", file_info.filename);
@@ -283,14 +280,14 @@ impl EventFileSchema {
                 );
                 continue;
             }
-            if use_json {
-                let mut json_writer = JSON_WRITER.json()?;
-                serde_json::to_writer(&mut *json_writer, &game_context)?;
-                json_writer.write("\n".as_bytes())?;
+            if let Some(jw) = json_writer {
+                let mut handle = jw.json()?;
+                serde_json::to_writer(&mut *handle, &game_context)?;
+                handle.write_all(b"\n")?;
             } else if game_context.file_info.account_type == AccountType::BoxScore {
-                Self::write_box_score_files(&game_context, record_slice)?;
+                Self::write_box_score_files(&game_context, record_slice, writer_map)?;
             } else {
-                Self::write_play_by_play_files(&game_context)?;
+                Self::write_play_by_play_files(&game_context, writer_map)?;
             }
         }
         Ok(game_ids)
@@ -321,9 +318,13 @@ impl EventFileSchema {
         })
     }
 
-    fn write_box_score_files(game_context: &GameContext, record_slice: &RecordSlice) -> Result<()> {
+    fn write_box_score_files(
+        game_context: &GameContext,
+        record_slice: &RecordSlice,
+        writer_map: &WriterMap,
+    ) -> Result<()> {
         // Write Game
-        WRITER_MAP
+        writer_map
             .get_csv(Self::BoxScoreGames)?
             .serialize(Games::from(game_context))?;
         // Write Linescores
@@ -334,12 +335,12 @@ impl EventFileSchema {
                 _ => None,
             })
             .flat_map(|ls| BoxScoreLineScores::transform_line_score(game_context.game_id.id, ls));
-        let mut w = WRITER_MAP.get_csv(Self::BoxScoreLineScores)?;
+        let mut w = writer_map.get_csv(Self::BoxScoreLineScores)?;
         for row in line_scores {
             w.serialize(row)?;
         }
         // Write Comments
-        let mut w = WRITER_MAP.get_csv(Self::BoxScoreComments)?;
+        let mut w = writer_map.get_csv(Self::BoxScoreComments)?;
         for row in BoxScoreComments::from_record_slice(&game_context.game_id.id, record_slice) {
             w.serialize(row)?;
         }
@@ -355,36 +356,36 @@ impl EventFileSchema {
             .map(|record| BoxScoreWritableRecord { game_id, record });
 
         for line in box_score_lines {
-            WRITER_MAP.write_box_score_line(&line)?;
+            writer_map.write_box_score_line(&line)?;
         }
         Ok(())
     }
 
-    fn write_play_by_play_files(game_context: &GameContext) -> Result<()> {
+    fn write_play_by_play_files(game_context: &GameContext, writer_map: &WriterMap) -> Result<()> {
         // Write schemas directly serializable from GameContext
-        WRITER_MAP.write_csv::<GameEarnedRuns>(Self::GameEarnedRuns, game_context)?;
-        WRITER_MAP.write_csv::<Events>(Self::Events, game_context)?;
-        WRITER_MAP.write_csv::<EventAudit>(Self::EventAudit, game_context)?;
-        WRITER_MAP.write_csv::<EventFieldingPlays>(Self::EventFieldingPlay, game_context)?;
-        WRITER_MAP.write_csv::<EventPitchSequences>(Self::EventPitchSequences, game_context)?;
-        WRITER_MAP.write_csv::<EventComments>(Self::EventComments, game_context)?;
-        WRITER_MAP.write_csv::<EventBaserunners>(Self::EventBaserunners, game_context)?;
+        writer_map.write_csv::<GameEarnedRuns>(Self::GameEarnedRuns, game_context)?;
+        writer_map.write_csv::<Events>(Self::Events, game_context)?;
+        writer_map.write_csv::<EventAudit>(Self::EventAudit, game_context)?;
+        writer_map.write_csv::<EventFieldingPlays>(Self::EventFieldingPlay, game_context)?;
+        writer_map.write_csv::<EventPitchSequences>(Self::EventPitchSequences, game_context)?;
+        writer_map.write_csv::<EventComments>(Self::EventComments, game_context)?;
+        writer_map.write_csv::<EventBaserunners>(Self::EventBaserunners, game_context)?;
         // Write Game
-        WRITER_MAP
+        writer_map
             .get_csv(Self::Games)?
             .serialize(Games::from(game_context))?;
         // Write GameLineupAppearance
-        let mut w = WRITER_MAP.get_csv(Self::GameLineupAppearances)?;
+        let mut w = writer_map.get_csv(Self::GameLineupAppearances)?;
         for row in &game_context.lineup_appearances {
             w.serialize(row)?;
         }
         // Write GameFieldingAppearance
-        let mut w = WRITER_MAP.get_csv(Self::GameFieldingAppearances)?;
+        let mut w = writer_map.get_csv(Self::GameFieldingAppearances)?;
         for row in &game_context.fielding_appearances {
             w.serialize(row)?;
         }
         //Write EventFlag
-        let mut w = WRITER_MAP.get_csv(Self::EventFlags)?;
+        let mut w = writer_map.get_csv(Self::EventFlags)?;
         let event_flags = game_context
             .events
             .iter()
@@ -409,37 +410,49 @@ struct Opt {
     json: bool,
 }
 
-#[allow(clippy::expect_used)]
-fn get_output_root(opt: &Opt) -> PathBuf {
-    std::fs::create_dir_all(&opt.output_dir).expect("Error occurred on output dir check");
+fn get_output_root(opt: &Opt) -> Result<PathBuf> {
+    std::fs::create_dir_all(&opt.output_dir)
+        .with_context(|| format!("Failed to create output dir {}", opt.output_dir.display()))?;
     opt.output_dir
         .canonicalize()
-        .expect("Error occurred on output dir canonicalization")
+        .with_context(|| format!("Failed to canonicalize {}", opt.output_dir.display()))
 }
 
 struct FileProcessor {
     index: usize,
     opt: Opt,
     game_ids: HashSet<GameId>,
+    writer_map: WriterMap,
+    json_writer: Option<ThreadSafeJsonWriter>,
 }
 
 impl FileProcessor {
-    pub fn new(opt: Opt) -> Self {
-        Self {
+    pub fn new(opt: Opt) -> Result<Self> {
+        let output_root = get_output_root(&opt)?;
+        let writer_map = WriterMap::new(&output_root)?;
+        let json_writer = if opt.json {
+            Some(ThreadSafeJsonWriter::new(&output_root)?)
+        } else {
+            None
+        };
+        Ok(Self {
             index: 0,
             opt,
             game_ids: HashSet::with_capacity(200_000),
-        }
+            writer_map,
+            json_writer,
+        })
     }
 
     fn process_file(
         input_path: &PathBuf,
         parsed_games: Option<&HashSet<GameId>>,
         file_index: usize,
-        use_json: bool,
+        writer_map: &WriterMap,
+        json_writer: Option<&ThreadSafeJsonWriter>,
     ) -> Result<Vec<GameId>> {
         let reader = RetrosheetReader::new(input_path, file_index)?;
-        EventFileSchema::write(reader, parsed_games, use_json)
+        EventFileSchema::write(reader, parsed_games, writer_map, json_writer)
     }
 
     fn contains_nlb_dupes(path: &PathBuf) -> bool {
@@ -465,6 +478,9 @@ impl FileProcessor {
             .collect::<Result<Vec<PathBuf>, GlobError>>()?;
         files.par_sort();
         let file_count = files.len();
+        let writer_map = &self.writer_map;
+        let json_writer = self.json_writer.as_ref();
+        let base_index = self.index;
         let games = files
             .into_par_iter()
             .enumerate()
@@ -472,8 +488,9 @@ impl FileProcessor {
                 Self::process_file(
                     &f,
                     parsed_games,
-                    (self.index + i) * EVENT_KEY_BUFFER,
-                    self.opt.json,
+                    (base_index + i) * EVENT_KEY_BUFFER,
+                    writer_map,
+                    json_writer,
                 )
             })
             .collect::<Result<Vec<Vec<GameId>>>>()?;
@@ -493,27 +510,28 @@ impl FileProcessor {
         info!("Parsing box score files");
         self.par_process_files(AccountType::BoxScore)?;
 
-        WRITER_MAP.flush_all()?;
-        JSON_WRITER.flush()?;
+        self.writer_map.flush_all()?;
+        if let Some(jw) = &self.json_writer {
+            jw.flush()?;
+        }
         Ok(())
     }
 }
 
-#[allow(clippy::expect_used)]
-fn main() {
+fn main() -> Result<()> {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .finish();
-    tracing::subscriber::set_global_default(subscriber).expect("Failed to initialize trace");
+    tracing::subscriber::set_global_default(subscriber)
+        .context("Failed to initialize tracing subscriber")?;
 
+    let opt = Opt::parse();
     let start = Instant::now();
-    let opt: Opt = Opt::parse();
 
-    FileProcessor::new(opt)
-        .process_files()
-        .expect("Error occurred while processing files");
+    FileProcessor::new(opt)?.process_files()?;
 
     let end = start.elapsed();
     info!("Elapsed: {:?}", end);
     print_cache_info();
+    Ok(())
 }
