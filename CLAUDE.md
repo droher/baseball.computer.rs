@@ -41,12 +41,14 @@ Full-corpus validation remains the final gate: run the binary against the full R
 After the Rust parser writes CSVs, `bin/parquet.py` and `bin/simple_files.py` produce the Parquet files actually consumed downstream. Per global rules, run Python with `uv`:
 
 ```bash
+uv sync                                                     # default deps (pyarrow/pandas/sqlalchemy/boxball-schemas)
+uv sync --extra ci                                          # adds awscli for `uv run aws s3 sync ...`
 uv run python bin/parquet.py                                # csv/*.csv -> parquet/*.parquet (zstd, dictionary, DELTA_BINARY_PACKED on event_key)
 uv run python bin/simple_files.py                           # gamelog/schedule/park/roster/bio CSV concat + parquet
 uv run python bin/patch_known_corpus_bugs.py <retrosheet>   # idempotent in-place fixes for game records the parser cannot resolve (currently only ATN193807032)
 ```
 
-`bin/requirements.txt` exists for CI; locally prefer `uv pip install -r bin/requirements.txt` over bare `pip`.
+Deps live in `pyproject.toml` + `uv.lock`. CI installs with `uv sync --extra ci --frozen`. Python is pinned to `>=3.10,<3.11` because `awscli==1.24.5` pulls `pyyaml==5.4.1`, which doesn't build on platforms without a prebuilt wheel; the `ci` extra is gated off the default deps so local `uv sync` doesn't trip on it.
 
 ## Architecture
 

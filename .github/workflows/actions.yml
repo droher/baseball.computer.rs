@@ -60,21 +60,21 @@ jobs:
           path: retrosheet/
           key: retrosheet-${{ needs.retrosheet.outputs.sha }}
 
-      - uses: actions/cache@v3
+      - uses: astral-sh/setup-uv@v3
         with:
-          path: ~/.cache/pip
-          key: pip-${{ hashFiles('**/requirements.txt') }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
-      - run: pip install -r bin/requirements.txt
-      - run: python bin/simple_files.py
+      - run: uv sync --extra ci --frozen
+      - run: uv run python bin/simple_files.py
 
       - run: |
-          aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
+          uv run aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
             retrosheet_simple s3://timeball/misc \
             --exclude '*' --include '*.parquet' --delete
 
       # TODO: Add back after databank is restored
-      # aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
+      # uv run aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
       # baseballdatabank s3://timeball/baseballdatabank \
       # --exclude '*' --include '*.parquet' --delete #}
         env:
@@ -101,16 +101,16 @@ jobs:
       - run: mkdir csv parquet arrow
       - run: ./target/release/baseball-computer -i retrosheet -o csv
 
-      - uses: actions/cache@v3
+      - uses: astral-sh/setup-uv@v3
         with:
-          path: ~/.cache/pip
-          key: pip-${{ hashFiles('**/requirements.txt') }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
-      - run: pip install -r bin/requirements.txt
-      - run: python bin/parquet.py
+      - run: uv sync --extra ci --frozen
+      - run: uv run python bin/parquet.py
 
       - run: |
-          aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
+          uv run aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
             parquet s3://timeball/event \
             --exclude '*' --include '*.parquet' --delete
         env:

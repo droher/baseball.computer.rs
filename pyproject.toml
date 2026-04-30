@@ -1,0 +1,25 @@
+[project]
+name = "baseball-computer-bin"
+version = "0.0.0"
+description = "Helper scripts that consume the baseball-computer Rust parser's CSV output and publish Parquet downstream."
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    "pyarrow==14.0.1",
+    "SQLAlchemy==1.4.46",
+    "boxball-schemas==0.0.8",
+    "pandas==2.1.1",
+    # pyarrow 14.0.1 was built against numpy 1.x; modern resolvers will
+    # otherwise pull numpy 2.x which fails at import.
+    "numpy<2",
+]
+
+[project.optional-dependencies]
+# Only CI needs the awscli wheel for `aws s3 sync ...`. Keeping it out of
+# the default deps avoids a local pyyaml-5.4.1 sdist build failure on
+# platforms without a prebuilt wheel (e.g. macOS arm64).
+ci = [
+    "awscli==1.24.5",
+]
+
+[tool.uv]
+package = false
