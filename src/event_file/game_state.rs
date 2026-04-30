@@ -1983,3 +1983,256 @@ pub fn dummy() -> GameContext {
         }),
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::event_file::misc::str_to_tinystr;
+    use crate::event_file::play::{Balls, Base, BaseRunner, Strikes};
+    use crate::event_file::traits::Side;
+    use csv::StringRecord;
+
+    fn rec(fields: &[&str]) -> StringRecord {
+        StringRecord::from(fields.to_vec())
+    }
+
+    fn make_runner(lineup: LineupPosition, event_id: u8) -> Runner {
+        Runner {
+            lineup_position: lineup,
+            reached_on_event_id: EventId::new(event_id.into()).unwrap(),
+            charge_event_id: EventId::new(event_id.into()).unwrap(),
+            explicit_charged_pitcher_id: None,
+        }
+    }
+
+    /// Build a record slice with one starter per lineup position on each side.
+    /// Lineup positions 1..=8 are non-pitcher fielders (positions 2..=9);
+    /// the 9-spot is the pitcher (fielding position 1). Player IDs follow the
+    /// pattern `{side}{lineup}001` where side is `a`/`h`.
+    fn build_starter_slice() -> Vec<MappedRecord> {
+        let mut records = vec![MappedRecord::try_from(&rec(&["id", "ABC202404010"])).unwrap()];
+        for (side_idx, side_letter) in [(0, "a"), (1, "h")] {
+            for lineup in 1..=9u8 {
+                // lineup 1..=8 -> fielding 2..=9 (non-pitcher); lineup 9 -> pitcher (1)
+                let fielding = if lineup == 9 { 1 } else { lineup + 1 };
+                let player_id = format!("{side_letter}{lineup}001");
+                let name = format!("{side_letter}{lineup}");
+                let lineup_str = lineup.to_string();
+                let fielding_str = fielding.to_string();
+                let side_str = side_idx.to_string();
+                records.push(
+                    MappedRecord::try_from(&rec(&[
+                        "start",
+                        &player_id,
+                        &name,
+                        &side_str,
+                        &lineup_str,
+                        &fielding_str,
+                    ]))
+                    .unwrap(),
+                );
+            }
+        }
+        records
+    }
+
+    fn make_state() -> GameState {
+        GameState::new(&build_starter_slice()).unwrap()
+    }
+
+    // --- BaseState invariants ---
+
+    #[test]
+    fn base_state_default_is_empty() {
+        let bs = BaseState::default();
+        assert_eq!(bs.num_runners_on_base(), 0);
+        assert!(bs.get_runner(BaseRunner::First).is_none());
+        assert!(bs.get_runner(BaseRunner::Second).is_none());
+        assert!(bs.get_runner(BaseRunner::Third).is_none());
+        assert_eq!(bs.get_base_state(), 0);
+    }
+
+    #[test]
+    fn base_state_set_then_get_returns_runner() {
+        let mut bs = BaseState::default();
+        let runner = make_runner(LineupPosition::Third, 7);
+        bs.set_runner(BaseRunner::Second, runner);
+        let got = bs.get_runner(BaseRunner::Second).unwrap();
+        assert_eq!(got.lineup_position, LineupPosition::Third);
+        assert_eq!(got.reached_on_event_id, EventId::new(7).unwrap());
+        assert_eq!(bs.num_runners_on_base(), 1);
+    }
+
+    #[test]
+    fn base_state_clear_after_set_is_empty() {
+        let mut bs = BaseState::default();
+        bs.set_runner(BaseRunner::First, make_runner(LineupPosition::First, 1));
+        assert!(bs.get_runner(BaseRunner::First).is_some());
+        bs.clear_baserunner(BaseRunner::First);
+        assert!(bs.get_runner(BaseRunner::First).is_none());
+        assert_eq!(bs.num_runners_on_base(), 0);
+    }
+
+    #[test]
+    fn base_state_full_bases_three_runners() {
+        let mut bs = BaseState::default();
+        bs.set_runner(BaseRunner::First, make_runner(LineupPosition::First, 1));
+        bs.set_runner(BaseRunner::Second, make_runner(LineupPosition::Second, 2));
+        bs.set_runner(BaseRunner::Third, make_runner(LineupPosition::Third, 3));
+        assert_eq!(bs.num_runners_on_base(), 3);
+        assert_eq!(bs.get_base_state(), 0b111);
+    }
+
+    #[test]
+    fn base_state_get_base_state_encodes_occupancy_bitfield() {
+        // Each table row asserts the bitfield contract derived from the
+        // BaseState definition: bit 0 = First, bit 1 = Second, bit 2 = Third.
+        let cases = [
+            (vec![], 0b000),
+            (vec![BaseRunner::First], 0b001),
+            (vec![BaseRunner::Second], 0b010),
+            (vec![BaseRunner::Third], 0b100),
+            (vec![BaseRunner::First, BaseRunner::Third], 0b101),
+        ];
+        for (occupied, expected) in cases {
+            let mut bs = BaseState::default();
+            for (i, br) in occupied.iter().enumerate() {
+                let event_id = u8::try_from(i + 1).unwrap();
+                bs.set_runner(*br, make_runner(LineupPosition::First, event_id));
+            }
+            assert_eq!(
+                bs.get_base_state(),
+                expected,
+                "expected {expected:#05b} for {occupied:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn base_state_new_inning_tiebreaker_places_only_on_second() {
+        let bs = BaseState::new_inning_tiebreaker(LineupPosition::Fourth, EventId::new(5).unwrap());
+        assert!(bs.get_runner(BaseRunner::First).is_none());
+        let runner = bs.get_runner(BaseRunner::Second).unwrap();
+        assert_eq!(runner.lineup_position, LineupPosition::Fourth);
+        assert!(bs.get_runner(BaseRunner::Third).is_none());
+        assert_eq!(bs.num_runners_on_base(), 1);
+    }
+
+    #[test]
+    fn base_state_get_from_position_finds_runner_by_lineup_position() {
+        let mut bs = BaseState::default();
+        bs.set_runner(BaseRunner::Third, make_runner(LineupPosition::Sixth, 4));
+        let runner = bs.get_from_position(LineupPosition::Sixth).unwrap();
+        assert_eq!(runner.reached_on_event_id, EventId::new(4).unwrap());
+        assert!(bs.get_from_position(LineupPosition::Ninth).is_none());
+    }
+
+    // --- GameState bootstrap ---
+
+    #[test]
+    fn game_state_new_initializes_to_top_first_zero_outs() {
+        let gs = make_state();
+        assert_eq!(gs.inning, 1);
+        assert_eq!(gs.frame, InningFrame::Top);
+        assert_eq!(gs.outs, Outs::new(0).unwrap());
+        assert_eq!(gs.bases.num_runners_on_base(), 0);
+        // Default home-bats-first is false in absence of an info record, so away bats first.
+        assert_eq!(gs.batting_side, Side::Away);
+    }
+
+    // --- update_on_pitcher_responsibility_adjustment ---
+
+    #[test]
+    fn update_on_pitcher_responsibility_adjustment_sets_charge_on_existing_runner() {
+        let mut gs = make_state();
+        // Put a runner on second so the adjustment has a target.
+        gs.bases
+            .set_runner(BaseRunner::Second, make_runner(LineupPosition::Fifth, 3));
+        let pitcher: Pitcher = str_to_tinystr("relp001").unwrap();
+        let adj = PitcherResponsibilityAdjustment {
+            pitcher_id: pitcher,
+            baserunner: BaseRunner::Second,
+        };
+        gs.update_on_pitcher_responsibility_adjustment(&adj);
+        assert_eq!(
+            gs.bases
+                .get_runner(BaseRunner::Second)
+                .unwrap()
+                .explicit_charged_pitcher_id,
+            Some(pitcher)
+        );
+    }
+
+    #[test]
+    fn update_on_pitcher_responsibility_adjustment_skips_when_base_empty() {
+        // Regression: BSN191409102 ships a presadj for an empty base. The
+        // parser must skip with a warn rather than panic; surrounding state
+        // (outs, frame, bases) stays put.
+        let mut gs = make_state();
+        let outs_before = gs.outs;
+        let frame_before = gs.frame;
+        let runners_before = gs.bases.num_runners_on_base();
+        let adj = PitcherResponsibilityAdjustment {
+            pitcher_id: str_to_tinystr("relp001").unwrap(),
+            baserunner: BaseRunner::First,
+        };
+        gs.update_on_pitcher_responsibility_adjustment(&adj);
+        assert!(gs.bases.get_runner(BaseRunner::First).is_none());
+        assert_eq!(gs.outs, outs_before);
+        assert_eq!(gs.frame, frame_before);
+        assert_eq!(gs.bases.num_runners_on_base(), runners_before);
+    }
+
+    // --- update_on_runner_adjustment ---
+
+    #[test]
+    fn update_on_runner_adjustment_flips_frame_and_places_runner_on_second() {
+        let mut gs = make_state();
+        // Simulate end of inning: 3 outs recorded, away batting.
+        gs.outs = Outs::new(3).unwrap();
+        gs.frame = InningFrame::Top;
+        gs.batting_side = Side::Away;
+        // Use a known starter (h1001 is the home leadoff hitter).
+        let adj = RunnerAdjustment {
+            runner_id: str_to_tinystr("h1001").unwrap(),
+            base: Base::Second,
+        };
+        gs.update_on_runner_adjustment(&adj).unwrap();
+        // Frame flipped, outs reset, runner placed on second only.
+        assert_eq!(gs.frame, InningFrame::Bottom);
+        assert_eq!(gs.batting_side, Side::Home);
+        assert_eq!(gs.outs, Outs::new(0).unwrap());
+        let runner = gs.bases.get_runner(BaseRunner::Second).unwrap();
+        assert_eq!(runner.lineup_position, LineupPosition::First);
+        assert!(gs.bases.get_runner(BaseRunner::First).is_none());
+        assert!(gs.bases.get_runner(BaseRunner::Third).is_none());
+    }
+
+    // --- update_on_substitution ---
+
+    #[test]
+    fn update_on_substitution_records_walk_responsible_pitcher_at_3_0_count() {
+        let mut gs = make_state();
+        // Personnel update sets `end_event_id = event_id - 1`, which underflows
+        // BoundedUsize<1, _> at event_id=1. Advance to a mid-game id before
+        // substituting.
+        gs.event_id = EventId::new(2).unwrap();
+        // Away bats, home pitches. Count 3-0 means the OLD pitcher owns the
+        // walk if a reliever now comes in. We grab the original home pitcher
+        // (h9001 per build_starter_slice) before the swap.
+        gs.count = Count {
+            balls: Balls::new(3),
+            strikes: Strikes::new(0),
+        };
+        let original_home_pitcher: Pitcher = str_to_tinystr("h9001").unwrap();
+        let sub_record =
+            SubstitutionRecord::try_from(&rec(&["sub", "relp001", "Reliever", "1", "9", "1"]))
+                .unwrap();
+        gs.update_on_substitution(&sub_record).unwrap();
+        assert_eq!(
+            gs.unusual_state.walk_responsible_pitcher,
+            Some(original_home_pitcher)
+        );
+    }
+}
