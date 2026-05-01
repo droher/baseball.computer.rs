@@ -12,6 +12,7 @@ parquet/
 baseballdatabank/
 misc/
 retrosheet_simple/
+retrosheet/
 .claude/
 alldata.zip
 __pycache__/

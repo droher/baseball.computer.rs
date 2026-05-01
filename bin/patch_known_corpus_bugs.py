@@ -30,6 +30,26 @@ Patches:
   event grammar concatenates the fielders (`53`). The same batter-fielder
   combo appears as `53` later in the same file (line 136). Rewrite the
   fielding code while preserving the explicit `2-3` runner advance.
+
+* Park-ID typos in NLB box-score files (`ngl_b/*.EBR`) — eight games carry
+  malformed `info,site,...` codes that don't resolve against retrosheet's
+  ballparks biodata. Each is a deterministic typo of a real ID present in
+  both `ballparks.csv` and `ballparks0.csv`:
+
+    - PH5194708140 (`ngl_b/1947.EBR`): `PHi17` → `PHI17`
+      Lowercase `i` typo of Penmar Park, Philadelphia.
+    - STA192107160 (`ngl_b/1921.EBR`): `DEC01` → `DCT01`
+      Wrong prefix. DCT01 (Staley Field, Decatur IL) has first_g=19210716
+      exactly matching this game; STA = Staleys.
+    - KCM194108070, CAG194608290, CAG194709050, IN9194708210,
+      CAG194807120 (across `ngl_b/{1941,1946,1947,1948}.EBR`):
+      `DEC02` → `DCT02`
+      Wrong prefix. DCT02 (Fans Field, Decatur IL) date range
+      1937-07-14 → 1949-06-22 covers all five neutral-site games.
+    - PH5194805010 (`ngl_b/1948.EBR`): `CHESTER PA` → `CHE01`
+      Free-text city/state in ID slot. Of three Chester PA parks in
+      biodata, only CHE01 (Lloyd Field, 1938-06-01 → 1949-06-07) covers
+      the 1948-05-01 game date; CHE02 ends 1938, CHE03 ends 1936.
 """
 
 # pyright: reportAny=false
@@ -88,6 +108,74 @@ PATCHES: tuple[Patch, ...] = (
             "Retrosheet's modern event grammar does not accept; later in "
             "the same file the same play is encoded as `53`. Concatenate "
             "the fielders while preserving the explicit `2-3` advance."
+        ),
+    ),
+    Patch(
+        relative_path="ngl_b/1947.EBR",
+        game_id="PH5194708140",
+        before="info,site,PHi17",
+        after="info,site,PHI17",
+        rationale="Lowercase `i` typo of PHI17 (Penmar Park, Philadelphia).",
+    ),
+    Patch(
+        relative_path="ngl_b/1921.EBR",
+        game_id="STA192107160",
+        before="info,site,DEC01",
+        after="info,site,DCT01",
+        rationale=(
+            "Wrong prefix `DEC` for Decatur park ID. Biodata has DCT01 "
+            "(Staley Field, Decatur IL) with first_g=19210716 — exact "
+            "match for this game (STA = Staleys, home team)."
+        ),
+    ),
+    Patch(
+        relative_path="ngl_b/1941.EBR",
+        game_id="KCM194108070",
+        before="info,site,DEC02",
+        after="info,site,DCT02",
+        rationale=(
+            "Wrong prefix `DEC` for DCT02 (Fans Field, Decatur IL). "
+            "Biodata date range 1937-1949 covers this neutral-site game."
+        ),
+    ),
+    Patch(
+        relative_path="ngl_b/1946.EBR",
+        game_id="CAG194608290",
+        before="info,site,DEC02",
+        after="info,site,DCT02",
+        rationale="DEC02 → DCT02 (Fans Field, Decatur IL). See KCM194108070.",
+    ),
+    Patch(
+        relative_path="ngl_b/1947.EBR",
+        game_id="CAG194709050",
+        before="info,site,DEC02",
+        after="info,site,DCT02",
+        rationale="DEC02 → DCT02 (Fans Field, Decatur IL). See KCM194108070.",
+    ),
+    Patch(
+        relative_path="ngl_b/1947.EBR",
+        game_id="IN9194708210",
+        before="info,site,DEC02",
+        after="info,site,DCT02",
+        rationale="DEC02 → DCT02 (Fans Field, Decatur IL). See KCM194108070.",
+    ),
+    Patch(
+        relative_path="ngl_b/1948.EBR",
+        game_id="CAG194807120",
+        before="info,site,DEC02",
+        after="info,site,DCT02",
+        rationale="DEC02 → DCT02 (Fans Field, Decatur IL). See KCM194108070.",
+    ),
+    Patch(
+        relative_path="ngl_b/1948.EBR",
+        game_id="PH5194805010",
+        before="info,site,CHESTER PA",
+        after="info,site,CHE01",
+        rationale=(
+            "Free-text `CHESTER PA` in park-ID slot. Of three Chester PA "
+            "parks in biodata, only CHE01 (Lloyd Field, 1938-06-01 → "
+            "1949-06-07) covers the 1948-05-01 game date; CHE02 ends "
+            "1938, CHE03 ends 1936."
         ),
     ),
 )
@@ -154,7 +242,7 @@ def apply_patch(root: Path, patch: Patch) -> str:
     for i in matched_idx:
         # Preserve original line ending on each rewritten line.
         original = lines[i]
-        eol = original[len(original.rstrip("\r\n")):]
+        eol = original[len(original.rstrip("\r\n")) :]
         lines[i] = patch.after + eol
 
     # Atomic write: stage the new bytes in a sibling temp file and then
