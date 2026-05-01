@@ -18,7 +18,21 @@ Patches:
   the bottom of 4th. The play below leaves the parser unable to locate the
   batter in the lineup. Newspaper box score corroborates Mitchell as pitcher
   of record at this point. Rewrite the batter to `mitca102`.
+
+* CIN191007090 (`events/1910CIN.EVN`) — `data,er,rowaj101, 0` carries a
+  stray leading space before the integer, so the strict numeric parser
+  rejects the whole game. Every other CIN191007??? game in the same file
+  records this pitcher's earned-run lines as `data,er,rowaj101,0` (no
+  space). Strip the space.
+
+* WS1191105040 (`events/1911WS1.EVA`) — bottom of 2nd, a 5-to-3 putout is
+  encoded as `5-3.2-3` (dash-separated fielders), but Retrosheet's modern
+  event grammar concatenates the fielders (`53`). The same batter-fielder
+  combo appears as `53` later in the same file (line 136). Rewrite the
+  fielding code while preserving the explicit `2-3` runner advance.
 """
+
+# pyright: reportAny=false
 
 from __future__ import annotations
 
@@ -51,6 +65,29 @@ PATCHES: tuple[Patch, ...] = (
             "hayeb104 left the game in the bottom of the 4th when mitca102 "
             "replaced him at batting position 9; the original record names "
             "the wrong batter for the top of the 5th."
+        ),
+    ),
+    Patch(
+        relative_path="events/1910CIN.EVN",
+        game_id="CIN191007090",
+        before="data,er,rowaj101, 0",
+        after="data,er,rowaj101,0",
+        rationale=(
+            "Stray leading space before integer 0 trips the strict numeric "
+            "data-record parser. Every other CIN191007??? game in this file "
+            "uses the no-space form."
+        ),
+    ),
+    Patch(
+        relative_path="events/1911WS1.EVA",
+        game_id="WS1191105040",
+        before="play,2,1,mcbrg101,??,,5-3.2-3",
+        after="play,2,1,mcbrg101,??,,53.2-3",
+        rationale=(
+            "Dash-separated fielders (`5-3`) are a scorebook convention "
+            "Retrosheet's modern event grammar does not accept; later in "
+            "the same file the same play is encoded as `53`. Concatenate "
+            "the fielders while preserving the explicit `2-3` advance."
         ),
     ),
 )

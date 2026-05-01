@@ -14,3 +14,5 @@ misc/
 retrosheet_simple/
 .claude/
 alldata.zip
+__pycache__/
+*.pyc
