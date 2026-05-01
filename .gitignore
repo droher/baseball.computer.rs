@@ -12,6 +12,7 @@ parquet/
 baseballdatabank/
 misc/
 retrosheet_simple/
+biodata/
 retrosheet/
 .claude/
 alldata.zip

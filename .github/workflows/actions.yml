@@ -67,20 +67,25 @@ jobs:
 
       - run: uv sync --extra ci --frozen
       - run: uv run python bin/simple_files.py
+      - run: uv run python bin/biodata.py
 
       - run: |
-          uv run aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
+          uv run aws s3 sync --endpoint-url="$R2_ENDPOINT" \
             retrosheet_simple s3://timeball/misc \
+            --exclude '*' --include '*.parquet' --delete
+          uv run aws s3 sync --endpoint-url="$R2_ENDPOINT" \
+            biodata s3://timeball/biodata \
             --exclude '*' --include '*.parquet' --delete
 
       # TODO: Add back after databank is restored
-      # uv run aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
+      # uv run aws s3 sync --endpoint-url="$R2_ENDPOINT" \
       # baseballdatabank s3://timeball/baseballdatabank \
       # --exclude '*' --include '*.parquet' --delete #}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET }}
           AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
 
   pbp:
     name: Create play-by-play
