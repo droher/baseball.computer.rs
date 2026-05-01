@@ -76,7 +76,7 @@ impl ThreadSafeJsonWriter {
     pub fn json(&self) -> Result<MutexGuard<'_, BufWriter<File>>> {
         self.json
             .lock()
-            .map_err(|e| anyhow!("Failed to acquire writer lock: {}", e))
+            .map_err(|e| anyhow!("Failed to acquire writer lock: {e}"))
     }
 
     pub fn flush(&self) -> Result<()> {
@@ -108,7 +108,7 @@ impl ThreadSafeCsvWriter {
     pub fn csv(&self) -> Result<MutexGuard<'_, Writer<File>>> {
         self.csv
             .lock()
-            .map_err(|e| anyhow!("Failed to acquire writer lock: {}", e))
+            .map_err(|e| anyhow!("Failed to acquire writer lock: {e}"))
     }
 }
 
@@ -137,7 +137,7 @@ impl WriterMap {
                 writer
                     .csv()?
                     .flush()
-                    .map_err(|e| anyhow!("Failed to flush writer: {}", e))
+                    .map_err(|e| anyhow!("Failed to flush writer: {e}"))
             })
             .collect::<Result<Vec<()>>>()
     }
@@ -279,8 +279,7 @@ impl EventFileSchema {
             game_ids.push(game_context.game_id);
             // Cross-pass dedup: skip games seen in earlier passes.
             if parsed_games
-                .map(|pg| pg.contains(&game_context.game_id))
-                .unwrap_or_default()
+                .is_some_and(|pg| pg.contains(&game_context.game_id))
             {
                 warn!(
                     "File {} contains already-processed game {}, ignoring",
@@ -294,7 +293,7 @@ impl EventFileSchema {
             if let Some(seen) = in_pass_seen {
                 let mut guard = seen
                     .lock()
-                    .map_err(|e| anyhow!("in-pass seen-set lock poisoned: {}", e))?;
+                    .map_err(|e| anyhow!("in-pass seen-set lock poisoned: {e}"))?;
                 if !guard.insert(game_context.game_id) {
                     warn!(
                         "File {} contains duplicate game {}, ignoring later occurrence",

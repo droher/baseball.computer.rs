@@ -366,14 +366,14 @@ impl<T> Matchup<T> {
         }
     }
 
-    pub fn get_mut(&mut self, side: Side) -> &mut T {
+    pub const fn get_mut(&mut self, side: Side) -> &mut T {
         match side {
             Side::Away => &mut self.away,
             Side::Home => &mut self.home,
         }
     }
 
-    pub fn get_both_mut(&mut self) -> (&mut T, &mut T) {
+    pub const fn get_both_mut(&mut self) -> (&mut T, &mut T) {
         (&mut self.away, &mut self.home)
     }
 }

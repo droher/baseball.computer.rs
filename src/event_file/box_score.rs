@@ -641,7 +641,7 @@ impl TryFrom<&RetrosheetEventRecord> for BoxScoreLine {
             _ => Self::Unrecognized,
         };
         match mapped {
-            Self::Unrecognized => bail!("Unrecognized box score line type {:?}", record),
+            Self::Unrecognized => bail!("Unrecognized box score line type {record:?}"),
             _ => Ok(mapped),
         }
     }
@@ -878,7 +878,7 @@ impl From<BoxScoreEvent> for RetrosheetEventRecord {
                 record.push_field(&cs.inning.unwrap_or_default().to_string());
             }
             BoxScoreEvent::Unrecognized => (),
-        };
+        }
         record
     }
 }

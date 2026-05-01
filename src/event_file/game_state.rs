@@ -161,7 +161,7 @@ impl PlateAppearanceResultType {
         })
     }
 
-    pub fn is_in_play(&self) -> bool {
+    pub const fn is_in_play(&self) -> bool {
         matches!(
             self,
             Self::Single
@@ -572,7 +572,7 @@ impl BoxScoreData {
         let mut events = Vec::new();
         let mut line_scores = Vec::new();
         let mut comments = Vec::new();
-        for record in slice.iter() {
+        for record in slice {
             match record {
                 MappedRecord::BoxScoreLine(bsl) => lines.push(*bsl),
                 MappedRecord::BoxScoreEvent(bse) => events.push(bse.clone()),
@@ -886,7 +886,7 @@ pub struct Event {
 impl Event {
     pub fn summary(&self) -> String {
         format!(
-            r#"
+            r"
         Event: {event_id}
         Inning: {frame:?} {inning}
         Outs at event: {outs_at_event}
@@ -894,7 +894,7 @@ impl Event {
         Plate appearance result: {pa:?}
         Baserunning: {ba:?}
         Out on play: {out:?}
-        "#,
+        ",
             event_id = self.event_id,
             frame = self.context.frame,
             inning = self.context.inning,
@@ -1018,9 +1018,7 @@ impl Personnel {
         };
         map.get(position).copied().with_context(|| {
             anyhow!(
-                "Position {} for side {} missing from current game state",
-                position,
-                side
+                "Position {position} for side {side} missing from current game state"
             )
         })
     }
@@ -1062,12 +1060,11 @@ impl Personnel {
             .get_mut(player)
             .with_context(|| {
                 anyhow!(
-                    "Cannot find existing player {} in lineup appearance records",
-                    player
+                    "Cannot find existing player {player} in lineup appearance records"
                 )
             })?
             .last_mut()
-            .with_context(|| anyhow!("Player {} has an empty list of lineup appearances", player))
+            .with_context(|| anyhow!("Player {player} has an empty list of lineup appearances"))
     }
 
     fn get_current_fielding_appearance(
@@ -1078,15 +1075,13 @@ impl Personnel {
             .get_mut(player)
             .with_context(|| {
                 anyhow!(
-                    "Cannot find existing player {} in defense appearance records",
-                    player
+                    "Cannot find existing player {player} in defense appearance records"
                 )
             })?
             .last_mut()
             .with_context(|| {
                 anyhow!(
-                    "Player {} has an empty list of fielding appearances",
-                    player
+                    "Player {player} has an empty list of fielding appearances"
                 )
             })
     }
@@ -1428,18 +1423,15 @@ impl GameState {
 
         let is_mid_plate_appearance = play.stats.plate_appearance.is_none() && new_outs < 3;
 
-        match is_mid_plate_appearance {
-            true => {
-                self.count = play.count;
-                // Hand adjustments are reset in all circumstances, including mid-PA
-                self.unusual_state.batter_hand = None;
-                self.unusual_state.pitcher_hand = None;
-            }
-            false => {
-                self.count = Count::default();
-                // All unusual state characteristics are reset on a new PA
-                self.unusual_state = RareAttributes::default();
-            }
+        if is_mid_plate_appearance {
+            self.count = play.count;
+            // Hand adjustments are reset in all circumstances, including mid-PA
+            self.unusual_state.batter_hand = None;
+            self.unusual_state.pitcher_hand = None;
+        } else {
+            self.count = Count::default();
+            // All unusual state characteristics are reset on a new PA
+            self.unusual_state = RareAttributes::default();
         }
         self.inning = play.inning;
         self.frame = new_frame;
@@ -1467,15 +1459,15 @@ impl GameState {
         {
             self.unusual_state.walk_responsible_pitcher =
                 Some(self.personnel.pitcher(record.side)?);
-        };
+        }
         self.personnel.update_on_substitution(record, self.event_id)
     }
 
-    fn update_on_bat_hand_adjustment(&mut self, record: &BatHandAdjustment) {
+    const fn update_on_bat_hand_adjustment(&mut self, record: &BatHandAdjustment) {
         self.unusual_state.batter_hand = Some(record.hand);
     }
 
-    fn update_on_pitch_hand_adjustment(&mut self, record: &PitchHandAdjustment) {
+    const fn update_on_pitch_hand_adjustment(&mut self, record: &PitchHandAdjustment) {
         self.unusual_state.batter_hand = Some(record.hand);
     }
 
@@ -1528,7 +1520,7 @@ impl GameState {
             MappedRecord::Play(_) => {
                 if let Some(cp) = play {
                     self.update_on_play(cp)
-                        .with_context(|| anyhow!("Failed to parse play {:?}", cp))
+                        .with_context(|| anyhow!("Failed to parse play {cp:?}"))
                 } else {
                     bail!("Expected play but got None")
                 }
@@ -1544,7 +1536,7 @@ impl GameState {
             }
             MappedRecord::Comment(r) => self.update_on_comment(r),
             _ => {}
-        };
+        }
 
         Ok(())
     }
@@ -1583,9 +1575,9 @@ impl BaseState {
 
     pub fn get_base_state(&self) -> u8 {
         // Integer representation of the base state with each binary digit representing a base
-        self.get_first().is_some() as u8
-            | (self.get_second().is_some() as u8) << 1
-            | (self.get_third().is_some() as u8) << 2
+        u8::from(self.get_first().is_some())
+            | u8::from(self.get_second().is_some()) << 1
+            | u8::from(self.get_third().is_some()) << 2
     }
 
     fn num_runners_on_base(&self) -> usize {
@@ -1647,19 +1639,16 @@ impl BaseState {
         } else {
             bail!(
                 "Advancement from a base that had no runner on it.\n\
-            Old state: {:?}\n\
-            New state: {:?}\n\
-            Advance: {:?}\n",
-                old_state,
-                new_state,
-                advance
+            Old state: {old_state:?}\n\
+            New state: {new_state:?}\n\
+            Advance: {advance:?}\n"
             )
         }
     }
 
     ///  Accounts for Rule 9.16(g) regarding the assignment of trailing
     ///  baserunners as inherited if they advance on a fielder's choice 🙃.
-    ///  Returns the charge_event_id of the new batter, if applicable.
+    ///  Returns the `charge_event_id` of the new batter, if applicable.
     fn update_runner_charges(&mut self, play: &PlayRecord) -> Result<Option<EventId>> {
         let mut charge_event_id = None;
         for out_baserunner in &play.stats.batter_caused_baserunning_outs {
@@ -1696,10 +1685,10 @@ impl BaseState {
                 scored: ArrayVec::new(),
             }
         };
-        let batter_charge_event_id = if !start_inning {
-            new_state.update_runner_charges(play)?
-        } else {
+        let batter_charge_event_id = if start_inning {
             None
+        } else {
+            new_state.update_runner_charges(play)?
         };
 
         // Cover cases where outs are not included in advance information

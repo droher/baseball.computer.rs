@@ -99,16 +99,16 @@ impl PitchSequenceItem {
 }
 
 impl PitchSequenceItem {
-    fn update_pitch_type(&mut self, pitch_type: PitchType) {
+    const fn update_pitch_type(&mut self, pitch_type: PitchType) {
         self.pitch_type = pitch_type;
     }
-    fn update_catcher_pickoff(&mut self, base: Option<Base>) {
+    const fn update_catcher_pickoff(&mut self, base: Option<Base>) {
         self.catcher_pickoff_attempt = base;
     }
-    fn update_blocked_by_catcher(&mut self) {
+    const fn update_blocked_by_catcher(&mut self) {
         self.blocked_by_catcher = true;
     }
-    fn update_runners_going(&mut self) {
+    const fn update_runners_going(&mut self) {
         self.runners_going = true;
     }
 

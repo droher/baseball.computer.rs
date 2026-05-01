@@ -413,7 +413,7 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
             _ => Self::Unrecognized,
         };
         match info {
-            Self::Unrecognized => bail!("Unrecognized info type: {:?}", record),
+            Self::Unrecognized => bail!("Unrecognized info type: {record:?}"),
             _ => Ok(info),
         }
     }

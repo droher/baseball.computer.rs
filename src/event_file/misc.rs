@@ -133,7 +133,7 @@ impl TryFrom<&RetrosheetEventRecord> for EarnedRunRecord {
                 pitcher_id: str_to_tinystr(arr[2])?,
                 earned_runs: arr[3].trim_end().parse::<u8>()?,
             }),
-            _ => Err(anyhow!("Unexpected `data` type value {:?}", record)),
+            _ => Err(anyhow!("Unexpected `data` type value {record:?}")),
         }
     }
 }

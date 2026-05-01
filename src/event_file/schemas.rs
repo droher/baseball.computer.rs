@@ -384,8 +384,7 @@ impl EventBaserunners {
             }
         });
         let attempted_sb = baserunning_play_type
-            .map(|p| p.is_attempted_stolen_base())
-            .unwrap_or_default();
+            .is_some_and(super::play::BaserunningPlayType::is_attempted_stolen_base);
         let picked_off = matches!(baserunning_play_type, Some(BaserunningPlayType::PickedOff));
 
         let starting_state = event.context.starting_base_state.get_runner(baserunner);

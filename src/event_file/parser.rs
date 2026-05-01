@@ -257,7 +257,7 @@ impl TryFrom<&RetrosheetEventRecord> for MappedRecord {
             _ => Self::Unrecognized,
         };
         match mapped {
-            Self::Unrecognized => Err(anyhow!("Unrecognized record type {:?}", record)),
+            Self::Unrecognized => Err(anyhow!("Unrecognized record type {record:?}")),
             _ => Ok(mapped),
         }
     }

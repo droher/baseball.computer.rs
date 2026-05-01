@@ -853,8 +853,7 @@ impl BaserunningPlay {
     fn error_on_play(&self) -> bool {
         self.baserunning_fielding_info
             .as_ref()
-            .map(|i| FieldersData::find_error(&i.fielders_data).is_some())
-            .unwrap_or_default()
+            .is_some_and(|i| FieldersData::find_error(&i.fielders_data).is_some())
     }
 
     pub const fn is_attempted_stolen_base(&self) -> bool {
@@ -1043,7 +1042,7 @@ impl PlayType {
         }
     }
 
-    pub fn reached_on_error(&self) -> bool {
+    pub const fn reached_on_error(&self) -> bool {
         match self {
             Self::PlateAppearance(pt) => pt.reached_on_error(),
             _ => false,
@@ -1322,7 +1321,7 @@ impl RunnerAdvanceModifier {
         match simple_match {
             Self::Unrecognized(_) => (),
             _ => return simple_match,
-        };
+        }
         let (first, last) = regex_split(value, NUMERIC_REGEX);
         let last = last.unwrap_or_default();
         let last_as_int_vec: PositionVec = FieldingPosition::fielding_vec(last);
@@ -1717,7 +1716,7 @@ impl PlayModifier {
     }
 
     pub fn flag_string(&self) -> String {
-        format!("{:?}", self)
+        format!("{self:?}")
     }
 
     const fn double_plays() -> [Self; 6] {
@@ -1833,7 +1832,7 @@ impl Count {
     }
 
     pub fn is_old_batter_responsible_strikeout(&self) -> bool {
-        self.strikes.map(|s| s == 2).unwrap_or_default()
+        self.strikes.is_some_and(|s| s == 2)
     }
 
     /// Whether the count has > 0 balls + strikes.
@@ -2148,8 +2147,7 @@ impl ParsedPlay {
 
     pub fn strikeout(&self) -> bool {
         self.plate_appearance()
-            .map(|pa| pa.is_strikeout())
-            .unwrap_or_default()
+            .is_some_and(PlateAppearanceType::is_strikeout)
     }
 
     pub fn hit_type(&self) -> Option<HitType> {
@@ -2283,7 +2281,7 @@ impl TryFrom<&str> for ParsedPlay {
             > 1
         {
             bail!("Multiple plate appearances in play: {value}")
-        };
+        }
 
         let modifiers = if modifiers_boundary < advances_boundary {
             let modifiers_raw = &value[modifiers_boundary + 1..advances_boundary];
