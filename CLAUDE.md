@@ -52,7 +52,7 @@ uv run python bin/patch_known_corpus_bugs.py <retrosheet>   # idempotent in-plac
 
 `bin/biodata.py` writes to `biodata/*.parquet` and is synced to `s3://timeball/biodata` alongside the existing `event/` and `misc/` paths. It applies one well-known fixup: two malformed `ejections.csv` rows for game `NY1191108192` carry an extra empty field between `EJECTEENAME` and `TEAM`; the script drops the empty field on read and warns. All date columns are strict-parsed (`m/d/Y` for ejections/coaches, `YYYYMMDD` for managers0/umpires0) — bad dates fail loudly.
 
-Deps live in `pyproject.toml` + `uv.lock`. CI installs with `uv sync --extra ci --frozen`. Python is pinned to `>=3.10,<3.11` because `awscli==1.24.5` pulls `pyyaml==5.4.1`, which doesn't build on platforms without a prebuilt wheel; the `ci` extra is gated off the default deps so local `uv sync` doesn't trip on it.
+Deps live in `pyproject.toml` + `uv.lock`. CI installs with `uv sync --extra ci --frozen`. The `ci` extra (awscli + a `pyyaml>=6.0.1` override — awscli's lower bound otherwise resolves to 5.4.1, whose sdist no longer builds on Cython 3+) is gated off the default deps so local `uv sync` stays minimal.
 
 ## Architecture
 
