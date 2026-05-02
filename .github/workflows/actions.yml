@@ -32,21 +32,31 @@ jobs:
     name: retrosheet
     runs-on: ubuntu-latest
     outputs:
-      sha: ${{ steps.sha.outputs.sha }}
+      key: ${{ steps.key.outputs.key }}
     steps:
-      - id: sha
-        run: echo "::set-output name=sha::$(git ls-remote https://github.com/droher/retrosheet-mirror working)"
+      - uses: actions/checkout@v3
+
+      - id: key
+        run: echo "key=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/cache@v3
         id: cache
         with:
           path: retrosheet/
-          key: retrosheet-${{ steps.sha.outputs.sha }}
+          key: retrosheet-${{ steps.key.outputs.key }}
+
+      - uses: astral-sh/setup-uv@v3
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - if: steps.cache.outputs.cache-hit != 'true'
-        run: wget https://github.com/droher/retrosheet-mirror/archive/working.zip -O retrosheet.zip
+        run: uv sync --extra ci --frozen
       - if: steps.cache.outputs.cache-hit != 'true'
-        run: unzip retrosheet.zip && mv retrosheet-* retrosheet
+        run: uv run python bin/fetch_retrosheet.py -o retrosheet
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: uv run python bin/patch_known_corpus_bugs.py retrosheet
 
   simple_files:
     name: Parse simple files
@@ -58,7 +68,7 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: retrosheet/
-          key: retrosheet-${{ needs.retrosheet.outputs.sha }}
+          key: retrosheet-${{ needs.retrosheet.outputs.key }}
 
       - uses: astral-sh/setup-uv@v3
         with:
@@ -97,7 +107,7 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: retrosheet/
-          key: retrosheet-${{ needs.retrosheet.outputs.sha }}
+          key: retrosheet-${{ needs.retrosheet.outputs.key }}
 
       - uses: actions/cache@v3
         with:
