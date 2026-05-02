@@ -31,6 +31,17 @@ Patches:
   combo appears as `53` later in the same file (line 136). Rewrite the
   fielding code while preserving the explicit `2-3` runner advance.
 
+* CHN198404200 (`events/1984CHN.EVN`) — 2nd inning, davij001 PA. Pitch
+  sequence `*B1FCB1Bx` ends with a lowercase `x`. The play (`43/G34`) is a
+  groundout, so the final pitch was put in play and the intended code is
+  uppercase `X` (InPlay). One-character typo; rewrite the final char.
+
+* CIN197510140, LAN197410090, KCA198706160 — three games carry stray
+  digits (`00`/`01`) in the pitches column of `NP` (no-play) records.
+  `NP` rows describe non-events such as a balk or appeal where no pitch
+  was actually thrown, and the digits are not valid Retrosheet pitch
+  codes. Empty the pitches column on these specific rows.
+
 * Park-ID typos in NLB box-score files (`ngl_b/*.EBR`) — eight games carry
   malformed `info,site,...` codes that don't resolve against retrosheet's
   ballparks biodata. Each is a deterministic typo of a real ID present in
@@ -108,6 +119,49 @@ PATCHES: tuple[Patch, ...] = (
             "Retrosheet's modern event grammar does not accept; later in "
             "the same file the same play is encoded as `53`. Concatenate "
             "the fielders while preserving the explicit `2-3` advance."
+        ),
+    ),
+    Patch(
+        relative_path="events/1984CHN.EVN",
+        game_id="CHN198404200",
+        before="play,2,1,davij001,32,*B1FCB1Bx,43/G34",
+        after="play,2,1,davij001,32,*B1FCB1BX,43/G34",
+        rationale=(
+            "Final pitch char is lowercase `x`; the play is a groundout "
+            "(`43/G34`), so the intended code is uppercase `X` (InPlay). "
+            "Single-character typo confined to this row."
+        ),
+    ),
+    Patch(
+        relative_path="postseason/1975WS.EVE",
+        game_id="CIN197510140",
+        before="play,5,0,evand002,00,00,NP",
+        after="play,5,0,evand002,00,,NP",
+        rationale=(
+            "Stray `00` in pitches column on a no-play record. NP rows "
+            "describe non-events (here a substitution) with no pitches "
+            "thrown; the digits are not valid Retrosheet pitch codes."
+        ),
+    ),
+    Patch(
+        relative_path="postseason/1974NLCS.EVE",
+        game_id="LAN197410090",
+        before="play,8,1,yeags001,00,00,NP",
+        after="play,8,1,yeags001,00,,NP",
+        rationale=(
+            "Stray `00` in pitches column on a no-play record. See "
+            "CIN197510140 for the same pattern."
+        ),
+    ),
+    Patch(
+        relative_path="events/1987KCA.EVA",
+        game_id="KCA198706160",
+        before="play,4,1,whitf001,,01,NP",
+        after="play,4,1,whitf001,,,NP",
+        rationale=(
+            "Stray `01` in pitches column on a no-play record. The com "
+            "line above explains the substitution (Steinbach injured by "
+            "a foul); no pitch belongs on this NP row."
         ),
     ),
     Patch(

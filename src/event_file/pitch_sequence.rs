@@ -152,6 +152,14 @@ impl PitchSequenceItem {
         let get_catcher_pickoff_base =
             { |c: Option<char>| Base::from_str(&c.unwrap_or('.').to_string()).ok() };
 
+        // PA-resume pickoff `.+N` — see docs/pitch_sequence_pa_resume.md.
+        let mut pending_resume_pickoff: Option<Base> = if char_iter.peek() == Some(&'+') {
+            char_iter.next();
+            get_catcher_pickoff_base(char_iter.next())
+        } else {
+            None
+        };
+
         while let Some(c) = char_iter.next() {
             match c {
                 // Tokens indicating info on the upcoming pitch
@@ -163,6 +171,15 @@ impl PitchSequenceItem {
                     pitch.update_runners_going();
                     continue;
                 }
+                // Duplicate pickoff annotation — see docs/pitch_sequence_pa_resume.md.
+                // Drop `+N` only when the next char is a base digit; otherwise
+                // surface as Unrecognized so a future malformed pattern stays loud.
+                '+' => {
+                    if matches!(char_iter.peek(), Some('1' | '2' | '3' | 'H')) {
+                        let _ = char_iter.next();
+                        continue;
+                    }
+                }
                 _ => {}
             }
             let pitch_type = PitchType::from_str(&c.to_string()).unwrap_or_else(|_| {
@@ -170,6 +187,10 @@ impl PitchSequenceItem {
                 PitchType::default()
             });
             pitch.update_pitch_type(pitch_type);
+
+            if let Some(base) = pending_resume_pickoff.take() {
+                pitch.update_catcher_pickoff(Some(base));
+            }
 
             match char_iter.peek() {
                 // Tokens indicating info on the previous pitch
@@ -306,6 +327,91 @@ mod tests {
         // "X" is not a valid base ("1", "2", "3", "H"); pickoff is None.
         let s = PitchSequenceItem::new_pitch_sequence("B+X").unwrap();
         assert_eq!(s[0].catcher_pickoff_attempt, None);
+    }
+
+    #[test]
+    fn pa_resume_pickoff_attaches_to_first_post_resume_pitch() {
+        // `BCS>B.+3FX` (e.g. MIN202309100 lewir003): rsplit gives `+3FX`.
+        // The `+3` is a catcher pickoff at the moment of PA resumption — it
+        // must attach to the first real pitch (`F`), not become its own
+        // Unrecognized pitch followed by a phantom PickoffAttemptThird.
+        let s = PitchSequenceItem::new_pitch_sequence("BCS>B.+3FX").unwrap();
+        assert_eq!(types(&s), vec![PitchType::Foul, PitchType::InPlay]);
+        assert_eq!(s[0].catcher_pickoff_attempt, Some(Base::Third));
+        assert_eq!(s[1].catcher_pickoff_attempt, None);
+    }
+
+    #[test]
+    fn pa_resume_pickoff_works_with_first_base() {
+        // `BB.+1BB` (TOR201805230 cozaz001).
+        let s = PitchSequenceItem::new_pitch_sequence("BB.+1BB").unwrap();
+        assert_eq!(
+            types(&s),
+            vec![PitchType::Ball, PitchType::Ball]
+        );
+        assert_eq!(s[0].catcher_pickoff_attempt, Some(Base::First));
+        assert_eq!(s[1].catcher_pickoff_attempt, None);
+    }
+
+    #[test]
+    fn pa_resume_pickoff_with_no_following_pitch_is_silent() {
+        // `.+1` (SLN199009300 pagnt001): degenerate case — the resumption
+        // pickoff has no following pitch. Emit nothing rather than a phantom.
+        let s = PitchSequenceItem::new_pitch_sequence(".+1").unwrap();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn pa_resume_pickoff_only_uses_rightmost_dot() {
+        // `B*BBC+1.+1F>X` (PHI201607010 franm004) has `+1` mid-sequence and
+        // another `+1` at PA resumption. The mid-sequence one is dropped by
+        // the rsplit (everything before the rightmost `.` goes away); the
+        // resumption one must still attach to `F`.
+        let s = PitchSequenceItem::new_pitch_sequence("B*BBC+1.+1F>X").unwrap();
+        assert_eq!(types(&s), vec![PitchType::Foul, PitchType::InPlay]);
+        assert_eq!(s[0].catcher_pickoff_attempt, Some(Base::First));
+        assert!(s[1].runners_going);
+    }
+
+    #[test]
+    fn duplicate_pickoff_annotation_is_dropped_silently() {
+        // `BBBC+1+1B` (WAS202508220 abrac001): C records pickoff to first
+        // via the peek path; the second `+1` is a duplicate annotation with
+        // no schema slot. Drop it rather than emit a phantom Unrecognized
+        // pitch + phantom PickoffAttemptFirst.
+        let s = PitchSequenceItem::new_pitch_sequence("BBBC+1+1B").unwrap();
+        assert_eq!(
+            types(&s),
+            vec![
+                PitchType::Ball,
+                PitchType::Ball,
+                PitchType::Ball,
+                PitchType::CalledStrike,
+                PitchType::Ball,
+            ]
+        );
+        assert_eq!(s[3].catcher_pickoff_attempt, Some(Base::First));
+    }
+
+    #[test]
+    fn arrow_plus_after_already_pickoffed_pitch_drops_extra() {
+        // `M+1>+1` (BAL201706050 buxtb001): M takes pickoff to first via
+        // peek; the trailing `>+1` is a duplicate annotation. The `>` flips
+        // runners_going on the next (never-emitted) pitch slot; the bare
+        // `+1` is dropped silently.
+        let s = PitchSequenceItem::new_pitch_sequence("M+1>+1").unwrap();
+        assert_eq!(types(&s), vec![PitchType::MissedBunt]);
+        assert_eq!(s[0].catcher_pickoff_attempt, Some(Base::First));
+    }
+
+    #[test]
+    fn arrow_followed_by_plus_pickoff_still_works() {
+        // Regression: ensure the existing `>+N` handling (runners going +
+        // catcher pickoff on the previous pitch) still works after the
+        // resume-pickoff change.
+        let s = PitchSequenceItem::new_pitch_sequence("B>+2C").unwrap();
+        assert_eq!(types(&s), vec![PitchType::Ball, PitchType::CalledStrike]);
+        assert_eq!(s[0].catcher_pickoff_attempt, Some(Base::Second));
     }
 
     #[test]
