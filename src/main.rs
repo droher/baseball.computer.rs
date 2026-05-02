@@ -278,9 +278,7 @@ impl EventFileSchema {
             let game_context = game_context_result?;
             game_ids.push(game_context.game_id);
             // Cross-pass dedup: skip games seen in earlier passes.
-            if parsed_games
-                .is_some_and(|pg| pg.contains(&game_context.game_id))
-            {
+            if parsed_games.is_some_and(|pg| pg.contains(&game_context.game_id)) {
                 warn!(
                     "File {} contains already-processed game {}, ignoring",
                     file_info.filename, &game_context.game_id.id

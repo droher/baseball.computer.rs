@@ -2081,9 +2081,9 @@ impl ParsedPlay {
         }
     }
 
-    // There is still some additional filtering work to do
-    // that requires knowledge of how many outs are at the start of the play
-    // TODO: Either add outs-at-start info to plays or talk to Retrosheet about changing
+    // Outs-dependent RBI rules (e.g. FC with two out and no force scores an
+    // RBI, FC with <2 outs does not) can't be applied here — the play parser
+    // is stateless. They'd belong in game_state.rs once the out count exists.
     pub fn rbi(&self) -> Vec<BaseRunner> {
         self.advances()
             .filter(|ra| match self.default_rbi_status() {
@@ -2191,14 +2191,14 @@ impl ParsedPlay {
         }
     }
 
-    // Primary fielder of a ball in play. For outs, this is the first fielder in the play string.
-    // For hits, this is the first fielder after the hit type indicator, e.g. the `8` in `S8`.
-    // This data point is particularly important as it's very well-populated historically and
-    // serves as a good fallback for hit location, which is usually not present.
-    // Some hit strings clearly indicate a deflection e.g. `S17`, but others may be
-    // an irregular recording of a hit location, e.g. `S48` to mean shallow center.
-    // We take the first fielder regardless, but may be worth another look.
-    // TODO: Investigate possible irregular hit location storage
+    // Primary fielder of a ball in play. For outs, the first fielder in the
+    // play string; for hits, the first fielder after the hit-type indicator
+    // (the `8` in `S8`). Well-populated historically — useful as a fallback
+    // when the explicit hit-location field is missing. Some strings clearly
+    // mark a deflection (`S17`); others may encode an irregular hit location
+    // (`S48` for shallow center). Both are treated the same: take the first
+    // fielder. Disambiguating would need either a Retrosheet schema change or
+    // per-game heuristics.
     pub fn hit_to_fielder(&self) -> Option<FieldingPosition> {
         let main_fielder = self.main_plays.iter().find_map(|pt| match pt {
             PlayType::PlateAppearance(PlateAppearanceType::Hit(h)) => {
@@ -2253,7 +2253,9 @@ impl TryFrom<&str> for ParsedPlay {
     type Error = Error;
 
     fn try_from(raw_play: &str) -> Result<Self> {
-        // TODO: Properly process exclamation point -- it's a bit diff
+        // `#` (questionable play) and `!` (exceptional play) are dropped along
+        // with stray spaces. Surfacing either as a flag would need a new schema
+        // column coordinated with the dbt project.
         let value = &*STRIP_CHARS_REGEX.replace_all(raw_play, "");
         if value.is_empty() {
             return Ok(Self::default());

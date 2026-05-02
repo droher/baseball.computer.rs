@@ -924,6 +924,20 @@ pub struct RareAttributes {
     pub walk_responsible_pitcher: Option<Player>,
 }
 
+/// `kind` ("lineup" / "fielding") only feeds the error messages.
+fn current_appearance_mut<'a, T>(
+    map: &'a mut HashMap<TrackedPlayer, Vec<T>>,
+    player: &TrackedPlayer,
+    kind: &'static str,
+) -> Result<&'a mut T> {
+    map.get_mut(player)
+        .with_context(|| {
+            anyhow!("Cannot find existing player {player} in {kind} appearance records")
+        })?
+        .last_mut()
+        .with_context(|| anyhow!("Player {player} has an empty list of {kind} appearances"))
+}
+
 /// Keeps track of the current players on the field at any given point
 /// and records their exits/entries.
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -1017,9 +1031,7 @@ impl Personnel {
             &map_tup.1
         };
         map.get(position).copied().with_context(|| {
-            anyhow!(
-                "Position {position} for side {side} missing from current game state"
-            )
+            anyhow!("Position {position} for side {side} missing from current game state")
         })
     }
 
@@ -1056,34 +1068,14 @@ impl Personnel {
         &mut self,
         player: &TrackedPlayer,
     ) -> Result<&mut GameLineupAppearance> {
-        self.lineup_appearances
-            .get_mut(player)
-            .with_context(|| {
-                anyhow!(
-                    "Cannot find existing player {player} in lineup appearance records"
-                )
-            })?
-            .last_mut()
-            .with_context(|| anyhow!("Player {player} has an empty list of lineup appearances"))
+        current_appearance_mut(&mut self.lineup_appearances, player, "lineup")
     }
 
     fn get_current_fielding_appearance(
         &mut self,
         player: &TrackedPlayer,
     ) -> Result<&mut GameFieldingAppearance> {
-        self.defense_appearances
-            .get_mut(player)
-            .with_context(|| {
-                anyhow!(
-                    "Cannot find existing player {player} in defense appearance records"
-                )
-            })?
-            .last_mut()
-            .with_context(|| {
-                anyhow!(
-                    "Player {player} has an empty list of fielding appearances"
-                )
-            })
+        current_appearance_mut(&mut self.defense_appearances, player, "fielding")
     }
 
     fn update_lineup_on_substitution(
@@ -1234,6 +1226,23 @@ impl Personnel {
     }
 }
 
+/// Holds `com,...` records seen between plays; drained onto the next event.
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
+struct CommentAccumulator {
+    buffer: Vec<String>,
+}
+
+impl CommentAccumulator {
+    fn push(&mut self, comment: &str) {
+        // `$` prefix marks an internal scoring note in Retrosheet; strip it.
+        self.buffer.push(comment.trim().replace('$', ""));
+    }
+
+    fn drain(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.buffer)
+    }
+}
+
 /// Tracks the information necessary to populate each event.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct GameState {
@@ -1248,10 +1257,83 @@ pub struct GameState {
     at_bat: LineupPosition,
     personnel: Personnel,
     unusual_state: RareAttributes,
-    comment_buffer: Vec<String>,
+    comments: CommentAccumulator,
+}
+
+/// Pre-update view of `GameState` fields needed by the event we're about to
+/// build. Taken before `update` mutates `self`.
+struct PrePlaySnapshot {
+    starting_base_state: BaseState,
+    starting_outs: Outs,
+    rare_attributes: RareAttributes,
 }
 
 impl GameState {
+    /// On a frame flip, bases/outs reset to defaults — the new event belongs
+    /// to the new half-inning and shouldn't inherit the previous frame's tail.
+    fn capture_pre_play_snapshot(&self, opt_play: Option<&PlayRecord>) -> Result<PrePlaySnapshot> {
+        let frame_flipped = matches!(opt_play.map(|p| self.is_frame_flipped(p)), Some(Ok(true)));
+        let (starting_base_state, starting_outs) = if frame_flipped {
+            (
+                BaseState::default(),
+                Outs::new(0).context("Unexpected outs bound error")?,
+            )
+        } else {
+            (self.bases.clone(), self.outs)
+        };
+        Ok(PrePlaySnapshot {
+            starting_base_state,
+            starting_outs,
+            rare_attributes: self.unusual_state,
+        })
+    }
+
+    /// Must run after `update`: reads post-play `inning`/`batting_side`/
+    /// `frame`/`at_bat` and `bases` (as `ending_base_state`).
+    fn build_event(
+        &mut self,
+        play: &PlayRecord,
+        pre_state: PrePlaySnapshot,
+        line_number: usize,
+        event_key: EventKey,
+    ) -> Result<Event> {
+        let context = EventContext {
+            inning: self.inning,
+            batting_side: self.batting_side,
+            frame: self.frame,
+            at_bat: self.at_bat,
+            batter_id: play.batter,
+            pitcher_id: self.personnel.pitcher(self.batting_side.flip())?,
+            outs: pre_state.starting_outs,
+            starting_base_state: pre_state.starting_base_state,
+            rare_attributes: pre_state.rare_attributes,
+        };
+        let results = EventResults {
+            count_at_event: play.count,
+            pitch_sequence: play.pitch_sequence.clone(),
+            plate_appearance: PlateAppearanceResultType::from_play(play),
+            batted_ball_info: EventBattedBallInfo::from_play(play, event_key),
+            plays_at_base: EventBaserunningPlay::from_play(play, event_key)?,
+            baserunning_advances: EventBaserunningAdvanceAttempt::from_play(play, event_key)?,
+            runs: EventRun::from_play(play, event_key),
+            play_info: EventFlag::from_play(play, event_key)?,
+            comment: self.comments.drain(),
+            fielding_plays: play.stats.fielders_data.clone(),
+            out_on_play: play.stats.outs.clone(),
+            ending_base_state: self.bases.clone(),
+            no_play_flag: play.stats.no_play_flag,
+        };
+        Ok(Event {
+            game_id: self.game_id,
+            event_id: self.event_id,
+            context,
+            results,
+            line_number,
+            event_key,
+            raw_play: play.raw.clone(),
+        })
+    }
+
     pub fn create_events(
         record_slice: &RecordSlice,
         line_offset: usize,
@@ -1270,62 +1352,12 @@ impl GameState {
                 MappedRecord::Play(pr) => Some(pr),
                 _ => None,
             };
-            // TODO: Feels wrong to have to handle out total differently than everything else
-            // TODO: Would be nice to clear this automatically rather than checking
-            let (starting_base_state, starting_outs) =
-                if matches!(opt_play.map(|p| state.is_frame_flipped(p)), Some(Ok(true))) {
-                    (
-                        BaseState::default(),
-                        Outs::new(0).context("Unexpected outs bound error")?,
-                    )
-                } else {
-                    (state.bases.clone(), state.outs)
-                };
-            // Unusual game state also needs to be grabbed before updating state
-            let rare_attributes = state.unusual_state;
-
+            let pre_state = state.capture_pre_play_snapshot(opt_play)?;
             state.update(record, opt_play)?;
             if let Some(play) = opt_play {
-                let context = EventContext {
-                    inning: state.inning,
-                    batting_side: state.batting_side,
-                    frame: state.frame,
-                    at_bat: state.at_bat,
-                    batter_id: play.batter,
-                    pitcher_id: state.personnel.pitcher(state.batting_side.flip())?,
-                    outs: starting_outs,
-                    starting_base_state,
-                    rare_attributes,
-                };
-                let results = EventResults {
-                    count_at_event: play.count,
-                    pitch_sequence: play.pitch_sequence.clone(),
-                    plate_appearance: PlateAppearanceResultType::from_play(play),
-                    batted_ball_info: EventBattedBallInfo::from_play(play, event_key),
-                    plays_at_base: EventBaserunningPlay::from_play(play, event_key)?,
-                    baserunning_advances: EventBaserunningAdvanceAttempt::from_play(
-                        play, event_key,
-                    )?,
-                    runs: EventRun::from_play(play, event_key),
-                    play_info: EventFlag::from_play(play, event_key)?,
-                    comment: state.comment_buffer,
-                    fielding_plays: play.stats.fielders_data.clone(),
-                    out_on_play: play.stats.outs.clone(),
-                    ending_base_state: state.bases.clone(),
-                    no_play_flag: play.stats.no_play_flag,
-                };
                 let line_number = line_offset + i;
-                events.push(Event {
-                    game_id: state.game_id,
-                    event_id: state.event_id,
-                    context,
-                    results,
-                    line_number,
-                    event_key,
-                    raw_play: play.raw.clone(),
-                });
+                events.push(state.build_event(play, pre_state, line_number, event_key)?);
                 state.event_id += 1;
-                state.comment_buffer = vec![]; // Clear comment buffer
             }
         }
         // Set all remaining blank end_event_ids to final event
@@ -1375,7 +1407,7 @@ impl GameState {
             at_bat: LineupPosition::default(),
             personnel: Personnel::new(record_slice)?,
             unusual_state: RareAttributes::default(),
-            comment_buffer: vec![],
+            comments: CommentAccumulator::default(),
         })
     }
 
@@ -1491,7 +1523,7 @@ impl GameState {
     }
 
     fn update_on_comment(&mut self, comment: &str) {
-        self.comment_buffer.push(comment.trim().replace('$', ""));
+        self.comments.push(comment);
     }
 
     fn update_on_pitcher_responsibility_adjustment(

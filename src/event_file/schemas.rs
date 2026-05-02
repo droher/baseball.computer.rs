@@ -21,7 +21,7 @@ use crate::event_file::traits::{
     Player, RetrosheetVolunteer, Scorer, SequenceId, Side, Umpire,
 };
 
-use super::game_state::{Event as E, GameLineupAppearance, PlateAppearanceResultType};
+use super::game_state::{Event as E, GameLineupAppearance, GameUmpire, PlateAppearanceResultType};
 use super::info::UmpirePosition;
 use super::misc::Hand;
 use super::parser::{AccountType, MappedRecord, RecordSlice};
@@ -80,6 +80,13 @@ pub struct Games<'a> {
     umpire_right_id: Option<Umpire>,
 }
 
+fn find_umpire_by_position(umpires: &[GameUmpire], position: UmpirePosition) -> Option<Umpire> {
+    umpires
+        .iter()
+        .find(|u| u.position == position)
+        .and_then(|u| u.umpire_id)
+}
+
 impl<'a> From<&'a GameContext> for Games<'a> {
     fn from(gc: &'a GameContext) -> Self {
         let setting = &gc.setting;
@@ -122,36 +129,12 @@ impl<'a> From<&'a GameContext> for Games<'a> {
             filename: gc.file_info.filename.as_str(),
             away_team_id: gc.teams.away,
             home_team_id: gc.teams.home,
-            umpire_home_id: gc
-                .umpires
-                .iter()
-                .find(|u| u.position == UmpirePosition::Home)
-                .and_then(|u| u.umpire_id),
-            umpire_first_id: gc
-                .umpires
-                .iter()
-                .find(|u| u.position == UmpirePosition::First)
-                .and_then(|u| u.umpire_id),
-            umpire_second_id: gc
-                .umpires
-                .iter()
-                .find(|u| u.position == UmpirePosition::Second)
-                .and_then(|u| u.umpire_id),
-            umpire_third_id: gc
-                .umpires
-                .iter()
-                .find(|u| u.position == UmpirePosition::Third)
-                .and_then(|u| u.umpire_id),
-            umpire_left_id: gc
-                .umpires
-                .iter()
-                .find(|u| u.position == UmpirePosition::LeftField)
-                .and_then(|u| u.umpire_id),
-            umpire_right_id: gc
-                .umpires
-                .iter()
-                .find(|u| u.position == UmpirePosition::RightField)
-                .and_then(|u| u.umpire_id),
+            umpire_home_id: find_umpire_by_position(&gc.umpires, UmpirePosition::Home),
+            umpire_first_id: find_umpire_by_position(&gc.umpires, UmpirePosition::First),
+            umpire_second_id: find_umpire_by_position(&gc.umpires, UmpirePosition::Second),
+            umpire_third_id: find_umpire_by_position(&gc.umpires, UmpirePosition::Third),
+            umpire_left_id: find_umpire_by_position(&gc.umpires, UmpirePosition::LeftField),
+            umpire_right_id: find_umpire_by_position(&gc.umpires, UmpirePosition::RightField),
         }
     }
 }
@@ -372,6 +355,25 @@ pub struct EventBaserunners {
     rbi_flag: bool,
 }
 
+/// Lineup-side fields of an `EventBaserunners` row.
+struct RunnerIdentity {
+    runner_lineup_position: LineupPosition,
+    runner_id: Player,
+    charge_event_id: EventId,
+    reached_on_event_id: Option<EventId>,
+    explicit_charged_pitcher_id: Option<Player>,
+}
+
+/// Advance-side fields of an `EventBaserunners` row.
+struct AdvanceOutcome {
+    attempted_advance_to_base: Option<Base>,
+    base_end: Option<Base>,
+    advanced_on_error_flag: bool,
+    explicit_out_flag: bool,
+    run_scored_flag: bool,
+    rbi_flag: bool,
+}
+
 impl EventBaserunners {
     fn runner(game_context: &GameContext, event: &E, baserunner: BaseRunner) -> Option<Self> {
         let is_out = event.results.out_on_play.iter().any(|o| o == &baserunner);
@@ -393,12 +395,12 @@ impl EventBaserunners {
             .baserunning_advances
             .iter()
             .find(|a| a.baserunner == baserunner);
-        match (starting_state, advance) {
-            (Some(ss), Some(a)) => Some(Self {
-                game_id: game_context.game_id.id,
-                event_id: event.event_id,
-                event_key: event.event_key,
-                baserunner,
+        if starting_state.is_none() && advance.is_none() {
+            return None;
+        }
+
+        let identity = match starting_state {
+            Some(ss) => RunnerIdentity {
                 runner_lineup_position: ss.lineup_position,
                 runner_id: GameLineupAppearance::get_at_event(
                     &game_context.lineup_appearances,
@@ -411,9 +413,20 @@ impl EventBaserunners {
                 charge_event_id: ss.charge_event_id,
                 reached_on_event_id: Some(ss.reached_on_event_id),
                 explicit_charged_pitcher_id: ss.explicit_charged_pitcher_id,
+            },
+            // No starting state means the batter reached base on this play.
+            None => RunnerIdentity {
+                runner_lineup_position: event.context.at_bat,
+                runner_id: event.context.batter_id,
+                charge_event_id: event.event_id,
+                reached_on_event_id: None,
+                explicit_charged_pitcher_id: None,
+            },
+        };
+
+        let outcome = match advance {
+            Some(a) => AdvanceOutcome {
                 attempted_advance_to_base: Some(a.attempted_advance_to),
-                baserunning_play_type,
-                is_out,
                 base_end: if a.is_successful {
                     Some(a.attempted_advance_to)
                 } else {
@@ -423,32 +436,14 @@ impl EventBaserunners {
                 explicit_out_flag: a.explicit_out_flag,
                 run_scored_flag: a.run_scored_flag,
                 rbi_flag: a.rbi_flag,
-            }),
-            // Runner was on base but either stayed put or got CS
-            (Some(ss), None) => Some(Self {
-                game_id: game_context.game_id.id,
-                event_id: event.event_id,
-                event_key: event.event_key,
-                baserunner,
-                runner_lineup_position: ss.lineup_position,
-                runner_id: GameLineupAppearance::get_at_event(
-                    &game_context.lineup_appearances,
-                    ss.lineup_position,
-                    event.event_id,
-                    event.context.batting_side,
-                )
-                .expect(&game_context.game_id.id)
-                .player_id,
-                charge_event_id: ss.charge_event_id,
-                reached_on_event_id: Some(ss.reached_on_event_id),
-                explicit_charged_pitcher_id: ss.explicit_charged_pitcher_id,
+            },
+            // No advance record: runner stayed, was caught stealing, or picked off.
+            None => AdvanceOutcome {
                 attempted_advance_to_base: if attempted_sb {
                     Some(baserunner.to_next_base())
                 } else {
                     None
                 },
-                baserunning_play_type,
-                is_out,
                 base_end: if attempted_sb || picked_off {
                     None
                 } else {
@@ -458,34 +453,28 @@ impl EventBaserunners {
                 explicit_out_flag: attempted_sb,
                 run_scored_flag: false,
                 rbi_flag: false,
-            }),
-            // Batter if there was a play involving him
-            (None, Some(a)) => Some(Self {
-                game_id: game_context.game_id.id,
-                event_id: event.event_id,
-                event_key: event.event_key,
-                baserunner,
-                runner_lineup_position: event.context.at_bat,
-                runner_id: event.context.batter_id,
-                charge_event_id: event.event_id,
-                reached_on_event_id: None,
-                explicit_charged_pitcher_id: None,
-                attempted_advance_to_base: Some(a.attempted_advance_to),
-                // Batter could be involved on baserunning play for K+WP,PO,
-                baserunning_play_type,
-                is_out,
-                base_end: if a.is_successful {
-                    Some(a.attempted_advance_to)
-                } else {
-                    None
-                },
-                advanced_on_error_flag: a.advanced_on_error_flag,
-                explicit_out_flag: a.explicit_out_flag,
-                run_scored_flag: a.run_scored_flag,
-                rbi_flag: a.rbi_flag,
-            }),
-            (None, None) => None,
-        }
+            },
+        };
+
+        Some(Self {
+            game_id: game_context.game_id.id,
+            event_id: event.event_id,
+            event_key: event.event_key,
+            baserunner,
+            runner_lineup_position: identity.runner_lineup_position,
+            runner_id: identity.runner_id,
+            charge_event_id: identity.charge_event_id,
+            reached_on_event_id: identity.reached_on_event_id,
+            explicit_charged_pitcher_id: identity.explicit_charged_pitcher_id,
+            attempted_advance_to_base: outcome.attempted_advance_to_base,
+            baserunning_play_type,
+            is_out,
+            base_end: outcome.base_end,
+            advanced_on_error_flag: outcome.advanced_on_error_flag,
+            explicit_out_flag: outcome.explicit_out_flag,
+            run_scored_flag: outcome.run_scored_flag,
+            rbi_flag: outcome.rbi_flag,
+        })
     }
 }
 

@@ -1,11 +1,31 @@
+use std::collections::HashSet;
 use std::str::FromStr;
+use std::sync::Mutex;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumString};
+use tracing::warn;
 
 use crate::event_file::play::Base;
 use crate::event_file::traits::SequenceId;
+
+// Dedup the unrecognized-pitch-char warn at most once per distinct char per
+// process. Without this, a single new char appearing on thousands of pitches
+// in a full-corpus run would flood the log.
+static UNRECOGNIZED_PITCH_CHARS_SEEN: Mutex<Option<HashSet<char>>> = Mutex::new(None);
+
+fn warn_unrecognized_pitch_char_once(c: char) {
+    if let Ok(mut guard) = UNRECOGNIZED_PITCH_CHARS_SEEN.lock() {
+        let seen = guard.get_or_insert_with(HashSet::new);
+        if seen.insert(c) {
+            warn!(
+                "Unrecognized pitch char {c:?}, mapping to {:?}",
+                PitchType::Unrecognized
+            );
+        }
+    }
+}
 
 #[derive(
     Debug,
@@ -145,19 +165,19 @@ impl PitchSequenceItem {
                 }
                 _ => {}
             }
-            // TODO: Log unrecognized types as a warning once I implement proper spans
-            let pitch_type = PitchType::from_str(&c.to_string()).unwrap_or_default();
+            let pitch_type = PitchType::from_str(&c.to_string()).unwrap_or_else(|_| {
+                warn_unrecognized_pitch_char_once(c);
+                PitchType::default()
+            });
             pitch.update_pitch_type(pitch_type);
 
             match char_iter.peek() {
                 // Tokens indicating info on the previous pitch
                 Some('>') => {
-                    // The sequence ">+" occurs around 70 times in the current data, usually but not always on
-                    // a pickoff caught stealing initiated by the catcher. It's unclear what the '>' is for, but
-                    // it might be to indicate cases in which the runner attempted to advance on the pickoff rather
-                    // than get back to the base. Current approach is to just record the catcher pickoff and
-                    // not apply the advance attempt info to the pitch.
-                    // TODO: Figure out what's going on here and fix if needed or delete the todo
+                    // ">+N" (~70 corpus occurrences, ~always a catcher pickoff
+                    // /CS) likely means the runner was going on the pickoff,
+                    // but PitchSequenceItem has no slot for "runners going on
+                    // previous pitch", so we keep the "+N" base and drop ">".
                     let mut speculative_iter = char_iter.clone();
                     if speculative_iter.nth(1) == Some('+') {
                         pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(2)));

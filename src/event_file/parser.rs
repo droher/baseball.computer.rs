@@ -135,6 +135,23 @@ impl Iterator for RetrosheetReader {
 }
 
 impl RetrosheetReader {
+    /// Advances past a leading comment block (1991-vintage files have one),
+    /// leaving `record` positioned on the first non-comment line. Returns the
+    /// number of comments skipped, which becomes the starting line offset.
+    fn skip_leading_comments(
+        reader: &mut Reader<BufReader<File>>,
+        record: &mut StringRecord,
+    ) -> Result<usize> {
+        let mut comments = 0;
+        loop {
+            reader.read_record(record)?;
+            match MappedRecord::try_from(&*record)? {
+                MappedRecord::Comment(_) => comments += 1,
+                _ => return Ok(comments),
+            }
+        }
+    }
+
     pub fn new(path: &PathBuf, file_index: usize) -> Result<Self> {
         let mut reader = ReaderBuilder::new()
             .has_headers(false)
@@ -142,16 +159,8 @@ impl RetrosheetReader {
             .flexible(true)
             .from_reader(BufReader::new(File::open(path)?));
         let mut current_record = StringRecord::new();
-        let mut line_number = 1;
-        // Skip comments at top of 1991 files
-        // TODO: Unmess
-        loop {
-            reader.read_record(&mut current_record)?;
-            match MappedRecord::try_from(&current_record)? {
-                MappedRecord::Comment(_) => line_number += 1,
-                _ => break,
-            }
-        }
+        let comments_skipped = Self::skip_leading_comments(&mut reader, &mut current_record)?;
+        let line_offset = 1 + comments_skipped;
         let current_game_id = match MappedRecord::try_from(&current_record)? {
             MappedRecord::GameId(g) => Ok(g),
             _ => Err(anyhow!(
@@ -165,8 +174,8 @@ impl RetrosheetReader {
             current_record,
             current_game_id,
             current_record_vec,
+            line_offset,
             file_info,
-            line_offset: line_number,
         })
     }
 

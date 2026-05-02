@@ -1,0 +1,8 @@
+game_id,pitcher_id,side,nth_pitcher,outs_recorded,no_out_batters,batters_faced,hits,doubles,triples,home_runs,runs,earned_runs,walks,intentional_walks,strikeouts,hit_batsmen,wild_pitches,balks,sacrifice_hits,sacrifice_flies
+BIR194806210,greab101,Home,1,27,,47,13,,,0,6,,5,,8,0,0,0,0,
+BIR194806210,lockc102,Away,1,7,,16,8,,,0,3,3,0,,2,0,0,0,0,
+BIR194806210,stewr101,Away,2,17,,30,8,,,0,9,,5,,3,0,0,0,1,
+DET194806220,haefm101,Away,1,18,0,28,3,2,0,0,2,1,5,2,3,0,0,0,1,0
+DET194806220,houta101,Home,1,20,0,29,10,0,1,0,4,4,0,0,5,0,0,0,0,0
+DET194806220,hutcf101,Home,2,7,0,10,2,0,0,1,1,1,1,0,2,0,0,0,0,0
+DET194806220,thomf109,Away,2,9,0,13,2,0,0,1,2,1,1,0,2,0,0,0,0,0

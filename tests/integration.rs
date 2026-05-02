@@ -13,6 +13,13 @@
 //!   - 1948_DET.EBA    — single box-score game
 //!   - 1914_BSN.EVN    — BSN191409102 PBP, exercises bogus `presadj` skip path
 //!   - 1948_BIR.EBR    — BIR194806210 box, exercises trailing-space `info` value
+//!   - 2023ALW1.EVE    — MIN202310030 Wild Card (deep substitution chain, 17 subs)
+//!   - 2023NLW1.EVE    — Wild Card with 14 subs and 2 `com,...` records interleaved
+//!     between subs and plays
+//!
+//! `csv_snapshots_are_stable` canonicalizes every output file (sort data rows
+//! lexicographically; preserve header) and compares against committed snapshots
+//! in `tests/snapshots/all_fixtures/`. Run with `BLESS=1 cargo test` to regenerate.
 
 use std::collections::HashMap;
 use std::fs;
@@ -72,7 +79,7 @@ fn json_mode_writes_one_line_per_play_by_play_game() {
     // to games.jsonl. 6 fixtures × 1 game each = 6 lines.
     let lines = count_lines(&path);
     assert_eq!(
-        lines, 6,
+        lines, 8,
         "expected one JSONL line per fixture game, got {lines}"
     );
 }
@@ -96,12 +103,13 @@ fn json_lines_are_valid_json_with_required_keys() {
 fn games_csv_has_one_row_per_pbp_fixture() {
     let out = run_parser(false);
     let games = read_csv_rows(&out.path().join("games.csv"));
-    // PBP fixtures: allstar, postseason, deduced, 1914_BSN. Box score fixtures
+    // PBP fixtures: allstar, postseason 2014, deduced 1959, 1914_BSN, plus
+    // 2023ALW1 + 2023NLW1 (sub-chain & comment fixtures). Box score fixtures
     // (1948_DET, 1948_BIR) go to box_score_games.csv.
     assert_eq!(
         games.len(),
-        4,
-        "games.csv should have 4 rows, got {}",
+        6,
+        "games.csv should have 6 rows, got {}",
         games.len()
     );
     let box_games = read_csv_rows(&out.path().join("box_score_games.csv"));
@@ -242,6 +250,95 @@ fn box_score_fixture_produces_expected_files() {
         assert!(n >= 2, "{f} has only {n} line(s) (header counts as 1)");
     }
 }
+
+/// Canonicalize output: sort data rows lexicographically, keep the header line
+/// in place. JSON-mode `games.jsonl` lines are sorted directly. Returns the
+/// canonical string, or `None` if the file is empty (no header / no body).
+fn canonicalize(path: &Path) -> String {
+    let body = fs::read_to_string(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let mut lines: Vec<&str> = body.lines().collect();
+    let is_jsonl = path.extension().and_then(|s| s.to_str()) == Some("jsonl");
+    if is_jsonl || lines.is_empty() {
+        lines.sort_unstable();
+    } else {
+        // Preserve header (line 0); sort the rest.
+        let (head, tail) = lines.split_at_mut(1);
+        tail.sort_unstable();
+        lines = head.iter().chain(tail.iter()).copied().collect();
+    }
+    let mut out = lines.join("\n");
+    if !out.is_empty() {
+        out.push('\n');
+    }
+    out
+}
+
+fn snapshot_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/snapshots/all_fixtures")
+}
+
+fn collect_output_files(dir: &Path) -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = fs::read_dir(dir)
+        .unwrap()
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| {
+            matches!(
+                p.extension().and_then(|s| s.to_str()),
+                Some("csv") | Some("jsonl")
+            )
+        })
+        .collect();
+    paths.sort();
+    paths
+}
+
+#[test]
+fn csv_snapshots_are_stable() {
+    let out = run_parser(false);
+    let snap_dir = snapshot_dir();
+    let bless = std::env::var_os("BLESS").is_some();
+    if bless {
+        // Wipe-and-rewrite so removed schemas don't leave stale snapshots.
+        if snap_dir.exists() {
+            fs::remove_dir_all(&snap_dir).unwrap();
+        }
+        fs::create_dir_all(&snap_dir).unwrap();
+    }
+    let mut missing = vec![];
+    let mut diffs = vec![];
+    for path in collect_output_files(out.path()) {
+        let name = path.file_name().unwrap().to_str().unwrap();
+        let canonical = canonicalize(&path);
+        let snap_path = snap_dir.join(format!("{name}.sorted"));
+        if bless {
+            fs::write(&snap_path, &canonical).unwrap();
+            continue;
+        }
+        if !snap_path.exists() {
+            missing.push(name.to_string());
+            continue;
+        }
+        let expected = fs::read_to_string(&snap_path).unwrap();
+        if expected != canonical {
+            diffs.push(name.to_string());
+        }
+    }
+    assert!(
+        missing.is_empty(),
+        "missing snapshots (run `BLESS=1 cargo test csv_snapshots_are_stable` to create): {missing:?}"
+    );
+    assert!(
+        diffs.is_empty(),
+        "snapshot diff in {diffs:?}; run `BLESS=1 cargo test csv_snapshots_are_stable` to update if intentional"
+    );
+}
+
+// `games.jsonl` is intentionally not snapshotted: it preserves vec field
+// ordering (e.g. `out_on_play: ["Second","Batter"]`) which currently varies
+// across runs because some upstream HashMap-backed iterations are non-stable.
+// The CSV path doesn't surface those vecs (only their lengths), so CSV
+// snapshots stay stable. `json_lines_are_valid_json_with_required_keys` still
+// guards the JSONL structure.
 
 #[test]
 fn rerun_is_deterministic_for_top_level_row_counts() {
