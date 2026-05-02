@@ -161,7 +161,7 @@ impl PlateAppearanceResultType {
         })
     }
 
-    pub const fn is_in_play(&self) -> bool {
+    pub const fn is_in_play(self) -> bool {
         matches!(
             self,
             Self::Single
@@ -567,7 +567,7 @@ pub struct BoxScoreData {
 }
 
 impl BoxScoreData {
-    fn from_record_slice(slice: &RecordSlice) -> Result<Self> {
+    fn from_record_slice(slice: &RecordSlice) -> Self {
         let mut lines = Vec::new();
         let mut events = Vec::new();
         let mut line_scores = Vec::new();
@@ -581,12 +581,12 @@ impl BoxScoreData {
                 _ => {}
             }
         }
-        Ok(Self {
+        Self {
             lines,
             events,
             line_scores,
             comments,
-        })
+        }
     }
 }
 
@@ -624,7 +624,7 @@ impl GameContext {
         let results = GameResults::from(record_slice);
         let event_key_offset = Self::event_key_offset(file_info, game_num)?;
         let box_score_data = if file_info.account_type == AccountType::BoxScore {
-            Some(BoxScoreData::from_record_slice(record_slice)?)
+            Some(BoxScoreData::from_record_slice(record_slice))
         } else {
             None
         };
@@ -755,6 +755,7 @@ impl EventBattedBallInfo {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct EventBaserunningAdvanceAttempt {
     pub event_key: EventKey,
     pub sequence_id: SequenceId,
@@ -814,7 +815,7 @@ pub struct EventRun {
 }
 
 impl EventRun {
-    pub fn is_team_unearned_run(&self) -> bool {
+    pub fn is_team_unearned_run(self) -> bool {
         self.explicit_unearned_run_status
             .is_some_and(|s| s == UnearnedRunStatus::TeamUnearned)
     }
@@ -873,6 +874,7 @@ pub struct EventResults {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize)]
+#[allow(clippy::struct_field_names)]
 pub struct Event {
     pub game_id: GameId,
     pub event_id: EventId,
@@ -941,6 +943,7 @@ fn current_appearance_mut<'a, T>(
 /// Keeps track of the current players on the field at any given point
 /// and records their exits/entries.
 #[derive(Debug, Eq, PartialEq, Clone)]
+#[allow(clippy::struct_field_names)]
 struct Personnel {
     game_id: GameId,
     personnel_state: Matchup<(Lineup, Defense)>,
@@ -1691,8 +1694,8 @@ impl BaseState {
             for (baserunner, runner) in self.iter_in_reverse_order() {
                 if baserunner < *out_baserunner {
                     let new_charge_event_id = runner.charge_event_id;
-                    // This is a safe unwrap because it has to be Some to reach this code
-                    runner.charge_event_id = charge_event_id.unwrap();
+                    // Always Some by this point: set in the prior loop iteration.
+                    runner.charge_event_id = charge_event_id.context("charge_event_id unset")?;
                     charge_event_id = Some(new_charge_event_id);
                 }
             }

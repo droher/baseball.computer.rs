@@ -487,12 +487,14 @@ impl FileProcessor {
     }
 
     fn contains_nlb_dupes(path: &Path) -> bool {
-        let s = path.to_str().unwrap_or_default();
-        if s.ends_with(".EVR") {
-            s.contains("allas") || s.contains("allpost")
-        } else {
-            false
+        let is_evr = path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("EVR"));
+        if !is_evr {
+            return false;
         }
+        let s = path.to_str().unwrap_or_default();
+        s.contains("allas") || s.contains("allpost")
     }
 
     pub fn par_process_files(&mut self, account_type: AccountType) -> Result<()> {

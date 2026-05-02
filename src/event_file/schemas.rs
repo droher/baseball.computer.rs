@@ -244,7 +244,7 @@ impl ContextToVec<'_> for Events {
                     .results
                     .runs
                     .iter()
-                    .filter(|r| r.is_team_unearned_run())
+                    .filter(|r| (**r).is_team_unearned_run())
                     .count(),
                 no_play_flag: e.results.no_play_flag,
             }
@@ -335,6 +335,7 @@ impl ContextToVec<'_> for EventFieldingPlays {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct EventBaserunners {
     game_id: GameIdString,
     event_id: EventId,
@@ -375,6 +376,7 @@ struct AdvanceOutcome {
 }
 
 impl EventBaserunners {
+    #[allow(clippy::option_if_let_else, clippy::expect_used)]
     fn runner(game_context: &GameContext, event: &E, baserunner: BaseRunner) -> Option<Self> {
         let is_out = event.results.out_on_play.iter().any(|o| o == &baserunner);
         // Baserunning plays involve the runner if he's specifically mentioned or there is no runner mentioned

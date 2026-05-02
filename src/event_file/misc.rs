@@ -225,6 +225,7 @@ pub fn to_str_vec(match_vec: Vec<Option<Match<'_>>>) -> Vec<&str> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use csv::StringRecord;

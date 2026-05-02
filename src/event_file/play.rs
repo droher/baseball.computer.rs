@@ -835,6 +835,7 @@ impl BaserunningPlayType {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
+#[allow(clippy::struct_field_names)]
 pub struct BaserunningPlay {
     pub baserunning_play_type: BaserunningPlayType,
     pub at_base: Option<Base>,
@@ -1745,10 +1746,8 @@ impl PlayModifier {
             Self::BuntGroundIntoDoublePlay => Some(Trajectory::GroundBallBunt),
             Self::BuntPoppedIntoDoublePlay => Some(Trajectory::PopUpBunt),
             Self::FlyBallDoublePlay => Some(Trajectory::Fly),
-            Self::GroundBallDoublePlay => Some(Trajectory::GroundBall),
-            Self::GroundBallTriplePlay => Some(Trajectory::GroundBall),
-            Self::LinedIntoDoublePlay => Some(Trajectory::LineDrive),
-            Self::LinedIntoTriplePlay => Some(Trajectory::LineDrive),
+            Self::GroundBallDoublePlay | Self::GroundBallTriplePlay => Some(Trajectory::GroundBall),
+            Self::LinedIntoDoublePlay | Self::LinedIntoTriplePlay => Some(Trajectory::LineDrive),
             // At the moment, not including sac flies, as the "fly" doesn't really
             // refer to the trajectory (could also be a line drive)
             _ => None,
@@ -1822,7 +1821,7 @@ impl Count {
     // One of the more annoying scorekeeping rules is that if a batter or pitcher is removed mid-count,
     // the substituted player can still be credited/charged with the at-bat result, and the
     // logic for that depends on both the count and the result.
-    pub fn is_old_pitcher_responsible_walk(&self) -> bool {
+    pub fn is_old_pitcher_responsible_walk(self) -> bool {
         if let (Some(b), Some(s)) = (self.balls, self.strikes) {
             b == 3 || (b == 2 && s <= 1)
         } else {
@@ -1831,12 +1830,12 @@ impl Count {
         }
     }
 
-    pub fn is_old_batter_responsible_strikeout(&self) -> bool {
+    pub fn is_old_batter_responsible_strikeout(self) -> bool {
         self.strikes.is_some_and(|s| s == 2)
     }
 
     /// Whether the count has > 0 balls + strikes.
-    pub fn has_any_pitches(&self) -> bool {
+    pub fn has_any_pitches(self) -> bool {
         let balls: usize = self.balls.map(Into::into).unwrap_or_default();
         let strikes: usize = self.strikes.map(Into::into).unwrap_or_default();
         balls + strikes > 0
@@ -2180,7 +2179,7 @@ impl ParsedPlay {
                 None
             }
         });
-        let trajectory = explicit_trajectory.or(self.implicit_trajectory());
+        let trajectory = explicit_trajectory.or_else(|| self.implicit_trajectory());
         if trajectory.is_some() || location.is_some() {
             Some(ContactDescription {
                 trajectory,
@@ -2366,13 +2365,9 @@ impl TryFrom<&ParsedPlay> for PlayStats {
 
 fn cache_hit_rate(cache: &Cache<String, Arc<impl Hash + Eq>>, name: &str) -> String {
     let (hits, misses) = (cache.hits(), cache.misses());
-    format!(
-        "{}: {} hits, {} misses, {:.2}% hit rate",
-        name,
-        hits,
-        misses,
-        hits as f64 / (hits + misses) as f64 * 100.0
-    )
+    #[allow(clippy::cast_precision_loss)]
+    let rate = hits as f64 / (hits + misses) as f64 * 100.0;
+    format!("{name}: {hits} hits, {misses} misses, {rate:.2}% hit rate")
 }
 
 pub fn print_cache_info() {
@@ -2394,6 +2389,7 @@ pub fn print_cache_info() {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -2597,9 +2593,8 @@ mod tests {
     fn double_with_runners_records_advances_to_home() {
         // Double, runner on second scores, runner on first scores.
         let s = stats("D7/L7D.2-H;1-H");
-        let runs: Vec<_> = s.runs.to_vec();
-        assert!(runs.contains(&BaseRunner::Second));
-        assert!(runs.contains(&BaseRunner::First));
+        assert!(s.runs.contains(&BaseRunner::Second));
+        assert!(s.runs.contains(&BaseRunner::First));
     }
 
     #[test]
