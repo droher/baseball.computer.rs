@@ -41,6 +41,8 @@ quick_cache = {version = "0.6.21", features = ["stats"]}
 fixed-map = {version = "0.9.5", features = ["serde"]}
 lazy-regex = "3.6.0"
 flate2 = "1.1.9"
+papaya = "0.2.4"
+crossbeam-channel = "0.5"
 
 [dev-dependencies]
 tempfile = "3.27"
@@ -48,3 +50,11 @@ tempfile = "3.27"
 [workspace]
 members = ["crates/retrosheet-grammar"]
 resolver = "3"
+
+# Release-equivalent profile that keeps debug line tables so samply / Instruments
+# flamegraphs resolve to real source lines. Strip is off; binary is bigger.
+[profile.profiling]
+inherits = "release"
+debug = "line-tables-only"
+strip = "none"
+split-debuginfo = "unpacked"

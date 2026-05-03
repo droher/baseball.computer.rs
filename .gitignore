@@ -4,6 +4,10 @@ output
 .idea
 *.iml
 perf.data*
+*.json.gz
+flamegraph.svg
+profile.json
+profile.json.gz
 arrow/
 data/
 event/
