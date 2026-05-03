@@ -494,24 +494,23 @@ impl EventFileSchema {
         json_writer: Option<&ThreadSafeJsonWriter>,
     ) -> Result<Option<GameId>> {
         let record_slice = &record_vec.record_vec;
-        let game_context = match GameContext::new(
-            record_slice,
-            file_info,
-            record_vec.line_offset,
-            game_num,
-        ) {
-            Ok(c) => c,
-            Err(e) => {
-                let game_id = if let Some(MappedRecord::GameId(id)) = record_slice.first() {
-                    id.id.as_str()
-                } else {
-                    "unknown"
-                };
-                let filename = file_info.filename.as_str();
-                error!("Error initializing game {game_id} in file {filename}: {:?}", e);
-                return Ok(None);
-            }
-        };
+        let game_context =
+            match GameContext::new(record_slice, file_info, record_vec.line_offset, game_num) {
+                Ok(c) => c,
+                Err(e) => {
+                    let game_id = if let Some(MappedRecord::GameId(id)) = record_slice.first() {
+                        id.id.as_str()
+                    } else {
+                        "unknown"
+                    };
+                    let filename = file_info.filename.as_str();
+                    error!(
+                        "Error initializing game {game_id} in file {filename}: {:?}",
+                        e
+                    );
+                    return Ok(None);
+                }
+            };
         let game_id = game_context.game_id;
         if parsed_games.is_some_and(|pg| pg.contains(&game_id)) {
             warn!(
@@ -571,7 +570,10 @@ impl EventFileSchema {
         record_slice: &RecordSlice,
         writer_map: &WriterMap,
     ) -> Result<()> {
-        writer_map.append_serialize(Self::BoxScoreGames, std::iter::once(Games::from(game_context)))?;
+        writer_map.append_serialize(
+            Self::BoxScoreGames,
+            std::iter::once(Games::from(game_context)),
+        )?;
         let line_scores = record_slice
             .iter()
             .filter_map(|mr| match mr {
@@ -609,14 +611,20 @@ impl EventFileSchema {
         writer_map.write_csv::<EventComments>(Self::EventComments, game_context)?;
         writer_map.write_csv::<EventBaserunners>(Self::EventBaserunners, game_context)?;
         writer_map.append_serialize(Self::Games, std::iter::once(Games::from(game_context)))?;
-        writer_map.append_serialize(Self::GameLineupAppearances, game_context.lineup_appearances.iter())?;
+        writer_map.append_serialize(
+            Self::GameLineupAppearances,
+            game_context.lineup_appearances.iter(),
+        )?;
         writer_map.append_serialize(
             Self::GameFieldingAppearances,
             game_context.fielding_appearances.iter(),
         )?;
         writer_map.append_serialize(
             Self::EventFlags,
-            game_context.events.iter().flat_map(|e| &e.results.play_info),
+            game_context
+                .events
+                .iter()
+                .flat_map(|e| &e.results.play_info),
         )
     }
 }
@@ -866,8 +874,7 @@ impl FileProcessor {
 
         info!("Flushing thread-local CSV buffers");
         let writer_map_ref = &self.writer_map;
-        let flush_results: Vec<Result<()>> =
-            rayon::broadcast(|_| writer_map_ref.flush_local());
+        let flush_results: Vec<Result<()>> = rayon::broadcast(|_| writer_map_ref.flush_local());
         for r in flush_results {
             r?;
         }
