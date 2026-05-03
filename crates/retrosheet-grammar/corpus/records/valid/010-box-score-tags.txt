@@ -1,0 +1,6 @@
+id,DET194806220
+version,3
+info,visteam,WS1
+stat,bline,yoste101,0,1,5,1,4,1,1,0,0,1,0,0
+line,0,1,0,0,0,0,0,0,0,0
+event,hpline,0,pitch001,batt001,

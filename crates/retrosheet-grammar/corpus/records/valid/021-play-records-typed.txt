@@ -1,0 +1,8 @@
+id,KCA201409300
+play,1,0,crisc001,32,CBBBFX,S7/L
+play,1,0,fulds001,21,C*BB1X,7/L
+play,1,0,donaj001,22,FF*B*BS,K
+play,1,0,mossb001,01,CX,HR/9/L.1-H
+play,1,1,hosme001,10,B>B,SB2
+play,1,0,a,??,,S8
+play,9,1,b,00,X,K23+WP.2-3

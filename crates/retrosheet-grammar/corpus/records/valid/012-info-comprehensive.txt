@@ -1,0 +1,37 @@
+id,KCA201409300
+version,2
+info,visteam,OAK
+info,hometeam,KCA
+info,site,KAN06
+info,date,2014/09/30
+info,number,0
+info,starttime,7:08PM
+info,daynight,night
+info,usedh,true
+info,gametype,wildcard
+info,umphome,millb901
+info,ump1b,davig901
+info,howscored,park
+info,pitches,pitches
+info,oscorer,boycd701
+info,temp,82
+info,winddir,rtol
+info,windspeed,10
+info,fieldcond,unknown
+info,precip,unknown
+info,sky,sunny
+info,timeofgame,285
+info,attendance,40502
+info,wp,frasj002
+info,lp,oterd001
+info,save,
+info,htbf,false
+info,innings,9
+info,inputtime,2024/09/22 3:40PM
+info,edittime,2024/09/22 4:00PM
+info,scorer,boycd701
+info,inputter,boycd701
+info,translator,
+info,tiebreaker,1
+info,inputprogvers,version 7RS
+info,howentered,manual

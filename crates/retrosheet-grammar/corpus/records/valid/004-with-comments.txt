@@ -1,0 +1,6 @@
+id,ARI202104150
+version,2
+info,visteam,WAS
+info,hometeam,ARI
+com,"$D-backs challenged (tag play), call on the field was overturned."
+com,"plain free-text comment"

@@ -1,0 +1,12 @@
+id,X
+info,wp,
+info,lp,
+info,save,
+info,gwrbi,
+info,scorer,
+info,oscorer,
+info,inputter,
+info,translator,
+info,umphome,
+info,ump1b,
+info,daynight,

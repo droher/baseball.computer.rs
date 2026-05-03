@@ -1,0 +1,3 @@
+id,BSN191409102
+info,scorer,"574,269,266,163"
+info,oscorer,"71,215"

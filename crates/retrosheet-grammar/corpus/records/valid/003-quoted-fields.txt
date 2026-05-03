@@ -1,0 +1,5 @@
+id,BOS201804090
+version,2
+start,bettm002,"Mookie Betts",1,1,9
+start,benii001,"Andrew Benintendi",1,2,7
+sub,smitr001,"Roe Smith",1,2,7

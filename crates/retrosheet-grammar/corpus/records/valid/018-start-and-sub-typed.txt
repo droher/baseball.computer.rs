@@ -1,0 +1,7 @@
+id,KCA201409300
+start,crisc001,"Coco Crisp",0,1,8
+start,fulds001,"Sam Fuld",0,2,7
+start,donaj001,"Josh Donaldson",0,3,5
+start,lestj001,"Jon Lester",0,0,1
+sub,solad001,"Donovan Solano",1,5,11
+sub,merrw001,"Whit Merrifield",0,9,7

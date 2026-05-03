@@ -1,0 +1,4 @@
+id,X
+info,windspeed,-1
+info,temp,-1
+info,attendance,0

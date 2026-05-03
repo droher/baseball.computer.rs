@@ -1,0 +1,907 @@
+// Retrosheet play notation grammar — Phase 1a subset.
+//
+// Provenance tags (per docs/grammar.md):
+//   @spec      — directly from retrosheet.org/eventfile.htm. Cite section.
+//   @derived   — logically implied by the spec.
+//   @practical — observed in real Retrosheet files, not in docs.
+//   @quirk     — Rust parser interprets differently than the spec; cross-ref docs/divergences.md.
+//
+// Whitespace strategy: Retrosheet plays have no internal whitespace. Both
+// `@{ ... }` (atomic) and `${ ... }` (compound atomic) disable Pest's
+// WHITESPACE auto-insertion, so a stray space cannot accidentally land
+// between tokens (e.g. "S 8" cannot parse as "S8"). Atomic suppresses child
+// pairs; compound atomic keeps them walkable. Compound atomic is used on
+// rules whose inner structure callers walk from Rust (`play`, `main_play`,
+// the multi-out and baserunning rules); atomic is used on leaf rules whose
+// content is just a string of digits or a single keyword.
+
+// @derived eventfile.htm §6: top-level play. SOI/EOI anchoring rejects trailing junk.
+// A play is one main play optionally followed by one or more chained
+// follow-on plays joined by "+" (e.g. "K23+WP") or ";" (e.g. "SB3;SB2"),
+// then zero or more "/"-prefixed modifiers (e.g. "/GDP"), then an optional
+// "." runner-advance section (e.g. ".2-H;1-3"). The top-level ";" lives
+// here; the ";" that separates advances is part of `advance_section`.
+play = ${ SOI ~ play_inner ~ EOI }
+
+// @derived The body of a play notation, without input anchors. `play_inner` is
+// reused inside `play_record` so the trailing field of a `play,...` record
+// reuses the same grammar. Silent (`_{ }`) so its children flatten into the
+// parent — `play.into_inner()` and `play_record.into_inner()` both yield
+// `main_play`, `chained_play*`, `modifier*`, `advance_section?` directly.
+//
+// @quirk `STRIP_CHARS_REGEX` at src/event_file/play.rs:39 strips `[#! ]`
+// globally from the play body before the legacy parser sees it. The grammar
+// mirrors that by threading the silent `play_strip` rule between every
+// concatenation in the play body — at token boundaries, between repetition
+// iterations, and between top-level `play_inner` elements. The corpus
+// harness no longer needs a pre-strip pass. The catchall rules
+// (`unrecognized_modifier`, `unrecognized_advance_modifier`) still capture
+// embedded strip chars into their spans (a single-line `as_str` cleanup
+// covers parity downstream).
+play_inner = _{ play_strip ~ main_play ~ play_strip ~ ( chained_play ~ play_strip )* ~ ( modifier ~ play_strip )* ~ ( advance_section ~ play_strip )? }
+play_strip = _{ ( "#" | "!" | " " )* }
+
+// @spec eventfile.htm §6.2: "+" or ";" joins a primary play to a follow-on
+// play at the top level. Mirrors MULTI_PLAY_REGEX in
+// src/event_file/play.rs:41, which splits the play string on either char.
+// @practical The follow-on main_play is optional — corpus has trailing
+// "53+" tokens that the parser accepts (split-and-filter drops the empty
+// segment).
+chained_play = ${ chain_separator ~ play_strip ~ main_play? }
+// @derived eventfile.htm §6.2 — top-level chain separator. The two glyphs
+// are interchangeable to the existing parser; the parse tree keeps the
+// literal so a future audit can tell which form a writer used.
+chain_separator = @{ "+" | ";" }
+
+// @derived eventfile.htm §6.1–6.2: main plays.
+// Ordered choice — longest-prefix alternative first. Pest commits on the
+// first matching alternative; if a shorter rule matches and EOI then fails,
+// Pest does not backtrack into the alternation. So any 2-char token whose
+// first char is a 1-char rule must be listed earlier (HR > H, IW > I,
+// WP > W, DI > D, HP > H, POCS > PO, CS > C, DGR > D, etc.).
+main_play = ${
+    pickoff_caught_stealing
+  | pickoff
+  | caught_stealing
+  | stolen_base
+  | home_run
+  | hit_by_pitch
+  | wild_pitch
+  | intentional_walk
+  | balk
+  | passed_ball
+  | defensive_indifference
+  | other_advance
+  | foul_fly_error
+  | no_play
+  | walk
+  | strikeout
+  | triple
+  | ground_rule_double
+  | double
+  | single
+  | hit_general
+  | catcher_interference
+  | fielders_choice
+  | error_play
+  | fielded_out
+}
+
+// @spec eventfile.htm §6.1: "S - single, fielder optional".
+// @practical Multi-digit hit-zone codes appear in the corpus (e.g. "S78",
+// "D13", "T46"). The Rust parser feeds the trailing digits to
+// `FieldingPosition::fielding_vec`, which accepts them.
+//
+// Compound atomic (`${ }`) so the walker can iterate the inner `fielder`
+// pairs and convert each one to a `FieldingPosition` directly — no more
+// regex-extracted digit string. Same change applies to the rest of the
+// fielder-bearing main-play alternatives below.
+single = ${ "S" ~ play_strip ~ ( fielder ~ play_strip )* }
+
+// @spec eventfile.htm §6.1: "DGR - ground rule double, fielder optional".
+// Listed before `double` so the "DGR" prefix wins the ordered-choice race.
+ground_rule_double = ${ "DGR" ~ play_strip ~ ( fielder ~ play_strip )* }
+
+// @spec eventfile.htm §6.1: "D - double, fielder optional".
+double = ${ "D" ~ play_strip ~ ( fielder ~ play_strip )* }
+
+// @spec eventfile.htm §6.1: "T - triple, fielder optional".
+triple = ${ "T" ~ play_strip ~ ( fielder ~ play_strip )* }
+
+// @spec eventfile.htm §6.1: "HR - home run, fielder optional".
+home_run = ${ "HR" ~ play_strip ~ ( fielder ~ play_strip )* }
+
+// @spec eventfile.htm §6.1: "H - generic hit". Distinct from home_run so the
+// parse tree reflects which form the writer used. The negative lookahead is
+// belt-and-suspenders — ordered choice already tries home_run first.
+hit_general = ${ "H" ~ !"R" ~ play_strip ~ ( fielder ~ play_strip )* }
+
+// @spec eventfile.htm §6.1: "K - strikeout". Optional fielder sequence covers
+// dropped-third-strike forms like "K23".
+strikeout = ${ "K" ~ play_strip ~ ( fielder ~ play_strip )* }
+
+// @spec eventfile.htm §6.1: "W - walk".
+// @practical "W0" appears in older corpus files; the trailing 0 is the
+// unknown-fielder placeholder and gets dropped by the Rust parser.
+walk = ${ "W" ~ play_strip ~ fielder? }
+
+// @spec eventfile.htm §6.1: "IW - intentional walk; I is the legacy form".
+intentional_walk = @{ "IW" | "I" }
+
+// @spec eventfile.htm §6.1: "HP - hit by pitch".
+hit_by_pitch = @{ "HP" }
+
+// @spec eventfile.htm §6.2: fielded out — one to three putout groups. Each
+// group is one or more fielders (assists then a putout) with an optional
+// "(runner)" annotation identifying which runner was retired. Cap of three
+// matches OUT_REGEX in src/event_file/play.rs:31, which only captures three
+// putout groups; a fourth would silently drop in the existing parser.
+// Compound atomic so the individual `putout_group` pairs remain walkable
+// from Rust (later phases need to inspect each group's runner annotation).
+fielded_out = ${ putout_group ~ play_strip ~ ( putout_group ~ play_strip )? ~ ( putout_group ~ play_strip )? }
+
+// @derived eventfile.htm §6.2: a putout group is the assist+putout fielder
+// run optionally followed by "(runner)". Compound atomic so the inner
+// `fielder` and `runner` pairs stay walkable for downstream consumers.
+putout_group = ${ ( fielder ~ play_strip )+ ~ ( "(" ~ play_strip ~ runner ~ play_strip ~ ")" )? }
+
+// @spec eventfile.htm §6.2: runner identifier inside parens is "B" (batter)
+// or the base the runner started from ("1", "2", "3").
+runner = @{ "B" | "1" | "2" | "3" }
+
+// @spec eventfile.htm §6.2: fielder is a single digit 1–9.
+// @practical 0 stands in for an unknown fielder. The legacy parser also
+// recognizes the unknown-fielder forms `?` and runs of two-or-more `9`s
+// (`UNKNOWN_FIELDER_REGEX = 999*|\?` rewrites them to `0` before parsing —
+// see src/event_file/play.rs:40). The grammar accepts them directly so the
+// caller no longer has to pre-rewrite the play body. Ordered choice tries
+// `?` first, then a `99+` run (greedy), then a single digit; this preserves
+// the legacy collapse where any 2+ run of `9`s collapses to one fielder.
+fielder = @{ "?" | "9"{2,} | '0'..'9' }
+
+// @spec eventfile.htm §6.2: "E$ - reached on error". Forms `$E$` and `$$E$`
+// add leading assists; existing Rust parser regex requires exactly one
+// putout/error digit. Compound atomic so the walker can iterate the
+// `fielder` pairs — the last one (after the literal `E`) is the error
+// fielder, earlier ones are assists.
+error_play = ${ ( fielder ~ play_strip )* ~ "E" ~ play_strip ~ fielder }
+
+// @spec eventfile.htm §6.2: "FC$ - fielder's choice".
+// @practical Existing Rust parser accepts a bare `FC` with no fielder digit
+// (FieldingPosition::try_from(...).unwrap_or_default() at play.rs:600).
+fielders_choice = ${ "FC" ~ play_strip ~ fielder? }
+
+// @spec eventfile.htm §6.2: "C - interference, generally catcher's".
+catcher_interference = @{ "C" }
+
+// @spec eventfile.htm §6.2: "BK - balk".
+balk = @{ "BK" }
+
+// @spec eventfile.htm §6.2: "WP - wild pitch".
+wild_pitch = @{ "WP" }
+
+// @spec eventfile.htm §6.2: "PB - passed ball".
+passed_ball = @{ "PB" }
+
+// @spec eventfile.htm §6.2: "DI - defensive indifference".
+defensive_indifference = @{ "DI" }
+
+// @spec eventfile.htm §6.2: "OA - other advance / unknown advance".
+other_advance = @{ "OA" }
+
+// @spec eventfile.htm §6.2: "FLE$ - error on foul fly ball".
+// @practical Rust parser splits on first digit and treats fielder as optional.
+foul_fly_error = ${ "FLE" ~ play_strip ~ fielder? }
+
+// @spec eventfile.htm §6.2: "NP - no play".
+no_play = @{ "NP" }
+
+// @spec eventfile.htm §6.2: base reached on a baserunning play — "1", "2",
+// "3", or "H". Distinct from `runner` (which uses "B" for the batter and the
+// starting base for fielded outs); here it's the base the runner ended at.
+base_tag = @{ "1" | "2" | "3" | "H" }
+
+// @derived eventfile.htm §6.2: fielding info paren on a baserunning play —
+// throwing fielders, optionally with a trailing error like "(24E4)" or just
+// "(E4)". Mirrors BASERUNNING_FIELDING_INFO_REGEX in src/event_file/play.rs:34.
+// @practical "(E1/TH)" appears in the corpus to mark a caught-stealing
+// throwing error; the Rust parser ignores the suffix and just keeps the
+// error fielder.
+//
+// Note: the post-`E` fielder is wrapped in `error_fielder` so the walker can
+// distinguish it from leading assist fielders without re-splitting the span.
+baserunning_fielding_info = ${ "(" ~ play_strip ~ ( fielder ~ play_strip )* ~ error_fielder? ~ play_strip ~ throw_suffix? ~ play_strip ~ ")" }
+error_fielder = ${ "E" ~ play_strip ~ fielder }
+
+// @spec eventfile.htm §6.2: "(UR)" / "(TUR)" suffix marking an unearned (or
+// team-unearned) run on the baserunning play.
+unearned_marker = @{ "(" ~ ( "TUR" | "UR" ) ~ ")" }
+
+// @spec eventfile.htm §6.2: "SB% - stolen base of base %".
+// @practical Parser allows a fielding-info paren on SB even though SBs have no
+// putout fielder; mirrors BASERUNNING_FIELDING_INFO_REGEX which is shared
+// across all baserunning plays.
+stolen_base = ${ "SB" ~ play_strip ~ base_tag ~ play_strip ~ baserunning_fielding_info? ~ play_strip ~ unearned_marker? }
+
+// @spec eventfile.htm §6.2: "CS%(fielders) - caught stealing base %".
+caught_stealing = ${ "CS" ~ play_strip ~ base_tag ~ play_strip ~ baserunning_fielding_info? ~ play_strip ~ unearned_marker? }
+
+// @spec eventfile.htm §6.2: "PO%(fielders) - picked off base %".
+pickoff = ${ "PO" ~ play_strip ~ base_tag ~ play_strip ~ baserunning_fielding_info? ~ play_strip ~ unearned_marker? }
+
+// @spec eventfile.htm §6.2: "POCS%(fielders) - picked off and caught stealing".
+pickoff_caught_stealing = ${ "POCS" ~ play_strip ~ base_tag ~ play_strip ~ baserunning_fielding_info? ~ play_strip ~ unearned_marker? }
+
+// @spec eventfile.htm §6.3: "/" prefixed modifiers attached to the play.
+// Each modifier is either a coded keyword (GDP, BGDP, IPHR, INT, ...), a
+// fielder-bearing token (E$, R$*, TH/THH/TH$), or a contact description
+// (trajectory + hit location). Mirrors PlayModifier::parse_modifiers in
+// src/event_file/play.rs:1767.
+// @quirk Empty body accepted: the Rust parser does
+// `value.split('/').filter(|s| !s.is_empty())`, so "0//FL" and trailing
+// "S/INT/" are silently legal. Track in docs/divergences.md if a stricter
+// position is ever desired.
+modifier = ${ "/" ~ play_strip ~ modifier_body? }
+
+// Ordered choice. Each `recognized_modifier` alternative is followed by a
+// `&modifier_terminator` lookahead so a partial-match (e.g. trajectory "B"
+// against "BFDP") fails the whole alternative and lets the parser fall
+// through to `unrecognized_modifier`. Without the guard Pest commits on the
+// first matching alt and the surrounding rule fails downstream.
+modifier_body = ${ recognized_modifier | unrecognized_modifier }
+
+recognized_modifier = ${
+    ( appeal_play
+    | bunt_ground_double_play
+    | bunt_popped_double_play
+    | batter_interference
+    | batting_out_of_turn
+    | runner_hit_by_batted_ball
+    | courtesy_batter
+    | courtesy_fielder
+    | courtesy_runner
+    | called_third_strike
+    | unspecified_double_play
+    | error_modifier
+    | fly_double_play
+    | fan_interference
+    | foul_modifier
+    | force_out
+    | ground_double_play
+    | ground_triple_play
+    | inside_the_park_hr
+    | interference
+    | infield_fly_rule
+    | lined_double_play
+    | lined_triple_play
+    | manager_challenge
+    | no_double_play_credited
+    | obstruction
+    | runner_passing_runner
+    | runner_interference
+    | relay_modifier
+    | sacrifice_fly
+    | sacrifice_hit
+    | swinging_third_strike
+    | throw_to_home
+    | throw_to_base
+    | unspecified_triple_play
+    | umpire_interference
+    | umpire_review
+    | unknown_modifier
+    | contact_description
+    ) ~ play_strip ~ &modifier_terminator
+}
+
+// Lookahead set: a modifier body is "complete" when the next char would
+// start another modifier ("/"), the advance section ("."), the next CSV
+// field (","), end of line (`\r`/`\n`), or end of input. Without `,`/`\n`
+// every end-of-line modifier (`/L`, `/G`, `/F`, etc.) falls through to
+// `unrecognized_modifier` when the play is parsed inside `play_record`.
+modifier_terminator = _{ "/" | "." | "," | "\r" | "\n" | EOI }
+
+// @quirk Catchall for modifier tokens the Rust parser marks as
+// `PlayModifier::Unrecognized(...)` (the `_ => Self::Unrecognized(value.into())`
+// arm in `parse_single_modifier`). The corpus has thousands of these
+// (e.g. "/BFDP", "/U7R2", "/G3SF"). The grammar accepts them so corpus
+// parity holds; downstream consumers should still treat them as opaque.
+// Excludes `\r`/`\n` so embedding `play_inner` in `play_record` cannot run
+// off the end of the record line into the next record.
+unrecognized_modifier = @{ ( !( "/" | "." | "," | "\r" | "\n" ) ~ ANY )+ }
+
+// @spec eventfile.htm §6.3 modifier keywords. One leaf rule per Retrosheet
+// code so the parse tree carries the exact name.
+appeal_play              = @{ "AP" }
+bunt_ground_double_play  = @{ "BGDP" }
+bunt_popped_double_play  = @{ "BPDP" }
+batter_interference      = @{ "BINT" }
+batting_out_of_turn      = @{ "BOOT" }
+runner_hit_by_batted_ball = @{ "BR" }
+courtesy_batter          = @{ "COUB" }
+courtesy_fielder         = @{ "COUF" }
+courtesy_runner          = @{ "COUR" }
+called_third_strike      = @{ "C" }
+unspecified_double_play  = @{ "DP" }
+// @spec eventfile.htm §6.3: "E$" — error charged to fielder $.
+// Compound atomic so the walker can read the inner `fielder` pair directly.
+error_modifier           = ${ "E" ~ play_strip ~ fielder }
+fly_double_play          = @{ "FDP" }
+fan_interference         = @{ "FINT" }
+foul_modifier            = @{ "FL" }
+force_out                = @{ "FO" }
+ground_double_play       = @{ "GDP" }
+ground_triple_play       = @{ "GTP" }
+infield_fly_rule         = @{ "IF" }
+interference             = @{ "INT" }
+inside_the_park_hr       = @{ "IPHR" }
+lined_double_play        = @{ "LDP" }
+lined_triple_play        = @{ "LTP" }
+manager_challenge        = @{ "MREV" }
+no_double_play_credited  = @{ "NDP" }
+obstruction              = @{ "OBS" }
+runner_passing_runner    = @{ "PASS" }
+runner_interference      = @{ "RINT" }
+// @spec eventfile.htm §6.3: "R$" — relay to fielder with no out made.
+// @practical Legacy `parse_single_modifier` accepts `"R"` alone (`Relay([])`)
+// or `"R"` followed by chars that contain at least one digit/`+`/`-` (the
+// `MODIFIER_DIVIDER_REGEX` split is what gates the typed dispatch). Pure
+// alphabetic suffixes like `"RNT"` and `"REV"` fail the strum lookup and
+// fall through to `Unrecognized`. Mirror that here: either the body is
+// empty, or it must contain a digit/`+`/`-` so the walker's `fielding_vec`
+// has something to grab.
+relay_modifier           = @{ "R" ~ relay_body? }
+relay_body               = @{ ( !modifier_terminator ~ !( ASCII_DIGIT | "+" | "-" ) ~ ANY )* ~ ( ASCII_DIGIT | "+" | "-" ) ~ ( !modifier_terminator ~ ANY )* }
+sacrifice_fly            = @{ "SF" }
+sacrifice_hit            = @{ "SH" }
+swinging_third_strike    = @{ "S" }
+// @spec eventfile.htm §6.3: "THH" — throw to home plate. Listed separately
+// because `throw_to_base` only accepts numeric bases 1/2/3.
+throw_to_home            = @{ "THH" }
+// @spec eventfile.htm §6.3: "TH" / "TH$" — throw, optional target base.
+// @practical Legacy strum maps the corpus typo `TH)` (stray closing paren
+// from misformatted `(.../TH))` plays) onto `ThrowToBase`. Accept the same
+// shape so the grammar walker matches.
+throw_to_base            = @{ "TH" ~ play_strip ~ ( "1" | "2" | "3" )? ~ ")"? }
+unspecified_triple_play  = @{ "TP" }
+umpire_interference      = @{ "UINT" }
+umpire_review            = @{ "UREV" }
+// @practical "U" with trailing fielder digits ("U7", "U24") appears in the
+// corpus and is silently coerced to the Unknown variant by the Rust parser
+// via the fall-through `Unrecognized` arm.
+unknown_modifier         = @{ "U" ~ play_strip ~ ( fielder ~ play_strip )* }
+
+// @spec eventfile.htm §6.3 + §6.5 hit-location grammar. A contact description
+// is a trajectory letter, a hit location, or both. Mirrors
+// ContactDescription::try_from in src/event_file/play.rs:1562 — at least one
+// of {trajectory, location} must be present.
+// @practical A trajectory may be followed by descriptors with no general
+// location ("/G-", "/L+", "/BG-" appear thousands of times in the corpus);
+// the Rust parser drops the descriptors when the location can't be parsed,
+// but the grammar should still accept the form.
+contact_description = ${ trajectory ~ play_strip ~ contact_tail? | batted_ball_location }
+contact_tail = ${ batted_ball_general ~ play_strip ~ ( batted_ball_descriptor ~ play_strip )* | ( batted_ball_descriptor ~ play_strip )+ }
+
+// @spec eventfile.htm §6.3 trajectory letters. Bunt forms (BP/BG/BF/BL)
+// share the "B" prefix and must precede the bare "B" alternative.
+trajectory = @{ "BP" | "BG" | "BF" | "BL" | "B" | "F" | "G" | "L" | "P" }
+
+// @spec eventfile.htm §6.5 hit location: general fielding zone digits with
+// optional depth/angle/strength descriptors (e.g. "78XD", "9LS", "6+").
+batted_ball_location = ${ batted_ball_general ~ play_strip ~ ( batted_ball_descriptor ~ play_strip )* }
+batted_ball_general    = @{ ASCII_DIGIT+ }
+// `batted_ball_other` is a single-char escape hatch for stray letters the
+// scorer wrote alongside real descriptors (e.g. "8RXDW+" — the lone "X" is
+// noise that must not abort the descriptor sequence). Mirrors the legacy
+// regex pipeline, which used `Regex::find` for each descriptor kind and so
+// silently skipped characters that didn't match.
+batted_ball_descriptor = ${ batted_ball_depth | batted_ball_angle | batted_ball_strength | batted_ball_other }
+// "XD" must precede "D" (longer prefix wins).
+batted_ball_depth      = @{ "XD" | "D" | "S" }
+batted_ball_angle      = @{ "F" | "M" | "L" | "R" }
+batted_ball_strength   = @{ "+" | "-" }
+batted_ball_other      = @{ ASCII_ALPHA }
+
+// @spec eventfile.htm §6.4: "." introduces the runner-advance section.
+// Multiple advances inside the section are joined by ";".
+advance_section = ${ "." ~ play_strip ~ advance ~ ( play_strip ~ ";" ~ play_strip ~ advance )* }
+
+// @spec eventfile.htm §6.4: "<from>-<to>" for safe advances and "<from>X<to>"
+// for putout attempts. Mirrors ADVANCE_REGEX in src/event_file/play.rs:37.
+advance = ${ from_base ~ play_strip ~ advance_separator ~ play_strip ~ to_base ~ play_strip ~ ( advance_modifier ~ play_strip )* }
+advance_separator = @{ "-" | "X" }
+// @spec eventfile.htm §6.4: starting base "B" (batter), "1", "2", or "3".
+from_base = @{ "B" | "1" | "2" | "3" }
+// @spec eventfile.htm §6.4: destination base "1", "2", "3", or "H". The "X"
+// marker is the *separator*, never a destination — `2-X` must not parse.
+to_base = @{ "1" | "2" | "3" | "H" }
+
+// @spec eventfile.htm §6.4: advance modifiers are parenthesized tokens that
+// annotate a single advance, e.g. "(UR)", "(E5)", "(82)", "(5/INT)".
+advance_modifier = ${ "(" ~ play_strip ~ advance_modifier_body ~ play_strip ~ ")" }
+
+// Ordered choice. Multi-letter keywords precede shorter prefixes (THH > TH$
+// > TH; NORBI vs NR are disjoint at index 1 so order between them is free).
+// `advance_putout` accepts the various interference suffixes (`/INT`,
+// `/RINT`, `/BINT`, `/OBS`, ...) via `advance_drop_suffix`, so they no longer
+// need their own rules — legacy maps every shape to `Putout` regardless.
+advance_modifier_body = ${ recognized_advance_modifier | unrecognized_advance_modifier }
+
+recognized_advance_modifier = ${
+    ( advance_unearned_run
+    | advance_team_unearned
+    | advance_no_rbi_long
+    | advance_no_rbi
+    | advance_rbi
+    | advance_passed_ball
+    | advance_wild_pitch
+    | advance_throw_home
+    | advance_throw_to_base
+    | advance_throw
+    | advance_interference
+    | advance_error_with_assists
+    | advance_error
+    | advance_putout
+    ) ~ play_strip ~ &")"
+}
+
+// @spec eventfile.htm §6.4 advance-modifier keywords.
+advance_unearned_run  = @{ "UR" }
+advance_team_unearned = @{ "TUR" }
+// "(NORBI)" is the long form; "(NR)" is the short form.
+advance_no_rbi_long   = @{ "NORBI" }
+advance_no_rbi        = @{ "NR" }
+advance_rbi           = @{ "RBI" }
+advance_passed_ball   = @{ "PB" }
+advance_wild_pitch    = @{ "WP" }
+advance_throw_home    = @{ "THH" }
+advance_throw_to_base = @{ "TH" ~ play_strip ~ ( "1" | "2" | "3" ) }
+advance_throw         = @{ "TH" }
+// @spec eventfile.htm §6.4: "(INT)" or "(INT$)" — interference, optional fielder.
+advance_interference  = @{ "INT" ~ play_strip ~ fielder? }
+// @spec eventfile.htm §6.4: "($$E$)" — assists then error fielder. The Rust
+// parser leaves the trailing fielder optional, so mirror that as @practical.
+// @quirk `/TH`, `/INT`, `/OBS`, `/BINT`, etc. suffixes annotate the play
+// shape; the Rust parser drops them silently (regex_split on NUMERIC_REGEX
+// stops before the `/`), so accepting them via `advance_drop_suffix` keeps
+// the corpus parity.
+advance_error_with_assists = ${ ( fielder ~ play_strip )+ ~ advance_error_marker ~ play_strip ~ ( throw_suffix | advance_drop_suffix )? }
+advance_error              = ${ advance_error_marker ~ play_strip ~ ( throw_suffix | advance_drop_suffix )? }
+advance_error_marker       = ${ "E" ~ play_strip ~ fielder? }
+// @spec eventfile.htm §6.4: "($$)" — fielders for the putout (last digit is
+// the putout, leading digits are assists). Optional trailing slash-prefixed
+// annotation handles `/INT`, `/RINT`, `/BINT`, `/OBS`, etc. — the Rust parser
+// keeps only the digits, so the suffix is informational.
+// @practical Real corpus interleaves `-` (e.g. `(7-2)`) and `H` (e.g.
+// `(74H)`) between the fielder digits. `FieldingPosition::fielding_vec`
+// ignores non-digits, so swallow any non-`)`/`/` chars after the leading
+// fielder and let the walker pick out the digits.
+advance_putout = @{ fielder ~ ( !( ")" | "/" | "\r" | "\n" ) ~ ANY )* ~ ( throw_suffix | advance_drop_suffix )? }
+// @spec eventfile.htm §6.4: "/TH" / "/TH$" — throw annotation tagged onto an
+// inner advance modifier (e.g. "(E4/TH)", "(E6/TH1)").
+throw_suffix = @{ "/TH" ~ play_strip ~ ( "1" | "2" | "3" | "H" )? }
+// @practical Catch-all for the trailing slash-prefixed annotations the legacy
+// parser ignores when computing typed advance-modifier values: `/INT`,
+// `/RINT`, `/BINT`, `/OBS`, etc. Letters only — digits are part of the
+// advance body proper.
+advance_drop_suffix = @{ "/" ~ ASCII_ALPHA+ }
+
+// @quirk Catchall for advance-modifier bodies the Rust parser falls through
+// to `RunnerAdvanceModifier::Unrecognized(...)`. Matches everything up to
+// the closing ")".
+unrecognized_advance_modifier = @{ ( !( ")" | "\r" | "\n" ) ~ ANY )+ }
+
+// =============================================================================
+// Phase 2 — Record-level grammar
+// =============================================================================
+//
+// A Retrosheet event file is a sequence of line-oriented, comma-separated
+// records. Phase 2a frames the file: the `id` record comes first, then any
+// number of subsequent records of one of the recognized tags. Each record
+// body is a list of opaque comma-delimited fields here; phases 2b–2h tighten
+// individual record bodies (info enums, lineup structure, embedded play
+// notation, comment sub-grammar, data/box-score lines, adjustments).
+//
+// Whitespace strategy: same as Phase 1. We never define `WHITESPACE`, so Pest
+// auto-inserts nothing. Compound atomic `${ }` is used on every record-level
+// rule so the parse tree is walkable from Rust without losing structure, and
+// line breaks are matched explicitly via `line_terminator`.
+
+// @spec eventfile.htm §2: an event file is one or more games. A game starts
+// with an `id` record; the remaining records belong to that game until the
+// next `id` (or EOF). Phase 2a frames a single-game file; multi-game framing
+// is part of Phase 3 (corpus validation).
+// @practical Files end with or without a trailing newline; the legacy reader
+// at src/event_file/parser.rs handles both. Blank lines are skipped.
+file = ${ SOI ~ blank_line* ~ id_record ~ line_terminator ~ ( blank_line | record_line )* ~ EOI }
+
+// @derived A non-id record on its own line. Record tags share no prefix, so
+// alternation order is immaterial.
+record_line = ${ record ~ line_terminator }
+
+record = ${
+    version_record
+  | info_record
+  | start_record
+  | sub_record
+  | play_record
+  | com_record
+  | data_record
+  | stat_record
+  | line_record
+  | event_record
+  | adjustment_record
+}
+
+// @spec eventfile.htm §3: "id,GAME_ID" — game identifier; first record.
+id_record = ${ "id" ~ "," ~ record_field }
+
+// @spec eventfile.htm §3: "version,VERSION_NUMBER".
+// @practical Some files write `version,3,` with a trailing empty field
+// (NLB box files in 1913.EBR). Allow an optional trailing comma.
+version_record = ${ "version" ~ "," ~ record_field ~ ","? }
+
+// @spec eventfile.htm §4: "info,KEY,VALUE". Phase 2b restricts the body to a
+// typed key/value pair. Keys are enumerated; values are constrained to the
+// shape the legacy parser at src/event_file/info.rs accepts. Unknown keys
+// are rejected (the legacy parser's `Self::Unrecognized` arm bails). Where
+// the legacy parser is strict (date, doubleheader, enum keywords, bool, int)
+// the grammar is strict; where it tolerates anything (start time, datetimes,
+// optional player/person/umpire IDs) the grammar accepts the opaque atom.
+// @quirk Real corpus has trailing chars after the typed value: extra
+// comma-separated fields (`info,scorer,?69,109,111,485?`), trailing
+// whitespace after a closing quote (`info,inputter,"Wigley" `), or unbalanced
+// stray quotes (`info,inputter,"…NBC video""`). Legacy parser uses the `csv`
+// crate which only reads the third field and ignores the rest — we do the
+// same by silently consuming anything after the typed body up to EOL.
+info_record = ${ "info" ~ "," ~ info_body ~ info_trailing? }
+// Trailing forms observed in the corpus (legacy CSV reader silently drops
+// them): whitespace, an extra `"` after a closing quote, or `,…` extra
+// comma-separated fields. Restricted to those shapes so an unrecognized
+// enum value (e.g. `playoffs` instead of `playoff`) still rejects.
+// Non-silent so the lint pass in `quirks.rs` can flag occurrences.
+info_trailing = @{ ( " " | "\t" | "\"" )+ | "," ~ ( !( "\r" | "\n" ) ~ ANY )* }
+
+info_body = ${
+    info_team
+  | info_site
+  | info_umpire
+  | info_doubleheader
+  | info_daynight
+  | info_pitches
+  | info_fieldcond
+  | info_precip
+  | info_sky
+  | info_winddir
+  | info_howscored
+  | info_gametype
+  | info_howentered
+  | info_int
+  | info_usedh
+  | info_htbf
+  | info_date
+  | info_starttime
+  | info_player_field
+  | info_person_field
+  | info_datetime
+  | info_tiebreaker
+  | info_inputprogvers
+  | info_umpchange
+}
+
+// @spec eventfile.htm §4: "visteam"/"hometeam" — three-letter team code.
+// @practical Trailing-space `BIR ` appears in 1948.EBR and is trimmed by the
+// legacy parser; the grammar accepts the opaque atom and lets downstream
+// trimming/length checks run.
+info_team = ${ info_team_key ~ "," ~ info_team_value }
+info_team_key = @{ "visteam" | "hometeam" }
+info_team_value = @{ info_atom }
+
+// @spec eventfile.htm §4: "site,PARK_ID" — up to 16 chars.
+info_site = ${ "site" ~ "," ~ info_site_value }
+info_site_value = @{ info_atom }
+
+// @spec eventfile.htm §4: umpire assignments. Value is a Retrosheet person ID
+// (8 chars), `(none)` for unassigned, or empty for omitted.
+info_umpire = ${ info_umpire_position ~ "," ~ info_umpire_value }
+info_umpire_position = @{ "umphome" | "ump1b" | "ump2b" | "ump3b" | "umplf" | "umprf" }
+info_umpire_value = @{ info_atom }
+
+// @spec eventfile.htm §4: "number" — doubleheader status, 0..=4.
+info_doubleheader = ${ "number" ~ "," ~ info_doubleheader_value }
+info_doubleheader_value = @{ "0" | "1" | "2" | "3" | "4" }
+
+// @spec eventfile.htm §4 enum-valued keys. Each value rule lists the
+// strum-supported lowercase forms (matching the corresponding Rust enum's
+// `#[strum(serialize_all = "lowercase")]` plus explicit aliases).
+info_daynight = ${ "daynight" ~ "," ~ info_daynight_value }
+// @practical Empty value is accepted (legacy DayNight strum has
+// `serialize = ""` aliased to Unknown).
+info_daynight_value = @{ "day" | "night" | "unknown" | "" }
+
+info_pitches = ${ "pitches" ~ "," ~ info_pitches_value }
+info_pitches_value = @{ "pitches" | "count" | "none" | "unknown" }
+
+// @practical "fieldcon" is a corpus alias for "fieldcond". Listed
+// longest-first so ordered choice doesn't commit to the shorter prefix.
+info_fieldcond = ${ info_fieldcond_key ~ "," ~ info_fieldcond_value }
+info_fieldcond_key = @{ "fieldcond" | "fieldcon" }
+info_fieldcond_value = @{ "dry" | "soaked" | "wet" | "damp" | "unknown" }
+
+info_precip = ${ "precip" ~ "," ~ info_precip_value }
+info_precip_value = @{ "rain" | "drizzle" | "showers" | "snow" | "none" | "unknown" }
+
+info_sky = ${ "sky" ~ "," ~ info_sky_value }
+info_sky_value = @{ "cloudy" | "dome" | "night" | "overcast" | "sunny" | "unknown" }
+
+info_winddir = ${ "winddir" ~ "," ~ info_winddir_value }
+info_winddir_value = @{ "fromcf" | "fromlf" | "fromrf" | "ltor" | "rtol" | "tocf" | "tolf" | "torf" | "unknown" }
+
+info_howscored = ${ "howscored" ~ "," ~ info_howscored_value }
+info_howscored_value = @{ "park" | "tv" | "radio" | "unknown" }
+
+info_gametype = ${ "gametype" ~ "," ~ info_gametype_value }
+info_gametype_value = @{ "exhibition" | "preseason" | "regular" | "allstar" | "playoff" | "wildcard" | "divisionseries" | "lcs" | "worldseries" | "negroleagues" | "championship" | "unknown" }
+
+// @spec eventfile.htm §4: "howentered" — value content is unit-like in the
+// legacy parser; accept opaque text.
+info_howentered = ${ "howentered" ~ "," ~ info_atom_value }
+
+// @spec eventfile.htm §4 numeric-keyed values.
+// @quirk The legacy `parse_int` returns `Option<i32>` and silently maps any
+// non-numeric value (including empty, `unknown`, `1789 (paid)`, `5000c.`,
+// `700?`, `17 ` with trailing space) to `None`. To stay at parity we accept
+// any opaque atom here; the structural shape is what the grammar enforces.
+// See `docs/divergences.md`.
+info_int = ${ info_int_key ~ "," ~ info_int_value }
+info_int_key = @{ "windspeed" | "timeofgame" | "attendance" | "temp" | "innings" }
+info_int_value = @{ info_atom }
+
+info_usedh = ${ "usedh" ~ "," ~ info_bool_value }
+info_htbf = ${ "htbf" ~ "," ~ info_bool_value }
+// @practical `usedh` is parsed case-insensitively (`bool::from_str(&value.to_lowercase())`).
+info_bool_value = @{ ^"true" | ^"false" }
+
+// @spec eventfile.htm §4: "date,YYYY/MM/DD".
+info_date = ${ "date" ~ "," ~ info_date_value }
+info_date_value = @{ ASCII_DIGIT{4} ~ "/" ~ ASCII_DIGIT{1,2} ~ "/" ~ ASCII_DIGIT{1,2} }
+
+// @practical Legacy parser's `parse_time` tolerates empty and garbage
+// (returns None); accept the opaque atom.
+info_starttime = ${ "starttime" ~ "," ~ info_starttime_value }
+info_starttime_value = @{ info_atom }
+
+// @spec eventfile.htm §4: "wp"/"lp"/"save"/"gwrbi" — winning/losing/save
+// pitcher, game-winning RBI player. Value is an 8-char player ID or empty.
+info_player_field = ${ info_player_key ~ "," ~ info_player_value }
+info_player_key = @{ "wp" | "lp" | "save" | "gwrbi" }
+info_player_value = @{ info_atom }
+
+// @spec eventfile.htm §4: "scorer"/"oscorer"/"inputter"/"translator". Value
+// is a 16-char volunteer/scorer ID or empty.
+info_person_field = ${ info_person_key ~ "," ~ info_person_value }
+info_person_key = @{ "oscorer" | "scorer" | "inputter" | "translator" }
+info_person_value = @{ info_atom }
+
+// @spec eventfile.htm §4: "inputtime"/"edittime,YYYY/MM/DD HH:MMAM".
+// @practical Legacy `parse_datetime` tolerates partial/empty values; accept
+// the opaque atom.
+info_datetime = ${ info_datetime_key ~ "," ~ info_datetime_value }
+info_datetime_key = @{ "inputtime" | "edittime" }
+info_datetime_value = @{ info_atom }
+
+// @spec eventfile.htm §4: unit-like keys whose value the legacy parser
+// ignores. Opaque text accepted.
+info_tiebreaker     = ${ "tiebreaker" ~ "," ~ info_atom_value }
+info_inputprogvers  = ${ "inputprogvers" ~ "," ~ info_atom_value }
+info_umpchange      = ${ "umpchange" ~ "," ~ info_atom_value }
+
+// Generic info-value atom: either a CSV-quoted field (internal commas
+// allowed) or an unquoted run up to the next comma or newline.
+// @practical Real corpus has quoted person/scorer values containing commas,
+// e.g. `info,scorer,"71,215"` (BSN191409102, KC1195906030).
+// @quirk After a closing quote the legacy CSV reader silently swallows
+// trailing chars up to the next comma or newline (`info,inputter,
+// "DWV/Smith"/RWood` in 1919PHA.EVA). We accept that here.
+info_atom_value = @{ info_atom }
+info_atom = _{ quoted_atom | unquoted_field }
+quoted_atom = ${ quoted_field ~ ( !( "," | "\r" | "\n" ) ~ ANY )* }
+
+// @spec eventfile.htm §5: "start,PLAYER_ID,NAME,TEAM,LINEUP,POSITION".
+// Body shared with `sub` (mid-game substitution). The legacy parser shape is
+// `AppearanceRecord::try_from` at src/event_file/misc.rs:102 — six fields
+// total, with `Side::from_str` (0/1), `LineupPosition::try_from` (0..=9, where
+// 0 is the pitcher with a DH in the game), and
+// `FieldingPosition::try_from(record[5].trim_end())` (0..=12, with 10=DH,
+// 11=PH, 12=PR; the trim tolerates trailing whitespace before the line break).
+start_record = ${ "start" ~ "," ~ appearance_body }
+sub_record = ${ "sub" ~ "," ~ appearance_body }
+
+appearance_body = ${
+    player_id ~ "," ~ player_name ~ "," ~ side_value ~ ","
+  ~ lineup_position_value ~ "," ~ fielding_position_value
+}
+
+// @practical Player IDs are 8-char ASCII (`abcdNNNN`) per
+// `Person = ArrayString<8>`; the legacy parser doesn't reject shorter or
+// non-alphanumeric IDs at this layer (TinyStr length check is the only gate).
+// Accept the opaque atom so the grammar matches the parser's tolerance.
+player_id = @{ unquoted_field }
+// @practical Names appear quoted (`"Last, First"`) and unquoted in the corpus.
+player_name = ${ quoted_field | unquoted_field }
+// @spec Side strum aliases at src/event_file/traits.rs:237 — "0" Away, "1" Home.
+side_value = @{ "0" | "1" }
+// @spec LineupPosition repr at src/event_file/traits.rs:49 — 0=PitcherWithDh,
+// 1..=9 are the batting-order slots.
+lineup_position_value = @{ '0'..'9' }
+// @spec FieldingPosition repr at src/event_file/traits.rs:115 — 0=Unknown,
+// 1..=9 = standard positions, 10=DH, 11=PH, 12=PR. Two-digit forms must
+// precede the single-digit alternatives so ordered choice doesn't commit to
+// the shorter prefix.
+// @practical Trailing spaces tolerated (legacy parser calls `trim_end()`).
+fielding_position_value = ${ fielding_position_digits ~ ( " " | "\t" )* }
+fielding_position_digits = @{ "10" | "11" | "12" | '0'..'9' }
+
+// @spec eventfile.htm §6: "play,INNING,TEAM,BATTER,COUNT,PITCHES,PLAY".
+// `PlayRecord::try_from` at src/event_file/play.rs:1898 deserializes exactly
+// 7 fields; the trailing PLAY field is parsed by the Phase 1 `play_inner`
+// grammar. PITCHES is held opaque here and tightened in Phase 2e.
+play_record = ${
+    "play" ~ ","
+  ~ play_inning ~ ","
+  ~ side_value ~ ","
+  ~ play_batter ~ ","
+  ~ play_count ~ ","
+  ~ play_pitches ~ ","
+  ~ play_inner
+}
+
+// @spec eventfile.htm §6: inning is a positive integer (legacy parser:
+// `record[1].parse::<Inning>()?` where `Inning = u8`).
+play_inning = @{ ASCII_DIGIT+ }
+
+// @practical Batter is an 8-char Retrosheet player ID; `str_to_tinystr`
+// allows shorter values, so accept the opaque atom.
+play_batter = @{ unquoted_field }
+
+// @spec eventfile.htm §6: count is two characters — balls digit then strikes
+// digit. `Count::new` (src/event_file/play.rs:1812) maps non-digits to None,
+// so `??` is the corpus convention for "unknown count" and an empty value is
+// also tolerated. Accept any 0- or 2-char run from the digit/`?` set.
+// @quirk Spec says `BS` (ball-strike) two-digit count. Real corpus has
+// `??` for unknown counts, and one row in 1964WS.EVE has the stray-dot form
+// `00.`. Legacy parser maps any non-digit char to None and tolerates length
+// drift, so we accept the shape `[digit-or-?]{0,2} [.]?`.
+play_count = @{ ( ASCII_DIGIT | "?" ){0,2} ~ "."? }
+
+// @spec eventfile.htm §6: pitch sequence is a stream of tokens.
+// `PitchSequenceItem::new_pitch_sequence` (src/event_file/pitch_sequence.rs:136)
+// classifies each char into a small set of structural tokens — modifiers
+// `*`/`>` that flag the next pitch, `+N` for a catcher pickoff, `.` for a
+// plate-appearance interruption, and any other char as a pitch chip whose
+// PitchType is looked up via strum (`Z` and other unknowns silently fall
+// through to `PitchType::Unrecognized` with a warn). Empty pitch sequences
+// are legal (legacy parser at play.rs:1911 hands `""` to
+// `PitchSequence::default()`).
+play_pitches = ${ pitch_token* }
+
+// Ordered choice: structural tokens (`+N`, `*`, `>`, `.`) take precedence
+// over the catch-all `pitch_char_token`. A bare `+` (no following base) falls
+// through to `pitch_char_token` since `pickoff_token` fails the lookahead.
+pitch_token = ${ pickoff_token | pitch_flag_token | pa_break_token | pitch_char_token }
+
+// @spec catcher pickoff annotation `+N` where N is a base. Mirrors the
+// `'+' => match peek { Some('1'|'2'|'3'|'H') => ... }` arm at
+// src/event_file/pitch_sequence.rs:177.
+pickoff_token = @{ "+" ~ pickoff_base }
+pickoff_base = @{ "1" | "2" | "3" | "H" }
+
+// @spec `*` blocks-by-catcher and `>` runners-going both flag the next pitch.
+pitch_flag_token = @{ "*" | ">" }
+
+// @spec `.` separates segments of a multi-event plate appearance. The legacy
+// parser only keeps the segment after the rightmost `.`, but the grammar
+// accepts every segment so the structure is preserved.
+pa_break_token = @{ "." }
+
+// @practical Any other single char is a pitch chip. PitchType::from_str
+// accepts the documented letters/digits and `?`; unrecognized chars (e.g.
+// `Z`) fall through to `Unrecognized` rather than failing, so the grammar
+// has to accept them too. A bare `+` (one not followed by `1`/`2`/`3`/`H`)
+// falls through here from `pickoff_token` and is accepted as an Unrecognized
+// pitch chip — matches the legacy fall-through path. See docs/divergences.md.
+pitch_char_token = @{ !( "," | "\r" | "\n" ) ~ ANY }
+
+// @spec eventfile.htm §7: "com,TEXT" — free-text comment. The legacy parser
+// at src/event_file/parser.rs:261 stores the second field as an opaque
+// `String`, so the grammar doesn't structure the body. Modern corpus rows
+// quote the text (commas inside the comment are common); older corpus
+// allows unquoted bodies.
+// @practical Some comments lead with structured prefixes — `$replay`, `$ej`,
+// `$umpchange` for instant-replay/ejection metadata, and `Protest=`/`Suspend=`
+// for game-state markers. The legacy parser ignores the prefix; the grammar
+// follows suit and treats the whole body as a single field. A future phase
+// can tag the prefixes once a downstream consumer needs them.
+// @quirk The legacy parser stores the body verbatim (opaque). Real corpus
+// includes quoted bodies with stray trailing chars (`com,"…".`, tab after
+// closing quote, embedded unescaped quotes, smart quotes). To mirror that
+// tolerance we consume everything up to EOL as the body — the structural
+// shape is just `com,...`.
+com_record = ${ "com" ~ "," ~ com_body }
+com_body = @{ ( !( "\r" | "\n" ) ~ ANY )* }
+
+// @spec eventfile.htm §8: "data,er,PITCHER_ID,EARNED_RUNS". The legacy parser
+// at src/event_file/misc.rs:131 only accepts the `er` sub-tag and bails on
+// anything else. Mirror that here.
+data_record = ${ "data" ~ "," ~ data_tag ~ "," ~ data_pitcher ~ "," ~ data_earned_runs }
+data_tag = @{ "er" }
+data_pitcher = @{ unquoted_field }
+// @practical Earned runs are a small non-negative integer (`u8::parse`).
+// Trailing whitespace is tolerated by the legacy parser via `trim_end()`.
+data_earned_runs = ${ ASCII_DIGIT+ ~ ( " " | "\t" )* }
+
+// @spec eventfile.htm §9 (box-score files): "stat,LINE_TYPE,...". The stat
+// tag is dispatched by `BoxScoreLine::try_from` at src/event_file/box_score.rs:627.
+// Field counts vary by sub-tag (e.g. `bline` is 23 fields, `tline` is 11);
+// keep the body opaque and let the per-line struct enforce its shape.
+stat_record = ${ "stat" ~ "," ~ stat_tag ~ ( "," ~ record_field )+ }
+stat_tag = @{ "bline" | "phline" | "prline" | "pline" | "dline" | "btline" | "dtline" | "tline" }
+
+// @spec eventfile.htm §9: "line,SIDE,RUN1,RUN2,...". Inning runs are
+// non-negative integers; the legacy parser calls `s.parse::<u8>()` on each
+// trailing field. Empty trailing fields are not produced by Retrosheet.
+line_record = ${ "line" ~ "," ~ side_value ~ ( "," ~ line_inning_runs )* }
+line_inning_runs = @{ ASCII_DIGIT+ }
+
+// @spec eventfile.htm §9: "event,EVENT_TYPE,..." — box-score event lines
+// dispatched by `BoxScoreEvent::try_from` at src/event_file/box_score.rs:886.
+event_record = ${ "event" ~ "," ~ event_tag ~ ( "," ~ record_field )+ }
+event_tag = @{ "dpline" | "tpline" | "hpline" | "hrline" | "sbline" | "csline" }
+
+// @spec eventfile.htm §9 adjustment records — five tags, each with a typed
+// body. Dispatched by `MappedRecord::try_from` at src/event_file/parser.rs:254.
+adjustment_record = ${
+    badj_record
+  | padj_record
+  | ladj_record
+  | radj_record
+  | presadj_record
+}
+
+// `presadj,PITCHER_ID,BASERUNNER` — `PitcherResponsibilityAdjustment` (misc.rs:167).
+// BaseRunner strum aliases at src/event_file/play.rs:204 — `B`/`1`/`2`/`3`.
+presadj_record = ${ "presadj" ~ "," ~ adj_player_id ~ "," ~ baserunner_value }
+baserunner_value = @{ "B" | "1" | "2" | "3" }
+
+// `radj,RUNNER_ID,BASE` — `RunnerAdjustment` (misc.rs:148). Base strum aliases
+// at src/event_file/play.rs:173 — `1`/`2`/`3`/`H`.
+radj_record = ${ "radj" ~ "," ~ adj_player_id ~ "," ~ base_value }
+base_value = @{ "1" | "2" | "3" | "H" }
+
+// `badj,BATTER_ID,HAND` and `padj,PITCHER_ID,HAND` — `HandAdjustment` (misc.rs:54).
+// Hand strum aliases at src/event_file/misc.rs:29 — `L` / `R`.
+badj_record = ${ "badj" ~ "," ~ adj_player_id ~ "," ~ hand_value }
+padj_record = ${ "padj" ~ "," ~ adj_player_id ~ "," ~ hand_value }
+hand_value = @{ "L" | "R" }
+
+// `ladj,SIDE,LINEUP_POSITION` — `LineupAdjustment` (misc.rs:80).
+ladj_record = ${ "ladj" ~ "," ~ side_value ~ "," ~ lineup_position_value }
+
+// @practical Player IDs are opaque; length-checked downstream by
+// `str_to_tinystr` (`Person = ArrayString<8>`).
+adj_player_id = @{ unquoted_field }
+
+// @derived A record field is the text between commas (or comma-and-newline).
+// Quoted fields preserve commas/parens inside; unquoted fields run until the
+// next comma or end of line. Empty fields are valid (e.g. `info,save,`).
+record_field = ${ quoted_field | unquoted_field }
+quoted_field = ${ "\"" ~ ( !( "\"" | "\r" | "\n" ) ~ ANY )* ~ "\"" }
+unquoted_field = @{ ( !( "," | "\r" | "\n" ) ~ ANY )* }
+
+// @practical Blank lines (and lines containing only spaces/tabs) appear in
+// some files; the legacy reader skips them. Silenced so they don't clutter
+// the parse tree.
+blank_line = _{ ( " " | "\t" )* ~ ( "\r\n" | "\n" ) }
+
+// Newline or end-of-file. EOI is a position assertion (consumes nothing) so
+// it is safe in alternation.
+line_terminator = _{ "\r\n" | "\n" | EOI }

@@ -1,0 +1,2 @@
+id,X
+start,a001,"name",0,10,7
