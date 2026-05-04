@@ -133,22 +133,23 @@ struct WriterMap {
 fn writer_loop(
     rx: crossbeam_channel::Receiver<WriteChunk>,
     mut file: BufWriter<File>,
-    path_display: String,
+    path_display: &str,
 ) -> Result<()> {
     // Body chunks may arrive before the header chunk because workers race on
     // the per-schema header CAS. Buffer body chunks until the header chunk
     // shows up, then drain in receive order.
     let mut header_written = false;
     let mut pending: Vec<Vec<u8>> = Vec::new();
-    while let Ok(chunk) = rx.recv() {
+    for chunk in rx {
         if chunk.has_header {
             file.write_all(&chunk.bytes)
                 .with_context(|| format!("Failed to write header to {path_display}"))?;
             header_written = true;
-            for buf in pending.drain(..) {
+            for buf in pending {
                 file.write_all(&buf)
                     .with_context(|| format!("Failed to flush pending body to {path_display}"))?;
             }
+            pending = Vec::new();
         } else if header_written {
             file.write_all(&chunk.bytes)
                 .with_context(|| format!("Failed to write body to {path_display}"))?;
@@ -164,7 +165,7 @@ fn writer_loop(
             pending.len(),
         );
     } else {
-        for buf in pending.drain(..) {
+        for buf in pending {
             file.write_all(&buf)
                 .with_context(|| format!("Failed to flush pending body to {path_display}"))?;
         }
@@ -188,7 +189,7 @@ impl WriterMap {
             let display = path.display().to_string();
             let handle = std::thread::Builder::new()
                 .name(format!("write-{schema}"))
-                .spawn(move || writer_loop(rx, bw, display))
+                .spawn(move || writer_loop(rx, bw, &display))
                 .with_context(|| format!("Failed to spawn writer for {schema}"))?;
             handles.push(handle);
             sinks.insert(
@@ -409,6 +410,121 @@ struct GameTask {
     record_vec: event_file::parser::RecordVec,
 }
 
+#[derive(Copy, Clone)]
+struct WorkerCtx<'a> {
+    parsed_games: Option<&'a HashSet<GameId>>,
+    claimed_games: &'a papaya::HashSet<GameId>,
+    writer_map: &'a WriterMap,
+    json_writer: Option<&'a ThreadSafeJsonWriter>,
+    errors: &'a Mutex<Vec<anyhow::Error>>,
+    base_index: usize,
+}
+
+fn worker_loop(
+    file_rx: &crossbeam_channel::Receiver<(usize, PathBuf)>,
+    game_rx: &crossbeam_channel::Receiver<GameTask>,
+    game_tx: crossbeam_channel::Sender<GameTask>,
+    ctx: &WorkerCtx<'_>,
+) {
+    let mut my_game_tx = Some(game_tx);
+    loop {
+        match game_rx.try_recv() {
+            Ok(task) => {
+                EventFileSchema::run_task(
+                    &task,
+                    ctx.parsed_games,
+                    ctx.claimed_games,
+                    ctx.writer_map,
+                    ctx.json_writer,
+                    ctx.errors,
+                );
+                continue;
+            }
+            Err(crossbeam_channel::TryRecvError::Disconnected) => break,
+            Err(crossbeam_channel::TryRecvError::Empty) => {}
+        }
+        if let Some(tx) = my_game_tx.as_ref() {
+            match file_rx.try_recv() {
+                Ok((i, f)) => {
+                    pump_file(&f, i, tx, game_rx, ctx);
+                    continue;
+                }
+                Err(_) => {
+                    my_game_tx = None;
+                }
+            }
+        }
+        match game_rx.recv() {
+            Ok(task) => EventFileSchema::run_task(
+                &task,
+                ctx.parsed_games,
+                ctx.claimed_games,
+                ctx.writer_map,
+                ctx.json_writer,
+                ctx.errors,
+            ),
+            Err(_) => break,
+        }
+    }
+}
+
+fn pump_file(
+    path: &Path,
+    file_idx: usize,
+    tx: &crossbeam_channel::Sender<GameTask>,
+    game_rx: &crossbeam_channel::Receiver<GameTask>,
+    ctx: &WorkerCtx<'_>,
+) {
+    let file_index = (ctx.base_index + file_idx) * EVENT_KEY_BUFFER;
+    let reader = match RetrosheetReader::new(path, file_index) {
+        Ok(r) => r,
+        Err(e) => {
+            error!("Failed to open {}: {:?}", path.display(), e);
+            ctx.errors.lock().map(|mut g| g.push(e)).ok();
+            return;
+        }
+    };
+    let file_info = reader.file_info;
+    debug!("Reading file {}", file_info.filename);
+    for (game_num, r) in reader.enumerate() {
+        let rv = match r {
+            Ok(rv) => rv,
+            Err(e) => {
+                error!("{:?}", e);
+                continue;
+            }
+        };
+        let mut task = GameTask {
+            file_info,
+            game_num,
+            record_vec: rv,
+        };
+        // Drain a game before pushing if the queue is full so we never park
+        // all threads on send at once.
+        loop {
+            match tx.try_send(task) {
+                Ok(()) => break,
+                Err(crossbeam_channel::TrySendError::Full(returned)) => {
+                    task = returned;
+                    if let Ok(other) = game_rx.try_recv() {
+                        EventFileSchema::run_task(
+                            &other,
+                            ctx.parsed_games,
+                            ctx.claimed_games,
+                            ctx.writer_map,
+                            ctx.json_writer,
+                            ctx.errors,
+                        );
+                    } else {
+                        std::thread::yield_now();
+                    }
+                }
+                Err(crossbeam_channel::TrySendError::Disconnected(_)) => return,
+            }
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash, Display, EnumIter, Key)]
 #[strum(serialize_all = "snake_case")]
 enum EventFileSchema {
@@ -464,7 +580,7 @@ impl EventFileSchema {
     }
 
     fn run_task(
-        task: GameTask,
+        task: &GameTask,
         parsed_games: Option<&HashSet<GameId>>,
         claimed_games: &papaya::HashSet<GameId>,
         writer_map: &WriterMap,
@@ -474,7 +590,7 @@ impl EventFileSchema {
         if let Err(e) = Self::process_game(
             task.file_info,
             task.game_num,
-            task.record_vec,
+            &task.record_vec,
             parsed_games,
             Some(claimed_games),
             writer_map,
@@ -487,7 +603,7 @@ impl EventFileSchema {
     fn process_game(
         file_info: event_file::parser::FileInfo,
         game_num: usize,
-        record_vec: event_file::parser::RecordVec,
+        record_vec: &event_file::parser::RecordVec,
         parsed_games: Option<&HashSet<GameId>>,
         claimed_games: Option<&papaya::HashSet<GameId>>,
         writer_map: &WriterMap,
@@ -712,9 +828,6 @@ impl FileProcessor {
             .collect::<Result<Vec<PathBuf>, GlobError>>()?;
         files.par_sort();
         let file_count = files.len();
-        let writer_map = &self.writer_map;
-        let json_writer = self.json_writer.as_ref();
-        let base_index = self.index;
         let claimed_games: papaya::HashSet<GameId> =
             papaya::HashSet::with_capacity(file_count * 81);
         // Tag each file with its alphabetical index (used to derive event_key),
@@ -741,104 +854,21 @@ impl FileProcessor {
         drop(file_tx);
         let (game_tx, game_rx) = crossbeam_channel::bounded::<GameTask>(total_threads * 4);
         let errors: Mutex<Vec<anyhow::Error>> = Mutex::new(Vec::new());
-        let claimed_games_ref = &claimed_games;
+        let ctx = WorkerCtx {
+            parsed_games,
+            claimed_games: &claimed_games,
+            writer_map: &self.writer_map,
+            json_writer: self.json_writer.as_ref(),
+            errors: &errors,
+            base_index: self.index,
+        };
 
         rayon::scope(|s| {
             for _ in 0..total_threads {
                 let file_rx = file_rx.clone();
                 let game_rx = game_rx.clone();
                 let game_tx = game_tx.clone();
-                let errors_ref = &errors;
-                s.spawn(move |_| {
-                    let mut my_game_tx = Some(game_tx);
-                    loop {
-                        match game_rx.try_recv() {
-                            Ok(task) => {
-                                EventFileSchema::run_task(
-                                    task,
-                                    parsed_games,
-                                    claimed_games_ref,
-                                    writer_map,
-                                    json_writer,
-                                    errors_ref,
-                                );
-                                continue;
-                            }
-                            Err(crossbeam_channel::TryRecvError::Disconnected) => break,
-                            Err(crossbeam_channel::TryRecvError::Empty) => {}
-                        }
-                        if let Some(tx) = my_game_tx.as_ref() {
-                            match file_rx.try_recv() {
-                                Ok((i, f)) => {
-                                    let file_index = (base_index + i) * EVENT_KEY_BUFFER;
-                                    match RetrosheetReader::new(&f, file_index) {
-                                        Ok(reader) => {
-                                            let file_info = reader.file_info;
-                                            debug!("Reading file {}", file_info.filename);
-                                            for (game_num, r) in reader.enumerate() {
-                                                match r {
-                                                    Ok(rv) => {
-                                                        let mut task = GameTask {
-                                                            file_info,
-                                                            game_num,
-                                                            record_vec: rv,
-                                                        };
-                                                        // Drain a game before
-                                                        // pushing if the queue
-                                                        // is full so we never
-                                                        // park all threads on
-                                                        // send at once.
-                                                        loop {
-                                                            match tx.try_send(task) {
-                                                                Ok(()) => break,
-                                                                Err(crossbeam_channel::TrySendError::Full(returned)) => {
-                                                                    task = returned;
-                                                                    if let Ok(other) = game_rx.try_recv() {
-                                                                        EventFileSchema::run_task(
-                                                                            other,
-                                                                            parsed_games,
-                                                                            claimed_games_ref,
-                                                                            writer_map,
-                                                                            json_writer,
-                                                                            errors_ref,
-                                                                        );
-                                                                    } else {
-                                                                        std::thread::yield_now();
-                                                                    }
-                                                                }
-                                                                Err(crossbeam_channel::TrySendError::Disconnected(_)) => return,
-                                                            }
-                                                        }
-                                                    }
-                                                    Err(e) => error!("{:?}", e),
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            error!("Failed to open {}: {:?}", f.display(), e);
-                                            errors_ref.lock().map(|mut g| g.push(e)).ok();
-                                        }
-                                    }
-                                    continue;
-                                }
-                                Err(_) => {
-                                    my_game_tx = None;
-                                }
-                            }
-                        }
-                        match game_rx.recv() {
-                            Ok(task) => EventFileSchema::run_task(
-                                task,
-                                parsed_games,
-                                claimed_games_ref,
-                                writer_map,
-                                json_writer,
-                                errors_ref,
-                            ),
-                            Err(_) => break,
-                        }
-                    }
-                });
+                s.spawn(move |_| worker_loop(&file_rx, &game_rx, game_tx, &ctx));
             }
             drop(game_tx);
         });

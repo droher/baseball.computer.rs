@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Error, Result, anyhow};
 use arrayvec::ArrayString;
@@ -152,7 +152,7 @@ impl RetrosheetReader {
         }
     }
 
-    pub fn new(path: &PathBuf, file_index: usize) -> Result<Self> {
+    pub fn new(path: &Path, file_index: usize) -> Result<Self> {
         let mut reader = ReaderBuilder::new()
             .has_headers(false)
             .double_quote(false)
