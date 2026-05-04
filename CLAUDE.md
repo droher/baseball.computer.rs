@@ -75,7 +75,7 @@ Entry point: `src/main.rs`. Module tree: `src/event_file/` (declared via `src/ev
 ### Module map (`src/event_file/`)
 
 - `parser.rs` — `RetrosheetReader`, `AccountType` (PlayByPlay / Deduced / BoxScore), `MappedRecord`, `RecordSlice`. Hand-rolled parser; long-lived (no rewrite in flight).
-- `game_state.rs` — `GameContext` + `GameState` state machine that replays records. Per-event build splits into `capture_pre_play_snapshot` (pre-update view of bases/outs/rare_attributes) and `build_event` (post-update assembly). Inter-play comments accumulate via `CommentAccumulator`. Lookups for the current lineup/fielding appearance go through `current_appearance_mut`.
+- `game_state.rs` — `GameContext` + `GameState` state machine that replays records. Owned-self shell: `update`, `update_on_*`, `fold_appearance_delta`, and `build_event` consume `self` and return the next state, so `create_events` is a `try_fold`. Per-event build splits into `capture_pre_play_snapshot` (pre-update view of bases/outs/rare_attributes, `&self`) and `build_event` (post-update assembly, consumes `self` to drain comments and returns `(Self, Event)`). Submodules `base_state.rs` and `personnel.rs` expose only owned-value transitions — `BaseState` and `Personnel` have zero `&mut self` methods. Inter-play comments accumulate via `CommentAccumulator`.
 - `play.rs` — play-string parsing + `quick_cache`.
 - `pitch_sequence.rs` — pitch-sequence parsing.
 - `box_score.rs` — `BoxScoreLine` / `BoxScoreEvent` enums.

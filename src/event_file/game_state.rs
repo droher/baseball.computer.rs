@@ -8,9 +8,8 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use anyhow::{Context, Error, Result, anyhow, bail};
-use arrayvec::ArrayString;
-use bounded_integer::{BoundedU8, BoundedUsize};
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
+use bounded_integer::BoundedUsize;
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use strum_macros::AsRefStr;
@@ -37,13 +36,13 @@ use crate::event_file::traits::{
 };
 
 use super::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
-use super::pitch_sequence::{PitchSequence, PitchSequenceItem, PitchType};
+use super::pitch_sequence::PitchSequence;
 use super::play::{
     BattedBallAngle, BattedBallDepth, BattedBallLocationGeneral, BattedBallStrength,
     RunnerAdvanceModifier,
 };
 use super::schemas::GameIdString;
-use super::traits::{EventKey, FieldingPlayType, GameType};
+use super::traits::{EventKey, GameType};
 
 const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
@@ -947,14 +946,16 @@ impl GameState {
     }
 
     /// Must run after `update`: reads post-play `inning`/`batting_side`/
-    /// `frame`/`at_bat` and `bases` (as `ending_base_state`).
+    /// `frame`/`at_bat` and `bases` (as `ending_base_state`). Consumes `self`
+    /// because it drains `self.comments` onto the event; returns the updated
+    /// state alongside the event so the caller can keep folding.
     fn build_event(
-        &mut self,
+        mut self,
         play: &PlayRecord,
         pre_state: PrePlaySnapshot,
         line_number: usize,
         event_key: EventKey,
-    ) -> Result<Event> {
+    ) -> Result<(Self, Event)> {
         let context = EventContext {
             inning: self.inning,
             batting_side: self.batting_side,
@@ -981,7 +982,7 @@ impl GameState {
             ending_base_state: self.bases.clone(),
             no_play_flag: play.stats.no_play_flag,
         };
-        Ok(Event {
+        let event = Event {
             game_id: self.game_id,
             event_id: self.event_id,
             context,
@@ -989,7 +990,8 @@ impl GameState {
             line_number,
             event_key,
             raw_play: play.raw.clone(),
-        })
+        };
+        Ok((self, event))
     }
 
     pub fn create_events(
@@ -1001,33 +1003,40 @@ impl GameState {
         Vec<GameLineupAppearance>,
         Vec<GameFieldingAppearance>,
     )> {
-        let mut events: Vec<Event> = Vec::with_capacity(100);
+        let initial = Self::new(record_slice)?;
+        let (final_state, events) = record_slice.iter().enumerate().try_fold(
+            (initial, Vec::<Event>::with_capacity(100)),
+            |(state, mut events), (i, record)| -> Result<(Self, Vec<Event>)> {
+                let event_key: i32 = event_key_offset + i32::try_from(state.event_id.get())?;
+                let opt_play = match record {
+                    MappedRecord::Play(pr) => Some(pr),
+                    _ => None,
+                };
+                let pre_state = state.capture_pre_play_snapshot(opt_play)?;
+                let state = state.update(record, opt_play)?;
+                if let Some(play) = opt_play {
+                    let line_number = line_offset + i;
+                    let (mut state, event) =
+                        state.build_event(play, pre_state, line_number, event_key)?;
+                    events.push(event);
+                    state.event_id += 1;
+                    Ok((state, events))
+                } else {
+                    Ok((state, events))
+                }
+            },
+        )?;
 
-        let mut state = Self::new(record_slice)?;
-        for (i, record) in record_slice.iter().enumerate() {
-            let event_key: i32 = event_key_offset + i32::try_from(state.event_id.get())?;
-            let opt_play = match record {
-                MappedRecord::Play(pr) => Some(pr),
-                _ => None,
-            };
-            let pre_state = state.capture_pre_play_snapshot(opt_play)?;
-            state.update(record, opt_play)?;
-            if let Some(play) = opt_play {
-                let line_number = line_offset + i;
-                events.push(state.build_event(play, pre_state, line_number, event_key)?);
-                state.event_id += 1;
-            }
-        }
         // Set all remaining blank end_event_ids to final event
         let max_event_id = EventId::new(events.len()).context("No events in list")?;
-        let lineup_appearances = state
+        let lineup_appearances = final_state
             .lineup_appearances
             .values()
             .flatten()
             .map(|la| la.finalize(max_event_id))
             .sorted_by_key(|la| (la.side, la.lineup_position, la.start_event_id))
             .collect_vec();
-        let defense_appearances = state
+        let defense_appearances = final_state
             .fielding_appearances
             .values()
             .flatten()
@@ -1052,7 +1061,7 @@ impl GameState {
             .map_or(Side::Away, |s| s);
 
         let (personnel, starts_delta) = personnel::from_starts(record_slice)?;
-        let mut state = Self {
+        let state = Self {
             game_id,
             event_id: EventId::new(1).context("Unexpected event ID bound error")?,
             inning: 1,
@@ -1068,11 +1077,10 @@ impl GameState {
             unusual_state: RareAttributes::default(),
             comments: CommentAccumulator::default(),
         };
-        state.fold_appearance_delta(starts_delta)?;
-        Ok(state)
+        state.fold_appearance_delta(starts_delta)
     }
 
-    fn fold_appearance_delta(&mut self, delta: AppearanceDelta) -> Result<()> {
+    fn fold_appearance_delta(mut self, delta: AppearanceDelta) -> Result<Self> {
         for (player, eid) in delta.close_lineup {
             let entry = self
                 .lineup_appearances
@@ -1111,10 +1119,10 @@ impl GameState {
                 .or_insert_with(|| Vec::with_capacity(1))
                 .push(appearance);
         }
-        Ok(())
+        Ok(self)
     }
 
-    fn update_on_play(&mut self, play: &PlayRecord) -> Result<()> {
+    fn update_on_play(mut self, play: &PlayRecord) -> Result<Self> {
         let flipped = transitions::frame_changed(self.batting_side, play.batting_side);
         if flipped && self.outs.get() < 3 {
             bail!("New frame without 3 outs recorded")
@@ -1152,10 +1160,10 @@ impl GameState {
         self.bases = new_base_state;
         self.at_bat = batter_lineup_position;
 
-        Ok(())
+        Ok(self)
     }
 
-    fn update_on_substitution(&mut self, record: &SubstitutionRecord) -> Result<()> {
+    fn update_on_substitution(mut self, record: &SubstitutionRecord) -> Result<Self> {
         if transitions::detect_mid_pa_strikeout_responsible(
             self.at_bat,
             self.batting_side,
@@ -1180,25 +1188,27 @@ impl GameState {
             self.event_id,
         )?;
         self.personnel = next_personnel;
-        self.fold_appearance_delta(sub_delta)?;
+        self = self.fold_appearance_delta(sub_delta)?;
         if record.fielding_position == FieldingPosition::Pitcher
             && record.lineup_position != LineupPosition::PitcherWithDh
         {
             let dh_delta = personnel::apply_dh_vacancy(&self.personnel, record, self.event_id);
-            self.fold_appearance_delta(dh_delta)?;
+            self = self.fold_appearance_delta(dh_delta)?;
         }
-        Ok(())
+        Ok(self)
     }
 
-    const fn update_on_bat_hand_adjustment(&mut self, record: &BatHandAdjustment) {
+    const fn update_on_bat_hand_adjustment(mut self, record: &BatHandAdjustment) -> Self {
         self.unusual_state.batter_hand = Some(record.hand);
+        self
     }
 
-    const fn update_on_pitch_hand_adjustment(&mut self, record: &PitchHandAdjustment) {
-        self.unusual_state.batter_hand = Some(record.hand);
+    const fn update_on_pitch_hand_adjustment(mut self, record: &PitchHandAdjustment) -> Self {
+        self.unusual_state.pitcher_hand = Some(record.hand);
+        self
     }
 
-    fn update_on_runner_adjustment(&mut self, record: &RunnerAdjustment) -> Result<()> {
+    fn update_on_runner_adjustment(mut self, record: &RunnerAdjustment) -> Result<Self> {
         let delta = transitions::apply_runner_adjustment(
             self.frame,
             self.batting_side,
@@ -1211,17 +1221,18 @@ impl GameState {
         self.batting_side = delta.new_side;
         self.outs = delta.new_outs;
         self.bases = delta.new_bases;
-        Ok(())
+        Ok(self)
     }
 
-    fn update_on_comment(&mut self, comment: &str) {
+    fn update_on_comment(mut self, comment: &str) -> Self {
         self.comments.push(comment);
+        self
     }
 
     fn update_on_pitcher_responsibility_adjustment(
-        &mut self,
+        mut self,
         record: &PitcherResponsibilityAdjustment,
-    ) {
+    ) -> Self {
         // Real corpus contains adjustments that name a base with no runner
         // (e.g. BSN191409102 in 1914BSN.EVN: `presadj,oescj101,1` after a
         // half-inning where only 2B is occupied). Skip with a warning so the
@@ -1235,219 +1246,34 @@ impl GameState {
                 w.adjustment
             );
         }
+        self
     }
 
-    pub fn update(&mut self, record: &MappedRecord, play: Option<&PlayRecord>) -> Result<()> {
+    pub fn update(self, record: &MappedRecord, play: Option<&PlayRecord>) -> Result<Self> {
         match record {
             // We've already pulled the play record out before the call to this function
-            MappedRecord::Play(_) => {
-                if let Some(cp) = play {
-                    self.update_on_play(cp)
-                        .with_context(|| anyhow!("Failed to parse play {cp:?}"))
-                } else {
-                    bail!("Expected play but got None")
-                }
-            }?,
-            MappedRecord::Substitution(r) => self.update_on_substitution(r)?,
-            MappedRecord::BatHandAdjustment(r) => self.update_on_bat_hand_adjustment(r),
-            MappedRecord::PitchHandAdjustment(r) => self.update_on_pitch_hand_adjustment(r),
-            // Nothing to do here, since we map player to batting order anyway
-            MappedRecord::LineupAdjustment(_) => (),
-            MappedRecord::RunnerAdjustment(r) => self.update_on_runner_adjustment(r)?,
+            MappedRecord::Play(_) => match play {
+                Some(cp) => self
+                    .update_on_play(cp)
+                    .with_context(|| anyhow!("Failed to parse play {cp:?}")),
+                None => bail!("Expected play but got None"),
+            },
+            MappedRecord::Substitution(r) => self.update_on_substitution(r),
+            MappedRecord::BatHandAdjustment(r) => Ok(self.update_on_bat_hand_adjustment(r)),
+            MappedRecord::PitchHandAdjustment(r) => Ok(self.update_on_pitch_hand_adjustment(r)),
+            MappedRecord::RunnerAdjustment(r) => self.update_on_runner_adjustment(r),
             MappedRecord::PitcherResponsibilityAdjustment(r) => {
-                self.update_on_pitcher_responsibility_adjustment(r);
+                Ok(self.update_on_pitcher_responsibility_adjustment(r))
             }
-            MappedRecord::Comment(r) => self.update_on_comment(r),
-            _ => {}
+            MappedRecord::Comment(r) => Ok(self.update_on_comment(r)),
+            _ => Ok(self),
         }
-
-        Ok(())
     }
 }
 
 pub type Outs = BoundedUsize<0, 3>;
 
-pub use base_state::{BaseState, Runner};
-
-/// Returns a dummy version of `GameContext` that
-/// has at least one entry in each of its Vecs
-#[allow(clippy::pedantic, clippy::nursery, clippy::unwrap_used)]
-pub fn dummy() -> GameContext {
-    let team = ArrayString::from("ABC").unwrap();
-    let dummy_str8 = ArrayString::from("dummy").unwrap();
-    let dummy_str16 = ArrayString::from("dummy").unwrap();
-    let dummy_datetime = DateTime::from_timestamp(0, 0).unwrap().naive_utc();
-    let mut dummy_base_state = BaseState::default();
-    dummy_base_state.set_runner(
-        BaseRunner::First,
-        Runner {
-            lineup_position: LineupPosition::PitcherWithDh,
-            explicit_charged_pitcher_id: Some(dummy_str8),
-            reached_on_event_id: EventId::new(1).unwrap(),
-            charge_event_id: EventId::new(1).unwrap(),
-        },
-    );
-    GameContext {
-        game_id: GameId {
-            id: GameIdString::default(),
-        },
-        file_info: FileInfo {
-            filename: ArrayString::from("dummy").unwrap(),
-            account_type: AccountType::BoxScore,
-            file_index: 0,
-        },
-        metadata: GameMetadata {
-            scorer: Some(dummy_str16),
-            how_scored: HowScored::Unknown,
-            inputter: Some(dummy_str16),
-            translator: Some(dummy_str16),
-            date_inputted: Some(dummy_datetime),
-            date_edited: Some(dummy_datetime),
-        },
-        teams: Matchup {
-            away: team,
-            home: team,
-        },
-        setting: GameSetting {
-            date: NaiveDate::MIN,
-            start_time: Some(NaiveTime::default()),
-            game_type: GameType::RegularSeason,
-            doubleheader_status: DoubleheaderStatus::DoubleHeaderGame1,
-            time_of_day: DayNight::Day,
-            bat_first_side: Side::Away,
-            sky: Sky::Unknown,
-            field_condition: FieldCondition::Unknown,
-            precipitation: Precipitation::Unknown,
-            wind_direction: WindDirection::Unknown,
-            season: Season(1990),
-            park_id: dummy_str16,
-            temperature_fahrenheit: Some(1),
-            attendance: Some(1),
-            wind_speed_mph: Some(1),
-            use_dh: true,
-        },
-        umpires: vec![GameUmpire {
-            game_id: ArrayString::from("dummy").unwrap(),
-            umpire_id: Some(dummy_str8),
-            position: UmpirePosition::Home,
-        }],
-        results: GameResults {
-            winning_pitcher: Some(dummy_str8),
-            losing_pitcher: Some(dummy_str8),
-            save_pitcher: Some(dummy_str8),
-            game_winning_rbi: Some(dummy_str8),
-            time_of_game_minutes: Some(1),
-            protest_info: Some(String::from("dummy")),
-            completion_info: Some(String::from("dummy")),
-            earned_runs: vec![EarnedRunRecord {
-                pitcher_id: dummy_str8,
-                earned_runs: 1,
-            }],
-        },
-        lineup_appearances: vec![GameLineupAppearance {
-            game_id: ArrayString::from("dummy").unwrap(),
-            player_id: dummy_str8,
-            lineup_position: LineupPosition::PitcherWithDh,
-            side: Side::Away,
-            entered_game_as: EnteredGameAs::Starter,
-            start_event_id: EventId::new(1).unwrap(),
-            end_event_id: Some(EventId::new(1).unwrap()),
-        }],
-        fielding_appearances: vec![GameFieldingAppearance {
-            game_id: ArrayString::from("dummy").unwrap(),
-            player_id: dummy_str8,
-            fielding_position: FieldingPosition::Pitcher,
-            side: Side::Away,
-            start_event_id: EventId::new(1).unwrap(),
-            end_event_id: Some(EventId::new(1).unwrap()),
-        }],
-        events: vec![Event {
-            game_id: GameId {
-                id: GameIdString::default(),
-            },
-            event_id: EventId::new(1).unwrap(),
-            context: EventContext {
-                inning: 1,
-                batting_side: Side::Away,
-                frame: InningFrame::Top,
-                at_bat: LineupPosition::PitcherWithDh,
-                batter_id: dummy_str8,
-                pitcher_id: dummy_str8,
-                outs: Outs::new(0).unwrap(),
-                starting_base_state: dummy_base_state.clone(),
-                rare_attributes: RareAttributes {
-                    batter_hand: Some(Hand::Left),
-                    pitcher_hand: Some(Hand::Left),
-                    strikeout_responsible_batter: Some(dummy_str8),
-                    walk_responsible_pitcher: Some(dummy_str8),
-                },
-            },
-            results: EventResults {
-                count_at_event: Count {
-                    balls: Some(BoundedU8::new(1).unwrap()),
-                    strikes: Some(BoundedU8::new(1).unwrap()),
-                },
-                pitch_sequence: Arc::new(vec![PitchSequenceItem {
-                    sequence_id: SequenceId::new(1).unwrap(),
-                    pitch_type: PitchType::CalledStrike,
-                    blocked_by_catcher: false,
-                    runners_going: false,
-                    catcher_pickoff_attempt: Some(Base::First),
-                }]),
-                plate_appearance: Some(PlateAppearanceResultType::Single),
-                batted_ball_info: Some(EventBattedBallInfo::default()),
-                plays_at_base: vec![EventBaserunningPlay {
-                    event_key: 1,
-                    sequence_id: SequenceId::new(1).unwrap(),
-                    baserunning_play_type: BaserunningPlayType::Balk,
-                    baserunner: Some(BaseRunner::Batter),
-                }],
-                baserunning_advances: vec![EventBaserunningAdvanceAttempt {
-                    event_key: 1,
-                    sequence_id: SequenceId::new(1).unwrap(),
-                    baserunner: BaseRunner::Batter,
-                    attempted_advance_to: Base::Second,
-                    is_successful: true,
-                    advanced_on_error_flag: true,
-                    explicit_out_flag: true,
-                    run_scored_flag: true,
-                    rbi_flag: true,
-                    team_unearned_flag: true,
-                }],
-                runs: vec![EventRun {
-                    event_key: 1,
-                    runner: BaseRunner::Batter,
-                    rbi_flag: true,
-                    explicit_unearned_run_status: Some(UnearnedRunStatus::TeamUnearned),
-                }],
-                play_info: vec![EventFlag {
-                    event_key: 1,
-                    sequence_id: SequenceId::new(1).unwrap(),
-                    flag: String::from("dummy"),
-                }],
-                comment: vec![String::from("dummy")],
-                fielding_plays: vec![FieldersData {
-                    fielding_position: FieldingPosition::Pitcher,
-                    fielding_play_type: FieldingPlayType::Assist,
-                }],
-                out_on_play: vec![BaseRunner::Batter],
-                ending_base_state: dummy_base_state.clone(),
-                no_play_flag: false,
-            },
-            line_number: 1,
-            event_key: 2,
-            raw_play: Arc::new(String::from("dummy")),
-        }],
-        line_offset: 1,
-        event_key_offset: 3,
-        box_score_data: Some(BoxScoreData {
-            lines: vec![],
-            events: vec![],
-            line_scores: vec![],
-            comments: vec![],
-        }),
-    }
-}
+pub use base_state::BaseState;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
@@ -1460,15 +1286,6 @@ mod tests {
 
     fn rec(fields: &[&str]) -> StringRecord {
         StringRecord::from(fields.to_vec())
-    }
-
-    fn make_runner(lineup: LineupPosition, event_id: u8) -> Runner {
-        Runner {
-            lineup_position: lineup,
-            reached_on_event_id: EventId::new(event_id.into()).unwrap(),
-            charge_event_id: EventId::new(event_id.into()).unwrap(),
-            explicit_charged_pitcher_id: None,
-        }
     }
 
     /// Build a record slice with one starter per lineup position on each side.
@@ -1506,93 +1323,6 @@ mod tests {
         GameState::new(&build_starter_slice()).unwrap()
     }
 
-    // --- BaseState invariants ---
-
-    #[test]
-    fn base_state_default_is_empty() {
-        let bs = BaseState::default();
-        assert_eq!(bs.num_runners_on_base(), 0);
-        assert!(bs.get_runner(BaseRunner::First).is_none());
-        assert!(bs.get_runner(BaseRunner::Second).is_none());
-        assert!(bs.get_runner(BaseRunner::Third).is_none());
-        assert_eq!(bs.get_base_state(), 0);
-    }
-
-    #[test]
-    fn base_state_set_then_get_returns_runner() {
-        let mut bs = BaseState::default();
-        let runner = make_runner(LineupPosition::Third, 7);
-        bs.set_runner(BaseRunner::Second, runner);
-        let got = bs.get_runner(BaseRunner::Second).unwrap();
-        assert_eq!(got.lineup_position, LineupPosition::Third);
-        assert_eq!(got.reached_on_event_id, EventId::new(7).unwrap());
-        assert_eq!(bs.num_runners_on_base(), 1);
-    }
-
-    #[test]
-    fn base_state_clear_after_set_is_empty() {
-        let mut bs = BaseState::default();
-        bs.set_runner(BaseRunner::First, make_runner(LineupPosition::First, 1));
-        assert!(bs.get_runner(BaseRunner::First).is_some());
-        bs.clear_baserunner(BaseRunner::First);
-        assert!(bs.get_runner(BaseRunner::First).is_none());
-        assert_eq!(bs.num_runners_on_base(), 0);
-    }
-
-    #[test]
-    fn base_state_full_bases_three_runners() {
-        let mut bs = BaseState::default();
-        bs.set_runner(BaseRunner::First, make_runner(LineupPosition::First, 1));
-        bs.set_runner(BaseRunner::Second, make_runner(LineupPosition::Second, 2));
-        bs.set_runner(BaseRunner::Third, make_runner(LineupPosition::Third, 3));
-        assert_eq!(bs.num_runners_on_base(), 3);
-        assert_eq!(bs.get_base_state(), 0b111);
-    }
-
-    #[test]
-    fn base_state_get_base_state_encodes_occupancy_bitfield() {
-        // Each table row asserts the bitfield contract derived from the
-        // BaseState definition: bit 0 = First, bit 1 = Second, bit 2 = Third.
-        let cases = [
-            (vec![], 0b000),
-            (vec![BaseRunner::First], 0b001),
-            (vec![BaseRunner::Second], 0b010),
-            (vec![BaseRunner::Third], 0b100),
-            (vec![BaseRunner::First, BaseRunner::Third], 0b101),
-        ];
-        for (occupied, expected) in cases {
-            let mut bs = BaseState::default();
-            for (i, br) in occupied.iter().enumerate() {
-                let event_id = u8::try_from(i + 1).unwrap();
-                bs.set_runner(*br, make_runner(LineupPosition::First, event_id));
-            }
-            assert_eq!(
-                bs.get_base_state(),
-                expected,
-                "expected {expected:#05b} for {occupied:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn base_state_new_inning_tiebreaker_places_only_on_second() {
-        let bs = BaseState::new_inning_tiebreaker(LineupPosition::Fourth, EventId::new(5).unwrap());
-        assert!(bs.get_runner(BaseRunner::First).is_none());
-        let runner = bs.get_runner(BaseRunner::Second).unwrap();
-        assert_eq!(runner.lineup_position, LineupPosition::Fourth);
-        assert!(bs.get_runner(BaseRunner::Third).is_none());
-        assert_eq!(bs.num_runners_on_base(), 1);
-    }
-
-    #[test]
-    fn base_state_get_from_position_finds_runner_by_lineup_position() {
-        let mut bs = BaseState::default();
-        bs.set_runner(BaseRunner::Third, make_runner(LineupPosition::Sixth, 4));
-        let runner = bs.get_from_position(LineupPosition::Sixth).unwrap();
-        assert_eq!(runner.reached_on_event_id, EventId::new(4).unwrap());
-        assert!(bs.get_from_position(LineupPosition::Ninth).is_none());
-    }
-
     // --- GameState bootstrap ---
 
     #[test]
@@ -1611,15 +1341,17 @@ mod tests {
     #[test]
     fn update_on_pitcher_responsibility_adjustment_sets_charge_on_existing_runner() {
         let mut gs = make_state();
-        // Put a runner on second so the adjustment has a target.
-        gs.bases
-            .set_runner(BaseRunner::Second, make_runner(LineupPosition::Fifth, 3));
+        // Put a runner on second so the adjustment has a target. Use the
+        // tiebreaker constructor since `BaseState` is a value type with no
+        // public mutators.
+        gs.bases =
+            BaseState::new_inning_tiebreaker(LineupPosition::Fifth, EventId::new(3).unwrap());
         let pitcher: Pitcher = str_to_tinystr("relp001").unwrap();
         let adj = PitcherResponsibilityAdjustment {
             pitcher_id: pitcher,
             baserunner: BaseRunner::Second,
         };
-        gs.update_on_pitcher_responsibility_adjustment(&adj);
+        let gs = gs.update_on_pitcher_responsibility_adjustment(&adj);
         assert_eq!(
             gs.bases
                 .get_runner(BaseRunner::Second)
@@ -1631,10 +1363,7 @@ mod tests {
 
     #[test]
     fn update_on_pitcher_responsibility_adjustment_skips_when_base_empty() {
-        // Regression: BSN191409102 ships a presadj for an empty base. The
-        // parser must skip with a warn rather than panic; surrounding state
-        // (outs, frame, bases) stays put.
-        let mut gs = make_state();
+        let gs = make_state();
         let outs_before = gs.outs;
         let frame_before = gs.frame;
         let runners_before = gs.bases.num_runners_on_base();
@@ -1642,7 +1371,7 @@ mod tests {
             pitcher_id: str_to_tinystr("relp001").unwrap(),
             baserunner: BaseRunner::First,
         };
-        gs.update_on_pitcher_responsibility_adjustment(&adj);
+        let gs = gs.update_on_pitcher_responsibility_adjustment(&adj);
         assert!(gs.bases.get_runner(BaseRunner::First).is_none());
         assert_eq!(gs.outs, outs_before);
         assert_eq!(gs.frame, frame_before);
@@ -1663,7 +1392,7 @@ mod tests {
             runner_id: str_to_tinystr("h1001").unwrap(),
             base: Base::Second,
         };
-        gs.update_on_runner_adjustment(&adj).unwrap();
+        let gs = gs.update_on_runner_adjustment(&adj).unwrap();
         // Frame flipped, outs reset, runner placed on second only.
         assert_eq!(gs.frame, InningFrame::Bottom);
         assert_eq!(gs.batting_side, Side::Home);
@@ -1694,10 +1423,43 @@ mod tests {
         let sub_record =
             SubstitutionRecord::try_from(&rec(&["sub", "relp001", "Reliever", "1", "9", "1"]))
                 .unwrap();
-        gs.update_on_substitution(&sub_record).unwrap();
+        let gs = gs.update_on_substitution(&sub_record).unwrap();
         assert_eq!(
             gs.unusual_state.walk_responsible_pitcher,
             Some(original_home_pitcher)
         );
+    }
+
+    // --- bat/pitch hand adjustments ---
+
+    #[test]
+    fn update_dispatches_bat_hand_adjustment_to_batter_hand() {
+        let gs = make_state();
+        let adj = BatHandAdjustment {
+            player_id: str_to_tinystr("a1001").unwrap(),
+            hand: Hand::Left,
+        };
+        let gs = gs
+            .update(&MappedRecord::BatHandAdjustment(adj), None)
+            .unwrap();
+        assert_eq!(gs.unusual_state.batter_hand, Some(Hand::Left));
+        assert_eq!(gs.unusual_state.pitcher_hand, None);
+    }
+
+    #[test]
+    fn update_dispatches_pitch_hand_adjustment_to_pitcher_hand() {
+        // Regression: the pitch-hand dispatch used to write to `batter_hand`,
+        // silently overwriting that field on every `padj,...` record in the
+        // corpus. Lock the destination here.
+        let gs = make_state();
+        let adj = PitchHandAdjustment {
+            player_id: str_to_tinystr("h9001").unwrap(),
+            hand: Hand::Right,
+        };
+        let gs = gs
+            .update(&MappedRecord::PitchHandAdjustment(adj), None)
+            .unwrap();
+        assert_eq!(gs.unusual_state.pitcher_hand, Some(Hand::Right));
+        assert_eq!(gs.unusual_state.batter_hand, None);
     }
 }

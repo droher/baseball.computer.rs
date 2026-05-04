@@ -51,6 +51,8 @@ start,gowdh101,"Hank Gowdy",1,8,2
 start,jameb102,"Bill James",1,9,1
 com,"$NL game was played at Fenway Park."
 play,1,0,lobeh101,??,,D
+badj,beckb101,L
+padj,jameb102,L
 play,1,0,beckb101,??,,FC6.2X3(65)
 play,1,0,mages101,??,,SB2
 play,1,0,mages101,??,,W

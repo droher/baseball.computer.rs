@@ -201,15 +201,15 @@ pub(super) fn apply_substitution(
     sub: &SubstitutionRecord,
     event_id: EventId,
 ) -> Result<(Personnel, AppearanceDelta)> {
-    let mut next = prev.clone();
-    let mut delta = AppearanceDelta::default();
+    let next = prev.clone();
+    let delta = AppearanceDelta::default();
 
-    apply_lineup_substitution(&mut next, lineup_appearances, sub, event_id, &mut delta)?;
+    let (next, delta) = apply_lineup_substitution(next, delta, lineup_appearances, sub, event_id)?;
     if sub.fielding_position.is_true_position() {
-        apply_defense_substitution(&mut next, defense_appearances, sub, event_id, &mut delta)?;
+        apply_defense_substitution(next, delta, defense_appearances, sub, event_id)
+    } else {
+        Ok((next, delta))
     }
-
-    Ok((next, delta))
 }
 
 /// DH-vacancy transition: closes the non-batting pitcher's lineup
@@ -253,19 +253,19 @@ pub(super) fn apply_dh_vacancy(
 }
 
 fn apply_lineup_substitution(
-    next: &mut Personnel,
+    mut next: Personnel,
+    mut delta: AppearanceDelta,
     lineup_appearances: &HashMap<TrackedPlayer, Vec<GameLineupAppearance>>,
     sub: &SubstitutionRecord,
     event_id: EventId,
-    delta: &mut AppearanceDelta,
-) -> Result<()> {
+) -> Result<(Personnel, AppearanceDelta)> {
     let original_batter = next.get_at_position(sub.side, PositionType::Lineup(sub.lineup_position));
 
     if let Ok(p) = original_batter {
         let current_appearance = current_lineup_appearance(lineup_appearances, &p)?;
 
         if p.player == sub.player && current_appearance.lineup_position == sub.lineup_position {
-            return Ok(());
+            return Ok((next, delta));
         }
 
         if current_appearance.lineup_position == sub.lineup_position {
@@ -301,24 +301,24 @@ fn apply_lineup_substitution(
     let (lineup, _) = next.state.get_mut(sub.side);
     lineup.insert(PositionType::Lineup(sub.lineup_position), new_player);
     delta.new_lineup.push((new_player, new_lineup_appearance));
-    Ok(())
+    Ok((next, delta))
 }
 
 /// The semantics of defensive substitutions are more complicated, because
 /// the new player could already have been in the game, and the replaced
 /// player might not have left the game.
 fn apply_defense_substitution(
-    next: &mut Personnel,
+    mut next: Personnel,
+    mut delta: AppearanceDelta,
     defense_appearances: &HashMap<TrackedPlayer, Vec<GameFieldingAppearance>>,
     sub: &SubstitutionRecord,
     event_id: EventId,
-    delta: &mut AppearanceDelta,
-) -> Result<()> {
+) -> Result<(Personnel, AppearanceDelta)> {
     let original_fielder =
         next.get_at_position(sub.side, PositionType::Fielding(sub.fielding_position));
     if let Ok(p) = original_fielder {
         if p.player == sub.player {
-            return Ok(());
+            return Ok((next, delta));
         }
         let current_appearance = current_fielding_appearance(defense_appearances, &p)?;
         if current_appearance.fielding_position == sub.fielding_position {
@@ -354,7 +354,7 @@ fn apply_defense_substitution(
         ),
     ));
 
-    Ok(())
+    Ok((next, delta))
 }
 
 fn current_lineup_appearance<'a>(

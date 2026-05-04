@@ -118,7 +118,7 @@ BSN191409102,16,16,Home,2,Bottom,7,mannl101,baums101,BSN,PHI,0,3,,,,,,,Single,Un
 BSN191409102,17,17,Home,2,Bottom,8,gowdh101,baums101,BSN,PHI,1,4,,,,,,,InPlayOut,GroundBall,0,Unknown,Unknown,Unknown,Unknown,1,0,0,0,false
 BSN191409102,18,18,Home,2,Bottom,9,jameb102,baums101,BSN,PHI,2,4,,,,,,,StrikeOut,,,,,,,1,0,0,0,false
 BSN191409102,19,19,Away,3,Top,9,baums101,jameb102,PHI,BSN,0,0,,,,,,,InPlayOut,Unknown,0,Unknown,Unknown,Unknown,Unknown,1,0,0,0,false
-BSN191409102,2,2,Away,1,Top,2,beckb101,jameb102,PHI,BSN,0,2,,,,,,,FieldersChoice,Unknown,6,Unknown,Unknown,Unknown,Unknown,1,0,0,0,false
+BSN191409102,2,2,Away,1,Top,2,beckb101,jameb102,PHI,BSN,0,2,,,Left,Left,,,FieldersChoice,Unknown,6,Unknown,Unknown,Unknown,Unknown,1,0,0,0,false
 BSN191409102,20,20,Away,3,Top,1,lobeh101,jameb102,PHI,BSN,1,0,,,,,,,Single,Unknown,9,Unknown,Unknown,Unknown,Unknown,0,0,0,0,false
 BSN191409102,21,21,Away,3,Top,2,beckb101,jameb102,PHI,BSN,1,1,,,,,,,Double,Unknown,9,Unknown,Unknown,Unknown,Unknown,0,0,0,0,false
 BSN191409102,22,22,Away,3,Top,3,mages101,jameb102,PHI,BSN,1,6,,,,,,,Single,Unknown,9,First,Default,Default,Default,0,2,2,0,false
