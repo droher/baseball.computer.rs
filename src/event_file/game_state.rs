@@ -1,5 +1,6 @@
 mod base_state;
 mod personnel;
+mod pitches;
 mod transitions;
 mod validation;
 
@@ -36,7 +37,7 @@ use crate::event_file::traits::{
 };
 
 use super::box_score::{BoxScoreEvent, BoxScoreLine, LineScore};
-use super::pitch_sequence::PitchSequence;
+use super::pitch_sequence::{ParsedPitchSequence, PitchSequence};
 use super::play::{
     BattedBallAngle, BattedBallDepth, BattedBallLocationGeneral, BattedBallStrength,
     RunnerAdvanceModifier,
@@ -48,6 +49,7 @@ const UNKNOWN_STRINGS: [&str; 1] = ["unknown"];
 const NONE_STRINGS: [&str; 2] = ["(none)", "none"];
 
 pub type EventId = SequenceId;
+pub use pitches::{PitchSequenceConflictReason, PitchSequenceIssue, PitchSequenceStatus};
 
 use personnel::{AppearanceDelta, Personnel, PositionType, TrackedPlayer};
 use validation::{get_game_id, info_presence, reconcile_with_game_id};
@@ -813,6 +815,9 @@ pub struct EventContext {
 pub struct EventResults {
     pub count_at_event: Count,
     pub pitch_sequence: Arc<PitchSequence>,
+    pub pitch_sequence_status: PitchSequenceStatus,
+    pub pitch_sequence_appearance_start: EventId,
+    pub pitch_sequence_issues: Vec<PitchSequenceIssue>,
     pub plate_appearance: Option<PlateAppearanceResultType>,
     pub batted_ball_info: Option<EventBattedBallInfo>,
     pub plays_at_base: Vec<EventBaserunningPlay>,
@@ -837,6 +842,9 @@ pub struct Event {
     pub results: EventResults,
     pub line_number: usize,
     pub raw_play: Arc<String>,
+    pub raw_pitch_sequence: Arc<str>,
+    #[serde(skip)]
+    pub(crate) parsed_pitch_sequence: Arc<ParsedPitchSequence>,
 }
 
 impl Event {
@@ -969,7 +977,10 @@ impl GameState {
         };
         let results = EventResults {
             count_at_event: play.count,
-            pitch_sequence: play.pitch_sequence.clone(),
+            pitch_sequence: Arc::default(),
+            pitch_sequence_status: PitchSequenceStatus::Unavailable,
+            pitch_sequence_appearance_start: self.event_id,
+            pitch_sequence_issues: Vec::new(),
             plate_appearance: PlateAppearanceResultType::from_play(play),
             batted_ball_info: EventBattedBallInfo::from_play(play, event_key),
             plays_at_base: EventBaserunningPlay::from_play(play, event_key)?,
@@ -990,6 +1001,8 @@ impl GameState {
             line_number,
             event_key,
             raw_play: play.raw.clone(),
+            raw_pitch_sequence: play.raw_pitch_sequence.clone(),
+            parsed_pitch_sequence: play.pitch_sequence.clone(),
         };
         Ok((self, event))
     }
@@ -1004,7 +1017,7 @@ impl GameState {
         Vec<GameFieldingAppearance>,
     )> {
         let initial = Self::new(record_slice)?;
-        let (final_state, events) = record_slice.iter().enumerate().try_fold(
+        let (final_state, mut events) = record_slice.iter().enumerate().try_fold(
             (initial, Vec::<Event>::with_capacity(100)),
             |(state, mut events), (i, record)| -> Result<(Self, Vec<Event>)> {
                 let event_key: i32 = event_key_offset + i32::try_from(state.event_id.get())?;
@@ -1026,6 +1039,8 @@ impl GameState {
                 }
             },
         )?;
+
+        pitches::resolve_pitch_histories(&mut events)?;
 
         // Set all remaining blank end_event_ids to final event
         let max_event_id = EventId::new(events.len()).context("No events in list")?;
@@ -1321,6 +1336,314 @@ mod tests {
 
     fn make_state() -> GameState {
         GameState::new(&build_starter_slice()).unwrap()
+    }
+
+    fn pitch_test_events(rows: &[&str]) -> Result<Vec<Event>> {
+        let mut records = build_starter_slice();
+        for row in rows {
+            records.push(MappedRecord::try_from(&rec(&row
+                .split(',')
+                .collect::<Vec<_>>()))?);
+        }
+        GameState::create_events(&records, 0, 0).map(|(events, _, _)| events)
+    }
+
+    #[test]
+    fn pitches_without_an_earlier_record_retain_all_segments() {
+        use crate::event_file::pitch_sequence::PitchType::{
+            Ball, CalledStrike, Foul, FoulTip, SwingingStrike,
+        };
+        let events =
+            pitch_test_events(&["play,1,0,a1001,32,BCBS.BT,K", "play,1,0,a2001,02,FS.S,K"])
+                .unwrap();
+        let types = |event: &Event| {
+            event
+                .results
+                .pitch_sequence
+                .iter()
+                .map(|p| p.pitch_type)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            types(&events[0]),
+            vec![Ball, CalledStrike, Ball, SwingingStrike, Ball, FoulTip]
+        );
+        assert_eq!(
+            types(&events[1]),
+            vec![Foul, SwingingStrike, SwingingStrike]
+        );
+    }
+
+    #[test]
+    fn cumulative_runner_play_contributes_only_new_pitches() {
+        let events = pitch_test_events(&[
+            "play,1,0,a1001,00,X,S7",
+            "play,1,0,a2001,22,CFBF*B>B,SB2",
+            "play,1,0,a2001,32,CFBF*B>B.B,W",
+        ])
+        .unwrap();
+        assert_eq!(events[1].results.pitch_sequence.len(), 6);
+        assert!(events[1].results.pitch_sequence[4].blocked_by_catcher);
+        assert!(events[1].results.pitch_sequence[5].runners_going);
+        let pitches = &events[2].results.pitch_sequence;
+        assert_eq!(pitches.len(), 1);
+        assert_eq!(
+            pitches[0].pitch_type,
+            crate::event_file::pitch_sequence::PitchType::Ball
+        );
+        assert_eq!(pitches[0].sequence_id.get(), 1);
+    }
+
+    #[test]
+    fn trailing_period_repeated_records_and_pending_annotations_keep_identity() {
+        use crate::event_file::pitch_sequence::PitchType;
+        let events = pitch_test_events(&[
+            "play,1,0,a1001,01,C1.,NP",
+            "play,1,0,a1001,01,C1.,NP",
+            "play,1,0,a1001,11,C1.>B,NP",
+            "play,1,0,a1001,11,C1.>B.+2,NP",
+            "play,1,0,a1001,12,C1.>B.+2F*FAV?Z,NP",
+        ])
+        .unwrap();
+        assert!(events[1].results.pitch_sequence.is_empty());
+        assert!(events[2].results.pitch_sequence[0].runners_going);
+        assert!(events[3].results.pitch_sequence.is_empty());
+        let pitches = &events[4].results.pitch_sequence;
+        assert_eq!(
+            pitches.iter().map(|p| p.pitch_type).collect::<Vec<_>>(),
+            vec![
+                PitchType::Foul,
+                PitchType::Foul,
+                PitchType::AutomaticStrike,
+                PitchType::AutomaticBall,
+                PitchType::Unknown,
+                PitchType::Unrecognized
+            ]
+        );
+        assert_eq!(pitches[0].catcher_pickoff_attempt, Some(Base::Second));
+        assert!(pitches[1].blocked_by_catcher);
+        assert_eq!(
+            pitches
+                .iter()
+                .map(|p| p.sequence_id.get())
+                .collect::<Vec<_>>(),
+            (1..=pitches.len()).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn mid_appearance_substitutions_keep_pitches_with_the_players_who_faced_them() {
+        let events = pitch_test_events(&[
+            "play,1,0,a1001,12,BCF,NP",
+            "sub,newb001,Replacement,0,1,11",
+            "sub,newp001,Replacement,1,9,1",
+            "play,1,0,newb001,12,BCF.FS,K",
+            "play,1,0,a2001,30,BBB,NP",
+            "sub,lastp001,Replacement,1,9,1",
+            "play,1,0,a2001,30,BBB.B,W",
+        ])
+        .unwrap();
+        assert_eq!(events[0].results.pitch_sequence.len(), 3);
+        assert_eq!(events[0].context.batter_id.as_str(), "a1001");
+        assert_eq!(events[0].context.pitcher_id.as_str(), "h9001");
+        assert_eq!(events[1].results.pitch_sequence.len(), 2);
+        assert_eq!(events[1].context.batter_id.as_str(), "newb001");
+        assert_eq!(events[1].context.pitcher_id.as_str(), "newp001");
+        assert_eq!(
+            events[1]
+                .context
+                .rare_attributes
+                .strikeout_responsible_batter
+                .unwrap()
+                .as_str(),
+            "a1001"
+        );
+        assert_eq!(events[3].results.pitch_sequence.len(), 1);
+        assert_eq!(events[3].context.pitcher_id.as_str(), "lastp001");
+        assert_eq!(
+            events[3]
+                .context
+                .rare_attributes
+                .walk_responsible_pitcher
+                .unwrap()
+                .as_str(),
+            "newp001"
+        );
+    }
+
+    #[test]
+    fn inning_ending_runner_out_resets_an_unfinished_appearance() {
+        let events = pitch_test_events(&[
+            "play,1,0,a1001,02,CCC,K",
+            "play,1,0,a2001,02,CCC,K",
+            "play,1,0,a3001,00,X,S7",
+            "play,1,0,a4001,01,C1.,CS2(26)",
+            "play,1,1,h1001,11,C1.>B,NP",
+        ])
+        .unwrap();
+        assert_eq!(events[1].results.pitch_sequence.len(), 3);
+        assert_eq!(events[4].results.pitch_sequence.len(), 3);
+    }
+
+    #[test]
+    fn non_pitch_placeholders_can_disappear_without_repeating_real_pitches() {
+        let events = pitch_test_events(&[
+            "play,1,0,a1001,00,>B,NP",
+            "play,1,0,a1001,22,>B.*B*SCN,NP",
+            "play,1,0,a1001,22,>B.*B*SC3.X,S7",
+            "play,1,0,a2001,00,N,NP",
+            "play,1,0,a2001,00,,NP",
+            "play,1,0,a2001,02,.CFX,S7",
+        ])
+        .unwrap();
+        assert_eq!(events[2].results.pitch_sequence.len(), 2);
+        assert_eq!(
+            events[2].results.pitch_sequence[0].pitch_type,
+            crate::event_file::pitch_sequence::PitchType::PickoffAttemptThird
+        );
+        assert_eq!(events[5].results.pitch_sequence.len(), 3);
+    }
+
+    #[test]
+    fn relocated_period_separators_do_not_change_pitch_identity() {
+        let events =
+            pitch_test_events(&["play,1,0,a1001,11,C.B,NP", "play,1,0,a1001,12,.CB.FX,S7"])
+                .unwrap();
+        assert_eq!(events[0].results.pitch_sequence.len(), 2);
+        assert_eq!(events[1].results.pitch_sequence.len(), 2);
+        assert_eq!(
+            events[1].results.pitch_sequence[0].pitch_type,
+            crate::event_file::pitch_sequence::PitchType::Foul
+        );
+    }
+
+    #[test]
+    fn retained_trailing_no_pitch_markers_are_not_exported_twice() {
+        for continuation in ["BN.X", "B.X"] {
+            let events = pitch_test_events(&[
+                "play,1,0,a1001,10,BNN,NP",
+                &format!("play,1,0,a1001,10,{continuation},S7"),
+            ])
+            .unwrap();
+            assert_eq!(events[0].results.pitch_sequence.len(), 3);
+            assert_eq!(events[1].results.pitch_sequence.len(), 1);
+            assert_eq!(
+                events[1].results.pitch_sequence[0].pitch_type,
+                crate::event_file::pitch_sequence::PitchType::InPlay
+            );
+        }
+    }
+
+    #[test]
+    fn conflicts_quarantine_the_entire_appearance_and_preserve_the_game() {
+        for (before, after) in [
+            ("BC", "BS.X"),
+            ("Z", "!.X"),
+            ("U", "?.X"),
+            ("NB", "BN.X"),
+            ("B+1", "B+2.X"),
+            ("C1", "C2.X"),
+            ("B", "B+1+2.X"),
+        ] {
+            let events = pitch_test_events(&[
+                &format!("play,1,0,a1001,00,{before},NP"),
+                &format!("play,1,0,a1001,00,{after},S7"),
+                "play,1,0,a2001,02,CCC,K",
+            ])
+            .unwrap();
+            for event in &events[..2] {
+                assert_eq!(
+                    event.results.pitch_sequence_status,
+                    PitchSequenceStatus::Unresolved
+                );
+                assert!(event.results.pitch_sequence.is_empty());
+                assert_eq!(
+                    event.results.pitch_sequence_appearance_start,
+                    events[0].event_id
+                );
+            }
+            let issue = &events[1].results.pitch_sequence_issues[0];
+            assert_eq!(issue.prior_raw_pitch_sequence.as_ref(), before);
+            assert_eq!(issue.current_raw_pitch_sequence.as_ref(), after);
+            assert_eq!(issue.prior_event_id, Some(events[0].event_id));
+            assert!(events[1].results.plate_appearance.is_some());
+            assert_eq!(events[2].results.pitch_sequence.len(), 3);
+            assert_eq!(
+                events[2].results.pitch_sequence_status,
+                PitchSequenceStatus::Resolved
+            );
+        }
+    }
+
+    #[test]
+    fn compatible_annotations_update_the_original_pitch_owner() {
+        let events = pitch_test_events(&[
+            "play,1,0,a1001,11,F>B,NP",
+            "sub,newb001,Replacement,0,1,11",
+            "sub,newp001,Replacement,1,9,1",
+            "play,1,0,newb001,11,*FB+2,NP",
+            "play,1,0,newb001,12,FB+2FX,S7",
+        ])
+        .unwrap();
+        assert_eq!(events[0].results.pitch_sequence.len(), 2);
+        assert!(events[0].results.pitch_sequence[0].blocked_by_catcher);
+        assert!(events[0].results.pitch_sequence[1].runners_going);
+        assert_eq!(
+            events[0].results.pitch_sequence[1].catcher_pickoff_attempt,
+            Some(Base::Second)
+        );
+        assert_eq!(events[0].context.batter_id.as_str(), "a1001");
+        assert_eq!(events[0].context.pitcher_id.as_str(), "h9001");
+        assert!(events[1].results.pitch_sequence.is_empty());
+        assert_eq!(events[2].results.pitch_sequence.len(), 2);
+        assert_eq!(events[2].context.batter_id.as_str(), "newb001");
+        assert_eq!(events[2].context.pitcher_id.as_str(), "newp001");
+    }
+
+    #[test]
+    fn omitted_pickoffs_are_preserved_and_ambiguous_reappearances_are_quarantined() {
+        let events =
+            pitch_test_events(&["play,1,0,a1001,01,C11,NP", "play,1,0,a1001,01,C.X,S7"]).unwrap();
+        assert_eq!(events[0].results.pitch_sequence.len(), 3);
+        assert_eq!(events[1].results.pitch_sequence.len(), 1);
+        let ambiguous = pitch_test_events(&[
+            "play,1,0,a1001,01,C1,NP",
+            "play,1,0,a1001,01,C,NP",
+            "play,1,0,a1001,01,C1.X,S7",
+        ])
+        .unwrap();
+        assert!(
+            ambiguous
+                .iter()
+                .all(|event| event.results.pitch_sequence.is_empty())
+        );
+        assert_eq!(
+            ambiguous[2].results.pitch_sequence_issues[0].reason,
+            PitchSequenceConflictReason::AmbiguousPickoffReplay
+        );
+    }
+
+    #[test]
+    fn audit_continues_after_the_first_conflict_and_empty_data_is_explicit() {
+        let events = pitch_test_events(&[
+            "play,1,0,a1001,00,B,NP",
+            "play,1,0,a1001,00,C,NP",
+            "play,1,0,a1001,00,SX,S7",
+            "play,1,0,a2001,??,,K",
+        ])
+        .unwrap();
+        assert_eq!(
+            events
+                .iter()
+                .map(|event| event.results.pitch_sequence_issues.len())
+                .sum::<usize>(),
+            2
+        );
+        assert_eq!(
+            events[3].results.pitch_sequence_status,
+            PitchSequenceStatus::Unavailable
+        );
+        assert_eq!(events[3].raw_pitch_sequence.as_ref(), "");
     }
 
     // --- GameState bootstrap ---

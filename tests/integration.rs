@@ -61,6 +61,353 @@ fn read_csv_rows(path: &Path) -> Vec<csv::StringRecord> {
         .unwrap_or_else(|e| panic!("malformed CSV row in {}: {e}", path.display()))
 }
 
+#[test]
+fn original_retrosheet_games_preserve_missing_prefixes_and_deduplicate_runner_plays() {
+    let out = TempDir::new().unwrap();
+    let status = Command::new(binary_path())
+        .arg("-i")
+        .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/pitch_history"))
+        .arg("-o")
+        .arg(out.path())
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let mut reader = csv::Reader::from_path(out.path().join("event_pitch_sequences.csv")).unwrap();
+    let headers = reader.headers().unwrap().clone();
+    let column = |name| headers.iter().position(|header| header == name).unwrap();
+    let rows = reader.records().collect::<Result<Vec<_>, _>>().unwrap();
+    for (game, event, expected) in [
+        (
+            "ANA202304070",
+            "22",
+            vec![
+                "Ball",
+                "CalledStrike",
+                "Ball",
+                "SwingingStrike",
+                "Ball",
+                "FoulTip",
+            ],
+        ),
+        (
+            "ANA202504040",
+            "12",
+            vec!["Foul", "SwingingStrike", "SwingingStrike"],
+        ),
+        (
+            "ANA202304070",
+            "34",
+            vec!["CalledStrike", "Foul", "Ball", "Foul", "Ball", "Ball"],
+        ),
+        ("ANA202304070", "35", vec!["Ball"]),
+    ] {
+        let pitches = rows
+            .iter()
+            .filter(|row| &row[column("game_id")] == game && &row[column("event_id")] == event)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            pitches
+                .iter()
+                .map(|row| &row[column("sequence_item")])
+                .collect::<Vec<_>>(),
+            expected,
+            "{game} event {event}"
+        );
+        for (index, row) in pitches.iter().enumerate() {
+            assert_eq!(
+                row[column("sequence_id")].parse::<usize>().unwrap(),
+                index + 1
+            );
+        }
+    }
+}
+
+#[test]
+fn unreviewed_pitch_history_conflicts_require_audit_mode_and_preserve_game_evidence() {
+    let input = TempDir::new().unwrap();
+    let original = include_str!("pitch_history/2023ANA.EVA");
+    let conflicted = original.replace("CFBF*B>B.B,W", "CFBS*B>B.B,W");
+    assert_ne!(conflicted, original);
+    fs::write(input.path().join("2023ANA.EVA"), conflicted).unwrap();
+
+    for json in [false, true] {
+        let out = TempDir::new().unwrap();
+        let mut command = Command::new(binary_path());
+        command
+            .arg("-i")
+            .arg(input.path())
+            .arg("-o")
+            .arg(out.path());
+        if json {
+            command.arg("--json");
+        }
+        let result = command.output().unwrap();
+        assert!(!result.status.success());
+        let message = String::from_utf8_lossy(&result.stderr);
+        assert!(message.contains("ANA202304070"), "{message}");
+        assert!(message.contains("event 35"), "{message}");
+        assert!(
+            message.contains("Unreviewed pitch sequence conflict"),
+            "{message}"
+        );
+    }
+
+    let csv_out = TempDir::new().unwrap();
+    let csv_status = Command::new(binary_path())
+        .arg("-i")
+        .arg(input.path())
+        .arg("-o")
+        .arg(csv_out.path())
+        .arg("--audit-pitch-conflicts")
+        .status()
+        .unwrap();
+    assert!(csv_status.success());
+
+    let games = read_csv_rows(&csv_out.path().join("games.csv"));
+    assert_eq!(games.len(), 1);
+    let statuses = read_csv_rows(&csv_out.path().join("event_pitch_sequence_status.csv"));
+    let mut status_reader =
+        csv::Reader::from_path(csv_out.path().join("event_pitch_sequence_status.csv")).unwrap();
+    let status_headers = status_reader.headers().unwrap().clone();
+    let status_column = |name| {
+        status_headers
+            .iter()
+            .position(|header| header == name)
+            .unwrap()
+    };
+    let conflicting = statuses
+        .iter()
+        .filter(|row| {
+            matches!(
+                &row[status_column("raw_pitch_sequence")],
+                "CFBF*B>B" | "CFBS*B>B.B"
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(conflicting.len(), 2);
+    assert!(
+        conflicting
+            .iter()
+            .all(|row| &row[status_column("status")] == "Unresolved")
+    );
+    assert_eq!(
+        conflicting[0][status_column("appearance_start_event_id")],
+        conflicting[1][status_column("appearance_start_event_id")]
+    );
+
+    let sequences = read_csv_rows(&csv_out.path().join("event_pitch_sequences.csv"));
+    let mut sequence_reader =
+        csv::Reader::from_path(csv_out.path().join("event_pitch_sequences.csv")).unwrap();
+    let sequence_headers = sequence_reader.headers().unwrap().clone();
+    let sequence_column = |name| {
+        sequence_headers
+            .iter()
+            .position(|header| header == name)
+            .unwrap()
+    };
+    for status in &conflicting {
+        assert!(sequences.iter().all(|sequence| {
+            sequence[sequence_column("event_id")] != status[status_column("event_id")]
+        }));
+    }
+
+    let issues = read_csv_rows(&csv_out.path().join("event_pitch_sequence_issues.csv"));
+    let mut issue_reader =
+        csv::Reader::from_path(csv_out.path().join("event_pitch_sequence_issues.csv")).unwrap();
+    let issue_headers = issue_reader.headers().unwrap().clone();
+    let issue_column = |name| {
+        issue_headers
+            .iter()
+            .position(|header| header == name)
+            .unwrap()
+    };
+    assert_eq!(issues.len(), 1);
+    assert_eq!(issues[0].get(issue_column("reason")), Some("TokenMismatch"));
+    assert_eq!(
+        issues[0].get(issue_column("prior_raw_pitch_sequence")),
+        Some("CFBF*B>B")
+    );
+    assert_eq!(
+        issues[0].get(issue_column("current_raw_pitch_sequence")),
+        Some("CFBS*B>B.B")
+    );
+
+    let next_appearance = statuses
+        .iter()
+        .find(|row| row.get(status_column("raw_pitch_sequence")) == Some("F1X"))
+        .unwrap();
+    assert_eq!(
+        next_appearance.get(status_column("status")),
+        Some("Resolved")
+    );
+    assert!(sequences.iter().any(|sequence| {
+        sequence[sequence_column("event_id")] == next_appearance[status_column("event_id")]
+    }));
+
+    let json_out = TempDir::new().unwrap();
+    let json_status = Command::new(binary_path())
+        .arg("-i")
+        .arg(input.path())
+        .arg("-o")
+        .arg(json_out.path())
+        .arg("--audit-pitch-conflicts")
+        .arg("--json")
+        .status()
+        .unwrap();
+    assert!(json_status.success());
+    let json = fs::read_to_string(json_out.path().join("games.jsonl")).unwrap();
+    let game: serde_json::Value = serde_json::from_str(json.trim()).unwrap();
+    let events = game["events"].as_array().unwrap();
+    let conflicting_events = events
+        .iter()
+        .filter(|event| {
+            matches!(
+                event["raw_pitch_sequence"].as_str(),
+                Some("CFBF*B>B") | Some("CFBS*B>B.B")
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(conflicting_events.len(), 2);
+    assert!(conflicting_events.iter().all(|event| {
+        event["results"]["pitch_sequence_status"] == "Unresolved"
+            && event["results"]["pitch_sequence"] == serde_json::json!([])
+    }));
+    let next_event = events
+        .iter()
+        .find(|event| event["raw_pitch_sequence"] == "F1X")
+        .unwrap();
+    assert_eq!(next_event["results"]["pitch_sequence_status"], "Resolved");
+    assert!(
+        !next_event["results"]["pitch_sequence"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn reviewed_historical_pickoff_conflict_exports_quarantined_appearance() {
+    let input = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/pitch_conflicts");
+    let csv_out = TempDir::new().unwrap();
+    let csv_status = Command::new(binary_path())
+        .arg("-i")
+        .arg(&input)
+        .arg("-o")
+        .arg(csv_out.path())
+        .status()
+        .unwrap();
+    assert!(csv_status.success());
+
+    let games = read_csv_rows(&csv_out.path().join("games.csv"));
+    assert_eq!(games.len(), 1);
+    assert!(games[0].iter().any(|value| value == "ATL199708270"));
+
+    let statuses = read_csv_rows(&csv_out.path().join("event_pitch_sequence_status.csv"));
+    let mut status_reader =
+        csv::Reader::from_path(csv_out.path().join("event_pitch_sequence_status.csv")).unwrap();
+    let status_headers = status_reader.headers().unwrap().clone();
+    let status_column = |name| {
+        status_headers
+            .iter()
+            .position(|header| header == name)
+            .unwrap()
+    };
+    let quarantined = statuses
+        .iter()
+        .filter(|row| matches!(row.get(status_column("event_id")), Some("46" | "47")))
+        .collect::<Vec<_>>();
+    assert_eq!(quarantined.len(), 2);
+    assert!(quarantined.iter().all(|row| {
+        row.get(status_column("status")) == Some("Unresolved")
+            && row.get(status_column("appearance_start_event_id")) == Some("46")
+    }));
+    assert_eq!(
+        quarantined[0].get(status_column("raw_pitch_sequence")),
+        Some("1SPBS+1")
+    );
+    assert_eq!(
+        quarantined[1].get(status_column("raw_pitch_sequence")),
+        Some("1SPBS+2.X")
+    );
+
+    let sequences = read_csv_rows(&csv_out.path().join("event_pitch_sequences.csv"));
+    let mut sequence_reader =
+        csv::Reader::from_path(csv_out.path().join("event_pitch_sequences.csv")).unwrap();
+    let sequence_headers = sequence_reader.headers().unwrap().clone();
+    let sequence_column = |name| {
+        sequence_headers
+            .iter()
+            .position(|header| header == name)
+            .unwrap()
+    };
+    assert!(
+        sequences
+            .iter()
+            .all(|row| { !matches!(row.get(sequence_column("event_id")), Some("46" | "47")) })
+    );
+    assert!(
+        sequences
+            .iter()
+            .any(|row| row.get(sequence_column("event_id")) == Some("48"))
+    );
+
+    let issues = read_csv_rows(&csv_out.path().join("event_pitch_sequence_issues.csv"));
+    assert_eq!(issues.len(), 1);
+    let mut issue_reader =
+        csv::Reader::from_path(csv_out.path().join("event_pitch_sequence_issues.csv")).unwrap();
+    let issue_headers = issue_reader.headers().unwrap().clone();
+    let issue_column = |name| {
+        issue_headers
+            .iter()
+            .position(|header| header == name)
+            .unwrap()
+    };
+    assert_eq!(issues[0].get(issue_column("event_id")), Some("47"));
+    assert_eq!(
+        issues[0].get(issue_column("reason")),
+        Some("CatcherPickoffConflict")
+    );
+    assert_eq!(
+        issues[0].get(issue_column("prior_raw_pitch_sequence")),
+        Some("1SPBS+1")
+    );
+    assert_eq!(
+        issues[0].get(issue_column("current_raw_pitch_sequence")),
+        Some("1SPBS+2.X")
+    );
+
+    let json_out = TempDir::new().unwrap();
+    let json_status = Command::new(binary_path())
+        .arg("-i")
+        .arg(&input)
+        .arg("-o")
+        .arg(json_out.path())
+        .arg("--json")
+        .status()
+        .unwrap();
+    assert!(json_status.success());
+    let json = fs::read_to_string(json_out.path().join("games.jsonl")).unwrap();
+    let game: serde_json::Value = serde_json::from_str(json.trim()).unwrap();
+    assert_eq!(game["id"], "ATL199708270");
+    let events = game["events"].as_array().unwrap();
+    for event_id in [46, 47] {
+        let event = events
+            .iter()
+            .find(|event| event["event_id"] == event_id)
+            .unwrap();
+        assert_eq!(event["results"]["pitch_sequence_status"], "Unresolved");
+        assert_eq!(event["results"]["pitch_sequence"], serde_json::json!([]));
+    }
+    let next_event = events.iter().find(|event| event["event_id"] == 48).unwrap();
+    assert_eq!(next_event["results"]["pitch_sequence_status"], "Resolved");
+    assert!(
+        !next_event["results"]["pitch_sequence"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+}
+
 fn count_lines(path: &Path) -> usize {
     fs::read_to_string(path).unwrap().lines().count()
 }

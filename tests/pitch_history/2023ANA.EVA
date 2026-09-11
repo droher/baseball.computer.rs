@@ -1,0 +1,156 @@
+id,ANA202304070
+version,2
+info,visteam,TOR
+info,hometeam,ANA
+info,site,ANA01
+info,date,2023/04/07
+info,number,0
+info,gametype,regular
+info,starttime,6:38PM
+info,daynight,night
+info,innings,9
+info,tiebreaker,2
+info,usedh,true
+info,umphome,knigb901
+info,ump1b,randt901
+info,ump2b,macka901
+info,ump3b,ticht901
+info,umplf,(none)
+info,umprf,(none)
+info,inputtime,2023/07/28 12:23:55
+info,howscored,unknown
+info,pitches,pitches
+info,oscorer,munse701
+info,temp,64
+info,winddir,tocf
+info,windspeed,6
+info,fieldcond,unknown
+info,precip,none
+info,sky,cloudy
+info,timeofgame,153
+info,attendance,44735
+info,wp,bassc001
+info,lp,hergj001
+info,save,romaj004
+start,sprig001,"George Springer",0,1,9
+start,bichb001,"Bo Bichette",0,2,6
+start,guerv002,"Vladimir Guerrero Jr.",0,3,3
+start,chapm001,"Matt Chapman",0,4,5
+start,merrw001,"Whit Merrifield",0,5,7
+start,kirka001,"Alejandro Kirk",0,6,2
+start,espis001,"Santiago Espinal",0,7,4
+start,luplj001,"Jordan Luplow",0,8,10
+start,kierk001,"Kevin Kiermaier",0,9,8
+start,bassc001,"Chris Bassitt",0,0,1
+start,wardt002,"Taylor Ward",1,1,7
+start,troum001,"Mike Trout",1,2,8
+start,ohtas001,"Shohei Ohtani",1,3,10
+start,renfh001,"Hunter Renfroe",1,4,9
+start,lambj001,"Jake Lamb",1,5,3
+start,drurb001,"Brandon Drury",1,6,4
+start,urshg001,"Gio Urshela",1,7,5
+start,ohopl001,"Logan O'Hoppe",1,8,2
+start,fletd002,"David Fletcher",1,9,6
+start,sandp002,"Patrick Sandoval",1,0,1
+play,1,0,sprig001,32,SBFBBX,7/F7LD
+play,1,0,bichb001,12,BFTX,D8/L89XD+
+play,1,0,guerv002,02,CFX,13/G1S
+play,1,0,chapm001,02,CCS,K
+play,1,1,wardt002,32,VCBBC*B,W
+play,1,1,troum001,00,X,HR/F78XD.1-H
+play,1,1,ohtas001,32,BBFSBC,K
+play,1,1,renfh001,11,BCX,E6/TH/G6+.B-1
+play,1,1,lambj001,12,CSFFFFBX,8/L8D
+play,1,1,drurb001,21,BS1BX,8/F8
+play,2,0,merrw001,21,BBSX,S9/L9
+play,2,0,kirka001,12,BFCX,486(1)/FO/F8S.B-1
+play,2,0,espis001,12,BCCFX,9/F9S
+play,2,0,luplj001,12,SSBS,K
+play,2,1,urshg001,10,BX,4/F89S
+play,2,1,ohopl001,31,CBBBB,W
+play,2,1,fletd002,10,B>X,53/G56S.1-2
+play,2,1,wardt002,12,CBCX,3/G3+
+play,3,0,kierk001,00,X,63/G6M-
+play,3,0,sprig001,22,BBFSX,4/F9S
+play,3,0,bichb001,01,CX,53/G56+
+play,3,1,troum001,32,BCBS.BT,K
+play,3,1,ohtas001,12,BFCC,K
+play,3,1,renfh001,32,BSBBCB,W
+play,3,1,lambj001,02,F>FX,3/G3S
+play,4,0,guerv002,00,X,S7/L78D+
+play,4,0,chapm001,10,BX,S7/L7D+.1-2
+play,4,0,merrw001,12,BFC+2X,8/L89
+play,4,0,kirka001,31,CBB*BB,W.2-3;1-2
+play,4,0,espis001,22,BSBFFX,46(1)/FO/G34.3-H;2-3;B-1
+play,4,0,luplj001,12,SB+1F>B,CSH(242536)
+play,4,1,drurb001,22,BCFBX,8/F8
+play,4,1,urshg001,32,FBBCBB,W
+play,4,1,ohopl001,22,CFBF*B>B,SB2.1-3(E2/TH)
+play,4,1,ohopl001,32,CFBF*B>B.B,W
+play,4,1,fletd002,01,F1X,S1/BG23.3-H(UR);1-2
+com,"$Blue Jays challenged (play at 1st), call on the field was upheld."
+play,4,1,wardt002,00,X,4(1)3/GDP/G4
+play,5,0,luplj001,31,VBBCX,43/G4M
+play,5,0,kierk001,32,BBSBFX,S8/F8S
+play,5,0,sprig001,10,*BX,54(1)/FO/G56.B-1
+play,5,0,bichb001,31,CBBBX,53/G5
+play,5,1,troum001,20,BBX,13/G34S
+play,5,1,ohtas001,00,X,S9/L9
+play,5,1,renfh001,21,FBB1X,6/P6D
+play,5,1,lambj001,11,BSX,5/P56
+play,6,0,guerv002,00,X,S9/G34+
+play,6,0,chapm001,10,BX,8/L8XD+
+play,6,0,merrw001,01,SX,64(1)/FO/G6M.B-1
+play,6,0,kirka001,11,B1CB,WP.1-2
+play,6,0,kirka001,21,B1CB.X,43/G4
+play,6,1,drurb001,12,C.FVFC,K
+play,6,1,urshg001,32,FBBBFFFX,43/G34
+play,6,1,ohopl001,22,BCSBF.S,K
+play,7,0,espis001,00,,NP
+sub,moorm003,"Matt Moore",1,0,1
+play,7,0,espis001,31,.BBVCX,S7/L7+
+play,7,0,luplj001,02,S1CS,K
+play,7,0,kierk001,10,B1X,8/F89
+play,7,0,sprig001,00,,NP
+sub,hergj001,"Jimmy Herget",1,0,1
+play,7,0,sprig001,10,.BX,S9/G34.1-2
+play,7,0,bichb001,11,BFX,HR/F78XD.2-H;1-H
+play,7,0,guerv002,12,SCBS,K
+play,7,1,fletd002,00,,NP
+sub,garcy001,"Yimi Garcia",0,0,1
+play,7,1,fletd002,12,.BCSFS,K
+play,7,1,wardt002,32,SBBBCX,8/F8XD
+play,7,1,troum001,11,BSX,9/F9L
+play,8,0,chapm001,00,,NP
+sub,wanta001,"Andrew Wantz",1,0,1
+play,8,0,chapm001,12,.CBFS,K
+play,8,0,merrw001,32,BBSBCX,8/F8
+play,8,0,kirka001,30,BBBX,53/G56
+play,8,1,ohtas001,00,,NP
+sub,varsd001,"Daulton Varsho",0,5,7
+play,8,1,ohtas001,00,.,NP
+sub,swane001,"Erik Swanson",0,0,1
+play,8,1,ohtas001,22,..FBCBFFFX,D9/F9LD+
+play,8,1,renfh001,00,X,7/L7D+
+play,8,1,lambj001,31,BBBCX,8/L8XD+.2-3
+play,8,1,drurb001,02,SFX,9/F9LS
+play,9,0,espis001,10,BX,13/G23-
+play,9,0,luplj001,00,,NP
+sub,biggc002,"Cavan Biggio",0,8,11
+play,9,0,biggc002,02,.CF.S,K
+play,9,0,kierk001,02,CFT,K
+play,9,1,urshg001,00,.,NP
+sub,romaj004,"Jordan Romano",0,0,1
+play,9,1,urshg001,00,..X,8/F8
+play,9,1,ohopl001,11,BSX,7/F78D
+play,9,1,fletd002,00,,NP
+sub,rengl001,"Luis Rengifo",1,9,11
+play,9,1,rengl001,01,.FX,43/G34
+data,er,bassc001,2
+data,er,garcy001,0
+data,er,swane001,0
+data,er,romaj004,0
+data,er,sandp002,1
+data,er,hergj001,2
+data,er,moorm003,1
+data,er,wanta001,0

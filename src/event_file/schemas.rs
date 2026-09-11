@@ -21,7 +21,10 @@ use crate::event_file::traits::{
     Player, RetrosheetVolunteer, Scorer, SequenceId, Side, Umpire,
 };
 
-use super::game_state::{Event as E, GameLineupAppearance, GameUmpire, PlateAppearanceResultType};
+use super::game_state::{
+    Event as E, GameLineupAppearance, GameUmpire, PitchSequenceConflictReason, PitchSequenceStatus,
+    PlateAppearanceResultType,
+};
 use super::info::UmpirePosition;
 use super::misc::Hand;
 use super::parser::{AccountType, MappedRecord, RecordSlice};
@@ -302,6 +305,65 @@ impl ContextToVec<'_> for EventPitchSequences {
             })
         });
         Box::from(pitch_sequences)
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct EventPitchSequenceStatus {
+    game_id: GameIdString,
+    event_id: EventId,
+    event_key: EventKey,
+    appearance_start_event_id: EventId,
+    status: PitchSequenceStatus,
+    raw_pitch_sequence: Arc<str>,
+}
+
+impl ContextToVec<'_> for EventPitchSequenceStatus {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
+        Box::from(gc.events.iter().map(move |event| Self {
+            game_id: gc.game_id.id,
+            event_id: event.event_id,
+            event_key: event.event_key,
+            appearance_start_event_id: event.results.pitch_sequence_appearance_start,
+            status: event.results.pitch_sequence_status,
+            raw_pitch_sequence: event.raw_pitch_sequence.clone(),
+        }))
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct EventPitchSequenceIssues {
+    game_id: GameIdString,
+    event_id: EventId,
+    event_key: EventKey,
+    appearance_start_event_id: EventId,
+    sequence_id: usize,
+    reason: PitchSequenceConflictReason,
+    prior_event_id: Option<EventId>,
+    prior_raw_pitch_sequence: Arc<str>,
+    current_raw_pitch_sequence: Arc<str>,
+}
+
+impl ContextToVec<'_> for EventPitchSequenceIssues {
+    fn from_game_context(gc: &GameContext) -> Box<dyn Iterator<Item = Self> + '_> {
+        Box::from(gc.events.iter().flat_map(move |event| {
+            event
+                .results
+                .pitch_sequence_issues
+                .iter()
+                .enumerate()
+                .map(move |(index, issue)| Self {
+                    game_id: gc.game_id.id,
+                    event_id: event.event_id,
+                    event_key: event.event_key,
+                    appearance_start_event_id: event.results.pitch_sequence_appearance_start,
+                    sequence_id: index + 1,
+                    reason: issue.reason.clone(),
+                    prior_event_id: issue.prior_event_id,
+                    prior_raw_pitch_sequence: issue.prior_raw_pitch_sequence.clone(),
+                    current_raw_pitch_sequence: issue.current_raw_pitch_sequence.clone(),
+                })
+        }))
     }
 }
 

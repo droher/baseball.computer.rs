@@ -1,0 +1,223 @@
+id,ATL199708270
+version,2
+info,visteam,HOU
+info,hometeam,ATL
+info,site,ATL02
+info,date,1997/08/27
+info,number,0
+info,starttime,7:40
+info,daynight,night
+info,usedh,false
+info,umphome,willc901
+info,ump1b,hirsm901
+info,ump2b,ripps901
+info,ump3b,froeb901
+info,translator,""
+info,inputtime,
+info,pitches,pitches
+info,temp,86
+info,winddir,tolf
+info,windspeed,6
+info,fieldcond,wet
+info,precip,rain
+info,sky,night
+info,timeofgame,268
+info,attendance,33019
+info,wp,hudej001
+info,lp,byrdp001
+info,save,limaj001
+start,biggc001,"Craig Biggio",0,1,4
+start,belld001,"Derek Bell",0,2,9
+start,bagwj001,"Jeff Bagwell",0,3,3
+start,gonzl001,"Luis Gonzalez",0,4,7
+start,gutir001,"Ricky Gutierrez",0,5,6
+start,spieb001,"Bill Spiers",0,6,5
+start,ausmb001,"Brad Ausmus",0,7,2
+start,carrc001,"Chuck Carr",0,8,8
+start,holtc001,"Chris Holt",0,9,1
+start,loftk001,"Kenny Lofton",1,1,8
+start,blauj001,"Jeff Blauser",1,2,6
+start,jonec004,"Chipper Jones",1,3,5
+start,mcgrf001,"Fred McGriff",1,4,3
+start,klesr001,"Ryan Klesko",1,5,7
+start,jonea002,"Andruw Jones",1,6,9
+start,peree002,"Eddie Perez",1,7,2
+start,graft001,"Tony Graffanino",1,8,4
+start,maddg002,"Greg Maddux",1,9,1
+play,1,0,biggc001,22,CFFBBX,63/G6M
+play,1,0,belld001,10,BX,53/G6S
+play,1,0,bagwj001,00,X,S7/G56
+play,1,0,gonzl001,31,1B1BC1BX,8/F8RS
+play,1,1,loftk001,10,BX,8/F78M
+play,1,1,blauj001,32,BBBCCFFX,S9/L9LS
+play,1,1,jonec004,00,X,46(1)3/GDP/G4M
+play,2,0,gutir001,00,X,43/G4
+play,2,0,spieb001,11,BCX,S5/G5L
+play,2,0,ausmb001,00,>X,8/L8RM
+play,2,0,carrc001,12,1FBSX,43/G4
+play,2,1,mcgrf001,11,BCX,5/P25
+play,2,1,klesr001,32,FFBBFFBX,6/P6M
+play,2,1,jonea002,20,BBX,9/F9LM
+play,3,0,holtc001,02,CCFS,K
+play,3,0,biggc001,10,BX,9/L9S
+play,3,0,belld001,11,FBX,63/G6
+play,3,1,peree002,31,BBBCB,W
+play,3,1,graft001,22,CBBSX,S8/G6M/R4.1-2
+play,3,1,maddg002,00,X,6(2)/FO/G56/R3.1-2;B-1
+play,3,1,loftk001,20,BBX,7/F7D/R6
+play,3,1,blauj001,32,*BBBCC>X,63/G6
+play,4,0,bagwj001,31,BBCBX,7/L7M
+play,4,0,gonzl001,12,BCFX,9/L9S
+play,4,0,gutir001,00,X,DGR/F89D
+play,4,0,spieb001,22,BCBCX,S7/L5D/R6.2-H
+play,4,0,ausmb001,10,B1X,9/L89M
+play,4,1,jonec004,00,X,43/G4
+play,4,1,mcgrf001,22,BBFSC,K
+play,4,1,klesr001,00,X,T9/L9LS/R4
+play,4,1,jonea002,30,BBBB,W
+play,4,1,peree002,32,BBCFBX,7/F7D
+play,5,0,carrc001,01,LX,4/P4M
+play,5,0,holtc001,11,FBX,S8/G4M/R6
+play,5,0,biggc001,00,X,S9/F89S/R6.1-2
+play,5,0,belld001,02,CSX,16(1)/FO/G15.2-3;B-1
+play,5,0,bagwj001,32,BC1BFB>B,W.1-2
+play,5,0,gonzl001,21,CBBX,13/G13
+play,5,1,graft001,22,SFBBX,HR/F7D.B-H
+play,5,1,maddg002,02,CSFS,K
+play,5,1,loftk001,21,BBCX,13/G15
+play,5,1,blauj001,00,X,63/G6
+play,6,0,gutir001,00,X,63/G6
+play,6,0,spieb001,02,CFS,K
+play,6,0,ausmb001,22,FCBBX,S6/G56D/R3
+play,6,0,carrc001,22,1SPBS+1,OA.1-2(E2/TH)
+play,6,0,carrc001,22,1SPBS+2.X,7/F7M
+play,6,1,jonec004,22,BBFFFX,7/F78M
+play,6,1,mcgrf001,32,SBBBFX,8/L78M
+play,6,1,klesr001,20,BBX,43/G4
+play,7,0,holtc001,10,BX,63/G6M
+play,7,0,biggc001,32,BFBCFBFX,8/F8LXD
+play,7,0,belld001,02,CFX,43/G34
+play,7,1,jonea002,22,BFBCS,K
+play,7,1,peree002,22,CBFBX,63/G6M
+play,7,1,graft001,20,BBX,63/G6
+play,8,0,bagwj001,20,BBX,63/G56
+play,8,0,gonzl001,12,CSBT,K
+play,8,0,gutir001,12,CFBX,8/F8RD
+play,8,1,maddg002,00,,NP
+sub,lockk001,"Keith Lockhart",1,9,11
+play,8,1,lockk001,10,.BX,E6/G6M
+play,8,1,loftk001,02,L1L1X,S9/L34D/R5.1-3;B-2(TH)
+play,8,1,blauj001,32,BBFBFX,13/G13
+play,8,1,jonec004,00,,NP
+sub,martt003,"Tom Martin",0,9,1
+play,8,1,jonec004,22,.FBFBX,S7/G56/R54.3-H(UR);2-H(UR);B-2(TH)
+play,8,1,mcgrf001,11,BCX,43/G34.2-3
+play,8,1,klesr001,00,,NP
+sub,bautd001,"Danny Bautista",1,5,11
+play,8,1,bautd001,00,.X,53/G5
+play,9,0,spieb001,00,,NP
+sub,wohlm001,"Mark Wohlers",1,9,1
+play,9,0,spieb001,00,.,NP
+sub,bautd001,"Danny Bautista",1,5,7
+play,9,0,spieb001,00,..X,T9/L8RD/R45U1
+play,9,0,ausmb001,10,BX,9/F9LD/SF/R2.3-H
+play,9,0,carrc001,21,BBCX,HR/F9D.B-H
+play,9,0,martt003,00,,NP
+sub,howat001,"Thomas Howard",0,9,11
+play,9,0,howat001,21,.BCBX,S8/G4M
+play,9,0,biggc001,00,,NP
+sub,moutj001,"James Mouton",0,9,12
+play,9,0,biggc001,00,.B,PB.1-2
+play,9,0,biggc001,30,B.BBB,W
+play,9,0,belld001,00,,NP
+sub,cathm001,"Mike Cather",1,9,1
+play,9,0,belld001,12,.CFBX,9/L9D/R6
+play,9,0,bagwj001,00,X,64(1)/FO/G6M
+play,9,1,jonea002,00,,NP
+sub,sprir001,"Russ Springer",0,9,1
+play,9,1,jonea002,31,.BBBCB,W
+play,9,1,peree002,00,,NP
+sub,bellr001,"Rafael Belliard",1,7,11
+play,9,1,bellr001,01,.LX,2/BP2LF
+play,9,1,graft001,12,11SB11FFX,6/L6/R3
+play,9,1,cathm001,00,,NP
+sub,lopej001,"Javier Lopez",1,9,11
+play,9,1,lopej001,22,.FBBFFF>S,K
+play,10,0,gonzl001,00,,NP
+sub,lopej001,"Javier Lopez",1,9,2
+play,10,0,gonzl001,00,.,NP
+sub,embra001,"Alan Embree",1,7,1
+play,10,0,gonzl001,31,..BBCBX,S8/G6M
+play,10,0,gutir001,22,1CBSFFBC,K
+play,10,0,spieb001,30,B1BBB,W.1-2
+play,10,0,ausmb001,00,,NP
+sub,ligtk001,"Kerry Ligtenberg",1,7,1
+play,10,0,ausmb001,22,.FCBFBS,K
+play,10,0,carrc001,01,CX,9/F9LD
+play,10,1,loftk001,22,CCBBFS,K
+play,10,1,blauj001,22,SSBBFS,K
+play,10,1,jonec004,22,BBFSX,43/G4M
+play,11,0,sprir001,00,,NP
+sub,johnr006,"Russ Johnson",0,9,11
+play,11,0,johnr006,32,.CSFBBBX,2/P2RF
+play,11,0,biggc001,32,BCSBFBB,W
+play,11,0,belld001,01,1S1>B,SB2/R6
+play,11,0,belld001,11,1S1>B.>B,SB3
+play,11,0,belld001,22,1S1>B.>B.FX,S9/L4D.3-H
+play,11,0,bagwj001,21,C1B1B>B,SB2/R4U6
+play,11,0,bagwj001,31,C1B1B>B.I,I
+play,11,0,gonzl001,22,CFFF>FBBX,9/F9D/R4.2-3
+play,11,0,gutir001,00,,NP
+sub,clonb001,"Brad Clontz",1,7,1
+play,11,0,gutir001,00,.X,4/P4
+play,11,1,mcgrf001,00,,NP
+sub,magnm001,"Mike Magnante",0,9,1
+play,11,1,mcgrf001,00,..X,7/F7M
+play,11,1,bautd001,02,..CKX,S5/G5S/R3
+play,11,1,jonea002,12,SCB1S,K
+play,11,1,clonb001,00,,NP
+sub,colbg001,"Greg Colbrunn",1,7,11
+play,11,1,colbg001,32,.1B1BFBF>F>X,D7/G5L.1-H;B-3(E7)
+play,11,1,graft001,10,BX,8/L8D
+play,12,0,spieb001,00,,NP
+sub,byrdp001,"Paul Byrd",1,7,1
+play,12,0,spieb001,32,.KBBBFC,K
+play,12,0,ausmb001,00,X,8/F89D
+play,12,0,carrc001,12,BKSS,K
+play,12,1,lopej001,00,,NP
+sub,hudej001,"John Hudek",0,7,1
+play,12,1,lopej001,00,.,NP
+sub,euset001,"Tony Eusebio",0,9,2
+play,12,1,lopej001,00,..X,6/P6D
+play,12,1,loftk001,01,CX,43/G4M
+play,12,1,blauj001,12,BCFX,E5/G5/R3.B-1
+play,12,1,jonec004,32,CFBFBB>B,W.1-2
+play,12,1,mcgrf001,00,X,9/F9D
+play,13,0,euset001,31,BBCBX,63/G6
+play,13,0,biggc001,00,H,HP
+play,13,0,belld001,10,1B1X,9/L9M
+play,13,0,bagwj001,00,11X,HR/F7D.1-H;B-H
+play,13,0,gonzl001,32,BFBFBB,W
+play,13,0,gutir001,11,B1SX,7/F7D
+play,13,1,bautd001,02,CFFX,S8/F8S
+play,13,1,jonea002,01,CX,8/F8XD
+play,13,1,byrdp001,00,,NP
+sub,tuckm001,"Michael Tucker",1,7,11
+play,13,1,tuckm001,30,.BBBB,W.1-2
+play,13,1,graft001,20,BB,NP
+sub,limaj001,"Jose Lima",0,7,1
+play,13,1,graft001,32,BB.BCSFFFFX,7/F7D
+play,13,1,lopej001,02,CCS,K
+data,er,holtc001,1
+data,er,martt003,0
+data,er,sprir001,0
+data,er,magnm001,1
+data,er,hudej001,0
+data,er,limaj001,0
+data,er,maddg002,1
+data,er,wohlm001,2
+data,er,cathm001,0
+data,er,embra001,0
+data,er,ligtk001,1
+data,er,clonb001,0
+data,er,byrdp001,2

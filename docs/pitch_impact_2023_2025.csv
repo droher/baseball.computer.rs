@@ -1,0 +1,4 @@
+year,source_games,events,changed_events_fixed_vs_old_suffix,affected_games_fixed_vs_old_suffix,old_suffix_ordinary_pitch_tokens,fixed_ordinary_pitch_tokens,ordinary_pitch_tokens_recovered,ordinary_pitch_undercount_percent,old_suffix_pitcher_pickoff_tokens,fixed_pitcher_pickoff_tokens,pitcher_pickoff_tokens_recovered,old_suffix_no_pitch_tokens,fixed_no_pitch_tokens
+2023,2430,217862,23436,2377,646012,720683,74671,10.361144,8428,8925,497,269,269
+2024,2429,248739,65,64,711758,711897,139,0.019525,9203,9203,0,255,255
+2025,2430,216845,36407,2430,605722,712523,106801,14.98913,8459,9358,899,235,235

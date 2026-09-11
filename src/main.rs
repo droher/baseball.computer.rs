@@ -15,7 +15,10 @@
     clippy::multiple_crate_versions
 )]
 
-use event_file::schemas::{BoxScoreComments, EventBaserunners, EventComments, EventPitchSequences};
+use event_file::schemas::{
+    BoxScoreComments, EventBaserunners, EventComments, EventPitchSequenceIssues,
+    EventPitchSequenceStatus, EventPitchSequences,
+};
 use glob::GlobError;
 use itertools::Itertools;
 use serde::Serialize;
@@ -54,6 +57,7 @@ use crate::event_file::schemas::{
 use crate::event_file::traits::{EVENT_KEY_BUFFER, GameType};
 
 mod event_file;
+mod pitch_review;
 
 const ABOUT: &str = "Creates structured datasets from raw Retrosheet files.";
 
@@ -418,6 +422,7 @@ struct WorkerCtx<'a> {
     json_writer: Option<&'a ThreadSafeJsonWriter>,
     errors: &'a Mutex<Vec<anyhow::Error>>,
     base_index: usize,
+    audit_pitch_conflicts: bool,
 }
 
 fn worker_loop(
@@ -430,14 +435,7 @@ fn worker_loop(
     loop {
         match game_rx.try_recv() {
             Ok(task) => {
-                EventFileSchema::run_task(
-                    &task,
-                    ctx.parsed_games,
-                    ctx.claimed_games,
-                    ctx.writer_map,
-                    ctx.json_writer,
-                    ctx.errors,
-                );
+                EventFileSchema::run_task(&task, ctx);
                 continue;
             }
             Err(crossbeam_channel::TryRecvError::Disconnected) => break,
@@ -455,14 +453,7 @@ fn worker_loop(
             }
         }
         match game_rx.recv() {
-            Ok(task) => EventFileSchema::run_task(
-                &task,
-                ctx.parsed_games,
-                ctx.claimed_games,
-                ctx.writer_map,
-                ctx.json_writer,
-                ctx.errors,
-            ),
+            Ok(task) => EventFileSchema::run_task(&task, ctx),
             Err(_) => break,
         }
     }
@@ -507,14 +498,7 @@ fn pump_file(
                 Err(crossbeam_channel::TrySendError::Full(returned)) => {
                     task = returned;
                     if let Ok(other) = game_rx.try_recv() {
-                        EventFileSchema::run_task(
-                            &other,
-                            ctx.parsed_games,
-                            ctx.claimed_games,
-                            ctx.writer_map,
-                            ctx.json_writer,
-                            ctx.errors,
-                        );
+                        EventFileSchema::run_task(&other, ctx);
                     } else {
                         std::thread::yield_now();
                     }
@@ -537,6 +521,8 @@ enum EventFileSchema {
     EventBaserunners,
     EventFieldingPlay,
     EventPitchSequences,
+    EventPitchSequenceStatus,
+    EventPitchSequenceIssues,
     EventFlags,
     EventComments,
     BoxScoreGames,
@@ -579,79 +565,61 @@ impl EventFileSchema {
         )
     }
 
-    fn run_task(
-        task: &GameTask,
-        parsed_games: Option<&HashSet<GameId>>,
-        claimed_games: &papaya::HashSet<GameId>,
-        writer_map: &WriterMap,
-        json_writer: Option<&ThreadSafeJsonWriter>,
-        errors: &Mutex<Vec<anyhow::Error>>,
-    ) {
-        if let Err(e) = Self::process_game(
-            task.file_info,
-            task.game_num,
-            &task.record_vec,
-            parsed_games,
-            Some(claimed_games),
-            writer_map,
-            json_writer,
-        ) {
-            errors.lock().map(|mut g| g.push(e)).ok();
+    fn run_task(task: &GameTask, ctx: &WorkerCtx<'_>) {
+        if let Err(e) = Self::process_game(task, ctx) {
+            ctx.errors.lock().map(|mut g| g.push(e)).ok();
         }
     }
 
-    fn process_game(
-        file_info: event_file::parser::FileInfo,
-        game_num: usize,
-        record_vec: &event_file::parser::RecordVec,
-        parsed_games: Option<&HashSet<GameId>>,
-        claimed_games: Option<&papaya::HashSet<GameId>>,
-        writer_map: &WriterMap,
-        json_writer: Option<&ThreadSafeJsonWriter>,
-    ) -> Result<Option<GameId>> {
+    fn process_game(task: &GameTask, ctx: &WorkerCtx<'_>) -> Result<Option<GameId>> {
+        let file_info = task.file_info;
+        let record_vec = &task.record_vec;
         let record_slice = &record_vec.record_vec;
-        let game_context =
-            match GameContext::new(record_slice, file_info, record_vec.line_offset, game_num) {
-                Ok(c) => c,
-                Err(e) => {
-                    let game_id = if let Some(MappedRecord::GameId(id)) = record_slice.first() {
-                        id.id.as_str()
-                    } else {
-                        "unknown"
-                    };
-                    let filename = file_info.filename.as_str();
-                    error!(
-                        "Error initializing game {game_id} in file {filename}: {:?}",
-                        e
-                    );
-                    return Ok(None);
-                }
-            };
+        let game_context = match GameContext::new(
+            record_slice,
+            file_info,
+            record_vec.line_offset,
+            task.game_num,
+        ) {
+            Ok(c) => c,
+            Err(e) => {
+                let game_id = if let Some(MappedRecord::GameId(id)) = record_slice.first() {
+                    id.id.as_str()
+                } else {
+                    "unknown"
+                };
+                let filename = file_info.filename.as_str();
+                error!(
+                    "Error initializing game {game_id} in file {filename}: {:?}",
+                    e
+                );
+                return Ok(None);
+            }
+        };
         let game_id = game_context.game_id;
-        if parsed_games.is_some_and(|pg| pg.contains(&game_id)) {
+        if ctx.parsed_games.is_some_and(|pg| pg.contains(&game_id)) {
             warn!(
                 "File {} contains already-processed game {}, ignoring",
                 file_info.filename, &game_id.id
             );
             return Ok(Some(game_id));
         }
-        if let Some(seen) = claimed_games
-            && !seen.pin().insert(game_id)
-        {
+        if !ctx.claimed_games.pin().insert(game_id) {
             warn!(
                 "File {} contains duplicate game {}, ignoring later occurrence",
                 file_info.filename, &game_id.id
             );
             return Ok(Some(game_id));
         }
-        if let Some(jw) = json_writer {
+        pitch_review::check_pitch_sequence_conflicts(&game_context, ctx.audit_pitch_conflicts)?;
+        if let Some(jw) = ctx.json_writer {
             let mut handle = jw.json()?;
             serde_json::to_writer(&mut *handle, &game_context)?;
             handle.write_all(b"\n")?;
         } else if file_info.account_type == AccountType::BoxScore {
-            Self::write_box_score_files(&game_context, record_slice, writer_map)?;
+            Self::write_box_score_files(&game_context, record_slice, ctx.writer_map)?;
         } else {
-            Self::write_play_by_play_files(&game_context, writer_map)?;
+            Self::write_play_by_play_files(&game_context, ctx.writer_map)?;
         }
         Ok(Some(game_id))
     }
@@ -724,6 +692,10 @@ impl EventFileSchema {
         writer_map.write_csv::<EventAudit>(Self::EventAudit, game_context)?;
         writer_map.write_csv::<EventFieldingPlays>(Self::EventFieldingPlay, game_context)?;
         writer_map.write_csv::<EventPitchSequences>(Self::EventPitchSequences, game_context)?;
+        writer_map
+            .write_csv::<EventPitchSequenceStatus>(Self::EventPitchSequenceStatus, game_context)?;
+        writer_map
+            .write_csv::<EventPitchSequenceIssues>(Self::EventPitchSequenceIssues, game_context)?;
         writer_map.write_csv::<EventComments>(Self::EventComments, game_context)?;
         writer_map.write_csv::<EventBaserunners>(Self::EventBaserunners, game_context)?;
         writer_map.append_serialize(Self::Games, std::iter::once(Games::from(game_context)))?;
@@ -756,6 +728,9 @@ struct Opt {
 
     #[arg(short, long)]
     json: bool,
+
+    #[arg(long)]
+    audit_pitch_conflicts: bool,
 }
 
 fn get_output_root(opt: &Opt) -> Result<PathBuf> {
@@ -861,6 +836,7 @@ impl FileProcessor {
             json_writer: self.json_writer.as_ref(),
             errors: &errors,
             base_index: self.index,
+            audit_pitch_conflicts: self.opt.audit_pitch_conflicts,
         };
 
         rayon::scope(|s| {

@@ -1,5 +1,6 @@
 import glob
 import os
+from pathlib import Path
 
 import pyarrow as pa
 from pyarrow import csv, parquet
@@ -53,23 +54,62 @@ EMPTY_SCHEMA_FALLBACK: dict[str, pa.Schema] = {
             ("passed_balls", pa.int8()),
         ]
     ),
+    "event_pitch_sequence_status": pa.schema(
+        [
+            ("game_id", pa.string()),
+            ("event_id", pa.uint8()),
+            ("event_key", pa.int32()),
+            ("appearance_start_event_id", pa.uint8()),
+            ("status", pa.string()),
+            ("raw_pitch_sequence", pa.string()),
+        ]
+    ),
+    "event_pitch_sequence_issues": pa.schema(
+        [
+            ("game_id", pa.string()),
+            ("event_id", pa.uint8()),
+            ("event_key", pa.int32()),
+            ("appearance_start_event_id", pa.uint8()),
+            ("sequence_id", pa.uint8()),
+            ("reason", pa.string()),
+            ("prior_event_id", pa.uint8()),
+            ("prior_raw_pitch_sequence", pa.string()),
+            ("current_raw_pitch_sequence", pa.string()),
+        ]
+    ),
+}
+
+PITCH_AUDIT_SCHEMAS = {
+    stem: schema
+    for stem, schema in EMPTY_SCHEMA_FALLBACK.items()
+    if stem in {"event_pitch_sequence_status", "event_pitch_sequence_issues"}
 }
 
 
 def file_to_data_frame_to_parquet(local_file: str, parquet_file: str) -> None:
-    explicit_types = {
-        "event_key": "int32",
-    }
-    table = csv.read_csv(local_file,
-                         convert_options=csv.ConvertOptions(strings_can_be_null=True,
-                                                            column_types=explicit_types))
+    stem = Path(local_file).stem
+    schema = PITCH_AUDIT_SCHEMAS.get(stem)
+    explicit_types = (
+        {field.name: field.type for field in schema}
+        if schema is not None
+        else {"event_key": pa.int32()}
+    )
+    table = csv.read_csv(
+        local_file,
+        convert_options=csv.ConvertOptions(
+            strings_can_be_null=schema is None,
+            column_types=explicit_types,
+        ),
+    )
     if "event" in local_file:
         table = table.sort_by("event_key")
-    parquet.write_table(table,
-                        parquet_file,
-                        compression='zstd',
-                        use_dictionary = [c for c in table.column_names if c != "event_key"],
-                        column_encoding={'event_key': 'DELTA_BINARY_PACKED'})
+    parquet.write_table(
+        table,
+        parquet_file,
+        compression="zstd",
+        use_dictionary=[c for c in table.column_names if c != "event_key"],
+        column_encoding={"event_key": "DELTA_BINARY_PACKED"},
+    )
 
 
 def write_empty_parquet(stem: str, parquet_file: str) -> bool:
@@ -94,5 +134,5 @@ if __name__ == "__main__":
             continue
         try:
             file_to_data_frame_to_parquet(f, parquet_path)
-        except Exception as e:
+        except (OSError, ValueError, pa.ArrowException) as e:
             print(e)

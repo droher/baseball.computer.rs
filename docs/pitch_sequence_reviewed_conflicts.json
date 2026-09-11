@@ -1,0 +1,1307 @@
+[
+  {
+    "game_id": "ATL198904210",
+    "event_id": 53,
+    "appearance_start_event_id": 52,
+    "prior_event_id": 52,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1B11B",
+    "current_raw_pitch_sequence": "11B1B.BC1X"
+  },
+  {
+    "game_id": "ATL199206200",
+    "event_id": 66,
+    "appearance_start_event_id": 65,
+    "prior_event_id": 65,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B1B",
+    "current_raw_pitch_sequence": "B2B..BB"
+  },
+  {
+    "game_id": "ATL199708270",
+    "event_id": 47,
+    "appearance_start_event_id": 46,
+    "prior_event_id": 46,
+    "reason": "CatcherPickoffConflict",
+    "prior_raw_pitch_sequence": "1SPBS+1",
+    "current_raw_pitch_sequence": "1SPBS+2.X"
+  },
+  {
+    "game_id": "ATL199804040",
+    "event_id": 67,
+    "appearance_start_event_id": 66,
+    "prior_event_id": 66,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B",
+    "current_raw_pitch_sequence": "SBSFBFBX"
+  },
+  {
+    "game_id": "ATL200210030",
+    "event_id": 19,
+    "appearance_start_event_id": 18,
+    "prior_event_id": 18,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "P",
+    "current_raw_pitch_sequence": "BBFBX"
+  },
+  {
+    "game_id": "BAL198904210",
+    "event_id": 59,
+    "appearance_start_event_id": 56,
+    "prior_event_id": 58,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "LPS.FB.",
+    "current_raw_pitch_sequence": "LIS.FB...S"
+  },
+  {
+    "game_id": "BAL199007190",
+    "event_id": 68,
+    "appearance_start_event_id": 66,
+    "prior_event_id": 67,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BB.",
+    "current_raw_pitch_sequence": "."
+  },
+  {
+    "game_id": "BAL199807260",
+    "event_id": 56,
+    "appearance_start_event_id": 55,
+    "prior_event_id": 55,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1SB1SBB",
+    "current_raw_pitch_sequence": "BBBB"
+  },
+  {
+    "game_id": "BAL199906250",
+    "event_id": 73,
+    "appearance_start_event_id": 71,
+    "prior_event_id": 72,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CSFF",
+    "current_raw_pitch_sequence": "FX"
+  },
+  {
+    "game_id": "BAL200204030",
+    "event_id": 29,
+    "appearance_start_event_id": 28,
+    "prior_event_id": 28,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "FF",
+    "current_raw_pitch_sequence": "BBBFX"
+  },
+  {
+    "game_id": "BOS196105300",
+    "event_id": 29,
+    "appearance_start_event_id": 28,
+    "prior_event_id": 28,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "X",
+    "current_raw_pitch_sequence": "BCBBX"
+  },
+  {
+    "game_id": "BOS197008151",
+    "event_id": 6,
+    "appearance_start_event_id": 5,
+    "prior_event_id": 5,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BCBSB",
+    "current_raw_pitch_sequence": "BCBCB.B"
+  },
+  {
+    "game_id": "BOS198604290",
+    "event_id": 41,
+    "appearance_start_event_id": 40,
+    "prior_event_id": 40,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CB1>B",
+    "current_raw_pitch_sequence": "BCB1>B.CB"
+  },
+  {
+    "game_id": "BOS199809212",
+    "event_id": 23,
+    "appearance_start_event_id": 22,
+    "prior_event_id": 22,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1BB",
+    "current_raw_pitch_sequence": "X"
+  },
+  {
+    "game_id": "BSN195107020",
+    "event_id": 6,
+    "appearance_start_event_id": 4,
+    "prior_event_id": 5,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "??",
+    "current_raw_pitch_sequence": ".X"
+  },
+  {
+    "game_id": "CAL199407240",
+    "event_id": 74,
+    "appearance_start_event_id": 70,
+    "prior_event_id": 73,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "...BCFB",
+    "current_raw_pitch_sequence": "...BCBFB.X"
+  },
+  {
+    "game_id": "CHA198005180",
+    "event_id": 25,
+    "appearance_start_event_id": 24,
+    "prior_event_id": 24,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "11B1>B",
+    "current_raw_pitch_sequence": "11B1>C.BSBFC"
+  },
+  {
+    "game_id": "CHA201205150",
+    "event_id": 100,
+    "appearance_start_event_id": 99,
+    "prior_event_id": 99,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "NP",
+    "current_raw_pitch_sequence": "BFBB.B"
+  },
+  {
+    "game_id": "CHN198204090",
+    "event_id": 21,
+    "appearance_start_event_id": 20,
+    "prior_event_id": 20,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BBB",
+    "current_raw_pitch_sequence": "BBK.BFX"
+  },
+  {
+    "game_id": "CHN198904040",
+    "event_id": 9,
+    "appearance_start_event_id": 8,
+    "prior_event_id": 8,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BF",
+    "current_raw_pitch_sequence": "CX"
+  },
+  {
+    "game_id": "CHN198908210",
+    "event_id": 94,
+    "appearance_start_event_id": 92,
+    "prior_event_id": 93,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "11BN.B2",
+    "current_raw_pitch_sequence": "11B.B.BB"
+  },
+  {
+    "game_id": "CHN199107140",
+    "event_id": 54,
+    "appearance_start_event_id": 52,
+    "prior_event_id": 53,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1B1P",
+    "current_raw_pitch_sequence": "2B2P..FBFFB"
+  },
+  {
+    "game_id": "CHN199909060",
+    "event_id": 9,
+    "appearance_start_event_id": 8,
+    "prior_event_id": 8,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1LB1B1BS",
+    "current_raw_pitch_sequence": "X"
+  },
+  {
+    "game_id": "CIN197108210",
+    "event_id": 14,
+    "appearance_start_event_id": 13,
+    "prior_event_id": 13,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BFM",
+    "current_raw_pitch_sequence": "BFS.BX"
+  },
+  {
+    "game_id": "CIN197610160",
+    "event_id": 40,
+    "appearance_start_event_id": 39,
+    "prior_event_id": 39,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BCB",
+    "current_raw_pitch_sequence": "BSBCX"
+  },
+  {
+    "game_id": "CIN197910030",
+    "event_id": 18,
+    "appearance_start_event_id": 17,
+    "prior_event_id": 17,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "C1LBB",
+    "current_raw_pitch_sequence": "C1MBB.S"
+  },
+  {
+    "game_id": "CIN198804200",
+    "event_id": 33,
+    "appearance_start_event_id": 32,
+    "prior_event_id": 32,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CFBB1",
+    "current_raw_pitch_sequence": "CFBB2..FBX"
+  },
+  {
+    "game_id": "CIN198808160",
+    "event_id": 37,
+    "appearance_start_event_id": 36,
+    "prior_event_id": 36,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "SFFB2",
+    "current_raw_pitch_sequence": "SFFB1.BS"
+  },
+  {
+    "game_id": "CIN198808270",
+    "event_id": 33,
+    "appearance_start_event_id": 32,
+    "prior_event_id": 32,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BBBSS",
+    "current_raw_pitch_sequence": "BBBS.B"
+  },
+  {
+    "game_id": "CIN198904070",
+    "event_id": 142,
+    "appearance_start_event_id": 141,
+    "prior_event_id": 141,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "PBFBM",
+    "current_raw_pitch_sequence": "PBFBS.X"
+  },
+  {
+    "game_id": "CIN199107300",
+    "event_id": 82,
+    "appearance_start_event_id": 79,
+    "prior_event_id": 81,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": ".LB1LP",
+    "current_raw_pitch_sequence": ".LB2LP..FBFB"
+  },
+  {
+    "game_id": "CIN199804150",
+    "event_id": 3,
+    "appearance_start_event_id": 2,
+    "prior_event_id": 2,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "11C1B",
+    "current_raw_pitch_sequence": "BFBCC"
+  },
+  {
+    "game_id": "CIN200206150",
+    "event_id": 41,
+    "appearance_start_event_id": 40,
+    "prior_event_id": 40,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B",
+    "current_raw_pitch_sequence": "FFS"
+  },
+  {
+    "game_id": "CLE198707290",
+    "event_id": 38,
+    "appearance_start_event_id": 37,
+    "prior_event_id": 37,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "SBSBB",
+    "current_raw_pitch_sequence": "SBSB.FBB"
+  },
+  {
+    "game_id": "CLE199609082",
+    "event_id": 72,
+    "appearance_start_event_id": 71,
+    "prior_event_id": 71,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B2",
+    "current_raw_pitch_sequence": "B3.BX"
+  },
+  {
+    "game_id": "CLE200107250",
+    "event_id": 71,
+    "appearance_start_event_id": 69,
+    "prior_event_id": 70,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1SC11",
+    "current_raw_pitch_sequence": "SB1BFFFBX"
+  },
+  {
+    "game_id": "COL199709070",
+    "event_id": 46,
+    "appearance_start_event_id": 45,
+    "prior_event_id": 45,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "C*B1S",
+    "current_raw_pitch_sequence": "C*BBS.FBX"
+  },
+  {
+    "game_id": "DET198410120",
+    "event_id": 57,
+    "appearance_start_event_id": 56,
+    "prior_event_id": 56,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "11BCB",
+    "current_raw_pitch_sequence": "11BBC.BB"
+  },
+  {
+    "game_id": "DET198410130",
+    "event_id": 27,
+    "appearance_start_event_id": 26,
+    "prior_event_id": 26,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BP1BCCB",
+    "current_raw_pitch_sequence": "P1BCCBB"
+  },
+  {
+    "game_id": "DET198906290",
+    "event_id": 38,
+    "appearance_start_event_id": 37,
+    "prior_event_id": 37,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B",
+    "current_raw_pitch_sequence": "FX"
+  },
+  {
+    "game_id": "DET200107080",
+    "event_id": 8,
+    "appearance_start_event_id": 6,
+    "prior_event_id": 7,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BC2",
+    "current_raw_pitch_sequence": "BC1SX"
+  },
+  {
+    "game_id": "FLO199404170",
+    "event_id": 79,
+    "appearance_start_event_id": 77,
+    "prior_event_id": 78,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": ".BB..",
+    "current_raw_pitch_sequence": ".BF..."
+  },
+  {
+    "game_id": "FLO200206020",
+    "event_id": 46,
+    "appearance_start_event_id": 45,
+    "prior_event_id": 45,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BFBFB",
+    "current_raw_pitch_sequence": "BFBFX"
+  },
+  {
+    "game_id": "FLO200308030",
+    "event_id": 52,
+    "appearance_start_event_id": 51,
+    "prior_event_id": 51,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": ".BBSB>C",
+    "current_raw_pitch_sequence": "..X"
+  },
+  {
+    "game_id": "HOU198904070",
+    "event_id": 22,
+    "appearance_start_event_id": 21,
+    "prior_event_id": 21,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "LFBFN",
+    "current_raw_pitch_sequence": "LLBFN.FFFS"
+  },
+  {
+    "game_id": "HOU198904090",
+    "event_id": 7,
+    "appearance_start_event_id": 5,
+    "prior_event_id": 6,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "11BC1FFN.F2",
+    "current_raw_pitch_sequence": "11BC1FF.F2.S"
+  },
+  {
+    "game_id": "HOU199205160",
+    "event_id": 57,
+    "appearance_start_event_id": 56,
+    "prior_event_id": 56,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "PS11B>FFFB>S",
+    "current_raw_pitch_sequence": "S"
+  },
+  {
+    "game_id": "HOU199207250",
+    "event_id": 56,
+    "appearance_start_event_id": 54,
+    "prior_event_id": 55,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1C",
+    "current_raw_pitch_sequence": "2C..CFBBX"
+  },
+  {
+    "game_id": "HOU199305010",
+    "event_id": 46,
+    "appearance_start_event_id": 44,
+    "prior_event_id": 45,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B.",
+    "current_raw_pitch_sequence": "F..BX"
+  },
+  {
+    "game_id": "HOU200208300",
+    "event_id": 7,
+    "appearance_start_event_id": 6,
+    "prior_event_id": 6,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BP",
+    "current_raw_pitch_sequence": "BICX"
+  },
+  {
+    "game_id": "HOU200309130",
+    "event_id": 19,
+    "appearance_start_event_id": 18,
+    "prior_event_id": 18,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "..BX",
+    "current_raw_pitch_sequence": "..BC.BFS"
+  },
+  {
+    "game_id": "HOU201505130",
+    "event_id": 76,
+    "appearance_start_event_id": 75,
+    "prior_event_id": 75,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "F>S",
+    "current_raw_pitch_sequence": "F>C.BS"
+  },
+  {
+    "game_id": "KCA197710090",
+    "event_id": 47,
+    "appearance_start_event_id": 46,
+    "prior_event_id": 46,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B",
+    "current_raw_pitch_sequence": "C.BBSFX"
+  },
+  {
+    "game_id": "KCA199309260",
+    "event_id": 60,
+    "appearance_start_event_id": 59,
+    "prior_event_id": 59,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B",
+    "current_raw_pitch_sequence": "."
+  },
+  {
+    "game_id": "KCA200904140",
+    "event_id": 6,
+    "appearance_start_event_id": 5,
+    "prior_event_id": 5,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CF*BBFB",
+    "current_raw_pitch_sequence": "SF*BBFB.>X"
+  },
+  {
+    "game_id": "KCA200907250",
+    "event_id": 29,
+    "appearance_start_event_id": 28,
+    "prior_event_id": 28,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "*BSBB",
+    "current_raw_pitch_sequence": "SBBB.X"
+  },
+  {
+    "game_id": "KCA201608110",
+    "event_id": 16,
+    "appearance_start_event_id": 15,
+    "prior_event_id": 15,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "FBBBF",
+    "current_raw_pitch_sequence": "CFBBBF.H"
+  },
+  {
+    "game_id": "LAN197810070",
+    "event_id": 75,
+    "appearance_start_event_id": 74,
+    "prior_event_id": 74,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "FPP",
+    "current_raw_pitch_sequence": "LPP.CFX"
+  },
+  {
+    "game_id": "LAN198310050",
+    "event_id": 35,
+    "appearance_start_event_id": 34,
+    "prior_event_id": 34,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "SP>FBB",
+    "current_raw_pitch_sequence": "SP>FBX"
+  },
+  {
+    "game_id": "LAN198905070",
+    "event_id": 36,
+    "appearance_start_event_id": 35,
+    "prior_event_id": 35,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BB",
+    "current_raw_pitch_sequence": "CFX"
+  },
+  {
+    "game_id": "LAN198907180",
+    "event_id": 26,
+    "appearance_start_event_id": 25,
+    "prior_event_id": 25,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "S",
+    "current_raw_pitch_sequence": "BX"
+  },
+  {
+    "game_id": "LAN199008190",
+    "event_id": 77,
+    "appearance_start_event_id": 75,
+    "prior_event_id": 76,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BB",
+    "current_raw_pitch_sequence": "1BBBCB"
+  },
+  {
+    "game_id": "LAN199909230",
+    "event_id": 83,
+    "appearance_start_event_id": 82,
+    "prior_event_id": 82,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CBFFFB",
+    "current_raw_pitch_sequence": "CBFFB.FFX"
+  },
+  {
+    "game_id": "LAN200108050",
+    "event_id": 63,
+    "appearance_start_event_id": 59,
+    "prior_event_id": 59,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "S",
+    "current_raw_pitch_sequence": "X"
+  },
+  {
+    "game_id": "LAN200208100",
+    "event_id": 5,
+    "appearance_start_event_id": 4,
+    "prior_event_id": 4,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BB",
+    "current_raw_pitch_sequence": "BSX"
+  },
+  {
+    "game_id": "LAN201704190",
+    "event_id": 25,
+    "appearance_start_event_id": 24,
+    "prior_event_id": 24,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BCF",
+    "current_raw_pitch_sequence": "BCS.X"
+  },
+  {
+    "game_id": "LAN202106150",
+    "event_id": 98,
+    "appearance_start_event_id": 96,
+    "prior_event_id": 97,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": ".B",
+    "current_raw_pitch_sequence": ".SBS*BC"
+  },
+  {
+    "game_id": "MIL198210090",
+    "event_id": 49,
+    "appearance_start_event_id": 48,
+    "prior_event_id": 48,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "FB",
+    "current_raw_pitch_sequence": "BB.BFCX"
+  },
+  {
+    "game_id": "MIL198904130",
+    "event_id": 89,
+    "appearance_start_event_id": 88,
+    "prior_event_id": 88,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "F",
+    "current_raw_pitch_sequence": "BBX"
+  },
+  {
+    "game_id": "MIL200606030",
+    "event_id": 52,
+    "appearance_start_event_id": 51,
+    "prior_event_id": 51,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BLB",
+    "current_raw_pitch_sequence": "BFB.CBB"
+  },
+  {
+    "game_id": "MIL200907120",
+    "event_id": 82,
+    "appearance_start_event_id": 81,
+    "prior_event_id": 81,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "TFB",
+    "current_raw_pitch_sequence": "SFB.BBFFFFS"
+  },
+  {
+    "game_id": "MIN200110050",
+    "event_id": 25,
+    "appearance_start_event_id": 24,
+    "prior_event_id": 24,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BSC",
+    "current_raw_pitch_sequence": "B1SC.BX"
+  },
+  {
+    "game_id": "MIN201707050",
+    "event_id": 44,
+    "appearance_start_event_id": 43,
+    "prior_event_id": 43,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "TB1B>C",
+    "current_raw_pitch_sequence": "SB1B>C.S"
+  },
+  {
+    "game_id": "MON198905140",
+    "event_id": 13,
+    "appearance_start_event_id": 12,
+    "prior_event_id": 12,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1C1",
+    "current_raw_pitch_sequence": "X"
+  },
+  {
+    "game_id": "MON198909060",
+    "event_id": 27,
+    "appearance_start_event_id": 26,
+    "prior_event_id": 26,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CFFFBB",
+    "current_raw_pitch_sequence": "X"
+  },
+  {
+    "game_id": "MON199107141",
+    "event_id": 33,
+    "appearance_start_event_id": 31,
+    "prior_event_id": 32,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B.CB2",
+    "current_raw_pitch_sequence": "B.CB3.X"
+  },
+  {
+    "game_id": "MON199404110",
+    "event_id": 119,
+    "appearance_start_event_id": 118,
+    "prior_event_id": 118,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CBBS2",
+    "current_raw_pitch_sequence": "CBBS1..FX"
+  },
+  {
+    "game_id": "MON199804160",
+    "event_id": 4,
+    "appearance_start_event_id": 3,
+    "prior_event_id": 3,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CBF",
+    "current_raw_pitch_sequence": "FBBCBX"
+  },
+  {
+    "game_id": "MON199808240",
+    "event_id": 73,
+    "appearance_start_event_id": 72,
+    "prior_event_id": 72,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BFB",
+    "current_raw_pitch_sequence": "X"
+  },
+  {
+    "game_id": "MON200105230",
+    "event_id": 21,
+    "appearance_start_event_id": 20,
+    "prior_event_id": 20,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "F",
+    "current_raw_pitch_sequence": "BX"
+  },
+  {
+    "game_id": "NY1192410080",
+    "event_id": 81,
+    "appearance_start_event_id": 80,
+    "prior_event_id": 80,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BCFF",
+    "current_raw_pitch_sequence": "BFF.>B"
+  },
+  {
+    "game_id": "NYA192110060",
+    "event_id": 5,
+    "appearance_start_event_id": 4,
+    "prior_event_id": 4,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BFX",
+    "current_raw_pitch_sequence": "BF.BBB"
+  },
+  {
+    "game_id": "NYA197810130",
+    "event_id": 23,
+    "appearance_start_event_id": 22,
+    "prior_event_id": 22,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B",
+    "current_raw_pitch_sequence": "1.CCX"
+  },
+  {
+    "game_id": "NYA198110200",
+    "event_id": 24,
+    "appearance_start_event_id": 23,
+    "prior_event_id": 23,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B",
+    "current_raw_pitch_sequence": "F.SX"
+  },
+  {
+    "game_id": "NYA199307300",
+    "event_id": 28,
+    "appearance_start_event_id": 27,
+    "prior_event_id": 27,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "Q",
+    "current_raw_pitch_sequence": "P.CBCX"
+  },
+  {
+    "game_id": "NYA201504280",
+    "event_id": 25,
+    "appearance_start_event_id": 24,
+    "prior_event_id": 24,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CSB",
+    "current_raw_pitch_sequence": "SCB.*BS"
+  },
+  {
+    "game_id": "NYA201509050",
+    "event_id": 82,
+    "appearance_start_event_id": 81,
+    "prior_event_id": 81,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1CPB",
+    "current_raw_pitch_sequence": "1CBB.SX"
+  },
+  {
+    "game_id": "NYN198610110",
+    "event_id": 27,
+    "appearance_start_event_id": 26,
+    "prior_event_id": 26,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "SFFBB",
+    "current_raw_pitch_sequence": "SBSFF.BBS"
+  },
+  {
+    "game_id": "NYN198905120",
+    "event_id": 97,
+    "appearance_start_event_id": 96,
+    "prior_event_id": 96,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CF>FB",
+    "current_raw_pitch_sequence": "CF>F.X"
+  },
+  {
+    "game_id": "NYN198905190",
+    "event_id": 11,
+    "appearance_start_event_id": 10,
+    "prior_event_id": 10,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "C1FB1",
+    "current_raw_pitch_sequence": "FFBX"
+  },
+  {
+    "game_id": "NYN200010150",
+    "event_id": 39,
+    "appearance_start_event_id": 38,
+    "prior_event_id": 38,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "P",
+    "current_raw_pitch_sequence": "BCSBX"
+  },
+  {
+    "game_id": "OAK197410170",
+    "event_id": 71,
+    "appearance_start_event_id": 70,
+    "prior_event_id": 70,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "F1BF1BB",
+    "current_raw_pitch_sequence": "L1BL1BB.X"
+  },
+  {
+    "game_id": "OAK198110150",
+    "event_id": 10,
+    "appearance_start_event_id": 9,
+    "prior_event_id": 9,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BCS",
+    "current_raw_pitch_sequence": "1BS1FFB"
+  },
+  {
+    "game_id": "OAK198110150",
+    "event_id": 31,
+    "appearance_start_event_id": 30,
+    "prior_event_id": 30,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BB",
+    "current_raw_pitch_sequence": "1X"
+  },
+  {
+    "game_id": "OAK198907210",
+    "event_id": 8,
+    "appearance_start_event_id": 7,
+    "prior_event_id": 7,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "FC",
+    "current_raw_pitch_sequence": "BFX"
+  },
+  {
+    "game_id": "OAK198907290",
+    "event_id": 80,
+    "appearance_start_event_id": 79,
+    "prior_event_id": 79,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "C",
+    "current_raw_pitch_sequence": "BSFBFBB"
+  },
+  {
+    "game_id": "PHI197810050",
+    "event_id": 32,
+    "appearance_start_event_id": 31,
+    "prior_event_id": 31,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "S",
+    "current_raw_pitch_sequence": "M.BCX"
+  },
+  {
+    "game_id": "PHI198904140",
+    "event_id": 33,
+    "appearance_start_event_id": 32,
+    "prior_event_id": 32,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "SBB",
+    "current_raw_pitch_sequence": "."
+  },
+  {
+    "game_id": "PHI198906070",
+    "event_id": 93,
+    "appearance_start_event_id": 91,
+    "prior_event_id": 92,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": ".BP",
+    "current_raw_pitch_sequence": "BCX"
+  },
+  {
+    "game_id": "PIT192510080",
+    "event_id": 21,
+    "appearance_start_event_id": 20,
+    "prior_event_id": 20,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1B1S>N",
+    "current_raw_pitch_sequence": "1B1K>N.BBFX"
+  },
+  {
+    "game_id": "PIT195308220",
+    "event_id": 65,
+    "appearance_start_event_id": 64,
+    "prior_event_id": 64,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BB",
+    "current_raw_pitch_sequence": "B.."
+  },
+  {
+    "game_id": "PIT198906220",
+    "event_id": 63,
+    "appearance_start_event_id": 62,
+    "prior_event_id": 62,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CB",
+    "current_raw_pitch_sequence": "SB.SBX"
+  },
+  {
+    "game_id": "PIT198907060",
+    "event_id": 18,
+    "appearance_start_event_id": 17,
+    "prior_event_id": 17,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BF",
+    "current_raw_pitch_sequence": "SSS"
+  },
+  {
+    "game_id": "PIT199006020",
+    "event_id": 5,
+    "appearance_start_event_id": 4,
+    "prior_event_id": 4,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BFS2",
+    "current_raw_pitch_sequence": "BFS1.S"
+  },
+  {
+    "game_id": "PIT199704190",
+    "event_id": 101,
+    "appearance_start_event_id": 100,
+    "prior_event_id": 100,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1LBB",
+    "current_raw_pitch_sequence": "."
+  },
+  {
+    "game_id": "PIT200905140",
+    "event_id": 69,
+    "appearance_start_event_id": 68,
+    "prior_event_id": 68,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CSB",
+    "current_raw_pitch_sequence": "CTB.X"
+  },
+  {
+    "game_id": "SDN198905030",
+    "event_id": 87,
+    "appearance_start_event_id": 86,
+    "prior_event_id": 86,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": ".BCCF",
+    "current_raw_pitch_sequence": "BBBB"
+  },
+  {
+    "game_id": "SDN198905040",
+    "event_id": 76,
+    "appearance_start_event_id": 75,
+    "prior_event_id": 75,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "S",
+    "current_raw_pitch_sequence": "CFS"
+  },
+  {
+    "game_id": "SDN198907130",
+    "event_id": 31,
+    "appearance_start_event_id": 30,
+    "prior_event_id": 30,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "C1S",
+    "current_raw_pitch_sequence": "FX"
+  },
+  {
+    "game_id": "SDN198907130",
+    "event_id": 50,
+    "appearance_start_event_id": 49,
+    "prior_event_id": 49,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "C+1",
+    "current_raw_pitch_sequence": "BX"
+  },
+  {
+    "game_id": "SDN198907130",
+    "event_id": 56,
+    "appearance_start_event_id": 55,
+    "prior_event_id": 55,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CB+2",
+    "current_raw_pitch_sequence": "FFFX"
+  },
+  {
+    "game_id": "SDN198907160",
+    "event_id": 18,
+    "appearance_start_event_id": 17,
+    "prior_event_id": 17,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "LLB",
+    "current_raw_pitch_sequence": "BX"
+  },
+  {
+    "game_id": "SDN199204240",
+    "event_id": 5,
+    "appearance_start_event_id": 4,
+    "prior_event_id": 4,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "2",
+    "current_raw_pitch_sequence": "1"
+  },
+  {
+    "game_id": "SDN199204240",
+    "event_id": 6,
+    "appearance_start_event_id": 4,
+    "prior_event_id": 5,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1",
+    "current_raw_pitch_sequence": "2..CSX"
+  },
+  {
+    "game_id": "SDN199804270",
+    "event_id": 58,
+    "appearance_start_event_id": 57,
+    "prior_event_id": 57,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "SBSB",
+    "current_raw_pitch_sequence": "X"
+  },
+  {
+    "game_id": "SDN199906280",
+    "event_id": 66,
+    "appearance_start_event_id": 64,
+    "prior_event_id": 64,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B111C",
+    "current_raw_pitch_sequence": "BSBFC"
+  },
+  {
+    "game_id": "SEA198907080",
+    "event_id": 16,
+    "appearance_start_event_id": 15,
+    "prior_event_id": 15,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B",
+    "current_raw_pitch_sequence": "CBX"
+  },
+  {
+    "game_id": "SEA201207240",
+    "event_id": 57,
+    "appearance_start_event_id": 56,
+    "prior_event_id": 56,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "FBCFFB",
+    "current_raw_pitch_sequence": "FBSFFB.S"
+  },
+  {
+    "game_id": "SEA201407100",
+    "event_id": 80,
+    "appearance_start_event_id": 79,
+    "prior_event_id": 79,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BCF",
+    "current_raw_pitch_sequence": "BFC.C"
+  },
+  {
+    "game_id": "SFN199806100",
+    "event_id": 60,
+    "appearance_start_event_id": 59,
+    "prior_event_id": 59,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "P1B1",
+    "current_raw_pitch_sequence": "X"
+  },
+  {
+    "game_id": "SFN201307240",
+    "event_id": 96,
+    "appearance_start_event_id": 95,
+    "prior_event_id": 95,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "FSB",
+    "current_raw_pitch_sequence": "SFB.X"
+  },
+  {
+    "game_id": "SFN201504180",
+    "event_id": 62,
+    "appearance_start_event_id": 61,
+    "prior_event_id": 61,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "SSB",
+    "current_raw_pitch_sequence": "SFB.X"
+  },
+  {
+    "game_id": "SLN195106130",
+    "event_id": 66,
+    "appearance_start_event_id": 65,
+    "prior_event_id": 65,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "FBBP",
+    "current_raw_pitch_sequence": "FBBB..X"
+  },
+  {
+    "game_id": "SLN196410140",
+    "event_id": 61,
+    "appearance_start_event_id": 59,
+    "prior_event_id": 60,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "K",
+    "current_raw_pitch_sequence": "..CFX"
+  },
+  {
+    "game_id": "SLN198510120",
+    "event_id": 13,
+    "appearance_start_event_id": 12,
+    "prior_event_id": 12,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BSB1C",
+    "current_raw_pitch_sequence": "1BSB1.CS"
+  },
+  {
+    "game_id": "SLN198906020",
+    "event_id": 55,
+    "appearance_start_event_id": 54,
+    "prior_event_id": 54,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B",
+    "current_raw_pitch_sequence": ".FFC"
+  },
+  {
+    "game_id": "SLN198908050",
+    "event_id": 71,
+    "appearance_start_event_id": 70,
+    "prior_event_id": 70,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BF",
+    "current_raw_pitch_sequence": "B."
+  },
+  {
+    "game_id": "SLN199108020",
+    "event_id": 62,
+    "appearance_start_event_id": 58,
+    "prior_event_id": 61,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1B",
+    "current_raw_pitch_sequence": "2B...FFBFX"
+  },
+  {
+    "game_id": "SLN199808160",
+    "event_id": 15,
+    "appearance_start_event_id": 14,
+    "prior_event_id": 14,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B",
+    "current_raw_pitch_sequence": ".CBBCBB"
+  },
+  {
+    "game_id": "SLN200105130",
+    "event_id": 18,
+    "appearance_start_event_id": 17,
+    "prior_event_id": 17,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BF",
+    "current_raw_pitch_sequence": "CFBBBFB"
+  },
+  {
+    "game_id": "SLN201208040",
+    "event_id": 18,
+    "appearance_start_event_id": 17,
+    "prior_event_id": 17,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1CSBN",
+    "current_raw_pitch_sequence": "1SSBN.X"
+  },
+  {
+    "game_id": "TBA199808040",
+    "event_id": 11,
+    "appearance_start_event_id": 10,
+    "prior_event_id": 10,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "FBB1",
+    "current_raw_pitch_sequence": "X"
+  },
+  {
+    "game_id": "TBA200607050",
+    "event_id": 82,
+    "appearance_start_event_id": 80,
+    "prior_event_id": 81,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B>FC.B",
+    "current_raw_pitch_sequence": "B>FC.FBX"
+  },
+  {
+    "game_id": "TEX197806231",
+    "event_id": 36,
+    "appearance_start_event_id": 35,
+    "prior_event_id": 35,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "C>S",
+    "current_raw_pitch_sequence": "C?S.*BBX"
+  },
+  {
+    "game_id": "TEX199106010",
+    "event_id": 74,
+    "appearance_start_event_id": 73,
+    "prior_event_id": 73,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": ".BBBCFX",
+    "current_raw_pitch_sequence": ".BBBCF"
+  },
+  {
+    "game_id": "TEX199610040",
+    "event_id": 82,
+    "appearance_start_event_id": 81,
+    "prior_event_id": 81,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "NP",
+    "current_raw_pitch_sequence": "BBCX"
+  },
+  {
+    "game_id": "TEX199806220",
+    "event_id": 46,
+    "appearance_start_event_id": 45,
+    "prior_event_id": 45,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "BBB",
+    "current_raw_pitch_sequence": "11BBBCX"
+  },
+  {
+    "game_id": "TEX200908150",
+    "event_id": 74,
+    "appearance_start_event_id": 72,
+    "prior_event_id": 73,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": ".BFF>F1N",
+    "current_raw_pitch_sequence": ".BSF>F1N.X"
+  },
+  {
+    "game_id": "TEX201104020",
+    "event_id": 26,
+    "appearance_start_event_id": 25,
+    "prior_event_id": 25,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "FC*B>B",
+    "current_raw_pitch_sequence": "FS*B>B.FX"
+  },
+  {
+    "game_id": "TOR198804290",
+    "event_id": 32,
+    "appearance_start_event_id": 31,
+    "prior_event_id": 31,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": ".B",
+    "current_raw_pitch_sequence": "1B.SX"
+  },
+  {
+    "game_id": "TOR199804290",
+    "event_id": 71,
+    "appearance_start_event_id": 70,
+    "prior_event_id": 70,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "FB1B",
+    "current_raw_pitch_sequence": "FB1S.S"
+  },
+  {
+    "game_id": "TOR199805310",
+    "event_id": 79,
+    "appearance_start_event_id": 78,
+    "prior_event_id": 78,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "C",
+    "current_raw_pitch_sequence": "X"
+  },
+  {
+    "game_id": "TOR200206060",
+    "event_id": 60,
+    "appearance_start_event_id": 58,
+    "prior_event_id": 58,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B",
+    "current_raw_pitch_sequence": "FBX"
+  },
+  {
+    "game_id": "TOR201606120",
+    "event_id": 25,
+    "appearance_start_event_id": 24,
+    "prior_event_id": 24,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "B>S",
+    "current_raw_pitch_sequence": "B>T.FX"
+  },
+  {
+    "game_id": "WS1192410090",
+    "event_id": 9,
+    "appearance_start_event_id": 8,
+    "prior_event_id": 8,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "CF1",
+    "current_raw_pitch_sequence": "BF1.FX"
+  }
+]

@@ -24,7 +24,7 @@ before doing it.
 
 ## Variants
 
-The 28 variants fall into six groups.
+The variants fall into six groups.
 
 ## Play-by-play, game-level
 
@@ -77,8 +77,30 @@ Source: `EventFieldingPlays` in `src/event_file/schemas.rs`.
 ### `event_pitch_sequences`
 One row per pitch in the event's pitch sequence, including pitch type,
 catcher pickoff target, runners-going flag, and blocked-by-catcher
-flag.
+flag. These are newly observed items for this event; previously exported
+appearance prefixes are excluded. Sequence IDs restart at one for each event.
+Join through `event_key` for the batter and pitcher who faced these pitches,
+including pitches recorded before a mid-appearance substitution.
 Source: `EventPitchSequences` in `src/event_file/schemas.rs`.
+
+### `event_pitch_sequence_status`
+One row per event: `game_id`, `event_id`, `event_key`,
+`appearance_start_event_id`, `status`, and the exact `raw_pitch_sequence`.
+All events in an appearance share `Resolved`, `Unavailable`, or `Unresolved`.
+Resolved means reconciled source history, not guaranteed complete observation.
+Unresolved appearances have no normalized pitch rows. Unavailable appearances
+have no parsed sequence items. Never convert either status to zero pitch totals.
+Source: `EventPitchSequenceStatus` in `src/event_file/schemas.rs`.
+
+### `event_pitch_sequence_issues`
+One row per conflict: `game_id`, `event_id`, `event_key`,
+`appearance_start_event_id`, `sequence_id`, `reason`, optional `prior_event_id`,
+`prior_raw_pitch_sequence`, and `current_raw_pitch_sequence`. Reasons are
+`TokenMismatch`, `CatcherPickoffConflict`, and `AmbiguousPickoffReplay`.
+Join `event_audit` for current/prior source file and line locations. The raw
+strings preserve empty values through Parquet conversion. Empty issue exports
+produce a typed zero-row Parquet file.
+Source: `EventPitchSequenceIssues` in `src/event_file/schemas.rs`.
 
 ### `event_flags`
 Free-form play-info flags emitted by the play parser (modifiers,

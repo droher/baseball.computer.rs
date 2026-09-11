@@ -21,7 +21,7 @@ use strum::ParseError;
 use strum_macros::{AsRefStr, Display, EnumDiscriminants, EnumIter, EnumString};
 
 use crate::event_file::misc::{regex_split, str_to_tinystr, to_str_vec};
-use crate::event_file::pitch_sequence::{PitchSequence, PitchSequenceItem};
+use crate::event_file::pitch_sequence::{ParsedPitchSequence, PitchSequenceItem};
 use crate::event_file::traits::{
     Batter, FieldingPlayType, FieldingPosition, Inning, RetrosheetEventRecord, Side,
 };
@@ -60,8 +60,8 @@ static RUNNER_ADVANCES_CACHE: LazyLock<Arc<Cache<String, Arc<Vec<RunnerAdvance>>
     LazyLock::new(|| preallocated_cache::<String, Vec<RunnerAdvance>>(10000));
 static PLAY_STATS_CACHE: LazyLock<Arc<Cache<String, Arc<PlayStats>>>> =
     LazyLock::new(|| preallocated_cache::<String, PlayStats>(10000));
-static PITCH_SEQUENCE_CACHE: LazyLock<Arc<Cache<String, Arc<PitchSequence>>>> =
-    LazyLock::new(|| preallocated_cache::<String, PitchSequence>(10000));
+static PITCH_SEQUENCE_CACHE: LazyLock<Arc<Cache<String, Arc<ParsedPitchSequence>>>> =
+    LazyLock::new(|| preallocated_cache::<String, ParsedPitchSequence>(10000));
 
 /// Instantiates a new cache with the given size and preallocates the given number of entries.
 /// This reduces the number of allocations needed to insert new entries into the cache.
@@ -1848,7 +1848,8 @@ pub struct PlayRecord {
     pub batting_side: Side,
     pub batter: Batter,
     pub count: Count,
-    pub pitch_sequence: Arc<PitchSequence>,
+    pub pitch_sequence: Arc<ParsedPitchSequence>,
+    pub raw_pitch_sequence: Arc<str>,
     pub parsed: Arc<ParsedPlay>,
     pub stats: Arc<PlayStats>,
     pub raw: Arc<String>,
@@ -1883,10 +1884,10 @@ impl PlayRecord {
         Ok((arced_raw_play, parsed_play, stats))
     }
 
-    fn get_pitch_sequence(sequence: &str) -> Result<Arc<PitchSequence>> {
+    fn get_pitch_sequence(sequence: &str) -> Result<Arc<ParsedPitchSequence>> {
         PITCH_SEQUENCE_CACHE.get(sequence).map_or_else(
             || {
-                let ps = Arc::new(PitchSequenceItem::new_pitch_sequence(sequence)?);
+                let ps = Arc::new(PitchSequenceItem::parse_pitch_sequence(sequence)?);
                 PITCH_SEQUENCE_CACHE.insert(sequence.into(), ps.clone());
                 Ok(ps)
             },
@@ -1907,12 +1908,8 @@ impl TryFrom<&RetrosheetEventRecord> for PlayRecord {
             batting_side: Side::from_str(record[2])?,
             batter: str_to_tinystr(record[3])?,
             count: Count::new(record[4]),
-            pitch_sequence: {
-                match record[5] {
-                    "" => Arc::new(PitchSequence::default()),
-                    s => Self::get_pitch_sequence(s)?,
-                }
-            },
+            raw_pitch_sequence: Arc::from(record[5]),
+            pitch_sequence: Self::get_pitch_sequence(record[5])?,
             parsed,
             stats,
             raw,

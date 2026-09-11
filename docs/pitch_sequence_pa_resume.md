@@ -1,22 +1,159 @@
-# PA-resumption catcher pickoff (`.+N`)
+# Pitch history and PA-resumption catcher pickoffs
 
-Retrosheet's pitch-sequence column carries the entire plate appearance, even
-when the PA spans multiple `play,` rows (e.g. because a stolen base, balk, or
-substitution interrupted it). A `.` separates the segments. The parser keeps
-only the segment after the **rightmost** `.` so a single PA's pitches aren't
-double-counted across event rows.
+`PitchSequenceItem::new_pitch_sequence` lexes the complete Retrosheet pitch
+field. A period is a separator, not evidence that the preceding pitches were
+already exported. For example, the first appearance records `BCBS.BT` in
+ANA202304070 event 22 and `FS.S` in ANA202504040 event 12 contain six and three
+pitches respectively. The former suffix-only parser exported only two and one.
 
-Occasionally a catcher pickoff occurs at the moment of resumption — Retrosheet
-encodes it as `+N` immediately after the `.`, before any new pitch. After
-trimming, the remainder begins with `+N…`, which is metadata for the next real
-pitch, not a pitch token itself.
+`PlayRecord` caches the complete lexical result, original token characters, and
+raw field. After game-state replay, `src/event_file/game_state.rs` resolves each
+appearance across its events. Period positions do not affect pitch identity.
+Unknown tokens retain their original identity: `U` cannot match `?`, nor can
+two different unrecognized characters match merely because their enums agree.
+No edit-distance, suffix-overlap, or count-based inference is used.
 
-The parser in `src/event_file/pitch_sequence.rs` consumes a leading `+N` from
-the trimmed segment and attaches it to the first real pitch as
-`catcher_pickoff_attempt`. Without that handling, `+` falls through to the
-pitch-type lookup and produces a phantom `Unrecognized` pitch, followed by a
-phantom `PickoffAttempt{First,Second,Third}` synthesized from the digit. The
-fix removes both phantoms and assigns the pickoff to the right pitch.
+Only newly observed items are assigned to the current event, with one-based
+event-local IDs. The cached sequence is never modified. For example,
+`CFBF*B>B` followed by `CFBF*B>B.B` emits six items and then one ball.
+`C1.` followed by `C1.>B` emits only the new runner-going ball.
+
+Matching pitch tokens may differ in annotations. Runner-going and blocked
+flags are combined by logical OR. A later catcher-pickoff annotation can fill
+an earlier missing annotation; an identical base is compatible, but different
+explicit bases conflict. Updates apply to the event that originally owned the
+pitch, preserving its batter and pitcher even across substitutions. A later
+omitted flag cannot erase an earlier observation. Raw fields retain every
+version of the annotations for auditing.
+
+A previously observed pitcher-pickoff throw may be absent from a later
+cumulative field. It stays attached to its original event. Only an exact
+ordered prefix with optional deletion of those prior throws is accepted;
+inserting a throw into the middle of recorded pitches or changing its base is
+unresolved. If an omitted throw later reappears at its old position, it is
+ambiguous whether it repeats the old throw or records a new one, so the
+appearance is quarantined. Repeated fouls and repeated throws are never
+collapsed just because their characters match.
+
+Trailing `N` placeholders may disappear, as in PIT202308210:
+`>B.*B*SCN` followed by `>B.*B*SC3.X`. The original `N` stays on its original
+event; only the new pickoff and in-play pitch are emitted later. Retained
+trailing markers are not emitted twice. Internal markers cannot move or
+disappear. The raw fields preserve these source changes.
+
+History survives empty fields, no-play records, comments, and substitutions.
+It resets after a plate-appearance result or the third out, including an
+inning-ending runner out during an unfinished appearance. Inning or batting
+side changes also establish a boundary.
+
+## Conflicts and explicit availability
+
+Each event has an `event_pitch_sequence_status` row containing its raw pitch
+field and appearance-start event ID. `Resolved` means the available records
+were reconciled without a sequence conflict; it does not assert that
+Retrosheet observed every real-world pitch. `Unavailable` means the whole
+appearance contains no parsed sequence items. A marker-only or pickoff-only
+appearance can be resolved and still have no delivered pitches.
+
+A conflict marks **every event in that appearance** `Unresolved` and removes
+all of its normalized pitch rows, including earlier rows. The game, ordinary
+play statistics, substitutions, counts, and raw fields remain intact. The
+`event_pitch_sequence_issues` table retains the reason, current and prior raw
+strings, and their event IDs. Join `event_audit` for original file/line
+locations. JSONL includes the same statuses, raw strings, and issue evidence.
+Comparison continues after a conflict to discover subsequent discrepancies;
+those comparisons cannot make any part of the appearance trusted again.
+
+Normal exports accept only the exact fingerprints in
+[pitch_sequence_reviewed_conflicts.json](pitch_sequence_reviewed_conflicts.json).
+Each entry records a reviewed decision to quarantine, not a corrected pitch
+sequence. Matching includes game, current/prior events, appearance start,
+reason, and both complete raw strings. An unexpected or changed conflict
+fails before any rows from that game are written. Failed runs can contain
+other games' partial output and must not be published.
+
+For discovery, use `--audit-pitch-conflicts` with a temporary output directory.
+It preserves unreviewed conflict evidence without failing on those conflicts.
+Review the issue rows and source records before extending the manifest; do
+not generate approvals automatically from every new audit. Rebuild the binary
+after updating the compiled manifest, then validate without the audit flag.
+
+## Catcher pickoffs at resumption
+
+A `+base` immediately after a period is pending metadata for the first pitch
+after resumption. It is consumed without synthesizing an unknown pitch or a
+pitcher pickoff. It remains pending across additional period markers. Both
+`B*BBC+1.+1F>X` pickoffs survive when the full appearance is first seen; if the
+first segment was already emitted, only the new segment is exported.
+A trailing `.+1` with no pitch emits no item, but a later cumulative record
+that supplies the next pitch attaches that pending annotation correctly.
+
+## Validation and regeneration
+
+Validation on 2026-09-11 used newly downloaded, unmodified
+[2023](https://www.retrosheet.org/events/2023eve.zip),
+[2024](https://www.retrosheet.org/events/2024eve.zip), and
+[2025](https://www.retrosheet.org/events/2025eve.zip) archives. All 7,289 games
+and 683,446 events matched their source identities, appearance histories,
+event-local pitch sequence IDs, pitch types, flags, and pickoff annotations.
+The original ANA games are regression fixtures under `tests/pitch_history`.
+
+Compared with the old suffix-only lexer, 59,908 event sequences change. The
+net recovery is 181,611 pitch entries plus 1,396 pitcher-pickoff throws.
+The corrected export contains 2,173,348 sequence items, including 759 `NoPitch`
+markers. Deduplicating the complete raw fields avoids repeating 146,596
+non-`NoPitch` items and 747 `NoPitch` markers.
+
+`bin/validate_pitch_sequences.py` independently reads original archives and
+checks the CSV export, including source count continuity and terminal pitch
+types. It distinguishes extraction failures (nonzero exit) from source-count
+and special-outcome findings. Four original sequences contain an extra ball
+relative to the stated count: CIN202409050 event 79, MIA202309220 event 110,
+OAK202304190 event 30, and SEA202503280 event 43. MIA202408250 event 87 has
+`VVVV` but a putout result (`2`). Three batter-interference records are reported
+as special outcomes. The source records are preserved; none is patched by
+this change. See [the saved validation report](pitch_sequence_validation_2023_2025.json).
+
+After extracting only the `.EVA` and `.EVN` archive members into a temporary
+input directory, reproduce the checks with:
+
+```bash
+cargo build
+target/debug/baseball-computer -i /tmp/pitch-validation/input -o /tmp/pitch-validation/output
+uv run python bin/validate_pitch_sequences.py --archives /tmp/pitch-validation/archives --output /tmp/pitch-validation/output --report /tmp/pitch-validation/report.json
+```
+
+`--max-games 1` runs a bounded validation smoke check. The regression suite is
+`cargo test`; lint with `cargo clippy --all-targets`.
+
+The historical discovery audit processed 205,886 games and 18,141,020 events.
+After reconciliation, 144 appearances in 141 games remain unresolved, spanning
+333 event rows. Their 145 diagnostics comprise 144 token disagreements and one
+conflicting catcher-pickoff base. All 145 exact source fingerprints were
+reviewed for quarantine and recorded in the manifest. These are conservative
+unresolved cases, not claimed source corrections. The earlier strict audit
+rejected 3,124 games, mostly because annotations disappeared in 1991–1992.
+The new audit continues through every conflict, so it also finds disagreements
+hidden behind those first annotation failures. See
+[pitch_impact_by_year.md](pitch_impact_by_year.md) and the
+[reconciliation CSV](pitch_history_reconciliation_by_year.csv).
+
+The normalized pitch CSV schema stays unchanged. Two new status/evidence
+tables accompany it, and JSONL gains the equivalent fields. Corrected values
+require regenerating the pitch export, both new tables, their Parquet files,
+and downstream pitch-derived tables. Downstream models must consume the status
+table before publication: unresolved or unavailable pitch totals must stay
+unknown, including mixed player/game/season aggregates, rather than becoming
+zero or a partial total. Follow the concrete
+[downstream migration requirements](pitch_sequence_downstream_migration.md).
+The downstream SQL changes and production regeneration are not part of this
+parser-only change.
+
+Keep source file ordering and the `event_key` namespace identical to retained
+event tables. A season-only run has different keys from a full-corpus run and
+cannot replace its source tables directly. The existing nonpitch CSV snapshots
+remain unchanged; the pitch snapshot changes and two new snapshots cover the
+status/evidence tables. No production data was rebuilt or published.
 
 ## Corpus occurrences (44)
 
@@ -75,12 +212,12 @@ raw value from the `play,` record; play column is the play description.
 
 A separate but related quirk: three corpus rows record a *second* catcher
 pickoff annotation for the same pitch, with no schema slot to hold it. The
-first pickoff is recorded on the previous pitch via the peek path; the
-duplicate `+N` (or `>+N` after a pickoff is already attached) is dropped
-silently in the main loop's control-char arm. The arm only consumes the
-`+` when the following char is a base digit (`1`/`2`/`3`/`H`); any other
-shape stays on the Unrecognized warn path so future Retrosheet additions
-don't get silently absorbed.
+same-base annotations are folded into one value and both remain visible in
+the raw field. Distinct bases produce structured conflict evidence and
+quarantine the appearance. The sequence-only lexical API returns an error
+for conflicting annotations; the parser uses the richer API to retain the
+evidence. Invalid `+` shapes remain unrecognized tokens rather than being
+absorbed as metadata.
 
 | File | Game | Inning | Batter | Pitch sequence | Play |
 |------|------|--------|--------|----------------|------|
@@ -96,14 +233,13 @@ don't get silently absorbed.
   event rows — the first segment ends with the pickoff (`POCS` is encoded on
   the *next* row's play); the parser must keep these in sync.
 - Edge case `2016PHI.EVN franm004 B*BBC+1.+1F>X` has *two* `+1` pickoffs
-  (one mid-segment, one at resumption). Both must survive — the rightmost-`.`
-  trim already drops the first, but the resumption pickoff must attach to the
-  first post-resumption pitch (`F`).
+  (one mid-segment, one at resumption). Both survive full-field lexing;
+  appearance history determines which event owns each pitch.
 - `1990SLN.EVN pagnt001 .+1` is the degenerate case: trimmed segment is
   `+1` with no following pitch. Pickoff has nothing to attach to; emit no
-  pitch and no warn.
+  pitch and no warning.
 
-## Regeneration
+## Reproducing the historical annotation inventory
 
 ```bash
 uv run python - <<'PY'

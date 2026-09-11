@@ -1,0 +1,375 @@
+{
+  "cases": {
+    "source_count_anomalies": [
+      {
+        "actual_count": [
+          3,
+          2
+        ],
+        "expected_count": [
+          4,
+          2
+        ],
+        "source": {
+          "batter_id": "stees001",
+          "batting_side": "1",
+          "count": "32",
+          "event_id": 79,
+          "filename": "2024CIN.EVN",
+          "game_id": "CIN202409050",
+          "inning": "8",
+          "line_number": 13195,
+          "raw_pitch_sequence": "BFB.BFBS",
+          "raw_play": "K"
+        }
+      },
+      {
+        "actual_count": [
+          3,
+          2
+        ],
+        "expected_count": [
+          4,
+          2
+        ],
+        "source": {
+          "batter_id": "sancj003",
+          "batting_side": "1",
+          "count": "32",
+          "event_id": 110,
+          "filename": "2023MIA.EVN",
+          "game_id": "MIA202309220",
+          "inning": "9",
+          "line_number": 12939,
+          "raw_pitch_sequence": "BCBSBFFBS",
+          "raw_play": "K"
+        }
+      },
+      {
+        "actual_count": [
+          3,
+          2
+        ],
+        "expected_count": [
+          4,
+          2
+        ],
+        "source": {
+          "batter_id": "aguij001",
+          "batting_side": "1",
+          "count": "32",
+          "event_id": 30,
+          "filename": "2023OAK.EVA",
+          "game_id": "OAK202304190",
+          "inning": "4",
+          "line_number": 1989,
+          "raw_pitch_sequence": ".BSBBCFBB",
+          "raw_play": "W"
+        }
+      },
+      {
+        "actual_count": [
+          3,
+          2
+        ],
+        "expected_count": [
+          4,
+          2
+        ],
+        "source": {
+          "batter_id": "brows003",
+          "batting_side": "0",
+          "count": "32",
+          "event_id": 43,
+          "filename": "2025SEA.EVA",
+          "game_id": "SEA202503280",
+          "inning": "6",
+          "line_number": 237,
+          "raw_pitch_sequence": "BFBBFBB",
+          "raw_play": "W"
+        }
+      }
+    ],
+    "source_count_overflows": [
+      {
+        "expected_count": [
+          4,
+          2
+        ],
+        "source": {
+          "batter_id": "stees001",
+          "batting_side": "1",
+          "count": "32",
+          "event_id": 79,
+          "filename": "2024CIN.EVN",
+          "game_id": "CIN202409050",
+          "inning": "8",
+          "line_number": 13195,
+          "raw_pitch_sequence": "BFB.BFBS",
+          "raw_play": "K"
+        }
+      },
+      {
+        "expected_count": [
+          4,
+          2
+        ],
+        "source": {
+          "batter_id": "sancj003",
+          "batting_side": "1",
+          "count": "32",
+          "event_id": 110,
+          "filename": "2023MIA.EVN",
+          "game_id": "MIA202309220",
+          "inning": "9",
+          "line_number": 12939,
+          "raw_pitch_sequence": "BCBSBFFBS",
+          "raw_play": "K"
+        }
+      },
+      {
+        "expected_count": [
+          4,
+          2
+        ],
+        "source": {
+          "batter_id": "aguij001",
+          "batting_side": "1",
+          "count": "32",
+          "event_id": 30,
+          "filename": "2023OAK.EVA",
+          "game_id": "OAK202304190",
+          "inning": "4",
+          "line_number": 1989,
+          "raw_pitch_sequence": ".BSBBCFBB",
+          "raw_play": "W"
+        }
+      },
+      {
+        "expected_count": [
+          4,
+          2
+        ],
+        "source": {
+          "batter_id": "brows003",
+          "batting_side": "0",
+          "count": "32",
+          "event_id": 43,
+          "filename": "2025SEA.EVA",
+          "game_id": "SEA202503280",
+          "inning": "6",
+          "line_number": 237,
+          "raw_pitch_sequence": "BFBBFBB",
+          "raw_play": "W"
+        }
+      }
+    ],
+    "terminal_pitch_mismatch": [
+      {
+        "event": {
+          "base_state": "6",
+          "batted_contact_strength": "Unknown",
+          "batted_location_angle": "Unknown",
+          "batted_location_depth": "Unknown",
+          "batted_location_general": "Unknown",
+          "batted_to_fielder": "2",
+          "batted_trajectory": "Unknown",
+          "batter_id": "sancj003",
+          "batter_lineup_position": "3",
+          "batting_side": "Home",
+          "batting_team_id": "MIA",
+          "count_balls": "3",
+          "count_strikes": "0",
+          "event_id": "87",
+          "event_key": "22457427",
+          "fielding_team_id": "CHN",
+          "frame": "Bottom",
+          "game_id": "MIA202408250",
+          "inning": "8",
+          "no_play_flag": "false",
+          "outs": "0",
+          "outs_on_play": "1",
+          "pitcher_id": "merrj001",
+          "plate_appearance_result": "InPlayOut",
+          "runs_batted_in": "0",
+          "runs_on_play": "0",
+          "specified_batter_hand": "",
+          "specified_pitcher_hand": "",
+          "strikeout_responsible_batter_id": "",
+          "team_unearned_runs": "0",
+          "walk_responsible_pitcher_id": ""
+        },
+        "source": {
+          "batter_id": "sancj003",
+          "batting_side": "1",
+          "count": "30",
+          "event_id": 87,
+          "filename": "2024MIA.EVN",
+          "game_id": "MIA202408250",
+          "inning": "8",
+          "line_number": 12831,
+          "raw_pitch_sequence": "VVVV",
+          "raw_play": "2"
+        }
+      }
+    ],
+    "terminal_special_outcome": [
+      {
+        "event": {
+          "base_state": "1",
+          "batted_contact_strength": "Unknown",
+          "batted_location_angle": "Unknown",
+          "batted_location_depth": "Unknown",
+          "batted_location_general": "Unknown",
+          "batted_to_fielder": "2",
+          "batted_trajectory": "Unknown",
+          "batter_id": "torrg001",
+          "batter_lineup_position": "1",
+          "batting_side": "Away",
+          "batting_team_id": "NYA",
+          "count_balls": "2",
+          "count_strikes": "1",
+          "event_id": "54",
+          "event_key": "11737704",
+          "fielding_team_id": "SEA",
+          "frame": "Top",
+          "game_id": "SEA202305300",
+          "inning": "6",
+          "no_play_flag": "false",
+          "outs": "2",
+          "outs_on_play": "1",
+          "pitcher_id": "sauct001",
+          "plate_appearance_result": "InPlayOut",
+          "runs_batted_in": "0",
+          "runs_on_play": "0",
+          "specified_batter_hand": "",
+          "specified_pitcher_hand": "",
+          "strikeout_responsible_batter_id": "",
+          "team_unearned_runs": "0",
+          "walk_responsible_pitcher_id": ""
+        },
+        "source": {
+          "batter_id": "torrg001",
+          "batting_side": "0",
+          "count": "21",
+          "event_id": 54,
+          "filename": "2023SEA.EVA",
+          "game_id": "SEA202305300",
+          "inning": "6",
+          "line_number": 4910,
+          "raw_pitch_sequence": "B*B1C>S",
+          "raw_play": "2/BINT"
+        }
+      },
+      {
+        "event": {
+          "base_state": "5",
+          "batted_contact_strength": "Unknown",
+          "batted_location_angle": "Unknown",
+          "batted_location_depth": "Unknown",
+          "batted_location_general": "Unknown",
+          "batted_to_fielder": "2",
+          "batted_trajectory": "Unknown",
+          "batter_id": "campk002",
+          "batter_lineup_position": "6",
+          "batting_side": "Away",
+          "batting_team_id": "BOS",
+          "count_balls": "1",
+          "count_strikes": "1",
+          "event_id": "7",
+          "event_key": "43863322",
+          "fielding_team_id": "TBA",
+          "frame": "Top",
+          "game_id": "TBA202504150",
+          "inning": "1",
+          "no_play_flag": "false",
+          "outs": "2",
+          "outs_on_play": "1",
+          "pitcher_id": "pepir001",
+          "plate_appearance_result": "InPlayOut",
+          "runs_batted_in": "0",
+          "runs_on_play": "0",
+          "specified_batter_hand": "",
+          "specified_pitcher_hand": "",
+          "strikeout_responsible_batter_id": "",
+          "team_unearned_runs": "0",
+          "walk_responsible_pitcher_id": ""
+        },
+        "source": {
+          "batter_id": "campk002",
+          "batting_side": "0",
+          "count": "11",
+          "event_id": 7,
+          "filename": "2025TBA.EVA",
+          "game_id": "TBA202504150",
+          "inning": "1",
+          "line_number": 2165,
+          "raw_pitch_sequence": "*B1CS",
+          "raw_play": "2/BINT"
+        }
+      },
+      {
+        "event": {
+          "base_state": "1",
+          "batted_contact_strength": "Unknown",
+          "batted_location_angle": "Unknown",
+          "batted_location_depth": "Unknown",
+          "batted_location_general": "Unknown",
+          "batted_to_fielder": "2",
+          "batted_trajectory": "Unknown",
+          "batter_id": "mccaj001",
+          "batter_lineup_position": "9",
+          "batting_side": "Away",
+          "batting_team_id": "BAL",
+          "count_balls": "1",
+          "count_strikes": "1",
+          "event_id": "21",
+          "event_key": "29587161",
+          "fielding_team_id": "TOR",
+          "frame": "Top",
+          "game_id": "TOR202406040",
+          "inning": "3",
+          "no_play_flag": "false",
+          "outs": "1",
+          "outs_on_play": "1",
+          "pitcher_id": "cabrg001",
+          "plate_appearance_result": "InPlayOut",
+          "runs_batted_in": "0",
+          "runs_on_play": "0",
+          "specified_batter_hand": "",
+          "specified_pitcher_hand": "",
+          "strikeout_responsible_batter_id": "",
+          "team_unearned_runs": "0",
+          "walk_responsible_pitcher_id": ""
+        },
+        "source": {
+          "batter_id": "mccaj001",
+          "batting_side": "0",
+          "count": "11",
+          "event_id": 21,
+          "filename": "2024TOR.EVA",
+          "game_id": "TOR202406040",
+          "inning": "3",
+          "line_number": 4880,
+          "raw_pitch_sequence": "B1F>S",
+          "raw_play": "2/BINT"
+        }
+      }
+    ]
+  },
+  "counters": {
+    "appearance_resets_plate_appearance": 549479,
+    "appearance_resets_third_out": 1299,
+    "count_checked": 683446,
+    "events_validated": 683446,
+    "games_checked": 7289,
+    "missing_resolution_rows": 0,
+    "output_events_not_selected": 0,
+    "resolution_rows_checked": 683446,
+    "source_count_anomalies": 4,
+    "source_count_overflows": 4,
+    "source_events": 683446,
+    "terminal_pitch_mismatch": 1,
+    "terminal_special_outcome": 3
+  }
+}

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Mutex;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumString};
 use tracing::warn;
@@ -10,9 +10,6 @@ use tracing::warn;
 use crate::event_file::play::Base;
 use crate::event_file::traits::SequenceId;
 
-// Dedup the unrecognized-pitch-char warn at most once per distinct char per
-// process. Without this, a single new char appearing on thousands of pitches
-// in a full-corpus run would flood the log.
 static UNRECOGNIZED_PITCH_CHARS_SEEN: Mutex<Option<HashSet<char>>> = Mutex::new(None);
 
 fn warn_unrecognized_pitch_char_once(c: char) {
@@ -106,6 +103,47 @@ pub struct PitchSequenceItem {
 
 pub type PitchSequence = Vec<PitchSequenceItem>;
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PitchSequenceAnnotationConflict {
+    pub token_index: usize,
+    pub existing: Base,
+    pub incoming: Base,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ParsedPitchSequence {
+    pub pitches: PitchSequence,
+    pub tokens: Vec<char>,
+    pub annotation_conflicts: Vec<PitchSequenceAnnotationConflict>,
+}
+
+fn catcher_annotation_follows(chars: &std::iter::Peekable<std::str::Chars<'_>>) -> bool {
+    let mut chars = chars.clone();
+    if chars.peek() == Some(&'>') {
+        chars.next();
+    }
+    chars.next() == Some('+') && matches!(chars.next(), Some('1' | '2' | '3' | 'H'))
+}
+
+fn update_pending_resume_pickoff(
+    pending_resume_pickoff: &mut Option<Base>,
+    incoming: Base,
+    token_index: usize,
+    annotation_conflicts: &mut Vec<PitchSequenceAnnotationConflict>,
+) {
+    match pending_resume_pickoff {
+        Some(existing) if *existing != incoming => {
+            annotation_conflicts.push(PitchSequenceAnnotationConflict {
+                token_index,
+                existing: *existing,
+                incoming,
+            });
+        }
+        None => *pending_resume_pickoff = Some(incoming),
+        _ => {}
+    }
+}
+
 impl PitchSequenceItem {
     fn new(sequence_id: usize) -> Result<Self> {
         Ok(Self {
@@ -132,37 +170,55 @@ impl PitchSequenceItem {
         self.runners_going = true;
     }
 
-    #[allow(clippy::unused_peekable)]
     pub fn new_pitch_sequence(str_sequence: &str) -> Result<PitchSequence> {
-        let mut pitches = Vec::with_capacity(10);
+        let parsed = Self::parse_pitch_sequence(str_sequence)?;
+        ensure!(
+            parsed.annotation_conflicts.is_empty(),
+            "Conflicting catcher-pickoff annotations in {str_sequence:?}"
+        );
+        Ok(parsed.pitches)
+    }
 
-        // If a single PA lasts multiple events (e.g. because of a stolen base or substitution),
-        // event rows will carry over the pitch sequence of all previous events in that PA.
-        // An interruption in the PA is indicated with "."
-        // To avoid double-counting, if there's a ".", we only take the sequence to the right of
-        // the right-most "." (Should I end that sentence with a period? How does that work)
-        let trimmed_sequence = if let Some((_, s)) = str_sequence.rsplit_once('.') {
-            s
-        } else {
-            str_sequence
-        };
-        let mut char_iter = trimmed_sequence.chars().peekable();
+    pub fn parse_pitch_sequence(str_sequence: &str) -> Result<ParsedPitchSequence> {
+        let mut pitches: PitchSequence = Vec::with_capacity(10);
+        let mut tokens = Vec::with_capacity(10);
+        let mut annotation_conflicts = Vec::new();
+
+        let mut char_iter = str_sequence.chars().peekable();
         let mut pitch = Self::new(1)?;
 
         let get_catcher_pickoff_base =
             { |c: Option<char>| Base::from_str(&c.unwrap_or('.').to_string()).ok() };
 
-        // PA-resume pickoff `.+N` — see docs/pitch_sequence_pa_resume.md.
-        let mut pending_resume_pickoff: Option<Base> = if char_iter.peek() == Some(&'+') {
+        let mut pending_resume_pickoff: Option<Base> = if char_iter.peek() == Some(&'+')
+            && matches!(char_iter.clone().nth(1), Some('1' | '2' | '3' | 'H'))
+        {
             char_iter.next();
             get_catcher_pickoff_base(char_iter.next())
         } else {
             None
         };
+        let mut annotation_target: Option<usize> = None;
 
         while let Some(c) = char_iter.next() {
             match c {
-                // Tokens indicating info on the upcoming pitch
+                '.' => {
+                    annotation_target = None;
+                    if char_iter.peek() == Some(&'+') {
+                        let mut next = char_iter.clone();
+                        next.next();
+                        if let Some(base) = get_catcher_pickoff_base(next.next()) {
+                            update_pending_resume_pickoff(
+                                &mut pending_resume_pickoff,
+                                base,
+                                tokens.len(),
+                                &mut annotation_conflicts,
+                            );
+                            char_iter = next;
+                        }
+                    }
+                    continue;
+                }
                 '*' => {
                     pitch.update_blocked_by_catcher();
                     continue;
@@ -171,12 +227,30 @@ impl PitchSequenceItem {
                     pitch.update_runners_going();
                     continue;
                 }
-                // Duplicate pickoff annotation — see docs/pitch_sequence_pa_resume.md.
-                // Drop `+N` only when the next char is a base digit; otherwise
-                // surface as Unrecognized so a future malformed pattern stays loud.
                 '+' => {
                     if matches!(char_iter.peek(), Some('1' | '2' | '3' | 'H')) {
-                        let _ = char_iter.next();
+                        let base = get_catcher_pickoff_base(char_iter.next());
+                        if let (Some(token_index), Some(incoming)) = (annotation_target, base) {
+                            let existing = pitches[token_index].catcher_pickoff_attempt;
+                            if existing.is_none() {
+                                pitches[token_index].update_catcher_pickoff(Some(incoming));
+                            } else if existing != Some(incoming) {
+                                annotation_conflicts.push(PitchSequenceAnnotationConflict {
+                                    token_index,
+                                    existing: existing.unwrap_or(incoming),
+                                    incoming,
+                                });
+                            }
+                        } else if let Some(incoming) = base
+                            && (pending_resume_pickoff.is_some() || pitches.is_empty())
+                        {
+                            update_pending_resume_pickoff(
+                                &mut pending_resume_pickoff,
+                                incoming,
+                                tokens.len(),
+                                &mut annotation_conflicts,
+                            );
+                        }
                         continue;
                     }
                 }
@@ -191,29 +265,18 @@ impl PitchSequenceItem {
             if let Some(base) = pending_resume_pickoff.take() {
                 pitch.update_catcher_pickoff(Some(base));
             }
-
-            match char_iter.peek() {
-                // Tokens indicating info on the previous pitch
-                Some('>') => {
-                    // ">+N" (~70 corpus occurrences, ~always a catcher pickoff
-                    // /CS) likely means the runner was going on the pickoff,
-                    // but PitchSequenceItem has no slot for "runners going on
-                    // previous pitch", so we keep the "+N" base and drop ">".
-                    let mut speculative_iter = char_iter.clone();
-                    if speculative_iter.nth(1) == Some('+') {
-                        pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(2)));
-                    }
-                }
-                Some('+') => {
-                    pitch.update_catcher_pickoff(get_catcher_pickoff_base(char_iter.nth(1)));
-                }
-                _ => {}
-            }
             let final_pitch = pitch;
             pitch = Self::new(final_pitch.sequence_id.get() + 1)?;
             pitches.push(final_pitch);
+            tokens.push(c);
+            let token_index = pitches.len() - 1;
+            annotation_target = catcher_annotation_follows(&char_iter).then_some(token_index);
         }
-        Ok(pitches)
+        Ok(ParsedPitchSequence {
+            pitches,
+            tokens,
+            annotation_conflicts,
+        })
     }
 }
 
@@ -224,6 +287,12 @@ mod tests {
 
     fn types(seq: &PitchSequence) -> Vec<PitchType> {
         seq.iter().map(|p| p.pitch_type).collect()
+    }
+
+    #[test]
+    fn sequence_only_api_rejects_conflicting_annotations() {
+        assert!(PitchSequenceItem::new_pitch_sequence("C+1+2B").is_err());
+        assert!(PitchSequenceItem::parse_pitch_sequence("C+1+2B").is_ok());
     }
 
     #[test]
@@ -255,8 +324,6 @@ mod tests {
 
     #[test]
     fn pitch_clock_violation_chars_map_to_automatic_pitches() {
-        // V = automatic ball (pitcher violation), A = automatic strike (batter violation).
-        // Both introduced with MLB pitch clock in 2023.
         let s = PitchSequenceItem::new_pitch_sequence("VA").unwrap();
         assert_eq!(
             types(&s),
@@ -266,31 +333,53 @@ mod tests {
 
     #[test]
     fn question_mark_aliases_unknown_pitch() {
-        // Retrosheet uses '?' for an unknown pitch in an otherwise-known sequence.
         let s = PitchSequenceItem::new_pitch_sequence("U?").unwrap();
         assert_eq!(types(&s), vec![PitchType::Unknown, PitchType::Unknown]);
     }
 
     #[test]
+    fn parsed_sequence_preserves_the_raw_character_for_each_pitch() {
+        let parsed = PitchSequenceItem::parse_pitch_sequence("U?.+1N1Z").unwrap();
+        assert_eq!(parsed.tokens, vec!['U', '?', 'N', '1', 'Z']);
+        assert_eq!(
+            types(&parsed.pitches),
+            vec![
+                PitchType::Unknown,
+                PitchType::Unknown,
+                PitchType::NoPitch,
+                PitchType::PickoffAttemptFirst,
+                PitchType::Unrecognized,
+            ]
+        );
+        assert_eq!(parsed.pitches[2].catcher_pickoff_attempt, Some(Base::First));
+    }
+
+    #[test]
     fn pitch_type_from_str_accepts_canonical_and_alias_for_unknown() {
-        // Lock down the alias semantics independent of the iterator path.
         assert_eq!(PitchType::from_str("U").unwrap(), PitchType::Unknown);
         assert_eq!(PitchType::from_str("?").unwrap(), PitchType::Unknown);
     }
 
     #[test]
-    fn dot_truncates_to_rightmost_segment() {
-        // PA spans events; only the segment after the last "." should be kept.
+    fn dot_preserves_all_unattributed_segments() {
         let s = PitchSequenceItem::new_pitch_sequence("BB.CX").unwrap();
-        assert_eq!(types(&s), vec![PitchType::CalledStrike, PitchType::InPlay]);
+        assert_eq!(
+            types(&s),
+            types(&PitchSequenceItem::new_pitch_sequence("BBCX").unwrap())
+        );
     }
 
     #[test]
-    fn multiple_dots_keep_only_final_segment() {
+    fn multiple_dots_preserve_all_pitches() {
         let s = PitchSequenceItem::new_pitch_sequence("B.C.SX").unwrap();
         assert_eq!(
             types(&s),
-            vec![PitchType::SwingingStrike, PitchType::InPlay]
+            vec![
+                PitchType::Ball,
+                PitchType::CalledStrike,
+                PitchType::SwingingStrike,
+                PitchType::InPlay
+            ]
         );
     }
 
@@ -317,65 +406,54 @@ mod tests {
     #[test]
     fn plus_records_catcher_pickoff_to_base() {
         let s = PitchSequenceItem::new_pitch_sequence("B+2C").unwrap();
-        // "B" picks up the "+2" as a catcher pickoff to second base.
         assert_eq!(s[0].catcher_pickoff_attempt, Some(Base::Second));
         assert_eq!(s[1].catcher_pickoff_attempt, None);
     }
 
     #[test]
     fn plus_followed_by_non_base_char_yields_no_pickoff() {
-        // "X" is not a valid base ("1", "2", "3", "H"); pickoff is None.
         let s = PitchSequenceItem::new_pitch_sequence("B+X").unwrap();
         assert_eq!(s[0].catcher_pickoff_attempt, None);
+        assert_eq!(
+            types(&s),
+            vec![PitchType::Ball, PitchType::Unrecognized, PitchType::InPlay]
+        );
     }
 
     #[test]
     fn pa_resume_pickoff_attaches_to_first_post_resume_pitch() {
-        // `BCS>B.+3FX` (e.g. MIN202309100 lewir003): rsplit gives `+3FX`.
-        // The `+3` is a catcher pickoff at the moment of PA resumption — it
-        // must attach to the first real pitch (`F`), not become its own
-        // Unrecognized pitch followed by a phantom PickoffAttemptThird.
         let s = PitchSequenceItem::new_pitch_sequence("BCS>B.+3FX").unwrap();
-        assert_eq!(types(&s), vec![PitchType::Foul, PitchType::InPlay]);
-        assert_eq!(s[0].catcher_pickoff_attempt, Some(Base::Third));
-        assert_eq!(s[1].catcher_pickoff_attempt, None);
+        assert_eq!(s.len(), 6);
+        assert_eq!(s[4].pitch_type, PitchType::Foul);
+        assert_eq!(s[4].catcher_pickoff_attempt, Some(Base::Third));
+        assert_eq!(s[5].catcher_pickoff_attempt, None);
     }
 
     #[test]
     fn pa_resume_pickoff_works_with_first_base() {
-        // `BB.+1BB` (TOR201805230 cozaz001).
         let s = PitchSequenceItem::new_pitch_sequence("BB.+1BB").unwrap();
-        assert_eq!(types(&s), vec![PitchType::Ball, PitchType::Ball]);
-        assert_eq!(s[0].catcher_pickoff_attempt, Some(Base::First));
-        assert_eq!(s[1].catcher_pickoff_attempt, None);
+        assert_eq!(types(&s), vec![PitchType::Ball; 4]);
+        assert_eq!(s[2].catcher_pickoff_attempt, Some(Base::First));
+        assert_eq!(s[3].catcher_pickoff_attempt, None);
     }
 
     #[test]
     fn pa_resume_pickoff_with_no_following_pitch_is_silent() {
-        // `.+1` (SLN199009300 pagnt001): degenerate case — the resumption
-        // pickoff has no following pitch. Emit nothing rather than a phantom.
         let s = PitchSequenceItem::new_pitch_sequence(".+1").unwrap();
         assert!(s.is_empty());
     }
 
     #[test]
-    fn pa_resume_pickoff_only_uses_rightmost_dot() {
-        // `B*BBC+1.+1F>X` (PHI201607010 franm004) has `+1` mid-sequence and
-        // another `+1` at PA resumption. The mid-sequence one is dropped by
-        // the rsplit (everything before the rightmost `.` goes away); the
-        // resumption one must still attach to `F`.
+    fn pa_resume_pickoff_preserves_pickoffs_on_both_segments() {
         let s = PitchSequenceItem::new_pitch_sequence("B*BBC+1.+1F>X").unwrap();
-        assert_eq!(types(&s), vec![PitchType::Foul, PitchType::InPlay]);
-        assert_eq!(s[0].catcher_pickoff_attempt, Some(Base::First));
-        assert!(s[1].runners_going);
+        assert_eq!(s.len(), 6);
+        assert_eq!(s[3].catcher_pickoff_attempt, Some(Base::First));
+        assert_eq!(s[4].catcher_pickoff_attempt, Some(Base::First));
+        assert!(s[5].runners_going);
     }
 
     #[test]
     fn duplicate_pickoff_annotation_is_dropped_silently() {
-        // `BBBC+1+1B` (WAS202508220 abrac001): C records pickoff to first
-        // via the peek path; the second `+1` is a duplicate annotation with
-        // no schema slot. Drop it rather than emit a phantom Unrecognized
-        // pitch + phantom PickoffAttemptFirst.
         let s = PitchSequenceItem::new_pitch_sequence("BBBC+1+1B").unwrap();
         assert_eq!(
             types(&s),
@@ -391,11 +469,82 @@ mod tests {
     }
 
     #[test]
+    fn conflicting_pickoff_annotations_are_reported_without_dropping_the_pitch() {
+        let parsed = PitchSequenceItem::parse_pitch_sequence("C+1+2B").unwrap();
+        assert_eq!(parsed.pitches[0].catcher_pickoff_attempt, Some(Base::First));
+        assert_eq!(
+            parsed.annotation_conflicts,
+            vec![PitchSequenceAnnotationConflict {
+                token_index: 0,
+                existing: Base::First,
+                incoming: Base::Second,
+            }]
+        );
+        assert_eq!(parsed.tokens, vec!['C', 'B']);
+    }
+
+    #[test]
+    fn pending_resume_pickoff_conflicts_with_a_postfix_pickoff() {
+        let parsed = PitchSequenceItem::parse_pitch_sequence(".+1F+2").unwrap();
+        assert_eq!(parsed.pitches[0].catcher_pickoff_attempt, Some(Base::First));
+        assert_eq!(
+            parsed.annotation_conflicts,
+            vec![PitchSequenceAnnotationConflict {
+                token_index: 0,
+                existing: Base::First,
+                incoming: Base::Second,
+            }]
+        );
+    }
+
+    #[test]
+    fn pending_pickoff_conflicts_preserve_the_first_base_without_a_pitch() {
+        for sequence in [".+1.+2F", "+1+2F"] {
+            let parsed = PitchSequenceItem::parse_pitch_sequence(sequence).unwrap();
+            assert_eq!(parsed.pitches[0].catcher_pickoff_attempt, Some(Base::First));
+            assert_eq!(
+                parsed.annotation_conflicts,
+                vec![PitchSequenceAnnotationConflict {
+                    token_index: 0,
+                    existing: Base::First,
+                    incoming: Base::Second,
+                }]
+            );
+            assert!(PitchSequenceItem::new_pitch_sequence(sequence).is_err());
+        }
+        let parsed = PitchSequenceItem::parse_pitch_sequence(".+1.+2").unwrap();
+        assert!(parsed.pitches.is_empty());
+        assert_eq!(parsed.annotation_conflicts[0].token_index, 0);
+        assert!(PitchSequenceItem::new_pitch_sequence(".+1.+2").is_err());
+    }
+
+    #[test]
+    fn resumption_conflicts_target_the_next_pitch_instead_of_a_prior_annotation() {
+        let parsed = PitchSequenceItem::parse_pitch_sequence("B+1.+2+1F").unwrap();
+        assert_eq!(parsed.pitches[0].catcher_pickoff_attempt, Some(Base::First));
+        assert_eq!(
+            parsed.pitches[1].catcher_pickoff_attempt,
+            Some(Base::Second)
+        );
+        assert_eq!(
+            parsed.annotation_conflicts,
+            vec![PitchSequenceAnnotationConflict {
+                token_index: 1,
+                existing: Base::Second,
+                incoming: Base::First,
+            }]
+        );
+    }
+
+    #[test]
+    fn duplicate_pending_pickoff_annotations_fold() {
+        let parsed = PitchSequenceItem::parse_pitch_sequence(".+1.+1F").unwrap();
+        assert_eq!(parsed.pitches[0].catcher_pickoff_attempt, Some(Base::First));
+        assert!(parsed.annotation_conflicts.is_empty());
+    }
+
+    #[test]
     fn arrow_plus_after_already_pickoffed_pitch_drops_extra() {
-        // `M+1>+1` (BAL201706050 buxtb001): M takes pickoff to first via
-        // peek; the trailing `>+1` is a duplicate annotation. The `>` flips
-        // runners_going on the next (never-emitted) pitch slot; the bare
-        // `+1` is dropped silently.
         let s = PitchSequenceItem::new_pitch_sequence("M+1>+1").unwrap();
         assert_eq!(types(&s), vec![PitchType::MissedBunt]);
         assert_eq!(s[0].catcher_pickoff_attempt, Some(Base::First));
@@ -403,9 +552,6 @@ mod tests {
 
     #[test]
     fn arrow_followed_by_plus_pickoff_still_works() {
-        // Regression: ensure the existing `>+N` handling (runners going +
-        // catcher pickoff on the previous pitch) still works after the
-        // resume-pickoff change.
         let s = PitchSequenceItem::new_pitch_sequence("B>+2C").unwrap();
         assert_eq!(types(&s), vec![PitchType::Ball, PitchType::CalledStrike]);
         assert_eq!(s[0].catcher_pickoff_attempt, Some(Base::Second));

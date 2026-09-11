@@ -1,92 +1,13 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Rust Retrosheet parser. Project guidance:
 
-## Project context
+- [Project context](.claude/rules/parser-context.md)
+- [Workspace](.claude/rules/workspace.md)
+- [Build / run](.claude/rules/build.md)
+- [Tests / lint](.claude/rules/validation.md)
+- [Downstream Python pipeline (`bin/`)](.claude/rules/python-pipeline.md)
+- [Architecture](.claude/rules/architecture.md)
+- [Conventions specific to this repo](.claude/rules/conventions.md)
 
-Rust parser that turns raw [Retrosheet](https://www.retrosheet.org/) event/box-score files into structured CSVs (and optionally JSONL). Downstream, those CSVs are converted to Parquet and consumed by the `baseball.computer` dbt pipeline. Retrosheet's event format is a stateful text format — the parser maintains full per-game state (lineup, runners, outs, score) to derive every output column.
-
-**Status (2026-05-03):** Active. Legacy parser runs cleanly on current Retrosheet corpus (assembled by `bin/fetch_retrosheet.py` from retrosheet.org per-year + bundle URLs; the older `alldata.zip` workflow is deprecated since the published bundle lags by months). Full corpus = 205,886 games / 18.14M events in ~5s on a 14-core M-series Mac (down from ~12s after the 2026-05-03 perf rewrite — see Architecture for details), with 11 known WARNs from play-by-play parsing (six internal NLB box-file dupes in `1913.EBR`/`1926.EBR`; four pitcher-responsibility-for-non-existent-runner cases — `riege101`, `willv101`, `steeb102`, `oescj101` (BSN191409102 ER-attribution loss); one `info,hometeam,BIR ` whitespace strip in BIR194806210). `GameContext::new` calls `reconcile_with_game_id` (in `event_file/game_state.rs`), which checks the `id,...` record against `info,date` and `info,hometeam`, and uses the game ID suffix to set `doubleheader_status` when no `info,number` record is present. On the current corpus that prints WARNs for ~2,549 games with no `info,number` (mostly box-score doubleheaders before 1920), one game whose ID and `info,number` disagree (HOM194509200), and three games whose ID is only 10 characters long (BLG4806220, CAG4807160, NY54805251). The parser logs each case and keeps going. Fifteen games require the idempotent fix-up applied by `uv run python bin/patch_known_corpus_bugs.py <retrosheet_dir>` before parsing (ATN193807032 batter swap; CIN191007090 stray-space `data,er`; WS1191105040 `5-3` → `53` fielders; CHN198404200 lowercase-`x` pitch-char typo on davij001's groundout; CIN197510140/LAN197410090/KCA198706160 stray `00`/`01` pitch chars on `NP` no-play rows; eight NLB box-score `info,site,...` park-ID typos in `ngl_b/{1921,1941,1946,1947,1948}.EBR` — `PHi17`→`PHI17`, `DEC01`→`DCT01`, 5×`DEC02`→`DCT02`, `CHESTER PA`→`CHE01`) — re-run it after every fresh fetch. Catcher-pickoff metadata at PA resumption (`.+N`, 44 corpus rows; see `docs/pitch_sequence_pa_resume.md`) is handled directly in `pitch_sequence.rs` rather than patched in the data — the `+N` is consumed from the trimmed segment and attached to the first post-resumption pitch. The `info`-value trim is scoped to known string-typed fields (team/site/scorer/inputter/translator/wp/lp/save/gwrbi/umps); strict-parsed fields (date, numbers, bool, enum lookups) keep their original strict behavior so corrupt structured values still fail loudly. The legacy parser is the long-lived implementation — no rewrite in flight.
-
-Upstream raw data is fetched directly from retrosheet.org via `bin/fetch_retrosheet.py` (see Build/run section). Output Parquet files are published to Cloudflare R2 (`s3://timeball/event`, `s3://timeball/misc`) and feed the dbt project at `droher/baseball.computer`.
-
-## Build / run
-
-```bash
-cargo build --release
-# Input dir contains Retrosheet files (.EVA/.EVN/.EVE/.EBA/.EBN, etc.); output dir is created if missing.
-./target/release/baseball-computer -i <retrosheet_dir> -o <csv_out_dir>
-# JSON mode (single games.jsonl, no per-schema CSVs):
-./target/release/baseball-computer -i <retrosheet_dir> -o <out_dir> --json
-```
-
-CI builds with PGO via `.cargo/config.toml` (`-Cprofile-use=/tmp/pgo-data/merged.profdata`); local debug/release builds without that profdata work fine.
-
-## Tests / lint
-
-```bash
-cargo test                   # unit + integration; ~1s for the suite
-cargo clippy --all-targets   # lint level is strict — see main.rs
-cargo fmt
-```
-
-Unit tests live as inline `#[cfg(test)] mod tests` blocks at the bottom of each `src/event_file/*.rs` module — they cover pitch sequence parsing, play parsing (`ParsedPlay::try_from`, `PlayStats` invariants), info records, box-score lines, and the `MappedRecord` dispatch. Integration tests in `tests/integration.rs` invoke the compiled binary against `tests/fixtures/events/` (fixtures spanning All-Star, postseason wild card, deduced PBP, single-game box score, dead-ball regression cases `1914_BSN.EVN` for bogus `presadj` and `1948_BIR.EBR` for trailing-space `info` values, plus `2023ALW1.EVE` for a deep substitution chain and `2023NLW1.EVE` for comments interleaved with subs/plays) and assert schema-level invariants on the resulting CSV/JSONL — row counts, `event_key` uniqueness, `events → games` referential integrity, and rerun determinism. `csv_snapshots_are_stable` additionally pins canonicalized (sort body, keep header) snapshots of every CSV output under `tests/snapshots/all_fixtures/`. Run `BLESS=1 cargo test csv_snapshots_are_stable` to regenerate after intentional output changes. JSONL is not snapshotted because some rows preserve `Vec` field ordering (e.g. `out_on_play`) which currently varies across runs (HashMap iteration upstream). The fixtures are checked into the repo.
-
-Full-corpus validation remains the final gate: run the binary against the full Retrosheet corpus and diff Parquet output downstream. Before validating, run `uv run python bin/audit_codes.py <retrosheet_dir>` to surface any codes the parser silently maps to `Unrecognized`/`Unknown` (pitch chars, info keys/values, stat/event tags, record types). Exits non-zero if any code in the corpus is missing from the corresponding Rust enum — the audit caught the `A` pitch-clock-violation strike code that was silently dropped on the 2023+ corpus, and is the canonical way to detect new Retrosheet additions before they hit downstream.
-
-`main.rs` declares `#![forbid(unsafe_code)]` and `#![deny(clippy::all, clippy::cargo)]` plus warn-level `nursery`/`pedantic`/`unwrap_used`/`expect_used`. Don't relax these globally — prefer per-call `#[allow(...)]` only at justified `expect()` sites (mirroring existing code). The current baseline has 56 pre-existing `clippy::all` errors in `src/event_file/{game_state,play,parser,box_score}.rs`; treat them as a known cleanup task, not a blocker.
-
-## Downstream Python pipeline (`bin/`)
-
-After the Rust parser writes CSVs, `bin/parquet.py` and `bin/simple_files.py` produce the Parquet files actually consumed downstream. Per global rules, run Python with `uv`:
-
-```bash
-uv sync                                                     # default deps (pyarrow/pandas/sqlalchemy/boxball-schemas)
-uv sync --extra ci                                          # adds awscli for `uv run aws s3 sync ...`
-uv run python bin/parquet.py                                # csv/*.csv -> parquet/*.parquet (zstd, dictionary, DELTA_BINARY_PACKED on event_key)
-uv run python bin/simple_files.py                           # gamelog/schedule/park/roster/bio CSV concat + parquet
-uv run python bin/biodata.py                                # retrosheet/{teams,coaches,relatives,ejections,managers0,umpires0}.csv -> biodata/*.parquet
-uv run python bin/fetch_retrosheet.py -o retrosheet         # assembles a fresh corpus from retrosheet.org per-year + bundle URLs
-uv run python bin/patch_known_corpus_bugs.py <retrosheet>   # idempotent in-place fixes for game records the parser cannot resolve (15 games — see Status block)
-```
-
-`bin/biodata.py` writes to `biodata/*.parquet` and is synced to `s3://timeball/biodata` alongside the existing `event/` and `misc/` paths. It applies one well-known fixup: two malformed `ejections.csv` rows for game `NY1191108192` carry an extra empty field between `EJECTEENAME` and `TEAM`; the script drops the empty field on read and warns. All date columns are strict-parsed (`m/d/Y` for ejections/coaches, `YYYYMMDD` for managers0/umpires0) — bad dates fail loudly.
-
-Deps live in `pyproject.toml` + `uv.lock`. CI installs with `uv sync --extra ci --frozen`. The `ci` extra (awscli + a `pyyaml>=6.0.1` override — awscli's lower bound otherwise resolves to 5.4.1, whose sdist no longer builds on Cython 3+) is gated off the default deps so local `uv sync` stays minimal.
-
-## Architecture
-
-Entry point: `src/main.rs`. Module tree: `src/event_file/` (declared via `src/event_file.rs`).
-
-**Three-pass file processing.** `FileProcessor::process_files` runs three passes in sequence: conventional play-by-play, deduced play-by-play, then box scores. Each pass globs the input dir via `AccountType::glob`, sorts files alphabetically (to assign a stable per-file index used in `event_key` namespacing), then re-sorts by size descending so the largest files start first. Game IDs are tracked in two `HashSet<GameId>`s on `FileProcessor`: PBP and Deduced share `pbp_game_ids`; BoxScore uses its own `box_game_ids` because every PBP game also has a box-score row by design. Cross-file dupes within a single pass are caught by a per-pass `papaya::HashSet<GameId>` (`claimed_games`) — lock-free, no mutex contention. NLB All-Star/postseason `.EVR` dupes are filtered via `contains_nlb_dupes` (TODO to remove once raw data is fixed).
-
-**Per-file pipeline.** `RetrosheetReader` (in `event_file/parser.rs`) is a stateful iterator that yields one `RecordVec` per game (a slice of `MappedRecord`s plus a line offset). For each game, `GameContext::new` (in `event_file/game_state.rs`) replays the records to produce a fully resolved `GameContext` containing events, lineup/fielding appearances, baserunner movements, etc. JSON mode serializes `GameContext` straight to `games.jsonl`; box-score files go through `EventFileSchema::write_box_score_files`; play-by-play goes through `write_play_by_play_files`.
-
-**Within-pass scheduling.** Each pass runs a `rayon::scope` with one task per worker thread. Every task plays both reader and consumer roles: it tries the game-task channel first, and only if that's empty does it pull a file off a shared file queue, open a `RetrosheetReader`, and pump that file's games into the channel. The send side uses `try_send` with drain-on-full — when the bounded game-task channel is full, the would-be sender consumes one game first to avoid parking every thread on `send`. When a thread can't claim any more files, it drops its sender clone; once all clones are dropped the receiver returns disconnected and remaining threads exit. Net effect: workers stay busy across file boundaries with no inner per-file fork-join barrier.
-
-**Writer fan-out.** `EventFileSchema` is a `strum::EnumIter` enum (one variant per output table — see ~28 variants in `main.rs`). At startup, `WriterMap` spawns one dedicated `std::thread` per schema (`write-{schema}`); each owns a `BufWriter<File>` over the final CSV and drains a `crossbeam_channel::unbounded::<WriteChunk>` of pre-serialized byte chunks. There is no shard-and-concat phase. Workers serialize rows into a `thread_local!` `HashMap<EventFileSchema, ThreadSchemaBuffer>` (a `csv::Writer<Vec<u8>>` plus a `is_first_batch` flag); when a buffer crosses `BATCH_THRESHOLD_BYTES` (64 KiB) the worker swaps in a fresh writer and ships the bytes through the channel. Header handling: each schema's `has_header_written: AtomicBool` is CAS-claimed at send time. The first chunk to win the CAS keeps its header; later chunks split off the leading header line before sending. Box-score line variants set `uses_custom_header()`; their writers run with `has_headers(false)` and the first row of the first batch manually serializes `BoxScoreWritableRecord::generate_header()`. After parsing finishes, `rayon::broadcast` runs `WriterMap::flush_local` on every rayon worker to ship leftover under-threshold buffers, then `WriterMap::close` drops senders and joins writer threads. The writer-thread loop tolerates body chunks arriving before the header chunk by buffering them in a per-thread pending Vec until the header chunk shows up.
-
-**Schema serialization.** `event_file/schemas.rs` defines the row structs and the `ContextToVec` trait (`from_game_context(&GameContext) -> Vec<Self>`). The generic `WriterMap::write_csv::<C: ContextToVec>` is the standard path; non-`ContextToVec` outputs (`Games`, `BoxScoreLineScores`, comment streams, `EventFlags`, lineup/fielding appearances) write inline in `write_play_by_play_files` / `write_box_score_files`.
-
-**Event key namespacing.** Each file's events are assigned globally unique `event_key`s by offsetting `(self.index + i) * EVENT_KEY_BUFFER` (constant in `event_file/traits.rs`). Don't reorder file processing without preserving this contract — the Parquet step in `bin/parquet.py` sorts by `event_key` and uses `DELTA_BINARY_PACKED` encoding for it.
-
-**Play parsing cache.** `event_file/play.rs` uses `quick_cache` with stats; `print_cache_info()` runs at end of `main()`. Cache hit rate matters for full-corpus runs. Don't disable stats casually.
-
-### Module map (`src/event_file/`)
-
-- `parser.rs` — `RetrosheetReader`, `AccountType` (PlayByPlay / Deduced / BoxScore), `MappedRecord`, `RecordSlice`. Hand-rolled parser; long-lived (no rewrite in flight).
-- `game_state.rs` — `GameContext` + `GameState` state machine that replays records. Owned-self shell: `update`, `update_on_*`, `fold_appearance_delta`, and `build_event` consume `self` and return the next state, so `create_events` is a `try_fold`. Per-event build splits into `capture_pre_play_snapshot` (pre-update view of bases/outs/rare_attributes, `&self`) and `build_event` (post-update assembly, consumes `self` to drain comments and returns `(Self, Event)`). Submodules `base_state.rs` and `personnel.rs` expose only owned-value transitions — `BaseState` and `Personnel` have zero `&mut self` methods. Inter-play comments accumulate via `CommentAccumulator`.
-- `play.rs` — play-string parsing + `quick_cache`.
-- `pitch_sequence.rs` — pitch-sequence parsing.
-- `box_score.rs` — `BoxScoreLine` / `BoxScoreEvent` enums.
-- `info.rs` — `info,` field handling.
-- `misc.rs` — `GameId` and small helpers.
-- `traits.rs` — `GameType`, `EVENT_KEY_BUFFER`.
-- `schemas.rs` — every output row struct + `ContextToVec`.
-
-## Conventions specific to this repo
-
-- Adding a new output table = add an `EventFileSchema` enum variant in `main.rs`, a row struct + (usually) `ContextToVec` impl in `schemas.rs`, and a write call in `write_play_by_play_files` or `write_box_score_files`. The `WriterMap`, header logic, and CSV path follow automatically from the enum.
-- Output filenames are `{schema}.csv` where `schema` is the `snake_case` strum display of the variant — `bin/parquet.py` reads from `csv/*.csv` and writes `parquet/*.parquet` by stem, so renaming a variant renames the downstream Parquet file and breaks dbt sources.
-- Schema changes must stay aligned with `baseball.computer`'s staging models. Coordinate before renaming columns. See [`docs/schema.md`](docs/schema.md) for the full variant→struct→filename map.
-- `event/` and `data/` directories are generated artifacts (gitignored). `alldata.zip` at the repo root is a local Retrosheet snapshot (also gitignored content-wise).
+Pitch-history extraction and validation: [docs/pitch_sequence_pa_resume.md](docs/pitch_sequence_pa_resume.md).

@@ -1,0 +1,183 @@
+id,ANA202504040
+version,2
+info,visteam,CLE
+info,hometeam,ANA
+info,site,ANA01
+info,date,2025/04/04
+info,number,0
+info,gametype,regular
+info,starttime,6:38PM
+info,daynight,night
+info,innings,9
+info,tiebreaker,2
+info,usedh,true
+info,umphome,vondc901
+info,ump1b,belld901
+info,ump2b,cuzzp901
+info,ump3b,randt901
+info,umplf,(none)
+info,umprf,(none)
+info,inputtime,2025/06/28 09:11:34
+info,howscored,unknown
+info,pitches,pitches
+info,oscorer,munse701
+info,temp,65
+info,winddir,torf
+info,windspeed,8
+info,fieldcond,unknown
+info,precip,none
+info,sky,sunny
+info,timeofgame,194
+info,attendance,44749
+info,wp,herrt002
+info,lp,sorij002
+info,save,
+start,kwans001,"Steven Kwan",0,1,7
+start,ramij003,"Jose Ramirez",0,2,5
+start,santc002,"Carlos Santana",0,3,3
+start,manzk001,"Kyle Manzardo",0,4,10
+start,thoml002,"Lane Thomas",0,5,8
+start,noelj001,"Jhonkensy Noel",0,6,9
+start,naylb001,"Bo Naylor",0,7,2
+start,ariag002,"Gabriel Arias",0,8,4
+start,roccb001,"Brayan Rocchio",0,9,6
+start,willg004,"Gavin Williams",0,0,1
+start,wardt002,"Taylor Ward",1,1,7
+start,troum001,"Mike Trout",1,2,9
+start,solej001,"Jorge Soler",1,3,10
+start,moncy001,"Yoan Moncada",1,4,5
+start,ohopl001,"Logan O'Hoppe",1,5,2
+start,schan001,"Nolan Schanuel",1,6,3
+start,rengl001,"Luis Rengifo",1,7,4
+start,adelj001,"Jo Adell",1,8,8
+start,newmk001,"Kevin Newman",1,9,6
+start,sorij002,"Jose Soriano",1,0,1
+play,1,0,kwans001,01,CX,63/G6
+play,1,0,ramij003,10,BX,HR/L9D
+play,1,0,santc002,21,CBBX,9/L9D+
+play,1,0,manzk001,11,FBX,S9/L9
+play,1,0,thoml002,32,BBBCS>S,K
+play,1,1,wardt002,10,BX,9/F89D
+play,1,1,troum001,22,BSC.BX,HR/F89XD
+play,1,1,solej001,11,BFX,S64/G6M
+play,1,1,moncy001,11,FBX,8/F8D+
+play,1,1,ohopl001,32,SFFBF*BF*B>B,W.1-2
+play,1,1,schan001,01,FX,6(1)/FO/G6.B-1
+play,2,0,noelj001,02,FS.S,K
+play,2,0,naylb001,22,BBFSS,K
+play,2,0,ariag002,32,BSBC.BFB,W
+play,2,0,roccb001,00,X,D8/L89D+.1-H;B-3
+play,2,0,kwans001,01,CX,63/G6
+play,2,1,rengl001,00,.X,D8/L78D+
+play,2,1,adelj001,32,BBFC*BFS,K
+play,2,1,newmk001,12,2FBS.S,K
+play,2,1,wardt002,32,CBBFBFX,63/G6+
+play,3,0,ramij003,22,BCBT.S,K
+play,3,0,santc002,12,BCF.S,K
+play,3,0,manzk001,32,BBCBF.S,K
+play,3,1,troum001,31,BBCBB,W
+play,3,1,solej001,12,BF1SS,K
+play,3,1,moncy001,31,BBBC1B,W.1-2
+play,3,1,ohopl001,22,BSFBS,K
+play,3,1,schan001,11,BCX,S8/L8.2-H;1-2
+play,3,1,rengl001,02,CF.X,FC/G56S.2-3;1-2(E5);B-1
+play,3,1,adelj001,11,CBX,S8/G6M.3-H(UR);2-H(UR);1-2
+play,3,1,newmk001,02,FF.FS,K
+play,4,0,thoml002,00,,NP
+sub,parik002,"Kyren Paris",1,7,4
+play,4,0,thoml002,12,.CBFS,K
+play,4,0,noelj001,10,BX,43/G4
+play,4,0,naylb001,10,BX,8/L8D
+play,4,1,wardt002,00,,NP
+sub,junij001,"Jakob Junis",0,0,1
+play,4,1,wardt002,22,.BCCBFFX,63/G6
+play,4,1,troum001,12,BTS.S,K
+play,4,1,solej001,12,BFFS,K
+play,5,0,ariag002,00,X,S9/G34
+play,5,0,roccb001,22,BCB1SX,6(1)3/GDP/G6
+play,5,0,kwans001,31,BBBCB,W
+play,5,0,ramij003,22,BCBSX,HR/F9LD.1-H
+play,5,0,santc002,22,BBCFFS,K
+play,5,1,moncy001,00,,NP
+sub,herrt002,"Tim Herrin",0,0,1
+play,5,1,moncy001,31,.CBBBX,D9/F9LS
+play,5,1,ohopl001,02,F*SFC,K
+play,5,1,schan001,32,CBBBC.B,W
+play,5,1,parik002,11,BCH,HP.2-3;1-2
+play,5,1,adelj001,12,FC*BS,K
+play,5,1,newmk001,00,X,8/F89
+play,6,0,manzk001,32,BCFBB.*B,W
+play,6,0,thoml002,02,SFF*S,K
+play,6,0,noelj001,00,,NP
+sub,zefer001,"Ryan Zeferjahn",1,0,1
+play,6,0,noelj001,00,.,NP
+sub,jonen002,"Nolan Jones",0,6,11
+play,6,0,jonen002,12,..BCFX,6/P6MD
+play,6,0,naylb001,32,CSBBB>B,W.1-2
+play,6,0,ariag002,00,,NP
+sub,detmr001,"Reid Detmers",1,0,1
+play,6,0,ariag002,32,.BCBSB>B,W.2-3;1-2
+play,6,0,roccb001,12,SBFFX,S57/G56.3-H;2-H;1-3
+play,6,0,kwans001,02,CC>F>B,CS2(26)
+play,6,1,wardt002,00,,NP
+sub,jonen002,"Nolan Jones",0,6,9
+play,6,1,wardt002,00,.,NP
+sub,smitc009,"Cade Smith",0,0,1
+play,6,1,wardt002,22,..CBBSS,K
+play,6,1,troum001,32,CBBBFX,9/F89D
+play,6,1,solej001,22,BBCC.*S,K
+play,7,0,kwans001,00,,NP
+sub,danac001,"Caden Dana",1,0,1
+play,7,0,kwans001,22,.CFBBX,S8/L8
+play,7,0,ramij003,31,1CBBB1>B,W.1-2
+play,7,0,santc002,32,B2SBS.FFF*BX,46(1)/FO/G34.2-3;B-1
+play,7,0,manzk001,22,CTBBX,7/SF/F7D.3-H
+play,7,0,thoml002,21,BBCX,D57/G56.1-3
+play,7,0,jonen002,32,CVBBSX,143/G13
+play,7,1,moncy001,00,,NP
+sub,sewap001,"Paul Sewald",0,0,1
+play,7,1,moncy001,32,.BCBBCS,K
+play,7,1,ohopl001,12,SFBX,S98/F89S
+play,7,1,schan001,12,CBC.X,8/F8D
+play,7,1,parik002,12,CBCX,S3/G34S-.1-2
+play,7,1,adelj001,11,CBX,7/L7D+
+play,8,0,naylb001,00,,NP
+sub,andet001,"Tim Anderson",1,4,6
+play,8,0,naylb001,00,.,NP
+sub,newmk001,"Kevin Newman",1,9,5
+play,8,0,naylb001,20,..BBX,5/P5F/FL
+play,8,0,ariag002,00,X,9/F89D
+play,8,0,roccb001,02,FF.FX,9/F89XD
+play,8,1,newmk001,00,,NP
+sub,gaddh001,"Hunter Gaddis",0,0,1
+play,8,1,newmk001,12,.TS.BFX,S8/G6M
+play,8,1,wardt002,02,FFC,K
+play,8,1,troum001,10,BX,7/F78XD+
+play,8,1,solej001,32,BSCBB>F>S,K
+play,9,0,kwans001,00,X,43/G34
+play,9,0,ramij003,11,CBX,HR/F89XD
+play,9,0,santc002,00,X,S7/L78
+play,9,0,manzk001,22,CT1B*BC,K
+play,9,0,thoml002,22,B*SSBS,K
+play,9,1,andet001,00,,NP
+sub,clase001,"Emmanuel Clase",0,0,1
+play,9,1,andet001,01,.CX,43/G4
+play,9,1,ohopl001,12,SBTFFFFFFFX,HR/F89XD
+play,9,1,schan001,11,BF.X,3/G3
+play,9,1,parik002,22,S.BBTX,S9/F9L
+play,9,1,adelj001,02,F>F>B,DI.1-2
+play,9,1,adelj001,12,F>F>B.X,D7/G6+.2-H
+play,9,1,newmk001,00,,NP
+sub,darnt001,"Travis d'Arnaud",1,9,11
+play,9,1,darnt001,01,.SX,53/G56
+data,er,clase001,2
+data,er,sewap001,0
+data,er,smitc009,0
+data,er,junij001,0
+data,er,willg004,2
+data,er,gaddh001,0
+data,er,herrt002,0
+data,er,sorij002,5
+data,er,danac001,2
+data,er,zefer001,1
+data,er,detmr001,0
