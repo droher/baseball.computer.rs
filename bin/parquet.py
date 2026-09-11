@@ -85,6 +85,27 @@ PITCH_AUDIT_SCHEMAS = {
     if stem in {"event_pitch_sequence_status", "event_pitch_sequence_issues"}
 }
 
+SCORER_PROVENANCE_COLUMNS = ("official_scorer", "source_scorer")
+
+
+def restore_scorer_provenance_strings(local_file: str, table: pa.Table) -> pa.Table:
+    columns = [name for name in SCORER_PROVENANCE_COLUMNS if name in table.column_names]
+    if not columns:
+        return table
+    scorer_table = csv.read_csv(
+        local_file,
+        convert_options=csv.ConvertOptions(
+            column_types={name: pa.string() for name in columns},
+            include_columns=columns,
+            null_values=[""],
+            strings_can_be_null=True,
+        ),
+    )
+    for name in columns:
+        index = table.column_names.index(name)
+        table = table.set_column(index, name, scorer_table[name])
+    return table
+
 
 def file_to_data_frame_to_parquet(local_file: str, parquet_file: str) -> None:
     stem = Path(local_file).stem
@@ -101,6 +122,8 @@ def file_to_data_frame_to_parquet(local_file: str, parquet_file: str) -> None:
             column_types=explicit_types,
         ),
     )
+    if stem in {"games", "box_score_games"}:
+        table = restore_scorer_provenance_strings(local_file, table)
     if "event" in local_file:
         table = table.sort_by("event_key")
     parquet.write_table(

@@ -25,6 +25,9 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::process::ExitStatus;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use tempfile::TempDir;
 
@@ -59,6 +62,227 @@ fn read_csv_rows(path: &Path) -> Vec<csv::StringRecord> {
         .records()
         .collect::<Result<Vec<_>, _>>()
         .unwrap_or_else(|e| panic!("malformed CSV row in {}: {e}", path.display()))
+}
+
+fn run_scorer_fixture(records: &str, json: bool) -> TempDir {
+    let input = TempDir::new().unwrap();
+    let original = include_str!("fixtures/events/2024AS.EVE");
+    let replacement = original.replace("info,oscorer,wells701", records);
+    assert_ne!(replacement, original);
+    fs::write(input.path().join("2024AS.EVE"), replacement).unwrap();
+    let output = TempDir::new().unwrap();
+    let mut command = Command::new(binary_path());
+    command
+        .arg("-i")
+        .arg(input.path())
+        .arg("-o")
+        .arg(output.path());
+    if json {
+        command.arg("--json");
+    }
+    assert!(command.status().unwrap().success());
+    output
+}
+
+fn run_duplicate_fixture(files: &[(&str, String)], threads: &str) -> TempDir {
+    let input = TempDir::new().unwrap();
+    for (name, contents) in files {
+        fs::write(input.path().join(name), contents).unwrap();
+    }
+    let output = TempDir::new().unwrap();
+    let mut command = Command::new(binary_path());
+    command
+        .env("RAYON_NUM_THREADS", threads)
+        .arg("-i")
+        .arg(input.path())
+        .arg("-o")
+        .arg(output.path());
+    let status = command_status_with_timeout(&mut command);
+    assert!(status.success());
+    output
+}
+
+fn command_status_with_timeout(command: &mut Command) -> ExitStatus {
+    let mut child = command.spawn().unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            return status;
+        }
+        if Instant::now() >= deadline {
+            child.kill().unwrap();
+            panic!("parser exceeded duplicate fixture timeout");
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn official_scorer(output: &Path) -> String {
+    let mut reader = csv::Reader::from_path(output.join("games.csv")).unwrap();
+    let rows = reader
+        .deserialize::<HashMap<String, String>>()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    assert_eq!(rows.len(), 1);
+    rows[0]["official_scorer"].clone()
+}
+
+#[test]
+fn duplicate_selection_uses_lexical_file_then_in_file_order_for_all_thread_counts() {
+    let original = include_str!("fixtures/events/2024AS.EVE");
+    let lexical_first = original.replace("info,oscorer,wells701", "info,oscorer,first001");
+    let scheduled_first = format!(
+        "{}{}",
+        original.replace("info,oscorer,wells701", "info,oscorer,later001"),
+        "com,padding\r\n".repeat(100)
+    );
+    let within_file_later = original.replace("info,oscorer,wells701", "info,oscorer,later002");
+    let within_file = format!("{lexical_first}\r\n{within_file_later}");
+
+    for threads in ["1", "2", "4"] {
+        let cross_file = run_duplicate_fixture(
+            &[
+                ("2024AAA.EVE", lexical_first.clone()),
+                ("2024ZZZ.EVE", scheduled_first.clone()),
+            ],
+            threads,
+        );
+        assert_eq!(official_scorer(cross_file.path()), "first001");
+
+        let same_file = run_duplicate_fixture(&[("2024DUP.EVE", within_file.clone())], threads);
+        assert_eq!(official_scorer(same_file.path()), "first001");
+    }
+}
+
+#[test]
+fn duplicate_selection_fails_closed_without_overriding_account_precedence() {
+    let original = include_str!("fixtures/events/2024AS.EVE");
+    let malformed = original.replace("info,date,2024/07/16", "info,date,invalid");
+    assert_ne!(malformed, original);
+    let duplicate_input = TempDir::new().unwrap();
+    fs::write(
+        duplicate_input.path().join("2024DUP.EVE"),
+        format!("{malformed}\r\n{original}"),
+    )
+    .unwrap();
+    let duplicate_output = TempDir::new().unwrap();
+    let mut duplicate_command = Command::new(binary_path());
+    duplicate_command
+        .arg("-i")
+        .arg(duplicate_input.path())
+        .arg("-o")
+        .arg(duplicate_output.path());
+    assert!(!command_status_with_timeout(&mut duplicate_command).success());
+
+    let invalid_context = original.replace("info,visteam,NLS\r\n", "");
+    assert_ne!(invalid_context, original);
+    let context_input = TempDir::new().unwrap();
+    fs::write(
+        context_input.path().join("2024DUP.EVE"),
+        format!("{invalid_context}\r\n{original}"),
+    )
+    .unwrap();
+    let context_output = TempDir::new().unwrap();
+    let mut context_command = Command::new(binary_path());
+    context_command
+        .arg("-i")
+        .arg(context_input.path())
+        .arg("-o")
+        .arg(context_output.path());
+    assert!(!command_status_with_timeout(&mut context_command).success());
+
+    let precedence_output = run_duplicate_fixture(
+        &[
+            ("2024AAA.EVE", original.to_owned()),
+            ("2024.EDA", format!("{malformed}\r\n{original}")),
+        ],
+        "4",
+    );
+    assert_eq!(official_scorer(precedence_output.path()), "wells701");
+
+    let context_precedence_output = run_duplicate_fixture(
+        &[
+            ("2024AAA.EVE", original.to_owned()),
+            ("2024.EDA", format!("{invalid_context}\r\n{original}")),
+        ],
+        "4",
+    );
+    assert_eq!(
+        official_scorer(context_precedence_output.path()),
+        "wells701"
+    );
+
+    let box_score = include_str!("fixtures/events/1948_DET.EBA");
+    let shared_id_pbp = original.replace("ALS202407160", "DET194806220");
+    let namespace_output = run_duplicate_fixture(
+        &[
+            ("2024AAA.EVE", shared_id_pbp),
+            ("1948_DET.EBA", box_score.to_owned()),
+        ],
+        "4",
+    );
+    assert_eq!(
+        read_csv_rows(&namespace_output.path().join("games.csv")).len(),
+        1
+    );
+    assert_eq!(
+        read_csv_rows(&namespace_output.path().join("box_score_games.csv")).len(),
+        1
+    );
+}
+
+#[test]
+fn scorer_provenance_is_key_specific_in_csv_and_json() {
+    let source = "Administrative scorer label, retained beyond sixteen bytes";
+    for records in [
+        format!("info,scorer,\"{source}\"\r\ninfo,oscorer,officl01"),
+        format!("info,oscorer,officl01\r\ninfo,scorer,\"{source}\""),
+    ] {
+        let csv_output = run_scorer_fixture(&records, false);
+        let mut reader = csv::Reader::from_path(csv_output.path().join("games.csv")).unwrap();
+        let headers = reader.headers().unwrap().clone();
+        let scorer_index = headers.iter().position(|value| value == "scorer").unwrap();
+        assert_eq!(headers.get(scorer_index + 1), Some("official_scorer"));
+        assert_eq!(headers.get(scorer_index + 2), Some("source_scorer"));
+        let row = reader
+            .deserialize::<HashMap<String, String>>()
+            .next()
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.get("official_scorer").map(String::as_str),
+            Some("officl01")
+        );
+        assert_eq!(row.get("source_scorer").map(String::as_str), Some(source));
+
+        let json_output = run_scorer_fixture(&records, true);
+        let text = fs::read_to_string(json_output.path().join("games.jsonl")).unwrap();
+        let game: serde_json::Value = serde_json::from_str(text.trim()).unwrap();
+        assert_eq!(game["metadata"]["official_scorer"], "officl01");
+        assert_eq!(game["metadata"]["source_scorer"], source);
+    }
+}
+
+#[test]
+fn real_fixtures_do_not_cross_fill_scorer_origins() {
+    let csv_output = run_parser(false);
+    let mut reader = csv::Reader::from_path(csv_output.path().join("games.csv")).unwrap();
+    let rows = reader
+        .deserialize::<HashMap<String, String>>()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    let official_only = rows
+        .iter()
+        .find(|row| row["game_id"] == "ALS202407160")
+        .unwrap();
+    assert_eq!(official_only["official_scorer"], "wells701");
+    assert_eq!(official_only["source_scorer"], "");
+    let source_only = rows
+        .iter()
+        .find(|row| row["game_id"] == "KC1195906030")
+        .unwrap();
+    assert_eq!(source_only["official_scorer"], "");
+    assert_eq!(source_only["source_scorer"], "71,215");
 }
 
 #[test]

@@ -33,6 +33,29 @@ Game metadata, weather, umpire assignments, decision pitchers, scorer
 provenance. One row per PBP game.
 Source: `Games` in `src/event_file/schemas.rs`.
 
+`official_scorer` preserves the complete value of `info,oscorer`, while
+`source_scorer` preserves the complete value of administrative `info,scorer`.
+An empty or whitespace-only value is absent; literal sentinel text such as
+`unknown` remains source text. `scorer` is the bounded legacy compatibility
+field whose value depends on the last scorer-key record and must not be used to
+infer which source key supplied it.
+
+Duplicate game records are selected deterministically within each account pass:
+the lexically first source file wins, followed by the earliest occurrence in
+that file. Conventional play-by-play still takes precedence over deduced
+play-by-play, while box scores use a separate namespace. This ordering is a
+reproducibility policy and does not assert that the selected source has better
+baseball facts. A malformed selected duplicate or a reader error that makes its
+rank unsafe fails the export. `RAYON_NUM_THREADS=1` is supported and uses the
+same selection policy.
+
+The CSV-to-Parquet converter reads these two columns as nullable Arrow strings
+with only an empty CSV field treated as null. Numeric-looking values retain
+leading zeros, and source text such as `NA`, `NULL`, `N/A`, or `unknown` remains
+literal. This override is limited to the two provenance columns; legacy column
+inference and null conversion are unchanged. CSV files without the new columns
+produce Parquet files without them rather than manufacturing null evidence.
+
 ### `game_lineup_appearances`
 Each batting-order slot a player held during the game, with start/end
 event ids. One row per lineup tenure.
@@ -118,6 +141,8 @@ Source: `EventComments` in `src/event_file/schemas.rs`.
 Same shape as `games` but populated from box-score (`.EB*`) files for
 games where no PBP exists.
 Source: `Games` in `src/event_file/schemas.rs` (shared with `games`).
+The scorer provenance columns and compatibility semantics documented for
+`games` apply unchanged.
 
 ### `box_score_line_scores`
 Inning-by-inning runs from the `line,...` records. One row per

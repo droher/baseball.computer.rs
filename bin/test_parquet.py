@@ -120,3 +120,75 @@ def test_empty_issues_csv_emits_typed_parquet(tmp_path: Path) -> None:
         "current_raw_pitch_sequence",
     ]
     assert table.schema.types[table.column_names.index("prior_event_id")] == pa.uint8()
+
+
+def test_scorer_columns_preserve_numeric_strings_and_all_empty_nulls(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "games.csv"
+    destination = tmp_path / "games.parquet"
+    source.write_text(
+        "game_id,event_key,official_scorer,source_scorer\n"
+        "ABC202404010,2,00123,\n"
+        "ABC202404020,1,00007,\n"
+    )
+
+    parquet_converter.file_to_data_frame_to_parquet(str(source), str(destination))
+
+    table = pyarrow_parquet.read_table(destination)
+    assert table.schema.field("official_scorer").type == pa.string()
+    assert table.schema.field("source_scorer").type == pa.string()
+    assert table.to_pylist() == [
+        {
+            "game_id": "ABC202404010",
+            "event_key": 2,
+            "official_scorer": "00123",
+            "source_scorer": None,
+        },
+        {
+            "game_id": "ABC202404020",
+            "event_key": 1,
+            "official_scorer": "00007",
+            "source_scorer": None,
+        },
+    ]
+
+
+def test_scorer_columns_preserve_literal_null_words_and_free_text(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "box_score_games.csv"
+    destination = tmp_path / "box_score_games.parquet"
+    source.write_text(
+        "game_id,event_key,official_scorer,source_scorer,legacy_text\n"
+        'ABC202404010,1,NA,"Press box, section 14 and a long source label",NA\n'
+        "ABC202404020,2,NULL,unknown,NULL\n"
+        "ABC202404030,3,unknown,N/A,N/A\n"
+    )
+
+    parquet_converter.file_to_data_frame_to_parquet(str(source), str(destination))
+
+    table = pyarrow_parquet.read_table(destination)
+    assert table.column("official_scorer").to_pylist() == ["NA", "NULL", "unknown"]
+    assert table.column("source_scorer").to_pylist() == [
+        "Press box, section 14 and a long source label",
+        "unknown",
+        "N/A",
+    ]
+    assert table.column("legacy_text").to_pylist() == [None, None, None]
+
+
+def test_old_game_csv_does_not_gain_provenance_columns(tmp_path: Path) -> None:
+    source = tmp_path / "games.csv"
+    destination = tmp_path / "games.parquet"
+    source.write_text(
+        "game_id,event_key,scorer,legacy_text\nABC202404010,1,scogc701,NA\n"
+    )
+
+    parquet_converter.file_to_data_frame_to_parquet(str(source), str(destination))
+
+    table = pyarrow_parquet.read_table(destination)
+    assert "official_scorer" not in table.column_names
+    assert "source_scorer" not in table.column_names
+    assert table.column("scorer").to_pylist() == ["scogc701"]
+    assert table.column("legacy_text").to_pylist() == [None]

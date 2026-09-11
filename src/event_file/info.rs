@@ -9,9 +9,7 @@ use strum_macros::{AsRefStr, Display, EnumString};
 use tracing::{debug, warn};
 
 use crate::event_file::misc::{parse_non_negative_int, parse_positive_int, str_to_tinystr};
-use crate::event_file::traits::{
-    Player, RetrosheetEventRecord, RetrosheetVolunteer, Scorer, Umpire,
-};
+use crate::event_file::traits::{Player, RetrosheetEventRecord, RetrosheetVolunteer, Umpire};
 
 use super::traits::GameType;
 
@@ -263,7 +261,7 @@ pub struct UmpireAssignment {
     pub umpire: Option<Umpire>,
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum InfoRecord {
     VisitingTeam(Team),
     HomeTeam(Team),
@@ -291,7 +289,8 @@ pub enum InfoRecord {
     GameWinningRbi(Option<Player>),
     HowScored(HowScored),
     Inputter(Option<RetrosheetVolunteer>),
-    Scorer(Option<Scorer>),
+    OfficialScorer(Option<String>),
+    SourceScorer(Option<String>),
     Translator(Option<RetrosheetVolunteer>),
     Innings(Option<u8>),
     InputDate(Option<NaiveDateTime>),
@@ -402,7 +401,12 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
             "lp" => Self::LosingPitcher(t8().ok()),
             "save" => Self::SavePitcher(t8().ok()),
             "gwrbi" => Self::GameWinningRbi(t8().ok()),
-            "scorer" | "oscorer" => Self::Scorer(t16().ok()),
+            "oscorer" => {
+                Self::OfficialScorer((!raw_value.trim().is_empty()).then(|| raw_value.to_owned()))
+            }
+            "scorer" => {
+                Self::SourceScorer((!raw_value.trim().is_empty()).then(|| raw_value.to_owned()))
+            }
             "inputter" => Self::Inputter(t16().ok()),
             "translator" => Self::Translator(t16().ok()),
             "inputtime" => Self::InputDate(Self::parse_datetime(value)),
@@ -593,5 +597,39 @@ mod tests {
             }
             other => panic!("unexpected variant: {other:?}"),
         }
+    }
+
+    #[test]
+    fn scorer_keys_preserve_origin_and_complete_values() {
+        let source_value = "Press box scoring sheet, section 14, revision alpha";
+        assert_eq!(
+            InfoRecord::try_from(&rec(&["info", "scorer", source_value])).unwrap(),
+            InfoRecord::SourceScorer(Some(source_value.to_owned()))
+        );
+        let official_value = "official-scorer-identifier-beyond-sixteen";
+        assert_eq!(
+            InfoRecord::try_from(&rec(&["info", "oscorer", official_value])).unwrap(),
+            InfoRecord::OfficialScorer(Some(official_value.to_owned()))
+        );
+    }
+
+    #[test]
+    fn scorer_keys_distinguish_absent_and_unknown_values() {
+        assert_eq!(
+            InfoRecord::try_from(&rec(&["info", "scorer", "   "])).unwrap(),
+            InfoRecord::SourceScorer(None)
+        );
+        assert_eq!(
+            InfoRecord::try_from(&rec(&["info", "oscorer", ""])).unwrap(),
+            InfoRecord::OfficialScorer(None)
+        );
+        assert_eq!(
+            InfoRecord::try_from(&rec(&["info", "scorer", "unknown"])).unwrap(),
+            InfoRecord::SourceScorer(Some("unknown".to_owned()))
+        );
+        assert_eq!(
+            InfoRecord::try_from(&rec(&["info", "oscorer", "unknown"])).unwrap(),
+            InfoRecord::OfficialScorer(Some("unknown".to_owned()))
+        );
     }
 }

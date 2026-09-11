@@ -23,7 +23,7 @@ use crate::event_file::info::{
 };
 use crate::event_file::misc::{
     BatHandAdjustment, EarnedRunRecord, GameId, Hand, PitchHandAdjustment,
-    PitcherResponsibilityAdjustment, RunnerAdjustment, SubstitutionRecord,
+    PitcherResponsibilityAdjustment, RunnerAdjustment, SubstitutionRecord, str_to_tinystr,
 };
 use crate::event_file::parser::{FileInfo, MappedRecord, RecordSlice};
 use crate::event_file::play::{
@@ -279,9 +279,11 @@ impl From<&RecordSlice> for GameSetting {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Default)]
 pub struct GameMetadata {
     pub scorer: Option<Scorer>,
+    pub official_scorer: Option<String>,
+    pub source_scorer: Option<String>,
     pub how_scored: HowScored,
     pub inputter: Option<RetrosheetVolunteer>,
     pub translator: Option<RetrosheetVolunteer>,
@@ -301,7 +303,14 @@ impl From<&RecordSlice> for GameMetadata {
         let mut metadata = Self::default();
         for info in infos {
             match info {
-                InfoRecord::Scorer(x) => metadata.scorer = *x,
+                InfoRecord::OfficialScorer(x) => {
+                    metadata.official_scorer.clone_from(x);
+                    metadata.scorer = str_to_tinystr(x.as_deref().unwrap_or_default().trim()).ok();
+                }
+                InfoRecord::SourceScorer(x) => {
+                    metadata.source_scorer.clone_from(x);
+                    metadata.scorer = str_to_tinystr(x.as_deref().unwrap_or_default().trim()).ok();
+                }
                 InfoRecord::HowScored(x) => metadata.how_scored = *x,
                 InfoRecord::Inputter(x) => metadata.inputter = *x,
                 InfoRecord::Translator(x) => metadata.translator = *x,
@@ -1301,6 +1310,65 @@ mod tests {
 
     fn rec(fields: &[&str]) -> StringRecord {
         StringRecord::from(fields.to_vec())
+    }
+
+    #[test]
+    fn scorer_metadata_preserves_key_origin_in_both_orders() {
+        let source = InfoRecord::SourceScorer(Some("source7".to_owned()));
+        let official = InfoRecord::OfficialScorer(Some("official7".to_owned()));
+        let source_first = vec![
+            MappedRecord::Info(source.clone()),
+            MappedRecord::Info(official.clone()),
+        ];
+        let official_first = vec![MappedRecord::Info(official), MappedRecord::Info(source)];
+        let source_first_metadata = GameMetadata::from(source_first.as_slice());
+        let official_first_metadata = GameMetadata::from(official_first.as_slice());
+        for metadata in [&source_first_metadata, &official_first_metadata] {
+            assert_eq!(metadata.official_scorer.as_deref(), Some("official7"));
+            assert_eq!(metadata.source_scorer.as_deref(), Some("source7"));
+        }
+        assert_eq!(
+            source_first_metadata.scorer.map(|value| value.to_string()),
+            Some("official7".to_owned())
+        );
+        assert_eq!(
+            official_first_metadata
+                .scorer
+                .map(|value| value.to_string()),
+            Some("source7".to_owned())
+        );
+    }
+
+    #[test]
+    fn scorer_metadata_serialization_retains_long_values() {
+        let source = "Administrative scoring provenance longer than sixteen bytes";
+        let official = "official-scorer-identifier-beyond-sixteen";
+        let records = vec![
+            MappedRecord::Info(InfoRecord::OfficialScorer(Some(official.to_owned()))),
+            MappedRecord::Info(InfoRecord::SourceScorer(Some(source.to_owned()))),
+        ];
+        let metadata = GameMetadata::from(records.as_slice());
+        assert!(metadata.scorer.is_none());
+        let serialized = serde_json::to_value(metadata).unwrap();
+        assert_eq!(serialized["official_scorer"], official);
+        assert_eq!(serialized["source_scorer"], source);
+        assert!(serialized["scorer"].is_null());
+    }
+
+    #[test]
+    fn blank_scorer_records_preserve_legacy_empty_string() {
+        for info in [
+            InfoRecord::OfficialScorer(None),
+            InfoRecord::SourceScorer(None),
+        ] {
+            let records = vec![MappedRecord::Info(info)];
+            let metadata = GameMetadata::from(records.as_slice());
+            assert!(metadata.official_scorer.is_none());
+            assert!(metadata.source_scorer.is_none());
+            let serialized = serde_json::to_value(metadata).unwrap();
+            assert_eq!(serialized["scorer"], "");
+        }
+        assert!(GameMetadata::default().scorer.is_none());
     }
 
     /// Build a record slice with one starter per lineup position on each side.

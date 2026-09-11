@@ -411,6 +411,7 @@ struct FileInfo {
 struct GameTask {
     file_info: event_file::parser::FileInfo,
     game_num: usize,
+    source_rank: (usize, usize),
     record_vec: event_file::parser::RecordVec,
 }
 
@@ -418,6 +419,8 @@ struct GameTask {
 struct WorkerCtx<'a> {
     parsed_games: Option<&'a HashSet<GameId>>,
     claimed_games: &'a papaya::HashSet<GameId>,
+    duplicate_sources: &'a HashMap<GameId, Vec<(usize, usize)>>,
+    duplicate_file_indices: &'a HashSet<usize>,
     writer_map: &'a WriterMap,
     json_writer: Option<&'a ThreadSafeJsonWriter>,
     errors: &'a Mutex<Vec<anyhow::Error>>,
@@ -482,12 +485,17 @@ fn pump_file(
             Ok(rv) => rv,
             Err(e) => {
                 error!("{:?}", e);
+                if ctx.duplicate_file_indices.contains(&file_idx) {
+                    ctx.errors.lock().map(|mut errors| errors.push(e)).ok();
+                    return;
+                }
                 continue;
             }
         };
         let mut task = GameTask {
             file_info,
             game_num,
+            source_rank: (file_idx, game_num),
             record_vec: rv,
         };
         // Drain a game before pushing if the queue is full so we never park
@@ -575,6 +583,38 @@ impl EventFileSchema {
         let file_info = task.file_info;
         let record_vec = &task.record_vec;
         let record_slice = &record_vec.record_vec;
+        let raw_game_id = match record_slice.first() {
+            Some(MappedRecord::GameId(game_id)) => Some(*game_id),
+            _ => None,
+        };
+        if let Some(game_id) = raw_game_id
+            && ctx
+                .parsed_games
+                .is_some_and(|games| games.contains(&game_id))
+        {
+            warn!(
+                "File {} contains already-processed game {}, ignoring",
+                file_info.filename, &game_id.id
+            );
+            return Ok(Some(game_id));
+        }
+        let duplicate_game_id =
+            raw_game_id.filter(|game_id| ctx.duplicate_sources.contains_key(game_id));
+        if let Some(game_id) = duplicate_game_id {
+            let selected = ctx
+                .duplicate_sources
+                .get(&game_id)
+                .and_then(|sources| sources.first())
+                .copied()
+                .context("duplicate source inventory was empty")?;
+            if task.source_rank != selected {
+                warn!(
+                    "File {} contains duplicate game {}, ignoring source rank {:?}; selected {:?}",
+                    file_info.filename, &game_id.id, task.source_rank, selected
+                );
+                return Ok(Some(game_id));
+            }
+        }
         let game_context = match GameContext::new(
             record_slice,
             file_info,
@@ -593,6 +633,9 @@ impl EventFileSchema {
                     "Error initializing game {game_id} in file {filename}: {:?}",
                     e
                 );
+                if duplicate_game_id.is_some() {
+                    return Err(e).context("selected duplicate source failed initialization");
+                }
                 return Ok(None);
             }
         };
@@ -803,6 +846,44 @@ impl FileProcessor {
             .collect::<Result<Vec<PathBuf>, GlobError>>()?;
         files.par_sort();
         let file_count = files.len();
+        let mut source_inventory: HashMap<GameId, Vec<(usize, usize)>> = HashMap::new();
+        for (file_idx, path) in files.iter().enumerate() {
+            let mut reader = csv::ReaderBuilder::new()
+                .has_headers(false)
+                .double_quote(false)
+                .flexible(true)
+                .from_path(path)?;
+            let mut game_num = 0;
+            for record in reader.records() {
+                let record = record?;
+                if record.get(0) != Some("id") {
+                    continue;
+                }
+                if let Ok(game_id) = GameId::try_from(&record) {
+                    source_inventory
+                        .entry(game_id)
+                        .or_default()
+                        .push((file_idx, game_num));
+                }
+                game_num += 1;
+            }
+        }
+        source_inventory.retain(|game_id, sources| {
+            sources.len() > 1 && !parsed_games.is_some_and(|games| games.contains(game_id))
+        });
+        let duplicate_file_indices = source_inventory
+            .values()
+            .flatten()
+            .map(|(file_idx, _)| *file_idx)
+            .collect::<HashSet<_>>();
+        for (game_id, sources) in &source_inventory {
+            info!(
+                "Duplicate game {} source ranks {:?}; selecting {:?}",
+                game_id.id,
+                sources,
+                sources.first()
+            );
+        }
         let claimed_games: papaya::HashSet<GameId> =
             papaya::HashSet::with_capacity(file_count * 81);
         // Tag each file with its alphabetical index (used to derive event_key),
@@ -820,7 +901,7 @@ impl FileProcessor {
         // work queue. Once the file queue is drained, the thread drops its
         // sender clone so the channel closes after the in-flight readers
         // finish, and all threads fall through to draining game work.
-        let total_threads = rayon::current_num_threads().max(2);
+        let total_threads = rayon::current_num_threads().max(1);
         let (file_tx, file_rx) =
             crossbeam_channel::bounded::<(usize, PathBuf)>(indexed.len().max(1));
         for item in indexed {
@@ -832,6 +913,8 @@ impl FileProcessor {
         let ctx = WorkerCtx {
             parsed_games,
             claimed_games: &claimed_games,
+            duplicate_sources: &source_inventory,
+            duplicate_file_indices: &duplicate_file_indices,
             writer_map: &self.writer_map,
             json_writer: self.json_writer.as_ref(),
             errors: &errors,
