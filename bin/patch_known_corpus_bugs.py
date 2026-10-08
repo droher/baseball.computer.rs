@@ -25,6 +25,24 @@ Patches:
   records this pitcher's earned-run lines as `data,er,rowaj101,0` (no
   space). Strip the space.
 
+* CHN190908040 (`events/1909CHN.EVN`) — bottom of 4th, `CS2(25).1-2`
+  both retires and advances the runner on first. The 1909 box score
+  attributes the caught stealing to reule101, who was on first, so drop
+  the contradictory `.1-2` advance.
+
+* CHA197409200 (`events/1974CHA.EVA`) — tenag101's 6th-inning force-out
+  carries ` X` (leading space) in the pitches column. Drop the space.
+
+* PRG193512011/PRG193512012 (`ngl_e/1935.EVR`) — both games of the
+  1935-12-01 doubleheader are filed under PRG193512012. The nine-inning
+  copy (wp grifr101) matches box score PRG193512011, so rename it and set
+  `info,number,1`. The patch locates that copy by its `info,wp` line.
+
+* NLB box scores (`ngl_b/*.EBR`) — `ngl_box_corrections.py` applies
+  rule-based corrections derived from each game's own records and leaves
+  anything ambiguous untouched with a warning. Pass `--corrections-csv` to
+  list every change.
+
 * WS1191105040 (`events/1911WS1.EVA`) — bottom of 2nd, a 5-to-3 putout is
   encoded as `5-3.2-3` (dash-separated fielders), but Retrosheet's modern
   event grammar concatenates the fielders (`53`). The same batter-fielder
@@ -74,6 +92,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import ngl_box_corrections
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,6 +104,7 @@ class Patch:
     before: str
     after: str
     rationale: str
+    context: str | None = None
 
 
 PATCHES: tuple[Patch, ...] = (
@@ -108,6 +129,47 @@ PATCHES: tuple[Patch, ...] = (
             "data-record parser. Every other CIN191007??? game in this file "
             "uses the no-space form."
         ),
+    ),
+    Patch(
+        relative_path="events/1909CHN.EVN",
+        game_id="CHN190908040",
+        before="play,4,1,everj102,??,,CS2(25).1-2",
+        after="play,4,1,everj102,??,,CS2(25)",
+        rationale=(
+            "The box score credits this inning-4 caught stealing to "
+            "reule101, the runner on first, so `CS2` already retires him. "
+            "The trailing `.1-2` advances the same runner and leaves the "
+            "half-inning one out short."
+        ),
+    ),
+    Patch(
+        relative_path="events/1974CHA.EVA",
+        game_id="CHA197409200",
+        before="play,6,0,tenag101,??, X,64(1)/FO",
+        after="play,6,0,tenag101,??,X,64(1)/FO",
+        rationale=(
+            "Leading space in the pitches column. The only recorded pitch is "
+            "the ball put in play for the force-out."
+        ),
+    ),
+    Patch(
+        relative_path="ngl_e/1935.EVR",
+        game_id="PRG193512012",
+        context="info,wp,grifr101",
+        before="id,PRG193512012",
+        after="id,PRG193512011",
+        rationale=(
+            "Two different games share this ID. The nine-inning copy won by "
+            "grifr101 matches box score PRG193512011 (game 1); the five-inning "
+            "copy matches PRG193512012."
+        ),
+    ),
+    Patch(
+        relative_path="ngl_e/1935.EVR",
+        game_id="PRG193512011",
+        before="info,number,2",
+        after="info,number,1",
+        rationale="Doubleheader number for the game renamed to PRG193512011.",
     ),
     Patch(
         relative_path="events/1911WS1.EVA",
@@ -235,21 +297,24 @@ PATCHES: tuple[Patch, ...] = (
 )
 
 
-def find_game_block(lines: list[str], game_id: str) -> tuple[int, int] | None:
+def find_game_block(
+    lines: list[str], game_id: str, context: str | None = None, alias: str | None = None
+) -> tuple[int, int] | None:
     """Return [start, end) line indices for the game block, or None."""
-    start = None
-    for i, line in enumerate(lines):
-        if line.startswith(f"id,{game_id}"):
-            start = i
-            break
-    if start is None:
-        return None
-    end = len(lines)
-    for j in range(start + 1, len(lines)):
-        if lines[j].startswith("id,"):
-            end = j
-            break
-    return (start, end)
+    starts = [
+        i
+        for i, line in enumerate(lines)
+        if line.startswith(f"id,{game_id}") or (alias is not None and line == alias)
+    ]
+    for start in starts:
+        end = len(lines)
+        for j in range(start + 1, len(lines)):
+            if lines[j].startswith("id,"):
+                end = j
+                break
+        if context is None or context in lines[start:end]:
+            return (start, end)
+    return None
 
 
 def apply_patch(root: Path, patch: Patch) -> str:
@@ -271,7 +336,10 @@ def apply_patch(root: Path, patch: Patch) -> str:
     # `keepends=True` retains them per-line so we can rejoin verbatim.
     lines = text.splitlines(keepends=True)
 
-    block = find_game_block([line.rstrip("\r\n") for line in lines], patch.game_id)
+    alias = patch.after if patch.before.startswith("id,") else None
+    block = find_game_block(
+        [line.rstrip("\r\n") for line in lines], patch.game_id, patch.context, alias
+    )
     if block is None:
         return f"SKIP game-not-found {patch.game_id} in {patch.relative_path}"
 
@@ -326,6 +394,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Enable debug-level logging.",
     )
+    _ = parser.add_argument(
+        "--corrections-csv",
+        type=Path,
+        default=None,
+        help="Write every rule-based NLB box-score correction to this CSV.",
+    )
     args = parser.parse_args(argv)
 
     verbose: bool = bool(getattr(args, "verbose", False))
@@ -352,6 +426,21 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("%s", outcome)
         if outcome.startswith("SKIP"):
             rc = max(rc, 1)
+
+    corrections, unresolved = ngl_box_corrections.correct_directory(root)
+    logger.info(
+        "NLB box-score normalization: %d correction(s), %d unresolved record(s)",
+        len(corrections),
+        len(unresolved),
+    )
+    corrections_csv: Path | None = getattr(args, "corrections_csv", None)
+    if corrections_csv is not None and not corrections:
+        logger.warning(
+            "No corrections applied (corpus already corrected?); leaving %s unchanged",
+            corrections_csv,
+        )
+    elif corrections_csv is not None:
+        ngl_box_corrections.write_corrections_csv(corrections, corrections_csv)
     return rc
 
 

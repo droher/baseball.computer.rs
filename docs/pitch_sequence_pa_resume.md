@@ -134,7 +134,11 @@ reviewed for quarantine and recorded in the manifest. These are conservative
 unresolved cases, not claimed source corrections. The earlier strict audit
 rejected 3,124 games, mostly because annotations disappeared in 1991–1992.
 The new audit continues through every conflict, so it also finds disagreements
-hidden behind those first annotation failures. See
+hidden behind those first annotation failures.
+The October 2026 Retrosheet release added video-sourced pitch sequences to
+CHN198606170 and SLN197409100. Each adds one token disagreement, bringing the
+manifest to 147 reviewed fingerprints; see
+[corpus_corrections.md](corpus_corrections.md). See
 [pitch_impact_by_year.md](pitch_impact_by_year.md) and the
 [reconciliation CSV](pitch_history_reconciliation_by_year.csv).
 

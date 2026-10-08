@@ -25,3 +25,6 @@ ci = [
 
 [tool.uv]
 package = false
+
+[tool.basedpyright]
+executionEnvironments = [{ root = "bin" }]

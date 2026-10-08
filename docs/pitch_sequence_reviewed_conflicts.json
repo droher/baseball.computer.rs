@@ -171,6 +171,15 @@
     "current_raw_pitch_sequence": "BBK.BFX"
   },
   {
+    "game_id": "CHN198606170",
+    "event_id": 7,
+    "appearance_start_event_id": 6,
+    "prior_event_id": 6,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "C11C",
+    "current_raw_pitch_sequence": "C11B.MX"
+  },
+  {
     "game_id": "CHN198904040",
     "event_id": 9,
     "appearance_start_event_id": 8,
@@ -1114,6 +1123,15 @@
     "reason": "TokenMismatch",
     "prior_raw_pitch_sequence": "K",
     "current_raw_pitch_sequence": "..CFX"
+  },
+  {
+    "game_id": "SLN197409100",
+    "event_id": 73,
+    "appearance_start_event_id": 72,
+    "prior_event_id": 72,
+    "reason": "TokenMismatch",
+    "prior_raw_pitch_sequence": "1F1C",
+    "current_raw_pitch_sequence": "KKX"
   },
   {
     "game_id": "SLN198510120",

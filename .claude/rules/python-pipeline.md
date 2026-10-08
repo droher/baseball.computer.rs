@@ -9,7 +9,8 @@ uv run python bin/parquet.py                                # csv/*.csv -> parqu
 uv run python bin/simple_files.py                           # gamelog/schedule/park/roster/bio CSV concat + parquet
 uv run python bin/biodata.py                                # retrosheet/{teams,coaches,relatives,ejections,managers0,umpires0}.csv -> biodata/*.parquet
 uv run python bin/fetch_retrosheet.py -o retrosheet         # assembles a fresh corpus from retrosheet.org per-year + bundle URLs
-uv run python bin/patch_known_corpus_bugs.py <retrosheet>   # idempotent in-place fixes for game records the parser cannot resolve (15 games — see Status block)
+uv run python bin/patch_known_corpus_bugs.py <retrosheet> [--corrections-csv docs/ngl_box_corrections.csv]   # idempotent in-place fixes for game records the parser cannot resolve (single-game patches plus NLB box-score normalization; see docs/corpus_corrections.md)
+uv run python -m unittest discover -s bin -p 'test_*.py'   # Python helper tests
 ```
 
 `bin/biodata.py` writes to `biodata/*.parquet` and is synced to `s3://timeball/biodata` alongside the existing `event/` and `misc/` paths. It applies one well-known fixup: two malformed `ejections.csv` rows for game `NY1191108192` carry an extra empty field between `EJECTEENAME` and `TEAM`; the script drops the empty field on read and warns. All date columns are strict-parsed (`m/d/Y` for ejections/coaches, `YYYYMMDD` for managers0/umpires0) — bad dates fail loudly.

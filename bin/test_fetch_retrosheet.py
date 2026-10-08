@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import sys
 import tempfile
+import time
 import unittest
 import zipfile
 from pathlib import Path
@@ -80,18 +81,12 @@ class NormalizeTargetNameTests(unittest.TestCase):
     def test_ngl_strips_NGL_infix_to_match_bundle_naming(self) -> None:
         # Per-year `{year}eve.zip` ships `{year}NGL.EVR`; bundle ships
         # `{year}.EVR`. Both must collide on the same path under ngl_e/.
-        self.assertEqual(
-            fr.normalize_target_name("1937NGL.EVR", "ngl_e"), "1937.EVR"
-        )
+        self.assertEqual(fr.normalize_target_name("1937NGL.EVR", "ngl_e"), "1937.EVR")
         self.assertEqual(fr.normalize_target_name("1937.EVR", "ngl_e"), "1937.EVR")
-        self.assertEqual(
-            fr.normalize_target_name("1942NGL.EBR", "ngl_b"), "1942.EBR"
-        )
+        self.assertEqual(fr.normalize_target_name("1942NGL.EBR", "ngl_b"), "1942.EBR")
         # Case-insensitive: defense in depth in case retrosheet ever ships
         # lowercase member names. `route_member` already accepts lowercase.
-        self.assertEqual(
-            fr.normalize_target_name("1937ngl.evr", "ngl_e"), "1937.evr"
-        )
+        self.assertEqual(fr.normalize_target_name("1937ngl.evr", "ngl_e"), "1937.evr")
         # Members not matching `{4-digit}NGL.{ext}` are passed through.
         self.assertEqual(fr.normalize_target_name("README.txt", "ngl_e"), "README.txt")
 
@@ -421,6 +416,71 @@ class ExtractZipTests(unittest.TestCase):
             self.assertEqual(
                 (root / "events" / "2024NYA.EVA").read_bytes(), b"second\n"
             )
+
+
+BOX_URLS = (
+    "https://www.retrosheet.org/events/1871box.zip",
+    "https://www.retrosheet.org/events/1897box.zip",
+)
+
+
+def box_dirs(root: Path) -> tuple[Path, Path]:
+    output = root / "out"
+    overrides = root / "overrides"
+    (output / "boxes").mkdir(parents=True)
+    (overrides / "boxes").mkdir(parents=True)
+    return output, overrides
+
+
+class RestoreMissingBoxesTests(unittest.TestCase):
+    def test_present_years_need_no_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output, overrides = box_dirs(Path(tmp))
+            for name in ("1871.EBN", "1897.EBN"):
+                (output / "boxes" / name).write_text("id,X\n")
+            self.assertEqual(
+                fr.restore_missing_boxes(output, BOX_URLS, overrides, 0.0), []
+            )
+
+    def test_missing_year_restored_from_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output, overrides = box_dirs(Path(tmp))
+            (output / "boxes" / "1897.EBN").write_text("upstream\n")
+            (overrides / "boxes" / "1871.EBN").write_text("override\n")
+            (overrides / "boxes" / "1897.EBN").write_text("stale\n")
+            missing = fr.restore_missing_boxes(output, BOX_URLS, overrides, 0.0)
+            self.assertEqual(missing, [])
+            self.assertEqual((output / "boxes" / "1871.EBN").read_text(), "override\n")
+            self.assertEqual((output / "boxes" / "1897.EBN").read_text(), "upstream\n")
+
+    def test_missing_year_without_override_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output, overrides = box_dirs(Path(tmp))
+            (output / "boxes" / "TEAM1871").write_text("BL1,NA\n")
+            (output / "boxes" / "1897.EBN").write_text("id,X\n")
+            self.assertEqual(
+                fr.restore_missing_boxes(output, BOX_URLS, overrides, 0.0), ["1871"]
+            )
+
+    def test_file_left_from_earlier_fetch_does_not_count(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output, overrides = box_dirs(Path(tmp))
+            for name in ("1871.EBN", "1897.EBN"):
+                (output / "boxes" / name).write_text("old\n")
+            later = time.time() + 60
+            self.assertEqual(
+                fr.restore_missing_boxes(output, BOX_URLS, overrides, later),
+                ["1871", "1897"],
+            )
+
+    def test_override_year_restored_when_upstream_delists_it(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output, overrides = box_dirs(Path(tmp))
+            (output / "boxes" / "1897.EBN").write_text("id,X\n")
+            (overrides / "boxes" / "1874.EBN").write_text("override\n")
+            missing = fr.restore_missing_boxes(output, BOX_URLS[1:], overrides, 0.0)
+            self.assertEqual(missing, [])
+            self.assertEqual((output / "boxes" / "1874.EBN").read_text(), "override\n")
 
 
 if __name__ == "__main__":

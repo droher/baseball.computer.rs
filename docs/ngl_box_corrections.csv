@@ -1,0 +1,737 @@
+file,line,game_id,rule,before,after
+ngl_b/1933.EBR,82,AKR193307231,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,83,AKR193307231,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1933.EBR,170,AKR193307232,trailing_line_score_placeholder,"line,0,0,2,1,0,0,2,1,","line,0,0,2,1,0,0,2,1"
+ngl_b/1933.EBR,171,AKR193307232,trailing_line_score_placeholder,"line,1,0,0,0,1,0,4,0,","line,1,0,0,0,1,0,4,0"
+ngl_b/1933.EBR,260,AKR193307270,trailing_line_score_placeholder,"line,1,0,1,1,0,1,1,6,0,","line,1,0,1,1,0,1,1,6,0"
+ngl_b/1933.EBR,441,AKR193307302,trailing_line_score_placeholder,"line,0,0,3,2,4,1,0,0,","line,0,0,3,2,4,1,0,0"
+ngl_b/1933.EBR,442,AKR193307302,trailing_line_score_placeholder,"line,1,0,0,0,0,0,0,0,","line,1,0,0,0,0,0,0,0"
+ngl_b/1933.EBR,1897,BLS193306260,trailing_line_score_placeholder,"line,0,0,0,0,3,0,1,0,","line,0,0,0,0,3,0,1,0"
+ngl_b/1933.EBR,1898,BLS193306260,trailing_line_score_placeholder,"line,1,3,4,2,0,0,12,","line,1,3,4,2,0,0,12"
+ngl_b/1933.EBR,2172,BLS193307232,trailing_line_score_placeholder,"line,0,0,0,0,0,0,3,2,","line,0,0,0,0,0,0,3,2"
+ngl_b/1933.EBR,2461,BLS193307302,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,2466,BLS193307302,trailing_line_score_placeholder,"line,0,0,1,0,4,0,3,2,","line,0,0,1,0,4,0,3,2"
+ngl_b/1933.EBR,2467,BLS193307302,trailing_line_score_placeholder,"line,1,0,4,0,1,0,0,0,","line,1,0,4,0,1,0,0,0"
+ngl_b/1933.EBR,2659,BLS193308062,trailing_line_score_placeholder,"line,0,0,6,0,4,3,0,0,","line,0,0,6,0,4,3,0,0"
+ngl_b/1933.EBR,2660,BLS193308062,trailing_line_score_placeholder,"line,1,0,1,3,0,2,0,0,","line,1,0,1,3,0,2,0,0"
+ngl_b/1933.EBR,3221,BLS193309171,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,3258,BLS193309172,blank_starter_position,"start,arleb101,""Buzz Arlett"",0,3,","start,arleb101,""Buzz Arlett"",0,3,9"
+ngl_b/1933.EBR,3260,BLS193309172,multi_position_starter,"start,roete101,""Ed Roetz"",0,5,79","start,roete101,""Ed Roetz"",0,5,7"
+ngl_b/1933.EBR,3326,BLS193309172,trailing_line_score_placeholder,"line,0,2,0,0,6,0,1,2,","line,0,2,0,0,6,0,1,2"
+ngl_b/1933.EBR,3327,BLS193309172,trailing_line_score_placeholder,"line,1,4,0,1,0,2,1,0,","line,1,4,0,1,0,2,1,0"
+ngl_b/1933.EBR,3414,BLS193310151,drop_validator_message,NUMBER OF CS DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,3416,BLS193310151,trailing_line_score_placeholder,"line,1,6,1,0,3,0,0,0,0,","line,1,6,1,0,3,0,0,0,0"
+ngl_b/1933.EBR,3944,CAG193308271,trailing_line_score_placeholder,"line,1,5,2,0,0,0,0,2,0,","line,1,5,2,0,0,0,0,2,0"
+ngl_b/1933.EBR,4216,CAG193309180,trailing_line_score_placeholder,"line,0,0,0,0,0,0,1,0,1,","line,0,0,0,0,0,0,1,0,1"
+ngl_b/1933.EBR,4217,CAG193309180,trailing_line_score_placeholder,"line,1,0,0,0,0,0,1,0,4,","line,1,0,0,0,0,0,1,0,4"
+ngl_b/1933.EBR,4780,CB2193306041,drop_validator_message,NUMBER OF CS DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,4888,CB2193306050,trailing_line_score_placeholder,"line,1,4,4,0,1,0,3,0,2,","line,1,4,4,0,1,0,3,0,2"
+ngl_b/1933.EBR,5107,CB2193306120,blank_starter_position,"start,crutj101,""Jimmie Crutchfield"",0,7,","start,crutj101,""Jimmie Crutchfield"",0,7,7"
+ngl_b/1933.EBR,5109,CB2193306120,multi_position_starter,"start,stres101,""Sam Streeter"",0,9,16","start,stres101,""Sam Streeter"",0,9,1"
+ngl_b/1933.EBR,5313,CB2193306181,blank_starter_position,"start,byrdb101,""Bill Byrd"",1,9,","start,byrdb101,""Bill Byrd"",1,9,1"
+ngl_b/1933.EBR,5358,CB2193306181,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,5359,CB2193306181,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1933.EBR,5971,CB2193307290,blank_starter_position,"start,byrdb101,""Bill Byrd"",1,8,","start,byrdb101,""Bill Byrd"",1,8,8"
+ngl_b/1933.EBR,5972,CB2193307290,blank_starter_position,"start,byrdb101,""Bill Byrd"",1,9,","start,byrdb101,""Bill Byrd"",1,9,8"
+ngl_b/1933.EBR,6582,DI1193304301,drop_validator_message,NUMBER OF CS DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,6667,DI1193304302,trailing_line_score_placeholder,"line,0,3,0,0,0,0,3,","line,0,3,0,0,0,0,3"
+ngl_b/1933.EBR,6668,DI1193304302,trailing_line_score_placeholder,"line,1,3,0,0,0,0,0,","line,1,3,0,0,0,0,0"
+ngl_b/1933.EBR,7853,DI1193306112,trailing_line_score_placeholder,"line,0,2,1,2,1,0,10,1,","line,0,2,1,2,1,0,10,1"
+ngl_b/1933.EBR,7854,DI1193306112,trailing_line_score_placeholder,"line,1,1,0,2,1,4,0,0,","line,1,1,0,2,1,4,0,0"
+ngl_b/1933.EBR,8525,DI1193307232,trailing_line_score_placeholder,"line,0,5,1,2,1,4,0,4,","line,0,5,1,2,1,4,0,4"
+ngl_b/1933.EBR,8526,DI1193307232,trailing_line_score_placeholder,"line,1,1,1,1,0,0,1,1,","line,1,1,1,1,0,0,1,1"
+ngl_b/1933.EBR,8560,DI1193309090,blank_starter_position,"start,benjj101,""Jerry Benjamin"",1,1,","start,benjj101,""Jerry Benjamin"",1,1,8"
+ngl_b/1933.EBR,8562,DI1193309090,multi_position_starter,"start,bindj101,""Jimmy Binder"",1,3,57","start,bindj101,""Jimmy Binder"",1,3,5"
+ngl_b/1933.EBR,8743,HOM193305170,blank_starter_position,"start,harrv102,""Vic Harris"",1,1,","start,harrv102,""Vic Harris"",1,1,7"
+ngl_b/1933.EBR,8749,HOM193305170,multi_position_starter,"start,evanb104,""Bill Evans"",1,7,57","start,evanb104,""Bill Evans"",1,7,5"
+ngl_b/1933.EBR,8884,HOM193306100,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,9145,HOM193309060,trailing_line_score_placeholder,"line,1,1,0,3,0,0,3,0,0,","line,1,1,0,3,0,0,3,0,0"
+ngl_b/1933.EBR,10270,NSH193304302,trailing_line_score_placeholder,"line,0,4,0,0,1,0,2,0,","line,0,4,0,0,1,0,2,0"
+ngl_b/1933.EBR,10271,NSH193304302,trailing_line_score_placeholder,"line,1,0,0,0,0,0,0,0,","line,1,0,0,0,0,0,0,0"
+ngl_b/1933.EBR,10530,NSH193306251,unknown_pline_sequence,"stat,pline,willr106,0,NA,24,-1,38,8,2,0,0,7,-1,4,-1,7,0,-1,-1,1,-1","stat,pline,willr106,0,1,24,-1,38,8,2,0,0,7,-1,4,-1,7,0,-1,-1,1,-1"
+ngl_b/1933.EBR,10531,NSH193306251,unknown_pline_sequence,"stat,pline,millp101,1,NA,27,-1,35,10,1,0,0,2,-1,2,-1,5,0,-1,-1,1,-1","stat,pline,millp101,1,1,27,-1,35,10,1,0,0,2,-1,2,-1,5,0,-1,-1,1,-1"
+ngl_b/1933.EBR,10552,NSH193306251,trailing_line_score_placeholder,"line,1,0,0,0,0,0,0,5,2,","line,1,0,0,0,0,0,0,5,2"
+ngl_b/1933.EBR,10667,NSH193307041,blank_starter_position,"start,gillg104,""George Gill"",0,4,","start,gillg104,""George Gill"",0,4,5"
+ngl_b/1933.EBR,10669,NSH193307041,multi_position_starter,"start,dandr101,""Ray Dandridge"",0,6,56","start,dandr101,""Ray Dandridge"",0,6,6"
+ngl_b/1933.EBR,11282,NSH193308062,trailing_line_score_placeholder,"line,0,0,0,0,0,0,0,1,","line,0,0,0,0,0,0,0,1"
+ngl_b/1933.EBR,11379,NSH193308070,trailing_line_score_placeholder,"line,1,3,1,2,1,1,0,0,0,","line,1,3,1,2,1,1,0,0,0"
+ngl_b/1933.EBR,11566,NSH193308202,trailing_line_score_placeholder,"line,0,1,0,0,0,2,1,1,","line,0,1,0,0,0,2,1,1"
+ngl_b/1933.EBR,11567,NSH193308202,trailing_line_score_placeholder,"line,1,0,1,2,0,0,0,0,","line,1,0,1,2,0,0,0,0"
+ngl_b/1933.EBR,12350,NY5193309280,multi_position_starter,"start,dixor101,""Rap Dixon"",0,5,29","start,dixor101,""Rap Dixon"",0,5,9"
+ngl_b/1933.EBR,12351,NY5193309280,blank_starter_position,"start,casem101,""Mickey Casey"",0,6,","start,casem101,""Mickey Casey"",0,6,2"
+ngl_b/1933.EBR,13685,PH5193309040,drop_validator_message,NUMBER OF DPs DISAGREE BETWEEN TEAMSTATS AND EVENTS,
+ngl_b/1933.EBR,13687,PH5193309040,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,13689,PH5193309040,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1933.EBR,13811,PH5193309062,blank_starter_position,"start,carts102,""Spoon Carter"",0,9,","start,carts102,""Spoon Carter"",0,9,1"
+ngl_b/1933.EBR,14588,PRG193310291,trailing_line_score_placeholder,"line,1,0,0,3,1,0,6,0,1,","line,1,0,0,3,1,0,6,0,1"
+ngl_b/1933.EBR,14672,PRG193310292,trailing_line_score_placeholder,"line,0,1,0,1,3,2,0,3,","line,0,1,0,1,3,2,0,3"
+ngl_b/1933.EBR,14673,PRG193310292,trailing_line_score_placeholder,"line,1,0,0,0,0,0,0,0,","line,1,0,0,0,0,0,0,0"
+ngl_b/1933.EBR,14945,PRG193312251,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,14946,PRG193312251,drop_validator_message,NUMBER OF PR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,15051,PTC193305100,trailing_line_score_placeholder,"line,1,0,0,0,0,0,0,1,4,","line,1,0,0,0,0,0,0,1,4"
+ngl_b/1933.EBR,15595,PTC193305302,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,15596,PTC193305302,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1933.EBR,15597,PTC193305302,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1933.EBR,15599,PTC193305302,trailing_line_score_placeholder,"line,1,1,0,0,1,0,1,4,0,","line,1,1,0,0,1,0,1,4,0"
+ngl_b/1933.EBR,15690,PTC193305310,trailing_line_score_placeholder,"line,0,0,0,0,0,0,1,0,0,","line,0,0,0,0,0,0,1,0,0"
+ngl_b/1933.EBR,16537,PTC193306172,multi_position_starter,"start,bellj103,""Cool Papa Bell"",1,1,48","start,bellj103,""Cool Papa Bell"",1,1,8"
+ngl_b/1933.EBR,16538,PTC193306172,blank_starter_position,"start,russj105,""John Henry Russell"",1,2,","start,russj105,""John Henry Russell"",1,2,4"
+ngl_b/1933.EBR,16901,PTC193307042,blank_starter_position,"start,johnj108,""Judy Johnson"",1,5,","start,johnj108,""Judy Johnson"",1,5,5"
+ngl_b/1933.EBR,16905,PTC193307042,multi_position_starter,"start,bellw101,""William Bell"",1,9,16","start,bellw101,""William Bell"",1,9,1"
+ngl_b/1933.EBR,17156,PTC193307120,blank_starter_position,"start,willh105,""Harry Williams"",0,4,","start,willh105,""Harry Williams"",0,4,5"
+ngl_b/1933.EBR,17158,PTC193307120,multi_position_starter,"start,johnb111,""Bert Johnson"",0,6,69","start,johnb111,""Bert Johnson"",0,6,9"
+ngl_b/1933.EBR,17304,PTC193307220,trailing_line_score_placeholder,"line,1,1,0,0,2,2,7,0,2,","line,1,1,0,0,2,2,7,0,2"
+ngl_b/1933.EBR,17685,PTC193307250,trailing_line_score_placeholder,"line,0,0,0,0,0,2,0,0,0,","line,0,0,0,0,0,2,0,0,0"
+ngl_b/1933.EBR,17777,PTC193307270,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,17778,PTC193307270,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1933.EBR,17779,PTC193307270,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,17781,PTC193307270,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1933.EBR,17782,PTC193307270,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1933.EBR,17973,PTC193308131,trailing_line_score_placeholder,"line,1,0,0,0,1,2,0,5,0,","line,1,0,0,0,1,2,0,5,0"
+ngl_b/1933.EBR,18058,PTC193308132,trailing_line_score_placeholder,"line,0,2,0,0,0,0,2,0,","line,0,2,0,0,0,0,2,0"
+ngl_b/1933.EBR,18059,PTC193308132,trailing_line_score_placeholder,"line,1,0,2,0,3,2,0,","line,1,0,2,0,3,2,0"
+ngl_b/1933.EBR,18145,PTC193308210,trailing_line_score_placeholder,"line,0,0,0,2,2,0,3,0,","line,0,0,0,2,2,0,3,0"
+ngl_b/1933.EBR,18146,PTC193308210,trailing_line_score_placeholder,"line,1,1,1,2,5,1,4,","line,1,1,1,2,5,1,4"
+ngl_b/1933.EBR,18321,PTC193309080,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1933.EBR,18322,PTC193309080,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1933.EBR,18329,PTC193309080,trailing_line_score_placeholder,"line,1,0,0,4,2,1,0,4,1,","line,1,0,0,4,2,1,0,4,1"
+ngl_b/1933.EBR,18593,PTC193309300,trailing_line_score_placeholder,"line,0,0,0,0,2,1,0,","line,0,0,0,0,2,1,0"
+ngl_b/1933.EBR,18896,PTC193310071,drop_validator_message,NUMBER OF CS DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,413,BLS193407081,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,414,BLS193407081,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,415,BLS193407081,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,416,BLS193407081,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,417,BLS193407081,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,1096,CAG193405260,multi_position_starter,"start,mothd101,""Dink Mothell"",0,2,34","start,mothd101,""Dink Mothell"",0,2,4"
+ngl_b/1934.EBR,1097,CAG193405260,blank_starter_position,"start,gileg101,""George Giles"",0,3,","start,gileg101,""George Giles"",0,3,3"
+ngl_b/1934.EBR,1154,CAG193405260,trailing_line_score_placeholder,"line,1,2,0,1,0,0,1,0,0,","line,1,2,0,1,0,0,1,0,0"
+ngl_b/1934.EBR,2350,CUS193405301,trailing_line_score_placeholder,"line,1,0,3,0,1,0,0,0,2,x","line,1,0,3,0,1,0,0,0,2"
+ngl_b/1934.EBR,2626,CV8193406171,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,2627,CV8193406171,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,2715,CV8193406172,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,2716,CV8193406172,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,2854,CV8193407292,blank_starter_position,"start,gilcd101,""Dennis Gilchrist"",1,7,","start,gilcd101,""Dennis Gilchrist"",1,7,2"
+ngl_b/1934.EBR,2856,CV8193407292,multi_position_starter,"start,jackj104,""Jelly Jackson"",1,9,16","start,jackj104,""Jelly Jackson"",1,9,6"
+ngl_b/1934.EBR,3096,HOM193405190,trailing_line_score_placeholder,"line,1,0,3,0,0,6,0,0,1,x","line,1,0,3,0,0,6,0,0,1"
+ngl_b/1934.EBR,3460,HOM193406162,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,3462,HOM193406162,trailing_line_score_placeholder,"line,1,0,0,0,0,2,0,0,1,","line,1,0,0,0,0,2,0,0,1"
+ngl_b/1934.EBR,3664,HOM193407262,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,3665,HOM193407262,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1934.EBR,3666,HOM193407262,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1934.EBR,3667,HOM193407262,trailing_line_score_placeholder,"line,0,1,0,2,4,0,1,2,","line,0,1,0,2,4,0,1,2"
+ngl_b/1934.EBR,3668,HOM193407262,trailing_line_score_placeholder,"line,1,0,0,0,0,5,0,0,","line,1,0,0,0,0,5,0,0"
+ngl_b/1934.EBR,4052,NSH193404292,trailing_line_score_placeholder,"line,0,0,0,1,0,1,0,0,","line,0,0,0,1,0,1,0,0"
+ngl_b/1934.EBR,4053,NSH193404292,trailing_line_score_placeholder,"line,1,1,0,1,0,1,0,","line,1,1,0,1,0,1,0"
+ngl_b/1934.EBR,4335,NSH193405271,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,4336,NSH193405271,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,4337,NSH193405271,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,4338,NSH193405271,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,4343,NSH193405271,trailing_line_score_placeholder,"line,1,5,0,2,0,0,4,0,1,x","line,1,5,0,2,0,0,4,0,1"
+ngl_b/1934.EBR,4427,NSH193405272,trailing_line_score_placeholder,"line,0,0,0,0,0,1,0,0,","line,0,0,0,0,0,1,0,0"
+ngl_b/1934.EBR,4805,NSH193406260,drop_validator_message,NUMBER OF CS DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,5139,NW1193405131,blank_starter_position,"start,willa107,""Andy Williams"",1,9,","start,willa107,""Andy Williams"",1,9,3"
+ngl_b/1934.EBR,5270,NW1193405132,trailing_line_score_placeholder,"line,0,2,0,2,0,0,0,0,","line,0,2,0,2,0,0,0,0"
+ngl_b/1934.EBR,5271,NW1193405132,trailing_line_score_placeholder,"line,1,1,0,0,0,0,0,0,","line,1,1,0,0,0,0,0,0"
+ngl_b/1934.EBR,5310,NW1193405201,multi_position_starter,"start,starj102,""Jim Starks"",1,6,49","start,starj102,""Jim Starks"",1,6,9"
+ngl_b/1934.EBR,5312,NW1193405201,blank_starter_position,"start,dandr101,""Ray Dandridge"",1,8,","start,dandr101,""Ray Dandridge"",1,8,5"
+ngl_b/1934.EBR,5359,NW1193405201,trailing_line_score_placeholder,"line,1,1,2,0,0,0,1,0,1,x","line,1,1,2,0,0,0,1,0,1"
+ngl_b/1934.EBR,5458,NW1193405202,trailing_line_score_placeholder,"line,0,0,0,1,0,0,0,4,1,","line,0,0,0,1,0,0,0,4,1"
+ngl_b/1934.EBR,5459,NW1193405202,trailing_line_score_placeholder,"line,1,3,0,0,0,0,0,2,0,","line,1,3,0,0,0,0,0,2,0"
+ngl_b/1934.EBR,5571,NW1193406102,blank_starter_position,"start,rober105,""Roy Roberts"",0,4,","start,rober105,""Roy Roberts"",0,4,1"
+ngl_b/1934.EBR,5632,NW1193406102,trailing_line_score_placeholder,"line,0,2,0,0,0,0,1,0,","line,0,2,0,0,0,0,1,0"
+ngl_b/1934.EBR,5808,NW1193406171,trailing_line_score_placeholder,"line,1,0,0,0,1,0,1,1,4,x","line,1,0,0,0,1,0,1,1,4"
+ngl_b/1934.EBR,5893,NW1193406172,trailing_line_score_placeholder,"line,0,0,0,0,0,0,0,1,","line,0,0,0,0,0,0,0,1"
+ngl_b/1934.EBR,6001,NW1193406241,trailing_line_score_placeholder,"line,1,0,0,3,2,0,0,5,0,x","line,1,0,0,3,2,0,0,5,0"
+ngl_b/1934.EBR,6028,NW1193406242,blank_starter_position,"start,propw101,""Willie Prophet"",0,3,","start,propw101,""Willie Prophet"",0,3,7"
+ngl_b/1934.EBR,6034,NW1193406242,multi_position_starter,"start,cartc101,""Cliff Carter"",0,9,16","start,cartc101,""Cliff Carter"",0,9,1"
+ngl_b/1934.EBR,6090,NW1193406242,trailing_line_score_placeholder,"line,0,5,0,0,1,1,1,0,","line,0,5,0,0,1,1,1,0"
+ngl_b/1934.EBR,6091,NW1193406242,trailing_line_score_placeholder,"line,1,0,0,0,0,0,0,0,","line,1,0,0,0,0,0,0,0"
+ngl_b/1934.EBR,6284,NW1193407090,trailing_line_score_placeholder,"line,0,3,0,0,2,3,0,7,","line,0,3,0,0,2,3,0,7"
+ngl_b/1934.EBR,6285,NW1193407090,trailing_line_score_placeholder,"line,1,1,0,0,1,0,2,0,","line,1,1,0,0,1,0,2,0"
+ngl_b/1934.EBR,6496,NW1193407151,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,6497,NW1193407151,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,6498,NW1193407151,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,6545,NW1193407152,blank_starter_position,"start,merrs101,""Schute Merritt"",1,6,","start,merrs101,""Schute Merritt"",1,6,4"
+ngl_b/1934.EBR,6915,NW1193407221,blank_starter_position,"start,britg103,""George Britt"",1,2,","start,britg103,""George Britt"",1,2,5"
+ngl_b/1934.EBR,7060,NW1193407222,trailing_line_score_placeholder,"line,0,0,0,4,1,3,2,0,","line,0,0,0,4,1,3,2,0"
+ngl_b/1934.EBR,7250,NW1193407291,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,7357,NW1193407292,trailing_line_score_placeholder,"line,0,0,0,0,6,1,1,6,","line,0,0,0,0,6,1,1,6"
+ngl_b/1934.EBR,7536,NW1193408052,trailing_line_score_placeholder,"line,0,0,3,0,2,1,0,1,","line,0,0,3,0,2,1,0,1"
+ngl_b/1934.EBR,7537,NW1193408052,trailing_line_score_placeholder,"line,1,0,1,0,2,1,0,0,","line,1,0,1,0,2,1,0,0"
+ngl_b/1934.EBR,7621,NW1193408060,trailing_line_score_placeholder,"line,0,1,0,0,1,0,4,0,","line,0,1,0,0,1,0,4,0"
+ngl_b/1934.EBR,7622,NW1193408060,trailing_line_score_placeholder,"line,1,0,2,0,1,0,1,1,","line,1,0,2,0,1,0,1,1"
+ngl_b/1934.EBR,7663,NW1193408191,blank_starter_position,"start,merrs101,""Schute Merritt"",1,8,","start,merrs101,""Schute Merritt"",1,8,6"
+ngl_b/1934.EBR,7710,NW1193408191,trailing_line_score_placeholder,"line,1,4,0,0,1,1,0,0,3,x","line,1,4,0,0,1,1,0,0,3"
+ngl_b/1934.EBR,7736,NW1193408192,multi_position_starter,"start,harrr104,""Richard Harris"",0,2,45","start,harrr104,""Richard Harris"",0,2,4"
+ngl_b/1934.EBR,7740,NW1193408192,blank_starter_position,"start,jackl103,""Lincoln Jackson"",0,6,","start,jackl103,""Lincoln Jackson"",0,6,3"
+ngl_b/1934.EBR,7809,NW1193408192,trailing_line_score_placeholder,"line,0,2,1,0,1,3,1,1,","line,0,2,1,0,1,3,1,1"
+ngl_b/1934.EBR,7896,NW1193408200,trailing_line_score_placeholder,"line,0,0,0,1,0,0,0,","line,0,0,0,1,0,0,0"
+ngl_b/1934.EBR,7897,NW1193408200,trailing_line_score_placeholder,"line,1,1,3,0,3,0,0,","line,1,1,3,0,3,0,0"
+ngl_b/1934.EBR,8071,NY5193405302,trailing_line_score_placeholder,"line,1,2,0,1,3,0,2,0,0,x","line,1,2,0,1,3,0,2,0,0"
+ngl_b/1934.EBR,9294,NY5193410072,trailing_line_score_placeholder,"line,0,2,0,0,0,3,0,0,","line,0,2,0,0,0,3,0,0"
+ngl_b/1934.EBR,9295,NY5193410072,trailing_line_score_placeholder,"line,1,1,0,0,0,1,0,1,","line,1,1,0,0,0,1,0,1"
+ngl_b/1934.EBR,10104,PH5193406050,trailing_line_score_placeholder,"line,1,1,0,0,3,0,1,0,1,","line,1,1,0,0,3,0,1,0,1"
+ngl_b/1934.EBR,10195,PH5193406091,trailing_line_score_placeholder,"line,1,0,1,2,0,0,0,0,2,x","line,1,0,1,2,0,0,0,0,2"
+ngl_b/1934.EBR,10732,PH5193406242,trailing_line_score_placeholder,"line,1,0,0,1,1,0,5,0,2,x","line,1,0,0,1,1,0,5,0,2"
+ngl_b/1934.EBR,11187,PH5193407040,trailing_line_score_placeholder,"line,1,2,0,0,0,1,1,0,3,","line,1,2,0,0,0,1,1,0,3"
+ngl_b/1934.EBR,11280,PH5193407081,trailing_line_score_placeholder,"line,1,2,0,0,0,1,1,0,3,x","line,1,2,0,0,0,1,1,0,3"
+ngl_b/1934.EBR,11373,PH5193407082,trailing_line_score_placeholder,"line,1,0,1,0,3,2,3,0,0,x","line,1,0,1,0,3,2,3,0,0"
+ngl_b/1934.EBR,11461,PH5193407100,trailing_line_score_placeholder,"line,1,1,0,2,0,1,0,0,0,","line,1,1,0,2,0,1,0,0,0"
+ngl_b/1934.EBR,11637,PH5193407142,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,11639,PH5193407142,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1934.EBR,11640,PH5193407142,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1934.EBR,11642,PH5193407142,trailing_line_score_placeholder,"line,1,0,0,4,1,1,2,1,0,x","line,1,0,0,4,1,1,2,1,0"
+ngl_b/1934.EBR,11808,PH5193407222,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,11809,PH5193407222,trailing_line_score_placeholder,"line,0,0,2,3,0,0,0,2,","line,0,0,2,3,0,0,0,2"
+ngl_b/1934.EBR,11810,PH5193407222,trailing_line_score_placeholder,"line,1,0,0,0,1,0,0,0,","line,1,0,0,0,1,0,0,0"
+ngl_b/1934.EBR,11900,PH5193407230,trailing_line_score_placeholder,"line,0,1,0,0,0,0,0,0,2,","line,0,1,0,0,0,0,0,0,2"
+ngl_b/1934.EBR,11901,PH5193407230,trailing_line_score_placeholder,"line,1,1,0,1,0,1,3,7,x","line,1,1,0,1,0,1,3,7"
+ngl_b/1934.EBR,12084,PH5193407282,trailing_line_score_placeholder,"line,1,2,0,0,2,1,0,0,4,x","line,1,2,0,0,2,1,0,0,4"
+ngl_b/1934.EBR,12169,PH5193407291,trailing_line_score_placeholder,"line,1,0,0,0,1,2,0,0,4,x","line,1,0,0,0,1,2,0,0,4"
+ngl_b/1934.EBR,12256,PH5193407292,trailing_line_score_placeholder,"line,1,4,4,0,0,1,0,0,0,x","line,1,4,4,0,0,1,0,0,0"
+ngl_b/1934.EBR,12704,PH5193408230,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,12879,PH5193408262,trailing_line_score_placeholder,"line,1,3,3,0,0,2,0,0,0,x","line,1,3,3,0,0,2,0,0,0"
+ngl_b/1934.EBR,12961,PH5193408270,trailing_line_score_placeholder,"line,1,3,2,1,1,0,1,0,0,x","line,1,3,2,1,1,0,1,0,0"
+ngl_b/1934.EBR,14170,PH6193406162,trailing_line_score_placeholder,"line,1,1,1,0,0,2,0,1,3,","line,1,1,1,0,0,2,0,1,3"
+ngl_b/1934.EBR,14449,PH6193408042,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,14450,PH6193408042,drop_validator_message,NUMBER OF PR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,14454,PH6193408042,trailing_line_score_placeholder,"line,1,2,3,1,0,2,0,0,1,x","line,1,2,3,1,0,2,0,0,1"
+ngl_b/1934.EBR,15587,PTC193405210,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,15588,PTC193405210,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,15591,PTC193405210,trailing_line_score_placeholder,"line,1,3,4,0,0,0,0,0,0,x","line,1,3,4,0,0,0,0,0,0"
+ngl_b/1934.EBR,15878,PTC193405260,trailing_line_score_placeholder,"line,1,1,0,0,1,2,1,0,1,","line,1,1,0,0,1,2,1,0,1"
+ngl_b/1934.EBR,15973,PTC193405271,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,15975,PTC193405271,trailing_line_score_placeholder,"line,1,1,1,0,2,1,3,0,0,x","line,1,1,1,0,2,1,3,0,0"
+ngl_b/1934.EBR,16263,PTC193406020,trailing_line_score_placeholder,"line,1,1,0,1,0,2,1,2,2,x","line,1,1,0,1,0,2,1,2,2"
+ngl_b/1934.EBR,16629,PTC193406091,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,16630,PTC193406091,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,16639,PTC193406091,trailing_line_score_placeholder,"line,1,0,1,4,5,1,2,1,3,x","line,1,0,1,4,5,1,2,1,3"
+ngl_b/1934.EBR,17127,PTC193406300,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,17128,PTC193406300,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,17316,PTC193407012,trailing_line_score_placeholder,"line,0,0,0,0,0,0,0,0,","line,0,0,0,0,0,0,0,0"
+ngl_b/1934.EBR,17409,PTC193407020,trailing_line_score_placeholder,"line,1,0,1,0,0,1,0,3,0,x","line,1,0,1,0,0,1,0,3,0"
+ngl_b/1934.EBR,17692,PTC193407050,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,17693,PTC193407050,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,17698,PTC193407050,trailing_line_score_placeholder,"line,1,0,1,0,1,0,5,2,1,x","line,1,0,1,0,1,0,5,2,1"
+ngl_b/1934.EBR,17783,PTC193407121,trailing_line_score_placeholder,"line,1,1,0,0,1,1,4,0,0,","line,1,1,0,0,1,1,4,0,0"
+ngl_b/1934.EBR,18230,PTC193407211,trailing_line_score_placeholder,"line,1,3,0,0,0,3,3,1,0,x","line,1,3,0,0,0,3,3,1,0"
+ngl_b/1934.EBR,18326,PTC193407212,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,18327,PTC193407212,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,18333,PTC193407212,trailing_line_score_placeholder,"line,1,2,0,1,0,0,2,0,0,x","line,1,2,0,1,0,0,2,0,0"
+ngl_b/1934.EBR,18522,PTC193407230,trailing_line_score_placeholder,"line,1,1,0,0,3,0,1,0,0,x","line,1,1,0,0,3,0,1,0,0"
+ngl_b/1934.EBR,18700,PTC193407250,trailing_line_score_placeholder,"line,1,0,0,6,1,0,0,0,5,","line,1,0,0,6,1,0,0,0,5"
+ngl_b/1934.EBR,19017,PTC193408191,multi_position_starter,"start,stepj105,""Jake Stephens"",0,1,68","start,stepj105,""Jake Stephens"",0,1,8"
+ngl_b/1934.EBR,19023,PTC193408191,blank_starter_position,"start,dunnj104,""Jake Dunn"",0,7,","start,dunnj104,""Jake Dunn"",0,7,9"
+ngl_b/1934.EBR,19078,PTC193408191,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,19079,PTC193408191,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,19080,PTC193408191,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,19084,PTC193408191,drop_validator_message,NUMBER OF CS DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,19086,PTC193408191,trailing_line_score_placeholder,"line,1,0,0,2,2,2,0,0,0,x","line,1,0,0,2,2,2,0,0,0"
+ngl_b/1934.EBR,19173,PTC193408192,trailing_line_score_placeholder,"line,1,1,2,0,0,0,0,0,1,x","line,1,1,2,0,0,0,0,0,1"
+ngl_b/1934.EBR,19355,PTC193409031,trailing_line_score_placeholder,"line,1,4,2,0,0,0,0,1,0,x","line,1,4,2,0,0,0,0,1,0"
+ngl_b/1934.EBR,19445,PTC193409050,trailing_line_score_placeholder,"line,1,1,4,1,3,1,4,1,0,x","line,1,1,4,1,3,1,4,1,0"
+ngl_b/1934.EBR,19934,PTC193410071,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1934.EBR,19935,PTC193410071,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,19936,PTC193410071,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1934.EBR,19939,PTC193410071,trailing_line_score_placeholder,"line,1,0,1,0,0,0,0,3,2,x","line,1,0,1,0,0,0,0,3,2"
+ngl_b/1935.EBR,185,ALM193510260,trailing_line_score_placeholder,"line,1,2,0,2,2,0,3,0,2,","line,1,2,0,2,2,0,3,0,2"
+ngl_b/1935.EBR,1909,BRN193505261,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,1910,BRN193505261,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,3011,BRN193507211,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,3012,BRN193507211,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,3013,BRN193507211,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,3117,BRN193507212,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,3118,BRN193507212,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,5620,CAG193508240,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,5747,CAG193508280,multi_position_starter,"start,suttm101,""Mule Suttles"",1,4,79","start,suttm101,""Mule Suttles"",1,4,7"
+ngl_b/1935.EBR,5748,CAG193508280,blank_starter_position,"start,reduw101,""Wilson Redus"",1,5,","start,reduw101,""Wilson Redus"",1,5,9"
+ngl_b/1935.EBR,5999,CUS193507042,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,6000,CUS193507042,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1935.EBR,6325,HOM193505301,multi_position_starter,"start,wellw101,""Willie Wells"",0,3,68","start,wellw101,""Willie Wells"",0,3,6"
+ngl_b/1935.EBR,6328,HOM193505301,blank_starter_position,"start,davis103,""Steel Arm Davis"",0,6,","start,davis103,""Steel Arm Davis"",0,6,3"
+ngl_b/1935.EBR,6482,HOM193506151,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,6483,HOM193506151,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,6484,HOM193506151,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,6485,HOM193506151,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,6784,HOM193506162,trailing_line_score_placeholder,"line,0,0,0,2,0,1,0,0,0,","line,0,0,0,2,0,1,0,0,0"
+ngl_b/1935.EBR,6785,HOM193506162,trailing_line_score_placeholder,"line,1,0,1,0,0,2,0,0,4,","line,1,0,1,0,0,2,0,0,4"
+ngl_b/1935.EBR,7058,HOM193507081,trailing_line_score_placeholder,"line,0,1,2,0,0,3,0,","line,0,1,2,0,0,3,0"
+ngl_b/1935.EBR,7190,HOM193507280,blank_starter_position,"start,santa102,""Anastasio Santaella"",0,6,","start,santa102,""Anastasio Santaella"",0,6,4"
+ngl_b/1935.EBR,7193,HOM193507280,multi_position_starter,"start,martr105,""Rabbit Martinez"",0,9,16","start,martr105,""Rabbit Martinez"",0,9,6"
+ngl_b/1935.EBR,7198,HOM193507280,blank_starter_position,"start,beckj104,""John Beckwith"",1,5,","start,beckj104,""John Beckwith"",1,5,2"
+ngl_b/1935.EBR,7199,HOM193507280,blank_starter_position,"start,gastr101,""Robert Gaston"",1,6,","start,gastr101,""Robert Gaston"",1,6,2"
+ngl_b/1935.EBR,7202,HOM193507280,multi_position_starter,"start,benjj101,""Jerry Benjamin"",1,9,19","start,benjj101,""Jerry Benjamin"",1,9,9"
+ngl_b/1935.EBR,7463,HOM193508100,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,7465,HOM193508100,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1935.EBR,7466,HOM193508100,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1935.EBR,7467,HOM193508100,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1935.EBR,7468,HOM193508100,trailing_line_score_placeholder,"line,0,0,3,2,3,0,2,0,3,","line,0,0,3,2,3,0,2,0,3"
+ngl_b/1935.EBR,7469,HOM193508100,trailing_line_score_placeholder,"line,1,1,2,2,1,0,2,0,3,","line,1,1,2,2,1,0,2,0,3"
+ngl_b/1935.EBR,7756,KCM193504250,trailing_line_score_placeholder,"line,1,0,2,1,8,1,0,1,0,","line,1,0,2,1,8,1,0,1,0"
+ngl_b/1935.EBR,8995,NSH193505250,trailing_line_score_placeholder,"line,1,4,1,2,0,3,1,0,0,","line,1,4,1,2,0,3,1,0,0"
+ngl_b/1935.EBR,9725,NW1193505051,multi_position_starter,"start,dandr101,""Ray Dandridge"",1,4,57","start,dandr101,""Ray Dandridge"",1,4,5"
+ngl_b/1935.EBR,9726,NW1193505051,blank_starter_position,"start,markd102,""Duke Markham"",1,5,","start,markd102,""Duke Markham"",1,5,7"
+ngl_b/1935.EBR,9869,NW1193505052,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,9870,NW1193505052,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,10118,NW1193505122,blank_starter_position,"start,duket102,""Tommie Dukes"",0,8,","start,duket102,""Tommie Dukes"",0,8,2"
+ngl_b/1935.EBR,10277,NW1193505130,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,10278,NW1193505130,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,10279,NW1193505130,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,10280,NW1193505130,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,10281,NW1193505130,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,10282,NW1193505130,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1935.EBR,10283,NW1193505130,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1935.EBR,10323,NW1193505160,blank_starter_position,"start,starj102,""Jim Starks"",1,5,","start,starj102,""Jim Starks"",1,5,3"
+ngl_b/1935.EBR,10325,NW1193505160,multi_position_starter,"start,markd102,""Duke Markham"",1,7,39","start,markd102,""Duke Markham"",1,7,9"
+ngl_b/1935.EBR,10453,NW1193505301,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,10454,NW1193505301,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,10627,NW1193506010,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,11493,NW1193507130,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,12282,NW1193508240,blank_starter_position,"start,parnr102,""Roy Parnell"",0,3,","start,parnr102,""Roy Parnell"",0,3,7"
+ngl_b/1935.EBR,12284,NW1193508240,multi_position_starter,"start,wrigb104,""Wild Bill Wright"",0,5,89","start,wrigb104,""Wild Bill Wright"",0,5,8"
+ngl_b/1935.EBR,12337,NW1193508240,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,13011,NY5193507041,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,13012,NY5193507041,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1935.EBR,13057,NY5193508042,blank_starter_position,"start,hubbj101,""Jesse Hubbard"",1,8,","start,hubbj101,""Jesse Hubbard"",1,8,1"
+ngl_b/1935.EBR,13058,NY5193508042,blank_starter_position,"start,hubbj101,""Jesse Hubbard"",1,9,","start,hubbj101,""Jesse Hubbard"",1,9,1"
+ngl_b/1935.EBR,13458,NY6193505261,blank_starter_position,"start,aranp101,""Pedro Arango"",1,7,","start,aranp101,""Pedro Arango"",1,7,5"
+ngl_b/1935.EBR,13516,NY6193505261,drop_validator_message,NUMBER OF DPs DISAGREE BETWEEN TEAMSTATS AND EVENTS,
+ngl_b/1935.EBR,14542,NY6193507141,multi_position_starter,"start,steat101,""Turkey Stearnes"",0,4,78","start,steat101,""Turkey Stearnes"",0,4,8"
+ngl_b/1935.EBR,14543,NY6193507141,blank_starter_position,"start,suttm101,""Mule Suttles"",0,5,","start,suttm101,""Mule Suttles"",0,5,7"
+ngl_b/1935.EBR,14804,NY6193507200,trailing_line_score_placeholder,"line,1,0,1,0,0,0,2,1,2,","line,1,0,1,0,0,0,2,1,2"
+ngl_b/1935.EBR,14950,NY6193507212,multi_position_starter,"start,martr105,""Rabbit Martinez"",1,9,16","start,martr105,""Rabbit Martinez"",1,9,6"
+ngl_b/1935.EBR,15326,NY6193508240,multi_position_starter,"start,perej103,""Javier Perez"",0,6,58","start,perej103,""Javier Perez"",0,6,5"
+ngl_b/1935.EBR,15328,NY6193508240,blank_starter_position,"start,sadlb101,""Bill Sadler"",0,8,","start,sadlb101,""Bill Sadler"",0,8,6"
+ngl_b/1935.EBR,15578,NY6193508252,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,16916,PH5193505122,trailing_line_score_placeholder,"line,0,0,0,0,0,1,0,","line,0,0,0,0,0,1,0"
+ngl_b/1935.EBR,17315,PH5193505192,blank_starter_position,"start,cread101,""Dewey Creacy"",1,2,","start,cread101,""Dewey Creacy"",1,2,5"
+ngl_b/1935.EBR,17316,PH5193505192,multi_position_starter,"start,whitc103,""Chaney White"",1,3,57","start,whitc103,""Chaney White"",1,3,7"
+ngl_b/1935.EBR,18107,PH5193506030,trailing_line_score_placeholder,"line,1,2,0,7,0,1,1,0,1,","line,1,2,0,7,0,1,1,0,1"
+ngl_b/1935.EBR,18717,PH5193506232,trailing_line_score_placeholder,"line,0,0,0,3,0,6,1,","line,0,0,0,3,0,6,1"
+ngl_b/1935.EBR,18718,PH5193506232,trailing_line_score_placeholder,"line,1,0,0,0,0,0,1,","line,1,0,0,0,0,0,1"
+ngl_b/1935.EBR,18748,PH5193506240,multi_position_starter,"start,davis103,""Steel Arm Davis"",0,6,39","start,davis103,""Steel Arm Davis"",0,6,3"
+ngl_b/1935.EBR,18749,PH5193506240,blank_starter_position,"start,reduw101,""Wilson Redus"",0,7,","start,reduw101,""Wilson Redus"",0,7,9"
+ngl_b/1935.EBR,19066,PH5193507041,trailing_line_score_placeholder,"line,1,1,0,0,2,2,0,0,0,","line,1,1,0,0,2,2,0,0,0"
+ngl_b/1935.EBR,19646,PH5193507142,trailing_line_score_placeholder,"line,0,1,0,0,0,0,2,2,5,","line,0,1,0,0,0,0,2,2,5"
+ngl_b/1935.EBR,19647,PH5193507142,trailing_line_score_placeholder,"line,1,0,0,1,2,0,0,0,0,","line,1,0,0,1,2,0,0,0,0"
+ngl_b/1935.EBR,19819,PH5193507201,trailing_line_score_placeholder,"line,1,0,4,0,2,0,0,11,1,","line,1,0,4,0,2,0,0,11,1"
+ngl_b/1935.EBR,19916,PH5193507202,trailing_line_score_placeholder,"line,1,1,1,2,0,1,0,0,2,","line,1,1,1,2,0,1,0,0,2"
+ngl_b/1935.EBR,19998,PH5193508140,trailing_line_score_placeholder,"line,1,0,0,0,0,0,3,0,5,","line,1,0,0,0,0,0,3,0,5"
+ngl_b/1935.EBR,20543,PH5193508241,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,20727,PH5193508251,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,21572,PRG193512011,trailing_line_score_placeholder,"line,1,0,0,3,1,0,0,0,2,","line,1,0,0,3,1,0,0,0,2"
+ngl_b/1935.EBR,22733,PTC193505250,trailing_line_score_placeholder,"line,1,2,0,1,0,6,0,0,1,","line,1,2,0,1,0,6,0,0,1"
+ngl_b/1935.EBR,23003,PTC193505280,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,23283,PTC193507041,trailing_line_score_placeholder,"line,1,0,0,1,0,0,2,3,0,","line,1,0,0,1,0,0,2,3,0"
+ngl_b/1935.EBR,23681,PTC193507200,trailing_line_score_placeholder,"line,1,3,1,1,3,0,1,3,0,","line,1,3,1,1,3,0,1,3,0"
+ngl_b/1935.EBR,24229,PTC193508170,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1935.EBR,24230,PTC193508170,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1935.EBR,24234,PTC193508170,trailing_line_score_placeholder,"line,0,0,2,1,0,1,1,0,0,","line,0,0,2,1,0,1,1,0,0"
+ngl_b/1935.EBR,24235,PTC193508170,trailing_line_score_placeholder,"line,1,0,1,1,0,2,0,0,0,","line,1,0,1,1,0,2,0,0,0"
+ngl_b/1935.EBR,24367,PTC193509021,blank_starter_position,"start,duket102,""Tommie Dukes"",0,4,","start,duket102,""Tommie Dukes"",0,4,2"
+ngl_b/1935.EBR,24787,SAS193509290,blank_starter_position,"start,smitb114,""Bob Smith"",1,2,","start,smitb114,""Bob Smith"",1,2,2"
+ngl_b/1935.EBR,24792,SAS193509290,multi_position_starter,"start,lylej102,""John Lyles"",1,7,25","start,lylej102,""John Lyles"",1,7,5"
+ngl_b/1936.EBR,320,BRG193609071,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,321,BRG193609071,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,980,CAG193609072,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,1073,CI1193605100,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,1074,CI1193605100,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,1075,CI1193605100,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,1283,CI1193607260,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,1284,CI1193607260,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,1381,CI1193608090,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,1382,CI1193608090,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,1659,CI1193609131,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,1660,CI1193609131,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,1661,CI1193609131,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,1751,CI1193609132,trailing_line_score_placeholder,"line,0,1,0,0,1,0,0,","line,0,1,0,0,1,0,0"
+ngl_b/1936.EBR,2170,HOM193605302,unknown_bline_sequence,"stat,bline,dandr101,0,1,NA,6,2,4,1,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,dandr101,0,1,1,6,2,4,1,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2171,HOM193605302,unknown_bline_sequence,"stat,bline,wellw101,0,2,NA,5,2,2,1,1,0,-1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1","stat,bline,wellw101,0,2,1,5,2,2,1,1,0,-1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2172,HOM193605302,unknown_bline_sequence,"stat,bline,willh105,0,3,NA,5,1,1,0,0,0,-1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1","stat,bline,willh105,0,3,1,5,1,1,0,0,0,-1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2173,HOM193605302,unknown_bline_sequence,"stat,bline,stone101,0,4,NA,6,1,2,1,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,stone101,0,4,1,6,1,2,1,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2174,HOM193605302,unknown_bline_sequence,"stat,bline,chrit101,0,5,NA,2,2,0,0,0,0,-1,-1,-1,-1,3,-1,-1,-1,-1,-1,-1","stat,bline,chrit101,0,5,1,2,2,0,0,0,0,-1,-1,-1,-1,3,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2175,HOM193605302,unknown_bline_sequence,"stat,bline,suttm101,0,6,NA,5,1,2,1,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,suttm101,0,6,1,5,1,2,1,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2176,HOM193605302,unknown_bline_sequence,"stat,bline,thomc103,0,7,NA,5,1,4,1,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,thomc103,0,7,1,5,1,4,1,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2177,HOM193605302,unknown_bline_sequence,"stat,bline,hayej104,0,8,NA,4,0,0,0,0,0,-1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1","stat,bline,hayej104,0,8,1,4,0,0,0,0,0,-1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2178,HOM193605302,unknown_bline_sequence,"stat,bline,day-l101,0,9,NA,5,1,1,1,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,day-l101,0,9,1,5,1,1,1,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2179,HOM193605302,unknown_bline_sequence,"stat,bline,benjj101,1,1,NA,3,0,0,0,0,0,-1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1","stat,bline,benjj101,1,1,1,3,0,0,0,0,0,-1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2180,HOM193605302,unknown_bline_sequence,"stat,bline,dixor101,1,2,NA,4,0,1,0,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,dixor101,1,2,1,4,0,1,0,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2181,HOM193605302,unknown_bline_sequence,"stat,bline,harrv102,1,3,NA,4,0,0,0,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,harrv102,1,3,1,4,0,0,0,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2182,HOM193605302,unknown_bline_sequence,"stat,bline,leonb101,1,4,NA,3,0,1,0,0,0,-1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1","stat,bline,leonb101,1,4,1,3,0,1,0,0,0,-1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2183,HOM193605302,unknown_bline_sequence,"stat,bline,duket102,1,5,NA,4,0,0,0,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,duket102,1,5,1,4,0,0,0,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2184,HOM193605302,unknown_bline_sequence,"stat,bline,speah101,1,6,NA,4,0,2,2,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,speah101,1,6,1,4,0,2,2,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2185,HOM193605302,unknown_bline_sequence,"stat,bline,hendc102,1,7,NA,4,0,0,0,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,hendc102,1,7,1,4,0,0,0,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2186,HOM193605302,unknown_bline_sequence,"stat,bline,carlm101,1,8,NA,3,0,0,0,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,carlm101,1,8,1,3,0,0,0,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2187,HOM193605302,unknown_bline_sequence,"stat,bline,waita101,1,9,NA,0,0,0,0,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,waita101,1,9,1,0,0,0,0,0,0,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2188,HOM193605302,unknown_bline_sequence,"stat,bline,gisew101,1,9,NA,3,1,1,0,0,1,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1","stat,bline,gisew101,1,9,2,3,1,1,0,0,1,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1936.EBR,2693,HOM193606240,trailing_line_score_placeholder,"line,0,0,3,0,2,0,0,0,1,","line,0,0,3,0,2,0,0,0,1"
+ngl_b/1936.EBR,2694,HOM193606240,trailing_line_score_placeholder,"line,1,1,0,3,0,2,0,2,3,","line,1,1,0,3,0,2,0,2,3"
+ngl_b/1936.EBR,3426,HOM193607262,multi_position_starter,"start,jackj104,""Jelly Jackson"",1,9,16","start,jackj104,""Jelly Jackson"",1,9,6"
+ngl_b/1936.EBR,4497,KCM193609210,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,4499,KCM193609210,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,5452,NW2193605110,trailing_line_score_placeholder,"line,1,1,0,0,0,0,2,0,0,","line,1,1,0,0,0,0,2,0,0"
+ngl_b/1936.EBR,5721,NW2193606090,trailing_line_score_placeholder,"line,1,4,1,1,2,2,4,2,0,","line,1,4,1,1,2,2,4,2,0"
+ngl_b/1936.EBR,6092,NW2193607041,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,6280,NW2193607051,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,6967,NW2193608040,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,6968,NW2193608040,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,6969,NW2193608040,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,7836,NY5193607030,trailing_line_score_placeholder,"line,1,0,0,1,2,0,0,2,0,","line,1,0,0,1,2,0,0,2,0"
+ngl_b/1936.EBR,8604,NY5193609071,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,8605,NY5193609071,drop_validator_message,NUMBER OF DPs DISAGREE BETWEEN TEAMSTATS AND EVENTS,
+ngl_b/1936.EBR,8644,NY5193609072,multi_position_starter,"start,walkh103,""Hoss Walker"",0,8,68","start,walkh103,""Hoss Walker"",0,8,6"
+ngl_b/1936.EBR,10142,NY6193606072,blank_starter_position,"start,chrit101,""Thad Christopher"",0,5,","start,chrit101,""Thad Christopher"",0,5,7"
+ngl_b/1936.EBR,10144,NY6193606072,multi_position_starter,"start,hayej104,""Johnny Hayes"",0,7,24","start,hayej104,""Johnny Hayes"",0,7,2"
+ngl_b/1936.EBR,10720,NY6193606282,blank_starter_position,"start,banks101,""Sam Bankhead"",0,3,","start,banks101,""Sam Bankhead"",0,3,7"
+ngl_b/1936.EBR,10721,NY6193606282,multi_position_starter,"start,perkb101,""Bill Perkins"",0,4,27","start,perkb101,""Bill Perkins"",0,4,2"
+ngl_b/1936.EBR,12751,NY6193609030,trailing_line_score_placeholder,"line,0,0,1,0,0,0,0,0,0,","line,0,0,1,0,0,0,0,0,0"
+ngl_b/1936.EBR,12886,NY6193609062,multi_position_starter,"start,cannw101,""Walter Cannady"",0,4,45","start,cannw101,""Walter Cannady"",0,4,4"
+ngl_b/1936.EBR,12887,NY6193609062,blank_starter_position,"start,scalg101,""George Scales"",0,5,","start,scalg101,""George Scales"",0,5,5"
+ngl_b/1936.EBR,12954,NY6193609062,trailing_line_score_placeholder,"line,1,1,1,5,0,2,0,1,0,","line,1,1,1,5,0,2,0,1,0"
+ngl_b/1936.EBR,13546,PH5193605110,trailing_line_score_placeholder,"line,0,1,1,0,0,0,0,0,0,","line,0,1,1,0,0,0,0,0,0"
+ngl_b/1936.EBR,13578,PH5193605120,blank_starter_position,"start,browr103,""Ray Brown"",0,5,","start,browr103,""Ray Brown"",0,5,9"
+ngl_b/1936.EBR,13639,PH5193605120,trailing_line_score_placeholder,"line,1,0,1,2,0,2,0,","line,1,0,1,2,0,2,0"
+ngl_b/1936.EBR,14121,PH5193605311,trailing_line_score_placeholder,"line,1,0,1,1,0,0,6,2,0,","line,1,0,1,1,0,0,6,2,0"
+ngl_b/1936.EBR,14214,PH5193606010,trailing_line_score_placeholder,"line,0,0,1,0,0,2,1,0,5,","line,0,0,1,0,0,2,1,0,5"
+ngl_b/1936.EBR,14215,PH5193606010,trailing_line_score_placeholder,"line,1,0,0,0,0,1,0,3,0,","line,1,0,0,0,0,1,0,3,0"
+ngl_b/1936.EBR,14670,PH5193606272,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,14671,PH5193606272,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,16041,PH5193609052,multi_position_starter,"start,parnr102,""Roy Parnell"",1,2,78","start,parnr102,""Roy Parnell"",1,2,7"
+ngl_b/1936.EBR,16042,PH5193609052,blank_starter_position,"start,steat101,""Turkey Stearnes"",1,3,","start,steat101,""Turkey Stearnes"",1,3,8"
+ngl_b/1936.EBR,16104,PH5193609052,trailing_line_score_placeholder,"line,1,0,4,0,3,0,1,","line,1,0,4,0,3,0,1"
+ngl_b/1936.EBR,16853,PTC193605160,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,16854,PTC193605160,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,16955,PTC193605171,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,16956,PTC193605171,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,16957,PTC193605171,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1936.EBR,17186,PTC193606071,blank_starter_position,"start,johnj108,""Judy Johnson"",1,7,","start,johnj108,""Judy Johnson"",1,7,5"
+ngl_b/1936.EBR,17335,PTC193606120,trailing_line_score_placeholder,"line,0,8,1,0,0,0,1,0,3,","line,0,8,1,0,0,0,1,0,3"
+ngl_b/1936.EBR,17336,PTC193606120,trailing_line_score_placeholder,"line,1,0,0,0,2,1,0,0,0,","line,1,0,0,0,2,1,0,0,0"
+ngl_b/1936.EBR,17432,PTC193606130,trailing_line_score_placeholder,"line,1,2,0,0,0,0,0,3,0,","line,1,2,0,0,0,0,0,3,0"
+ngl_b/1936.EBR,17755,PTC193607181,blank_starter_position,"start,mackb102,""Biz Mackey"",0,5,","start,mackb102,""Biz Mackey"",0,5,2"
+ngl_b/1936.EBR,17758,PTC193607181,multi_position_starter,"start,walkh103,""Hoss Walker"",0,8,26","start,walkh103,""Hoss Walker"",0,8,6"
+ngl_b/1936.EBR,17812,PTC193607181,drop_validator_message,NUMBER OF DPs DISAGREE BETWEEN TEAMSTATS AND EVENTS,
+ngl_b/1936.EBR,18277,PTC193608011,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,18278,PTC193608011,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,18478,PTC193608030,trailing_line_score_placeholder,"line,0,0,0,0,4,0,5,2,2,","line,0,0,0,0,4,0,5,2,2"
+ngl_b/1936.EBR,18479,PTC193608030,trailing_line_score_placeholder,"line,1,0,0,0,2,0,0,0,2,","line,1,0,0,0,2,0,0,0,2"
+ngl_b/1936.EBR,19276,PTC193609050,multi_position_starter,"start,washj102,""Johnny Washington"",1,5,36","start,washj102,""Johnny Washington"",1,5,3"
+ngl_b/1936.EBR,19277,PTC193609050,blank_starter_position,"start,willc106,""Chester Williams"",1,6,","start,willc106,""Chester Williams"",1,6,6"
+ngl_b/1936.EBR,19335,PTC193609050,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,19336,PTC193609050,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,19342,PTC193609050,trailing_line_score_placeholder,"line,1,5,0,3,0,0,0,0,3,","line,1,5,0,3,0,0,0,0,3"
+ngl_b/1936.EBR,19815,PTC193609122,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,19816,PTC193609122,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,19950,PTC193609142,multi_position_starter,"start,seayd101,""Dick Seay"",1,2,46","start,seayd101,""Dick Seay"",1,2,4"
+ngl_b/1936.EBR,19954,PTC193609142,blank_starter_position,"start,willc106,""Chester Williams"",1,6,","start,willc106,""Chester Williams"",1,6,6"
+ngl_b/1936.EBR,20946,WEG193606270,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,20947,WEG193606270,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,20948,WEG193606270,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,21044,WEG193606282,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,21045,WEG193606282,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,21046,WEG193606282,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1936.EBR,21087,WEG193607110,blank_starter_position,"start,wrigz102,""Zollie Wright"",1,4,","start,wrigz102,""Zollie Wright"",1,4,9"
+ngl_b/1936.EBR,21338,WEG193607122,trailing_line_score_placeholder,"line,1,1,0,6,0,0,0,","line,1,1,0,6,0,0,0"
+ngl_b/1936.EBR,22271,WEG193608190,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1936.EBR,22273,WEG193608190,trailing_line_score_placeholder,"line,1,0,1,3,0,0,4,1,0,","line,1,0,1,3,0,0,4,1,0"
+ngl_b/1937.EBR,2438,BIR193706061,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,2441,BIR193706061,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,2442,BIR193706061,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,2443,BIR193706061,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,2444,BIR193706061,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,2451,BIR193706061,drop_validator_message,NUMBER OF CS DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,2547,BIR193706062,trailing_line_score_placeholder,"line,0,0,1,0,1,0,1,0,","line,0,0,1,0,1,0,1,0"
+ngl_b/1937.EBR,2548,BIR193706062,trailing_line_score_placeholder,"line,1,1,0,3,3,0,1,","line,1,1,0,3,3,0,1"
+ngl_b/1937.EBR,3260,BRG193705312,blank_starter_position,"start,gisew101,""Willie Gisentaner"",1,5,","start,gisew101,""Willie Gisentaner"",1,5,9"
+ngl_b/1937.EBR,3264,BRG193705312,multi_position_starter,"start,owenr102,""Roosevelt Owens"",1,9,19","start,owenr102,""Roosevelt Owens"",1,9,9"
+ngl_b/1937.EBR,3441,CAG193705290,blank_starter_position,"start,sandl101,""Leo Sanders"",0,2,","start,sandl101,""Leo Sanders"",0,2,6"
+ngl_b/1937.EBR,3448,CAG193705290,multi_position_starter,"start,madib101,""Bob Madison"",0,9,17","start,madib101,""Bob Madison"",0,9,1"
+ngl_b/1937.EBR,3453,CAG193705290,blank_starter_position,"start,reduw101,""Wilson Redus"",1,5,","start,reduw101,""Wilson Redus"",1,5,7"
+ngl_b/1937.EBR,3455,CAG193705290,multi_position_starter,"start,bondt102,""Ted Bond"",1,7,68","start,bondt102,""Ted Bond"",1,7,8"
+ngl_b/1937.EBR,3830,CAG193706300,blank_starter_position,"start,housc103,""Charley House"",0,7,","start,housc103,""Charley House"",0,7,5"
+ngl_b/1937.EBR,3831,CAG193706300,multi_position_starter,"start,petws101,""Shirley Petway"",0,8,25","start,petws101,""Shirley Petway"",0,8,2"
+ngl_b/1937.EBR,4447,CAG193707100,drop_validator_message,NUMBER OF CS DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,4582,CAG193707140,blank_starter_position,"start,reduw101,""Wilson Redus"",1,5,","start,reduw101,""Wilson Redus"",1,5,7"
+ngl_b/1937.EBR,4583,CAG193707140,multi_position_starter,"start,gilyl101,""Luther Gilyard"",1,6,37","start,gilyl101,""Luther Gilyard"",1,6,3"
+ngl_b/1937.EBR,4641,CAG193707140,trailing_line_score_placeholder,"line,1,1,0,7,2,3,2,2,","line,1,1,0,7,2,3,2,2"
+ngl_b/1937.EBR,7160,CI1193707190,blank_starter_position,"start,oneib801,""Buck O`Neil"",0,1,","start,oneib801,""Buck O`Neil"",0,1,6"
+ngl_b/1937.EBR,7168,CI1193707190,multi_position_starter,"start,bryar102,""R.B. Bryant"",0,9,16","start,bryar102,""R.B. Bryant"",0,9,1"
+ngl_b/1937.EBR,8167,CI1193708291,blank_starter_position,"start,davel102,""Lloyd Davenport"",1,2,","start,davel102,""Lloyd Davenport"",1,2,9"
+ngl_b/1937.EBR,8172,CI1193708291,multi_position_starter,"start,harrs105,""Sonny Harris"",1,7,79","start,harrs105,""Sonny Harris"",1,7,9"
+ngl_b/1937.EBR,8886,DT2193705231,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,8887,DT2193705231,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,8982,DT2193705232,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,8983,DT2193705232,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,8984,DT2193705232,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,9468,HOM193704252,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,9469,HOM193704252,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,9472,HOM193704252,trailing_line_score_placeholder,"line,0,0,0,2,0,1,2,0,","line,0,0,0,2,0,1,2,0"
+ngl_b/1937.EBR,9473,HOM193704252,trailing_line_score_placeholder,"line,1,0,4,2,0,0,0,","line,1,0,4,2,0,0,0"
+ngl_b/1937.EBR,9677,HOM193705220,blank_starter_position,"start,gileg101,""George Giles"",0,2,","start,gileg101,""George Giles"",0,2,3"
+ngl_b/1937.EBR,9679,HOM193705220,multi_position_starter,"start,cannw101,""Walter Cannady"",0,4,35","start,cannw101,""Walter Cannady"",0,4,3"
+ngl_b/1937.EBR,9680,HOM193705220,blank_starter_position,"start,thomc103,""Clint Thomas"",0,5,","start,thomc103,""Clint Thomas"",0,5,8"
+ngl_b/1937.EBR,9681,HOM193705220,multi_position_starter,"start,barkm101,""Marvin Barker"",0,6,89","start,barkm101,""Marvin Barker"",0,6,9"
+ngl_b/1937.EBR,9844,HOM193705231,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,9845,HOM193705231,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,9846,HOM193705231,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,9944,HOM193705232,drop_validator_message,NUMBER OF DPs DISAGREE BETWEEN TEAMSTATS AND EVENTS,
+ngl_b/1937.EBR,10079,HOM193705311,blank_starter_position,"start,perej103,""Javier Perez"",1,7,","start,perej103,""Javier Perez"",1,7,2"
+ngl_b/1937.EBR,10081,HOM193705311,multi_position_starter,"start,parkt101,""Tom Parker"",1,9,14","start,parkt101,""Tom Parker"",1,9,4"
+ngl_b/1937.EBR,10700,HOM193706272,trailing_line_score_placeholder,"line,0,0,0,0,0,0,0,0,","line,0,0,0,0,0,0,0,0"
+ngl_b/1937.EBR,10701,HOM193706272,trailing_line_score_placeholder,"line,1,4,2,0,3,10,1,","line,1,4,2,0,3,10,1"
+ngl_b/1937.EBR,10728,HOM193707181,blank_starter_position,"start,harrc104,""Curtis Harris"",0,3,","start,harrc104,""Curtis Harris"",0,3,3"
+ngl_b/1937.EBR,10731,HOM193707181,multi_position_starter,"start,casem101,""Mickey Casey"",0,6,23","start,casem101,""Mickey Casey"",0,6,3"
+ngl_b/1937.EBR,11363,HOM193708210,drop_validator_message,NUMBER OF DPs DISAGREE BETWEEN TEAMSTATS AND EVENTS,
+ngl_b/1937.EBR,11364,HOM193708210,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,11366,HOM193708210,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,11604,IN6193705100,blank_starter_position,"start,burkj106,""Joe Burke"",1,3,","start,burkj106,""Joe Burke"",1,3,9"
+ngl_b/1937.EBR,11607,IN6193705100,multi_position_starter,"start,hallp101,""Perry Hall"",1,6,59","start,hallp101,""Perry Hall"",1,6,5"
+ngl_b/1937.EBR,11745,IN6193706060,drop_validator_message,NUMBER OF DPs DISAGREE BETWEEN TEAMSTATS AND EVENTS,
+ngl_b/1937.EBR,12059,IN6193707200,multi_position_starter,"start,walkw103,""William Walker"",0,5,38","start,walkw103,""William Walker"",0,5,8"
+ngl_b/1937.EBR,12062,IN6193707200,blank_starter_position,"start,thomu102,""Marcellus Thomas"",0,8,","start,thomu102,""Marcellus Thomas"",0,8,8"
+ngl_b/1937.EBR,16900,MEM193704251,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,16901,MEM193704251,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,16902,MEM193704251,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,17003,MEM193704252,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,17004,MEM193704252,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,17005,MEM193704252,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,17006,MEM193704252,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1937.EBR,17010,MEM193704252,trailing_line_score_placeholder,"line,0,0,1,1,0,1,9,","line,0,0,1,1,0,1,9"
+ngl_b/1937.EBR,17011,MEM193704252,trailing_line_score_placeholder,"line,1,1,0,2,1,0,0,","line,1,1,0,2,1,0,0"
+ngl_b/1937.EBR,18621,NW2193705161,blank_starter_position,"start,perej103,""Javier Perez"",0,2,","start,perej103,""Javier Perez"",0,2,5"
+ngl_b/1937.EBR,18624,NW2193705161,multi_position_starter,"start,willj110,""Jim Williams"",0,5,59","start,willj110,""Jim Williams"",0,5,5"
+ngl_b/1937.EBR,18630,NW2193705161,blank_starter_position,"start,seayd101,""Dick Seay"",1,2,","start,seayd101,""Dick Seay"",1,2,4"
+ngl_b/1937.EBR,18635,NW2193705161,multi_position_starter,"start,hayej104,""Johnny Hayes"",1,7,24","start,hayej104,""Johnny Hayes"",1,7,4"
+ngl_b/1937.EBR,18713,NW2193705162,blank_starter_position,"start,seayd101,""Dick Seay"",1,2,","start,seayd101,""Dick Seay"",1,2,4"
+ngl_b/1937.EBR,18717,NW2193705162,multi_position_starter,"start,dandr101,""Ray Dandridge"",1,6,57","start,dandr101,""Ray Dandridge"",1,6,7"
+ngl_b/1937.EBR,18768,NW2193705162,trailing_line_score_placeholder,"line,0,2,0,3,1,2,0,3,","line,0,2,0,3,1,2,0,3"
+ngl_b/1937.EBR,18769,NW2193705162,trailing_line_score_placeholder,"line,1,2,0,1,0,0,0,0,","line,1,2,0,1,0,0,0,0"
+ngl_b/1937.EBR,18929,NW2193705180,unknown_dline_sequence,"stat,dline,walkg103,0,NA,1,-1,0,2,0,-1,-1,0","stat,dline,walkg103,0,1,1,-1,0,2,0,-1,-1,0"
+ngl_b/1937.EBR,18930,NW2193705180,unknown_dline_sequence,"stat,dline,stroj103,0,NA,1,-1,0,1,0,-1,-1,0","stat,dline,stroj103,0,1,1,-1,0,1,0,-1,-1,0"
+ngl_b/1937.EBR,18940,NW2193705180,unknown_hrline_side,"event,hrline,?,browr103,evanb105,-1,0,","event,hrline,0,browr103,evanb105,-1,0,"
+ngl_b/1937.EBR,18941,NW2193705180,unknown_hrline_side,"event,hrline,?,wellw101,?,-1,0,","event,hrline,1,wellw101,?,-1,0,"
+ngl_b/1937.EBR,18942,NW2193705180,unknown_hrline_side,"event,hrline,?,suttm101,?,-1,0,","event,hrline,1,suttm101,?,-1,0,"
+ngl_b/1937.EBR,18944,NW2193705180,trailing_line_score_placeholder,"line,1,0,1,2,0,2,0,5,","line,1,0,1,2,0,2,0,5"
+ngl_b/1937.EBR,18981,NW2193705200,multi_position_starter,"start,stone101,""Ed Stone"",1,4,39","start,stone101,""Ed Stone"",1,4,9"
+ngl_b/1937.EBR,18982,NW2193705200,blank_starter_position,"start,suttm101,""Mule Suttles"",1,5,","start,suttm101,""Mule Suttles"",1,5,3"
+ngl_b/1937.EBR,19931,NW2193708140,blank_starter_position,"start,seayd101,""Dick Seay"",1,2,","start,seayd101,""Dick Seay"",1,2,4"
+ngl_b/1937.EBR,19932,NW2193708140,multi_position_starter,"start,wellw101,""Willie Wells"",1,3,46","start,wellw101,""Willie Wells"",1,3,6"
+ngl_b/1937.EBR,21070,NY5193705312,trailing_line_score_placeholder,"line,0,0,0,0,1,0,0,3,","line,0,0,0,0,1,0,0,3"
+ngl_b/1937.EBR,21071,NY5193705312,trailing_line_score_placeholder,"line,1,0,1,0,2,2,0,","line,1,0,1,0,2,2,0"
+ngl_b/1937.EBR,21205,NY5193706120,blank_starter_position,"start,cannw101,""Walter Cannady"",1,4,","start,cannw101,""Walter Cannady"",1,4,3"
+ngl_b/1937.EBR,21209,NY5193706120,multi_position_starter,"start,stepj105,""Jake Stephens"",1,8,35","start,stepj105,""Jake Stephens"",1,8,3"
+ngl_b/1937.EBR,21737,NY5193707052,mistyped_id_record,"Yid,NY5193707052","id,NY5193707052"
+ngl_b/1937.EBR,23898,PH5193706122,trailing_line_score_placeholder,"line,0,0,0,0,0,0,0,1,","line,0,0,0,0,0,0,0,1"
+ngl_b/1937.EBR,23899,PH5193706122,trailing_line_score_placeholder,"line,1,0,0,0,1,3,1,","line,1,0,0,0,1,3,1"
+ngl_b/1937.EBR,24298,PH5193707102,trailing_line_score_placeholder,"line,0,3,0,2,3,0,2,2,","line,0,3,0,2,3,0,2,2"
+ngl_b/1937.EBR,24299,PH5193707102,trailing_line_score_placeholder,"line,1,0,4,0,0,0,0,0,","line,1,0,4,0,0,0,0,0"
+ngl_b/1937.EBR,25332,PH5193709112,blank_starter_position,"start,snowf101,""Felton Snow"",0,1,","start,snowf101,""Felton Snow"",0,1,5"
+ngl_b/1937.EBR,25337,PH5193709112,multi_position_starter,"start,mornl101,""Leroy Morney"",0,6,57","start,mornl101,""Leroy Morney"",0,6,7"
+ngl_b/1937.EBR,25400,PH5193709112,trailing_line_score_placeholder,"line,0,0,0,0,0,2,1,0,","line,0,0,0,0,0,2,1,0"
+ngl_b/1937.EBR,25401,PH5193709112,trailing_line_score_placeholder,"line,1,1,6,2,0,0,0,","line,1,1,6,2,0,0,0"
+ngl_b/1937.EBR,25915,PTC193705080,blank_starter_position,"start,banks101,""Sam Bankhead"",1,4,","start,banks101,""Sam Bankhead"",1,4,7"
+ngl_b/1937.EBR,25918,PTC193705080,multi_position_starter,"start,wilsd103,""Dan Wilson"",1,7,79","start,wilsd103,""Dan Wilson"",1,7,9"
+ngl_b/1937.EBR,26444,PTC193706062,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,26445,PTC193706062,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1937.EBR,26446,PTC193706062,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1937.EBR,26447,PTC193706062,trailing_line_score_placeholder,"line,0,3,1,2,1,0,0,0,","line,0,3,1,2,1,0,0,0"
+ngl_b/1937.EBR,26535,PTC193706070,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1937.EBR,26536,PTC193706070,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,26537,PTC193706070,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1937.EBR,29552,WEG193707171,blank_starter_position,"start,stepj105,""Jake Stephens"",0,1,","start,stepj105,""Jake Stephens"",0,1,4"
+ngl_b/1937.EBR,29555,WEG193707171,multi_position_starter,"start,cannw101,""Walter Cannady"",0,4,45","start,cannw101,""Walter Cannady"",0,4,5"
+ngl_b/1937.EBR,29712,WEG193707172,trailing_line_score_placeholder,"line,0,2,1,0,2,0,","line,0,2,1,0,2,0"
+ngl_b/1937.EBR,29713,WEG193707172,trailing_line_score_placeholder,"line,1,4,5,6,0,","line,1,4,5,6,0"
+ngl_b/1938.EBR,3744,BIR193808200,trailing_line_score_placeholder,"line,1,0,2,0,0,0,0,10,3,","line,1,0,2,0,0,0,0,10,3"
+ngl_b/1938.EBR,4104,BLG193805011,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1938.EBR,4105,BLG193805011,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1938.EBR,4111,BLG193805011,trailing_line_score_placeholder,"line,1,0,2,0,0,2,0,2,1,","line,1,0,2,0,0,2,0,2,1"
+ngl_b/1938.EBR,4149,BLG193805012,multi_position_starter,"start,hughs101,""Sammy Hughes"",1,3,34","start,hughs101,""Sammy Hughes"",1,3,4"
+ngl_b/1938.EBR,4151,BLG193805012,blank_starter_position,"start,westj102,""Jim West"",1,5,","start,westj102,""Jim West"",1,5,3"
+ngl_b/1938.EBR,4202,BLG193805012,trailing_line_score_placeholder,"line,1,2,0,0,1,0,0,","line,1,2,0,0,1,0,0"
+ngl_b/1938.EBR,4481,BLG193805150,trailing_line_score_placeholder,"line,1,3,0,0,3,1,0,4,1,","line,1,3,0,0,3,1,0,4,1"
+ngl_b/1938.EBR,4751,BLG193807031,trailing_line_score_placeholder,"line,1,0,3,3,2,3,3,0,4,","line,1,0,3,3,2,3,3,0,4"
+ngl_b/1938.EBR,4836,BLG193807032,trailing_line_score_placeholder,"line,1,2,0,0,1,2,3,","line,1,2,0,0,1,2,3"
+ngl_b/1938.EBR,5268,BLG193807160,trailing_line_score_placeholder,"line,0,1,0,0,0,0,1,2,1,","line,0,1,0,0,0,0,1,2,1"
+ngl_b/1938.EBR,8937,HOM193805291,trailing_line_score_placeholder,"line,1,0,0,1,1,0,0,2,2,","line,1,0,0,1,1,0,0,2,2"
+ngl_b/1938.EBR,9028,HOM193805301,trailing_line_score_placeholder,"line,1,0,2,3,1,5,1,0,4,","line,1,0,2,3,1,5,1,0,4"
+ngl_b/1938.EBR,9222,HOM193806120,trailing_line_score_placeholder,"line,1,0,0,0,2,3,0,0,1,","line,1,0,0,0,2,3,0,0,1"
+ngl_b/1938.EBR,9312,HOM193806140,trailing_line_score_placeholder,"line,1,0,1,0,5,3,1,0,1,","line,1,0,1,0,5,3,1,0,1"
+ngl_b/1938.EBR,9338,HOM193806160,blank_starter_position,"start,snowf101,""Felton Snow"",0,2,","start,snowf101,""Felton Snow"",0,2,5"
+ngl_b/1938.EBR,9343,HOM193806160,multi_position_starter,"start,mackb102,""Biz Mackey"",0,7,25","start,mackb102,""Biz Mackey"",0,7,5"
+ngl_b/1938.EBR,9397,HOM193806160,trailing_line_score_placeholder,"line,1,1,0,0,2,2,0,0,0,","line,1,1,0,0,2,2,0,0,0"
+ngl_b/1938.EBR,9466,HOM193807031,unknown_pline_sequence,"stat,pline,taylj108,0,NA,15,-1,26,8,-1,-1,0,6,-1,4,-1,2,-1,-1,-1,0,-1","stat,pline,taylj108,0,1,15,-1,26,8,-1,-1,0,6,-1,4,-1,2,-1,-1,-1,0,-1"
+ngl_b/1938.EBR,9467,HOM193807031,unknown_pline_sequence,"stat,pline,cainm101,0,NA,7,-1,12,3,-1,-1,0,3,-1,2,-1,0,-1,-1,-1,0,-1","stat,pline,cainm101,0,2,7,-1,12,3,-1,-1,0,3,-1,2,-1,0,-1,-1,-1,0,-1"
+ngl_b/1938.EBR,9468,HOM193807031,unknown_pline_sequence,"stat,pline,smitt105,0,NA,2,-1,5,1,-1,-1,0,1,-1,2,-1,0,-1,-1,-1,0,-1","stat,pline,smitt105,0,3,2,-1,5,1,-1,-1,0,1,-1,2,-1,0,-1,-1,-1,0,-1"
+ngl_b/1938.EBR,9469,HOM193807031,unknown_pline_sequence,"stat,pline,hannl102,1,NA,12,-1,19,1,0,0,0,2,-1,6,-1,0,-1,-1,-1,-1,-1","stat,pline,hannl102,1,1,12,-1,19,1,0,0,0,2,-1,6,-1,0,-1,-1,-1,-1,-1"
+ngl_b/1938.EBR,9470,HOM193807031,unknown_pline_sequence,"stat,pline,welmr101,1,NA,15,-1,22,2,0,0,0,2,-1,2,-1,2,-1,-1,-1,-1,-1","stat,pline,welmr101,1,2,15,-1,22,2,0,0,0,2,-1,2,-1,2,-1,-1,-1,-1,-1"
+ngl_b/1938.EBR,9788,HOM193807171,trailing_line_score_placeholder,"line,1,0,1,0,2,4,1,3,0,","line,1,0,1,0,2,4,1,3,0"
+ngl_b/1938.EBR,9908,HOM193807190,blank_starter_position,"start,jenkf102,""Fats Jenkins"",0,6,","start,jenkf102,""Fats Jenkins"",0,6,7"
+ngl_b/1938.EBR,9909,HOM193807190,multi_position_starter,"start,washj102,""Johnny Washington"",0,7,37","start,washj102,""Johnny Washington"",0,7,7"
+ngl_b/1938.EBR,9972,HOM193807190,trailing_line_score_placeholder,"line,1,2,2,2,0,1,1,3,1,","line,1,2,2,2,0,1,1,3,1"
+ngl_b/1938.EBR,10999,JAX193804030,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1938.EBR,11000,JAX193804030,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1938.EBR,11283,JAX193805080,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1938.EBR,11284,JAX193805080,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1938.EBR,11287,JAX193805080,trailing_line_score_placeholder,"line,1,2,0,2,2,0,1,1,0,","line,1,2,0,2,2,0,1,1,0"
+ngl_b/1938.EBR,11766,KCM193804102,trailing_line_score_placeholder,"line,1,0,1,3,0,0,1,2,0,","line,1,0,1,3,0,0,1,2,0"
+ngl_b/1938.EBR,14187,KCM193808020,unknown_pline_sequence,"stat,pline,mossp101,0,NA,6,-1,16,8,-1,-1,1,9,-1,0,-1,1,1,-1,-1,-1,-1","stat,pline,mossp101,0,1,6,-1,16,8,-1,-1,1,9,-1,0,-1,1,1,-1,-1,-1,-1"
+ngl_b/1938.EBR,14188,KCM193808020,unknown_pline_sequence,"stat,pline,allec101,0,NA,9,-1,16,5,-1,-1,0,5,-1,2,-1,5,0,-1,-1,-1,-1","stat,pline,allec101,0,2,9,-1,16,5,-1,-1,0,5,-1,2,-1,5,0,-1,-1,-1,-1"
+ngl_b/1938.EBR,14189,KCM193808020,unknown_pline_sequence,"stat,pline,markj101,1,NA,18,-1,26,7,0,0,0,1,-1,1,-1,9,0,-1,-1,-1,-1","stat,pline,markj101,1,1,18,-1,26,7,0,0,0,1,-1,1,-1,9,0,-1,-1,-1,-1"
+ngl_b/1938.EBR,14210,KCM193808020,trailing_line_score_placeholder,"line,0,0,0,1,0,0,0,","line,0,0,0,1,0,0,0"
+ngl_b/1938.EBR,14298,KCM193808030,trailing_line_score_placeholder,"line,1,0,0,0,2,0,1,5,1,","line,1,0,0,0,2,0,1,5,1"
+ngl_b/1938.EBR,14798,KCM193808211,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1938.EBR,14799,KCM193808211,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1938.EBR,15909,MEM193806051,trailing_line_score_placeholder,"line,1,0,1,1,2,0,0,3,0,","line,1,0,1,1,2,0,0,3,0"
+ngl_b/1938.EBR,16630,MEM193806280,blank_starter_position,"start,madib101,""Bob Madison"",1,5,","start,madib101,""Bob Madison"",1,5,7"
+ngl_b/1938.EBR,16633,MEM193806280,multi_position_starter,"start,longr102,""Red Longley"",1,8,45","start,longr102,""Red Longley"",1,8,4"
+ngl_b/1938.EBR,21811,PH5193806041,trailing_line_score_placeholder,"line,1,6,1,4,0,0,3,1,1,","line,1,6,1,4,0,0,3,1,1"
+ngl_b/1938.EBR,21896,PH5193806060,trailing_line_score_placeholder,"line,0,0,0,0,2,0,0,0,0,","line,0,0,0,0,2,0,0,0,0"
+ngl_b/1938.EBR,22312,PH5193806191,blank_starter_position,"start,parnr102,""Roy Parnell"",1,2,","start,parnr102,""Roy Parnell"",1,2,7"
+ngl_b/1938.EBR,22462,PH5193806192,trailing_line_score_placeholder,"line,1,3,3,0,0,1,1,","line,1,3,3,0,0,1,1"
+ngl_b/1938.EBR,24396,PH5193808201,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1938.EBR,24398,PH5193808201,trailing_line_score_placeholder,"line,1,0,0,0,0,2,3,2,0,","line,1,0,0,0,0,2,3,2,0"
+ngl_b/1938.EBR,25867,PTC193806040,trailing_line_score_placeholder,"line,1,0,2,4,0,0,2,1,0,","line,1,0,2,4,0,0,2,1,0"
+ngl_b/1938.EBR,26910,WBS193806191,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1938.EBR,26911,WBS193806191,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1938.EBR,27013,WBS193806192,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1938.EBR,27014,WBS193806192,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1938.EBR,27017,WBS193806192,trailing_line_score_placeholder,"line,1,0,3,0,3,0,3,","line,1,0,3,0,3,0,3"
+ngl_b/1939.EBR,1940,BLG193907220,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,1943,BLG193907220,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1939.EBR,3290,CAG193905211,blank_starter_position,"start,bibbr101,""Rainey Bibbs"",0,2,","start,bibbr101,""Rainey Bibbs"",0,2,5"
+ngl_b/1939.EBR,3292,CAG193905211,multi_position_starter,"start,broww101,""Willard Brown"",0,4,57","start,broww101,""Willard Brown"",0,4,7"
+ngl_b/1939.EBR,3298,CAG193905211,blank_starter_position,"start,simmw101,""Willie Simms"",1,1,","start,simmw101,""Willie Simms"",1,1,8"
+ngl_b/1939.EBR,3300,CAG193905211,multi_position_starter,"start,smite112,""Ernest Smith"",1,3,78","start,smite112,""Ernest Smith"",1,3,7"
+ngl_b/1939.EBR,6305,CV9193906182,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,6347,CV9193906252,blank_starter_position,"start,turnh101,""Henry Turner"",1,4,","start,turnh101,""Henry Turner"",1,4,9"
+ngl_b/1939.EBR,6349,CV9193906252,multi_position_starter,"start,clevd101,""Duke Cleveland"",1,6,79","start,clevd101,""Duke Cleveland"",1,6,7"
+ngl_b/1939.EBR,6690,CV9193907120,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,6692,CV9193907120,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,6693,CV9193907120,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1939.EBR,7078,CV9193908202,drop_validator_message,NUMBER OF DPs DISAGREE BETWEEN TEAMSTATS AND EVENTS,
+ngl_b/1939.EBR,7544,HOM193905120,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,7896,HOM193906102,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,7897,HOM193906102,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1939.EBR,7993,HOM193907161,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,7994,HOM193907161,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1939.EBR,8082,HOM193907162,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,8647,HOM193908061,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,8648,HOM193908061,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1939.EBR,8649,HOM193908061,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,8650,HOM193908061,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1939.EBR,9416,KCM193905170,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,9417,KCM193905170,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1939.EBR,9418,KCM193905170,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,9419,KCM193905170,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1939.EBR,11110,KCM193908062,blank_starter_position,"start,allen102,""Newt Allen"",1,1,","start,allen102,""Newt Allen"",1,1,6"
+ngl_b/1939.EBR,11117,KCM193908062,multi_position_starter,"start,langu101,"" Langrum"",1,8,49","start,langu101,"" Langrum"",1,8,4"
+ngl_b/1939.EBR,12057,MEM193904301,blank_starter_position,"start,greel102,""Leslie Green"",0,7,","start,greel102,""Leslie Green"",0,7,8"
+ngl_b/1939.EBR,12058,MEM193904301,multi_position_starter,"start,trouq101,""Quincy Trouppe"",0,8,28","start,trouq101,""Quincy Trouppe"",0,8,2"
+ngl_b/1939.EBR,14324,NW2193905251,blank_starter_position,"start,wilsf104,""Fred Wilson"",1,3,","start,wilsf104,""Fred Wilson"",1,3,7"
+ngl_b/1939.EBR,14327,NW2193905251,multi_position_starter,"start,pearl102,""Lennie Pearson"",1,6,78","start,pearl102,""Lennie Pearson"",1,6,8"
+ngl_b/1939.EBR,14412,NW2193905252,blank_starter_position,"start,wilsf104,""Fred Wilson"",1,3,","start,wilsf104,""Fred Wilson"",1,3,7"
+ngl_b/1939.EBR,14415,NW2193905252,multi_position_starter,"start,pearl102,""Lennie Pearson"",1,6,78","start,pearl102,""Lennie Pearson"",1,6,8"
+ngl_b/1939.EBR,16389,NY5193905301,blank_starter_position,"start,campd103,""David Campbell"",1,1,","start,campd103,""David Campbell"",1,1,4"
+ngl_b/1939.EBR,16396,NY5193905301,multi_position_starter,"start,scalg101,""George Scales"",1,8,45","start,scalg101,""George Scales"",1,8,5"
+ngl_b/1939.EBR,16488,NY5193905302,blank_starter_position,"start,hughs101,""Sammy Hughes"",0,2,","start,hughs101,""Sammy Hughes"",0,2,4"
+ngl_b/1939.EBR,16493,NY5193905302,multi_position_starter,"start,rivec101,""Charlie Rivera"",0,7,56","start,rivec101,""Charlie Rivera"",0,7,5"
+ngl_b/1939.EBR,18583,PH5193906112,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,19073,PH5193906241,blank_starter_position,"start,parnr102,""Roy Parnell"",1,3,","start,parnr102,""Roy Parnell"",1,3,7"
+ngl_b/1939.EBR,19077,PH5193906241,multi_position_starter,"start,harrc104,""Curtis Harris"",1,7,37","start,harrc104,""Curtis Harris"",1,7,3"
+ngl_b/1939.EBR,19124,PH5193906241,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,19125,PH5193906241,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1939.EBR,20562,PH5193908122,blank_starter_position,"start,day-l101,""Leon Day"",0,1,","start,day-l101,""Leon Day"",0,1,9"
+ngl_b/1939.EBR,20566,PH5193908122,multi_position_starter,"start,suttm101,""Mule Suttles"",0,5,39","start,suttm101,""Mule Suttles"",0,5,3"
+ngl_b/1939.EBR,22065,SSA193906270,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1939.EBR,22066,SSA193906270,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1941.EBR,7271,HOM194108280,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1941.EBR,7272,HOM194108280,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1942.EBR,13526,KCM194207121,trailing_line_score_placeholder,"line,0,0,0,0,0,0,0,0,","line,0,0,0,0,0,0,0,0"
+ngl_b/1942.EBR,13527,KCM194207121,trailing_line_score_placeholder,"line,1,2,1,2,0,6,0,","line,1,2,1,2,0,6,0"
+ngl_b/1943.EBR,5151,BLG194308110,trailing_line_score_placeholder,"line,1,0,0,1,3,0,0,0,4,","line,1,0,0,1,3,0,0,0,4"
+ngl_b/1943.EBR,12138,HOM194307080,unknown_pline_sequence,"stat,pline,walke103,0,NA,27,-1,34,4,1,0,0,1,-1,1,-1,2,0,-1,-1,0,-1","stat,pline,walke103,0,1,27,-1,34,4,1,0,0,1,-1,1,-1,2,0,-1,-1,0,-1"
+ngl_b/1943.EBR,12139,HOM194307080,unknown_pline_sequence,"stat,pline,davis106,1,NA,11,-1,21,6,-1,-1,1,6,-1,3,-1,1,0,-1,-1,-1,-1","stat,pline,davis106,1,1,11,-1,21,6,-1,-1,1,6,-1,3,-1,1,0,-1,-1,-1,-1"
+ngl_b/1943.EBR,12140,HOM194307080,unknown_pline_sequence,"stat,pline,boona101,1,NA,16,-1,26,6,-1,-1,1,6,-1,3,-1,2,0,-1,-1,-1,-1","stat,pline,boona101,1,2,16,-1,26,6,-1,-1,1,6,-1,3,-1,2,0,-1,-1,-1,-1"
+ngl_b/1943.EBR,18988,KCM194309230,unknown_bline_sequence,"stat,bline,smith113,0,1,NA,4,0,0,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,smith113,0,1,1,4,0,0,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,18989,KCM194309230,unknown_bline_sequence,"stat,bline,lamac101,0,2,NA,4,0,1,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,lamac101,0,2,1,4,0,1,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,18990,KCM194309230,unknown_bline_sequence,"stat,bline,sneas101,0,3,NA,4,0,0,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,sneas101,0,3,1,4,0,0,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,18991,KCM194309230,unknown_bline_sequence,"stat,bline,britj104,0,4,NA,3,0,0,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,britj104,0,4,1,3,0,0,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,18992,KCM194309230,unknown_bline_sequence,"stat,bline,ray-j102,0,5,NA,3,1,0,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,ray-j102,0,5,1,3,1,0,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,18993,KCM194309230,unknown_bline_sequence,"stat,bline,nelse102,0,6,NA,3,1,1,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,nelse102,0,6,1,3,1,1,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,18994,KCM194309230,unknown_bline_sequence,"stat,bline,harpd101,0,7,NA,3,0,1,1,-1,-1,2,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,harpd101,0,7,1,3,0,1,1,-1,-1,2,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,18995,KCM194309230,unknown_bline_sequence,"stat,bline,haywb102,0,8,NA,3,0,0,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,haywb102,0,8,1,3,0,0,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,18996,KCM194309230,unknown_bline_sequence,"stat,bline,davip103,0,9,NA,3,0,0,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,davip103,0,9,1,3,0,0,0,-1,-1,0,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,18997,KCM194309230,unknown_bline_sequence,"stat,bline,simmw101,1,1,NA,3,1,1,1,-1,-1,-1,1,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,simmw101,1,1,1,3,1,1,1,-1,-1,-1,1,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,18998,KCM194309230,unknown_bline_sequence,"stat,bline,allen102,1,2,NA,3,1,2,0,-1,-1,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1","stat,bline,allen102,1,2,1,3,1,2,0,-1,-1,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,18999,KCM194309230,unknown_bline_sequence,"stat,bline,davel102,1,3,NA,4,0,3,2,-1,-1,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,davel102,1,3,1,4,0,3,2,-1,-1,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,19000,KCM194309230,unknown_bline_sequence,"stat,bline,broww101,1,4,NA,4,0,1,0,-1,-1,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,broww101,1,4,1,4,0,1,0,-1,-1,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,19001,KCM194309230,unknown_bline_sequence,"stat,bline,serrb101,1,5,NA,4,0,1,1,-1,-1,-1,0,-1,0,0,-1,-1,1,-1,-1,-1","stat,bline,serrb101,1,5,1,4,0,1,1,-1,-1,-1,0,-1,0,0,-1,-1,1,-1,-1,-1"
+ngl_b/1943.EBR,19002,KCM194309230,unknown_bline_sequence,"stat,bline,soueh101,1,6,NA,3,0,1,0,-1,-1,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1","stat,bline,soueh101,1,6,1,3,0,1,0,-1,-1,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,19003,KCM194309230,unknown_bline_sequence,"stat,bline,charb102,1,7,NA,4,1,1,0,-1,-1,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,charb102,1,7,1,4,1,1,0,-1,-1,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,19004,KCM194309230,unknown_bline_sequence,"stat,bline,hayns101,1,8,NA,4,0,1,0,-1,-1,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,hayns101,1,8,1,4,0,1,0,-1,-1,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,19005,KCM194309230,unknown_bline_sequence,"stat,bline,mcdab101,1,9,NA,3,1,1,0,-1,-1,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1","stat,bline,mcdab101,1,9,1,3,1,1,0,-1,-1,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1"
+ngl_b/1943.EBR,19028,KCM194309230,trailing_line_score_placeholder,"line,1,1,0,0,0,1,1,1,0,","line,1,1,0,0,0,1,1,1,0"
+ngl_b/1944.EBR,407,BIR194404162,trailing_line_score_placeholder,"line,0,0,1,1,3,4,0,0,","line,0,0,1,1,3,4,0,0"
+ngl_b/1944.EBR,408,BIR194404162,trailing_line_score_placeholder,"line,1,0,0,0,0,0,2,0,","line,1,0,0,0,0,0,2,0"
+ngl_b/1944.EBR,1455,BLG194405071,trailing_line_score_placeholder,"line,1,2,1,0,0,4,2,0,6,","line,1,2,1,0,0,4,2,0,6"
+ngl_b/1944.EBR,1766,BLG194405190,trailing_line_score_placeholder,"line,1,2,2,1,0,3,0,0,1,","line,1,2,2,1,0,3,0,0,1"
+ngl_b/1944.EBR,2509,BLG194407110,trailing_line_score_placeholder,"line,1,0,3,0,0,6,0,1,1,","line,1,0,3,0,0,6,0,1,1"
+ngl_b/1944.EBR,3374,BLG194408050,trailing_line_score_placeholder,"line,1,0,2,1,0,0,0,3,2,","line,1,0,2,1,0,0,0,3,2"
+ngl_b/1944.EBR,3754,BLG194408201,trailing_line_score_placeholder,"line,1,4,1,0,2,0,0,0,3,","line,1,4,1,0,2,0,0,0,3"
+ngl_b/1944.EBR,3844,BLG194408202,trailing_line_score_placeholder,"line,0,1,0,0,0,3,0,2,","line,0,1,0,0,0,3,0,2"
+ngl_b/1944.EBR,3845,BLG194408202,trailing_line_score_placeholder,"line,1,0,0,0,1,0,0,0,","line,1,0,0,0,1,0,0,0"
+ngl_b/1944.EBR,4308,BLG194409031,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1944.EBR,4309,BLG194409031,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1944.EBR,4313,BLG194409031,trailing_line_score_placeholder,"line,1,1,0,0,2,0,3,0,4,","line,1,1,0,0,2,0,3,0,4"
+ngl_b/1944.EBR,4401,BLG194409032,trailing_line_score_placeholder,"line,0,0,0,0,0,0,2,1,","line,0,0,0,0,0,0,2,1"
+ngl_b/1944.EBR,4402,BLG194409032,trailing_line_score_placeholder,"line,1,1,1,4,0,0,0,","line,1,1,1,4,0,0,0"
+ngl_b/1944.EBR,4693,BLG194409172,trailing_line_score_placeholder,"line,0,0,1,0,0,0,0,0,","line,0,0,1,0,0,0,0,0"
+ngl_b/1944.EBR,6425,CIA194405120,trailing_line_score_placeholder,"line,1,0,0,0,4,0,2,0,0,","line,1,0,0,0,4,0,2,0,0"
+ngl_b/1944.EBR,7752,CVB194406112,trailing_line_score_placeholder,"line,0,0,0,0,0,0,0,0,","line,0,0,0,0,0,0,0,0"
+ngl_b/1944.EBR,8420,CVB194408202,trailing_line_score_placeholder,"line,0,1,0,1,0,1,1,1,","line,0,1,0,1,0,1,1,1"
+ngl_b/1944.EBR,8913,HOM194405301,drop_validator_message,NUMBER OF HR DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1944.EBR,8915,HOM194405301,placeholder_hrline,"event,hrline,NA,NA,NA,-1,NA,-1",
+ngl_b/1944.EBR,9819,HOM194406181,trailing_line_score_placeholder,"line,1,1,0,3,1,1,3,0,1,","line,1,1,0,3,1,1,3,0,1"
+ngl_b/1944.EBR,10307,HOM194407120,trailing_line_score_placeholder,"line,1,6,5,0,1,0,0,0,0,","line,1,6,5,0,1,0,0,0,0"
+ngl_b/1944.EBR,11143,HOM194408062,trailing_line_score_placeholder,"line,0,1,0,0,0,0,2,0,","line,0,1,0,0,0,0,2,0"
+ngl_b/1944.EBR,11901,HOM194409140,trailing_line_score_placeholder,"line,1,1,2,1,0,3,0,0,0,","line,1,1,2,1,0,3,0,0,0"
+ngl_b/1944.EBR,12371,HOM194410012,trailing_line_score_placeholder,"line,1,1,0,0,0,0,3,0,4,","line,1,1,0,0,0,0,3,0,4"
+ngl_b/1944.EBR,12461,KCM194404170,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1944.EBR,12462,KCM194404170,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1944.EBR,12463,KCM194404170,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1944.EBR,12467,KCM194404170,trailing_line_score_placeholder,"line,1,0,4,1,1,0,0,0,0,","line,1,0,4,1,1,0,0,0,0"
+ngl_b/1944.EBR,12650,KCM194404260,unknown_fielding_play_side,"event,dpline,NA,hallb110,cannw101","event,dpline,0,hallb110,cannw101"
+ngl_b/1944.EBR,13146,KCM194405230,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1944.EBR,13147,KCM194405230,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1944.EBR,14229,KCM194407232,trailing_line_score_placeholder,"line,0,0,0,0,0,1,0,0,","line,0,0,0,0,0,1,0,0"
+ngl_b/1944.EBR,14633,KCM194408131,trailing_line_score_placeholder,"line,1,0,0,5,4,0,1,0,2,","line,1,0,0,5,4,0,1,0,2"
+ngl_b/1944.EBR,14729,KCM194408132,trailing_line_score_placeholder,"line,0,3,0,1,0,0,0,1,","line,0,3,0,1,0,0,0,1"
+ngl_b/1944.EBR,14730,KCM194408132,trailing_line_score_placeholder,"line,1,0,0,0,0,1,0,0,","line,1,0,0,0,0,1,0,0"
+ngl_b/1944.EBR,15867,KCM194409190,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1944.EBR,15868,KCM194409190,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1944.EBR,15872,KCM194409190,trailing_line_score_placeholder,"line,1,2,0,1,0,0,0,6,1,","line,1,2,0,1,0,0,0,6,1"
+ngl_b/1944.EBR,15967,KCR194410180,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1944.EBR,15968,KCR194410180,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1944.EBR,16171,MEM194406041,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1944.EBR,16172,MEM194406041,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1944.EBR,17735,NW2194405301,trailing_line_score_placeholder,"line,1,4,0,3,2,0,3,0,1,","line,1,4,0,3,2,0,3,0,1"
+ngl_b/1944.EBR,18614,NW2194408131,trailing_line_score_placeholder,"line,1,3,0,3,0,0,0,0,0,","line,1,3,0,3,0,0,0,0,0"
+ngl_b/1944.EBR,19284,NY5194406042,trailing_line_score_placeholder,"line,0,1,3,2,0,0,2,5,","line,0,1,3,2,0,0,2,5"
+ngl_b/1944.EBR,19285,NY5194406042,trailing_line_score_placeholder,"line,1,0,0,0,0,0,0,0,","line,1,0,0,0,0,0,0,0"
+ngl_b/1944.EBR,19562,NY5194407091,drop_validator_message,NUMBER OF HBP DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1944.EBR,19563,NY5194407091,placeholder_hpline,"event,hpline,NA,NA,NA",
+ngl_b/1944.EBR,20148,NY6194406252,trailing_line_score_placeholder,"line,0,0,0,0,0,0,3,0,","line,0,0,0,0,0,0,3,0"
+ngl_b/1944.EBR,21998,PH5194406041,drop_validator_message,NUMBER OF PH DISAGREE BETWEEN BATTING AND EVENTS,
+ngl_b/1944.EBR,22099,PH5194406052,trailing_line_score_placeholder,"line,0,0,0,0,0,0,0,0,","line,0,0,0,0,0,0,0,0"
+ngl_b/1944.EBR,23660,PH5194408170,trailing_line_score_placeholder,"line,1,3,0,1,2,3,9,2,0,","line,1,3,0,1,2,3,9,2,0"
+ngl_b/1945.EBR,14961,NW2194506010,trailing_line_score_placeholder,"line,1,3,2,0,3,1,1,2,1,","line,1,3,2,0,3,1,1,2,1"
+ngl_b/1945.EBR,15326,NW2194507041,trailing_line_score_placeholder,"line,1,7,0,0,0,8,3,0,0,","line,1,7,0,0,0,8,3,0,0"
+ngl_b/1946.EBR,1283,ASP194610050,blank_starter_position,"start,hemsr101,""Rollie Hemsley"",0,8,","start,hemsr101,""Rollie Hemsley"",0,8,5"
+ngl_b/1948.EBR,617,BIR194805161,misfiled_sub_line,"event,phline,willk103,9,0,1,0,0,0,0,0,0,0,-1,0,0,-1,-1,0,-1,-1,-1","stat,phline,willk103,9,0,1,0,0,0,0,0,0,0,-1,0,0,-1,-1,0,-1,-1,-1"
+ngl_b/1948.EBR,618,BIR194805161,misfiled_sub_line,"event,phline,bennj102,9,0,1,0,0,0,0,0,0,0,-1,0,0,-1,-1,0,-1,-1,-1","stat,phline,bennj102,9,0,1,0,0,0,0,0,0,0,-1,0,0,-1,-1,0,-1,-1,-1"
+ngl_b/1948.EBR,619,BIR194805161,misfiled_sub_line,"event,prline,cohej101,9,0,0,0,0","stat,prline,cohej101,9,0,0,0,0"
+ngl_b/1948.EBR,620,BIR194805161,misfiled_sub_line,"event,prline,merch101,9,0,0,0,0","stat,prline,merch101,9,0,0,0,0"
+ngl_b/1948.EBR,9156,CVB194805301,swapped_phline_inning_side,"stat,phline,renfc101,1,9,1,1,0,1,0,0,0,0,0,-1,0,0,-1,-1,0,-1,-1,-1","stat,phline,renfc101,9,1,1,1,0,1,0,0,0,0,0,-1,0,0,-1,-1,0,-1,-1,-1"
+ngl_b/1948.EBR,10527,HOM194806202,swapped_phline_inning_side,"stat,phline,fielw101,1,6,1,1,0,0,0,0,0,-1,0,-1,0,0,-1,-1,0,-1,-1,-1","stat,phline,fielw101,6,1,1,1,0,0,0,0,0,-1,0,-1,0,0,-1,-1,0,-1,-1,-1"
+ngl_b/1948.EBR,13215,KCM194805270,swapped_phline_inning_side,"stat,phline,piggl101,0,9,0,1,0,0,0,0,0,0,0,-1,0,0,-1,-1,0,-1,-1,-1","stat,phline,piggl101,9,0,0,1,0,0,0,0,0,0,0,-1,0,0,-1,-1,0,-1,-1,-1"

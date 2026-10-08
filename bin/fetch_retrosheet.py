@@ -74,6 +74,7 @@ HTTP_TIMEOUT_S = 180
 RETRY_ATTEMPTS = 4
 RETRY_BACKOFF_S = 3.0
 DEFAULT_PARALLELISM = 8
+DEFAULT_OVERRIDES = Path(__file__).resolve().parent.parent / "corpus_overrides"
 
 # Index pages whose <a href> links describe the per-year zips retrosheet
 # currently publishes for each asset class.
@@ -339,6 +340,45 @@ def fetch_one(src: Source, output_root: Path) -> tuple[str, int]:
     return (src.url, n)
 
 
+def box_year(url: str) -> str | None:
+    m = _CATEGORY_PATTERNS["boxes"].search(url)
+    return m.group(1) if m else None
+
+
+def restore_missing_boxes(
+    output_root: Path,
+    box_urls: Iterable[str],
+    overrides_root: Path,
+    fetched_since: float,
+) -> list[str]:
+    missing: list[str] = []
+    boxes = output_root / "boxes"
+    override_dir = overrides_root / "boxes"
+    years = {y for y in map(box_year, box_urls) if y is not None}
+    years |= {p.name[:4] for p in override_dir.glob("*.EB*")}
+    for year in sorted(years):
+        fetched = [
+            p for p in boxes.glob(f"{year}.EB*") if p.stat().st_mtime >= fetched_since
+        ]
+        if fetched:
+            continue
+        overrides = sorted(override_dir.glob(f"{year}.EB*"))
+        if not overrides:
+            LOG.error("Upstream published no box-score file for %s", year)
+            missing.append(year)
+            continue
+        boxes.mkdir(parents=True, exist_ok=True)
+        for override in overrides:
+            shutil.copyfile(override, boxes / override.name)
+            LOG.warning(
+                "Upstream published no box-score file for %s; restored %s from %s",
+                year,
+                override.name,
+                overrides_root,
+            )
+    return missing
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -359,6 +399,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="INFO",
         help="Python logging level name (default: INFO)",
     )
+    parser.add_argument(
+        "--overrides",
+        type=Path,
+        default=DEFAULT_OVERRIDES,
+        help=f"Files restored when upstream drops them (default: {DEFAULT_OVERRIDES})",
+    )
     return parser.parse_args(argv)
 
 
@@ -367,6 +413,7 @@ def main(argv: list[str] | None = None) -> int:
     log_level: str = args.log_level
     output: Path = args.output
     parallelism: int = args.parallelism
+    overrides: Path = args.overrides
 
     logging.basicConfig(
         level=log_level.upper(),
@@ -399,14 +446,19 @@ def main(argv: list[str] | None = None) -> int:
             extracted_total += n
             LOG.info("OK %s -> %d files", url, n)
 
+    missing_boxes = restore_missing_boxes(
+        output, discovered["boxes"], overrides, float(int(started))
+    )
+
     elapsed = time.time() - started
     LOG.info(
-        "Done in %.1fs: extracted=%d files, failed=%d",
+        "Done in %.1fs: extracted=%d files, failed=%d, missing box years=%d",
         elapsed,
         extracted_total,
         len(failures),
+        len(missing_boxes),
     )
-    return 1 if failures else 0
+    return 1 if failures or missing_boxes else 0
 
 
 if __name__ == "__main__":
