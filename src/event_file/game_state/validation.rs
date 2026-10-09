@@ -30,10 +30,11 @@ pub(super) fn get_game_id(rv: &RecordSlice) -> Result<GameId> {
 enum LineupSource {
     Start,
     BattingLine,
+    StartingFieldingPosition,
 }
 
 pub(super) fn ensure_unique_lineup_slots(rv: &RecordSlice) -> Result<()> {
-    let mut slots: HashMap<(LineupSource, Side, Player), BTreeSet<LineupPosition>> = HashMap::new();
+    let mut slots: HashMap<(LineupSource, Side, Player), BTreeSet<u8>> = HashMap::new();
     for record in rv {
         let (source, side, player, position) = match record {
             MappedRecord::Start(start) => (
@@ -48,13 +49,26 @@ pub(super) fn ensure_unique_lineup_slots(rv: &RecordSlice) -> Result<()> {
                 line.batter_id,
                 line.lineup_position,
             ),
+            MappedRecord::BoxScoreLine(BoxScoreLine::DefenseLine(line))
+                if line.nth_position_played_by_player == 1 =>
+            {
+                let _ = slots
+                    .entry((
+                        LineupSource::StartingFieldingPosition,
+                        line.side,
+                        line.fielder_id,
+                    ))
+                    .or_default()
+                    .insert(line.fielding_position.into());
+                continue;
+            }
             _ => continue,
         };
         if position != LineupPosition::PitcherWithDh {
             let _ = slots
                 .entry((source, side, player))
                 .or_default()
-                .insert(position);
+                .insert(position.into());
         }
     }
     let mut duplicates: Vec<_> = slots
@@ -68,8 +82,7 @@ pub(super) fn ensure_unique_lineup_slots(rv: &RecordSlice) -> Result<()> {
     let described = duplicates
         .iter()
         .map(|((source, side, player), positions)| {
-            let positions: Vec<u8> = positions.iter().map(|p| u8::from(*p)).collect();
-            format!("{player} ({side}) in {source:?} lineup positions {positions:?}")
+            format!("{player} ({side}) in {source:?} positions {positions:?}")
         })
         .collect::<Vec<_>>()
         .join("; ");
@@ -402,6 +415,31 @@ mod tests {
             &["start", "byrdb101", "Bill Byrd", "1", "9", "8"],
         ]);
         assert!(ensure_unique_lineup_slots(&rv).is_err());
+    }
+
+    fn dline<'a>(player: &'a str, side: &'a str, nth: &'a str, position: &'a str) -> Vec<&'a str> {
+        vec![
+            "stat", "dline", player, side, nth, position, "9", "1", "0", "0", "0", "0", "0",
+        ]
+    }
+
+    #[test]
+    fn rejects_fielder_with_two_starting_positions() {
+        let rv = records(&[
+            &dline("browr103", "0", "1", "8"),
+            &dline("browr103", "0", "1", "1"),
+        ]);
+        let err = ensure_unique_lineup_slots(&rv).unwrap_err().to_string();
+        assert!(err.contains("browr103"), "{err}");
+    }
+
+    #[test]
+    fn accepts_fielder_changing_position_mid_game() {
+        let rv = records(&[
+            &dline("hillb102", "0", "1", "1"),
+            &dline("hillb102", "0", "2", "7"),
+        ]);
+        assert!(ensure_unique_lineup_slots(&rv).is_ok());
     }
 
     #[test]
