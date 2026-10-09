@@ -78,6 +78,59 @@ Other new parser warnings are left as published:
 - HOM193807031's other `bline` rows carry fielding positions in the
   sequence column. They parse as sequence numbers.
 
+## Games excluded from the release build
+
+The parser accepts these 28 games, but each box score contradicts itself in a
+way the `baseball.computer` models cannot load. The release build excludes
+them. As with the unresolved records, the game's other records do not supply
+a single correct value, so the files stay as published.
+
+A batter has fewer hits than extra-base hits:
+
+| Game | File | Record | Conflict |
+| --- | --- | --- | --- |
+| PTC193307042 | `ngl_b/1933.EBR` | `stat,bline,charo101,1,3,1,4,3,1,1,0,1,...` | 1 hit; 1 double, 1 home run |
+| BRN193505261 | `ngl_b/1935.EBR` | `stat,bline,dixor101,1,4,1,5,0,1,2,0,0,...` | 1 hit; 2 doubles |
+| BRN193507211 | `ngl_b/1935.EBR` | `stat,bline,willn103,0,6,1,5,0,1,1,0,1,...` | 1 hit; 1 double, 1 home run |
+| BRN193507212 | `ngl_b/1935.EBR` | `stat,bline,wrigb104,0,5,1,3,2,1,1,0,1,...` | 1 hit; 1 double, 1 home run |
+| CAG193506021 | `ngl_b/1935.EBR` | `stat,bline,harrv102,0,1,1,4,1,1,1,1,0,...` | 1 hit; 1 double, 1 triple |
+| NW1193507141 | `ngl_b/1935.EBR` | `stat,bline,willn103,0,8,1,4,1,1,3,0,0,...` | 1 hit; 3 doubles |
+| PH5193506030 | `ngl_b/1935.EBR` | `stat,bline,wrigb104,0,6,1,4,0,0,-1,-1,1,...` | 0 hits; 1 home run |
+| IN6193707200 | `ngl_b/1937.EBR` | `stat,bline,pearl101,0,4,1,4,2,1,2,0,0,...` | 1 hit; 2 doubles. The team and pitcher totals agree with these values |
+| MEM193704251 | `ngl_b/1937.EBR` | `stat,bline,davel102,0,1,1,6,2,3,1,2,1,...` | 3 hits; 1 double, 2 triples, 1 home run |
+| NW2193708140 | `ngl_b/1937.EBR` | `stat,bline,hayej104,1,8,1,3,2,1,1,1,0,...` | 1 hit; 1 double, 1 triple |
+| HOM193808283 | `ngl_b/1938.EBR` | `stat,bline,clarb101,0,8,1,3,1,1,1,0,1,...` | 1 hit; 1 double, 1 home run. The game also has home runs with no pitcher |
+
+A starter fills two lineup or fielding slots. The parser drops the bad
+`start` records listed above, but the `bline` and `dline` rows remain:
+
+| Game | File | Records | Conflict |
+| --- | --- | --- | --- |
+| NW1193408192 | `ngl_b/1934.EBR` | `stat,bline,johnb111,1,1,...`; `stat,bline,johnb111,1,4,...`; first-position `dline`s 7 and 9 | Batting slots 1 and 4 |
+| PH5193408270 | `ngl_b/1934.EBR` | `stat,bline,wrigb104,0,1,...`; `stat,bline,wrigb104,0,8,...`; first-position `dline`s 8 and 9 | Batting slots 1 and 8 |
+| PTC193509021 | `ngl_b/1935.EBR` | `stat,dline,browr103,0,1,8,...`; `stat,dline,browr103,0,1,1,...` | Two first-position `dline`s (8, 1) for the slot-6 batter |
+
+A home run has a batter but no pitcher. The pitching lines do not say which
+pitcher allowed it, and these records are not filled in from `pline` totals:
+
+| Game | File | Records |
+| --- | --- | --- |
+| AKR193307270 | `ngl_b/1933.EBR` | `event,hrline,1,palmc101,,-1,0,`; `event,hrline,1,huntb106,,-1,0,` |
+| HOM193507280 | `ngl_b/1935.EBR` | `event,hrline,1,benjj101,,9,3,` |
+| HOM193508100 | `ngl_b/1935.EBR` | `event,hrline,0,grifc102,,-1,0,` |
+| NY6193505262 | `ngl_b/1935.EBR` | `event,hrline,0,carlm101,,-1,0,` |
+| NY6193508181 | `ngl_b/1935.EBR` | `event,hrline,1,salal101,,-1,0,`; `event,hrline,1,thomd104,,-1,0,` |
+| PH5193506222 | `ngl_b/1935.EBR` | `event,hrline,0,davis103,,-1,0,`; `event,hrline,0,browl107,,-1,0,`; `event,hrline,1,cread101,,-1,0,`; `event,hrline,1,seayd101,,-1,0,` |
+| PH5193509222 | `ngl_b/1935.EBR` | `event,hrline,0,perkb101,,-1,0,` |
+| PH5193609051 | `ngl_b/1936.EBR` | `event,hrline,1,parnr102,,5,0,`; `event,hrline,1,steat101,,9,0,`; `event,hrline,1,wilsj106,,9,0,` |
+| HOM193705220 | `ngl_b/1937.EBR` | `event,hrline,1,willj110,,-1,0,`; `event,hrline,1,harrv102,,-1,0,` |
+| HOM193706272 | `ngl_b/1937.EBR` | `event,hrline,1,leonb101,,5,0,` |
+| HOM193708210 | `ngl_b/1937.EBR` | `event,hrline,1,gibsj101,,-1,0,` |
+| PH5193709112 | `ngl_b/1937.EBR` | `event,hrline,1,paget101,,-1,0,` |
+| SSA193705301 | `ngl_b/1937.EBR` | `event,hrline,0,steat101,,-1,0,` (twice); `event,hrline,0,justc101,,-1,0,`; `event,hrline,0,millp101,,-1,0,` |
+| HOM193808283 | `ngl_b/1938.EBR` | `event,hrline,1,gibsj101,,5,0,`; `event,hrline,1,browr103,,8,0,` |
+| NW2194507041 | `ngl_b/1945.EBR` | `event,hrline,1,willc107,,5,0,` |
+
 ## Pitch-sequence conflicts
 
 The release adds pitch sequences, recorded from video, to CHN198606170 and
