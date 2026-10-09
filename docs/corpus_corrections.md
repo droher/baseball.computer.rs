@@ -78,9 +78,31 @@ Other new parser warnings are left as published:
 - HOM193807031's other `bline` rows carry fielding positions in the
   sequence column. They parse as sequence numbers.
 
+## Games rejected by the parser
+
+The parser rejects a game when one player holds two batting slots on the same
+side, either in the game's `start` records or in its `bline` records. It logs
+an `ERROR` and writes no output for the game. In the October 2026 corpus
+these games are rejected:
+
+| Game | File | Records | Slots |
+| --- | --- | --- | --- |
+| BSN189905310 | `boxes/1899.EBN` | `stat,bline,hillb102,0,1,2,...`; `stat,bline,hillb102,0,9,1,...` | 1 and 9 |
+| CB2193307290 | `ngl_b/1933.EBR` | `start,byrdb101,...,1,8,8`; `start,byrdb101,...,1,9,8` | 8 and 9 |
+| NSH193306042 | `ngl_b/1933.EBR` | `start,browr103,...` twice | 5 and 6 |
+| PTC193306010 | `ngl_b/1933.EBR` | `start,lacko101,...,1,7,6`; `start,lacko101,...,1,8,6` | 7 and 8 |
+| NW1193408192 | `ngl_b/1934.EBR` | `stat,bline,johnb111,1,1,...`; `stat,bline,johnb111,1,4,...` | 1 and 4 |
+| PH5193408270 | `ngl_b/1934.EBR` | `stat,bline,wrigb104,0,1,...`; `stat,bline,wrigb104,0,8,...` | 1 and 8 |
+| NY5193508042 | `ngl_b/1935.EBR` | `start,hubbj101,...` twice | 8 and 9 |
+| PTC193608040 | `ngl_b/1936.EBR` | `start,cartp102,...` twice | 8 and 9 |
+| WBS193805220 | `ngl_b/1938.EBR` | `start,speah101,...,1,3,5`; `start,speah101,...,1,4,5` | 3 and 4 |
+
+A `start` record that names a different slot from the player's `bline` is
+not rejected.
+
 ## Games excluded from the release build
 
-The parser accepts these 28 games, but each box score contradicts itself in a
+The parser accepts these 12 games, but each box score contradicts itself in a
 way the `baseball.computer` models cannot load. The release build excludes
 them. As with the unresolved records, the game's other records do not supply
 a single correct value, so the files stay as published.
@@ -99,19 +121,21 @@ A batter has fewer hits than extra-base hits:
 | IN6193707200 | `ngl_b/1937.EBR` | `stat,bline,pearl101,0,4,1,4,2,1,2,0,0,...` | 1 hit; 2 doubles. The team and pitcher totals agree with these values |
 | MEM193704251 | `ngl_b/1937.EBR` | `stat,bline,davel102,0,1,1,6,2,3,1,2,1,...` | 3 hits; 1 double, 2 triples, 1 home run |
 | NW2193708140 | `ngl_b/1937.EBR` | `stat,bline,hayej104,1,8,1,3,2,1,1,1,0,...` | 1 hit; 1 double, 1 triple |
-| HOM193808283 | `ngl_b/1938.EBR` | `stat,bline,clarb101,0,8,1,3,1,1,1,0,1,...` | 1 hit; 1 double, 1 home run. The game also has home runs with no pitcher |
+| HOM193808283 | `ngl_b/1938.EBR` | `stat,bline,clarb101,0,8,1,3,1,1,1,0,1,...` | 1 hit; 1 double, 1 home run |
 
-A starter fills two lineup or fielding slots. The parser drops the bad
-`start` records listed above, but the `bline` and `dline` rows remain:
+A starter has two first-position `dline`s:
 
-| Game | File | Records | Conflict |
-| --- | --- | --- | --- |
-| NW1193408192 | `ngl_b/1934.EBR` | `stat,bline,johnb111,1,1,...`; `stat,bline,johnb111,1,4,...`; first-position `dline`s 7 and 9 | Batting slots 1 and 4 |
-| PH5193408270 | `ngl_b/1934.EBR` | `stat,bline,wrigb104,0,1,...`; `stat,bline,wrigb104,0,8,...`; first-position `dline`s 8 and 9 | Batting slots 1 and 8 |
-| PTC193509021 | `ngl_b/1935.EBR` | `stat,dline,browr103,0,1,8,...`; `stat,dline,browr103,0,1,1,...` | Two first-position `dline`s (8, 1) for the slot-6 batter |
+| Game | File | Records |
+| --- | --- | --- |
+| PTC193509021 | `ngl_b/1935.EBR` | `stat,dline,browr103,0,1,8,...`; `stat,dline,browr103,0,1,1,...` |
 
-A home run has a batter but no pitcher. The pitching lines do not say which
-pitcher allowed it, and these records are not filled in from `pline` totals:
+## Home runs with no pitcher
+
+These games are not excluded. Each has an `hrline` with a batter but no
+pitcher, and the pitching lines do not say which pitcher allowed it. The
+records are not filled in from `pline` totals. The `baseball.computer` build
+loads them and its `not_null` audit on `box_score_home_runs.pitcher_id`
+warns.
 
 | Game | File | Records |
 | --- | --- | --- |
@@ -130,6 +154,7 @@ pitcher allowed it, and these records are not filled in from `pline` totals:
 | SSA193705301 | `ngl_b/1937.EBR` | `event,hrline,0,steat101,,-1,0,` (twice); `event,hrline,0,justc101,,-1,0,`; `event,hrline,0,millp101,,-1,0,` |
 | HOM193808283 | `ngl_b/1938.EBR` | `event,hrline,1,gibsj101,,5,0,`; `event,hrline,1,browr103,,8,0,` |
 | NW2194507041 | `ngl_b/1945.EBR` | `event,hrline,1,willc107,,5,0,` |
+
 
 ## Pitch-sequence conflicts
 

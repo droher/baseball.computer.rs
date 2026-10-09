@@ -1,13 +1,16 @@
 //! Game-id reconciliation and info-record presence checks.
 
-use anyhow::{Context, Result};
+use std::collections::{BTreeSet, HashMap};
+
+use anyhow::{Context, Result, bail};
 use chrono::Datelike;
 use tracing::warn;
 
+use crate::event_file::box_score::BoxScoreLine;
 use crate::event_file::info::{DoubleheaderStatus, InfoRecord, Team};
 use crate::event_file::misc::GameId;
 use crate::event_file::parser::{MappedRecord, RecordSlice};
-use crate::event_file::traits::Matchup;
+use crate::event_file::traits::{LineupPosition, Matchup, Player, Side};
 
 use super::GameSetting;
 
@@ -21,6 +24,56 @@ pub(super) fn get_game_id(rv: &RecordSlice) -> Result<GameId> {
             }
         })
         .context("No Game ID found in records")
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+enum LineupSource {
+    Start,
+    BattingLine,
+}
+
+pub(super) fn ensure_unique_lineup_slots(rv: &RecordSlice) -> Result<()> {
+    let mut slots: HashMap<(LineupSource, Side, Player), BTreeSet<LineupPosition>> = HashMap::new();
+    for record in rv {
+        let (source, side, player, position) = match record {
+            MappedRecord::Start(start) => (
+                LineupSource::Start,
+                start.side,
+                start.player,
+                start.lineup_position,
+            ),
+            MappedRecord::BoxScoreLine(BoxScoreLine::BattingLine(line)) => (
+                LineupSource::BattingLine,
+                line.side,
+                line.batter_id,
+                line.lineup_position,
+            ),
+            _ => continue,
+        };
+        if position != LineupPosition::PitcherWithDh {
+            let _ = slots
+                .entry((source, side, player))
+                .or_default()
+                .insert(position);
+        }
+    }
+    let mut duplicates: Vec<_> = slots
+        .into_iter()
+        .filter(|(_, positions)| positions.len() > 1)
+        .collect();
+    if duplicates.is_empty() {
+        return Ok(());
+    }
+    duplicates.sort_unstable();
+    let described = duplicates
+        .iter()
+        .map(|((source, side, player), positions)| {
+            let positions: Vec<u8> = positions.iter().map(|p| u8::from(*p)).collect();
+            format!("{player} ({side}) in {source:?} lineup positions {positions:?}")
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
+    bail!("Player listed in more than one lineup position: {described}")
 }
 
 pub(super) const fn doubleheader_status_from_suffix(suffix: u8) -> Option<DoubleheaderStatus> {
@@ -311,5 +364,71 @@ mod tests {
         ];
         let p = info_presence(&all);
         assert!(p.date && p.home_team && p.doubleheader);
+    }
+
+    fn records(lines: &[&[&str]]) -> Vec<MappedRecord> {
+        lines
+            .iter()
+            .map(|fields| {
+                MappedRecord::try_from(&csv::StringRecord::from(fields.to_vec())).unwrap()
+            })
+            .collect()
+    }
+
+    const BLINE_STATS: [&str; 17] = [
+        "4", "1", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0",
+    ];
+
+    fn bline<'a>(player: &'a str, side: &'a str, slot: &'a str, nth: &'a str) -> Vec<&'a str> {
+        let mut fields = vec!["stat", "bline", player, side, slot, nth];
+        fields.extend(BLINE_STATS);
+        fields
+    }
+
+    #[test]
+    fn rejects_batter_in_two_lineup_positions() {
+        let rv = records(&[
+            &bline("johnb111", "1", "1", "1"),
+            &bline("johnb111", "1", "4", "1"),
+        ]);
+        let err = ensure_unique_lineup_slots(&rv).unwrap_err().to_string();
+        assert!(err.contains("johnb111"), "{err}");
+    }
+
+    #[test]
+    fn rejects_starter_in_two_lineup_positions() {
+        let rv = records(&[
+            &["start", "byrdb101", "Bill Byrd", "1", "8", "8"],
+            &["start", "byrdb101", "Bill Byrd", "1", "9", "8"],
+        ]);
+        assert!(ensure_unique_lineup_slots(&rv).is_err());
+    }
+
+    #[test]
+    fn accepts_substitutes_sharing_a_lineup_position() {
+        let rv = records(&[
+            &bline("starter1", "0", "9", "1"),
+            &bline("pinchh01", "0", "9", "2"),
+            &bline("starter1", "1", "4", "1"),
+        ]);
+        assert!(ensure_unique_lineup_slots(&rv).is_ok());
+    }
+
+    #[test]
+    fn accepts_start_record_disagreeing_with_batting_line() {
+        let rv = records(&[
+            &["start", "barkm101", "Marvin Barker", "1", "8", "9"],
+            &bline("barkm101", "1", "7", "1"),
+        ]);
+        assert!(ensure_unique_lineup_slots(&rv).is_ok());
+    }
+
+    #[test]
+    fn accepts_two_way_player_batting_and_pitching_with_dh() {
+        let rv = records(&[
+            &["start", "ohtas001", "Shohei Ohtani", "0", "1", "10"],
+            &["start", "ohtas001", "Shohei Ohtani", "0", "0", "1"],
+        ]);
+        assert!(ensure_unique_lineup_slots(&rv).is_ok());
     }
 }
