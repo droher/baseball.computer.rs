@@ -52,7 +52,7 @@ pub type EventId = SequenceId;
 pub use pitches::{PitchSequenceConflictReason, PitchSequenceIssue, PitchSequenceStatus};
 
 use personnel::{AppearanceDelta, Personnel, PositionType, TrackedPlayer};
-use validation::{ensure_unique_lineup_slots, get_game_id, info_presence, reconcile_with_game_id};
+use validation::{ensure_unique_starters, get_game_id, info_presence, reconcile_with_game_id};
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Serialize, Deserialize, AsRefStr)]
 pub enum EnteredGameAs {
@@ -581,7 +581,7 @@ impl GameContext {
         game_num: usize,
     ) -> Result<Self> {
         let game_id = get_game_id(record_slice)?;
-        ensure_unique_lineup_slots(record_slice)?;
+        ensure_unique_starters(record_slice)?;
         let teams: Matchup<Team> = Matchup::try_from(record_slice)?;
         let mut setting = GameSetting::from(record_slice);
         reconcile_with_game_id(game_id, &mut setting, &teams, info_presence(record_slice));

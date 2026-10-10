@@ -80,26 +80,25 @@ Other new parser warnings are left as published:
 
 ## Games rejected by the parser
 
-The parser rejects a game when one player appears twice in a side's starting
-lineup: in two `start` records, or as the first `bline` in two batting slots.
-It logs an `ERROR` and writes no output for the game. A player who moves to
-another batting slot or fielding position during the game is accepted. In the
-October 2026 corpus these games are rejected:
+The parser rejects a game that lists one player twice in a side's starting
+lineup. It logs an `ERROR` and writes no output for the game. A player is
+listed twice when they are the first `bline` in two batting slots (in a
+play-by-play game, when they have `start` records in two slots), or when
+they have first-position `dline`s at two positions and no other player has a
+first-position `dline` at either one. A player who moves to another slot or
+position during the game is accepted, including when the scorer numbered the
+new position 1 and the replaced fielder also has a first-position `dline`
+there. In the October 2026 corpus these games are rejected:
 
-| Game | File | Records | Slots |
+| Game | File | Records | Starting lineup |
 | --- | --- | --- | --- |
-| CB2193307290 | `ngl_b/1933.EBR` | `start,byrdb101,...,1,8,8`; `start,byrdb101,...,1,9,8` | 8 and 9 |
-| NSH193306042 | `ngl_b/1933.EBR` | `start,browr103,...` twice | 5 and 6 |
-| PTC193306010 | `ngl_b/1933.EBR` | `start,lacko101,...,1,7,6`; `start,lacko101,...,1,8,6` | 7 and 8 |
-| NW1193408192 | `ngl_b/1934.EBR` | `stat,bline,johnb111,1,1,1,...`; `stat,bline,johnb111,1,4,1,...` | 1 and 4 |
-| PH5193408270 | `ngl_b/1934.EBR` | `stat,bline,wrigb104,0,1,1,...`; `stat,bline,wrigb104,0,8,1,...` | 1 and 8 |
-| NY5193508042 | `ngl_b/1935.EBR` | `start,hubbj101,...` twice | 8 and 9 |
-| PTC193608040 | `ngl_b/1936.EBR` | `start,cartp102,...` twice | 8 and 9 |
-| WBS193805220 | `ngl_b/1938.EBR` | `start,speah101,...,1,3,5`; `start,speah101,...,1,4,5` | 3 and 4 |
+| NW1193408192 | `ngl_b/1934.EBR` | `stat,bline,johnb111,1,1,1,...`; `stat,bline,johnb111,1,4,1,...`; `stat,dline,johnb111,1,1,7,...`; `stat,dline,johnb111,1,1,9,...` | Batting slots 1 and 4; fielding positions 7 and 9 |
+| PH5193408270 | `ngl_b/1934.EBR` | `stat,bline,wrigb104,0,1,1,...`; `stat,bline,wrigb104,0,8,1,...`; `stat,dline,wrigb104,0,1,8,...`; `stat,dline,wrigb104,0,1,9,...` | Batting slots 1 and 8; fielding positions 8 and 9 |
+| PTC193509021 | `ngl_b/1935.EBR` | `stat,dline,browr103,0,1,8,...`; `stat,dline,browr103,0,1,1,...` | Fielding positions 8 and 1 |
 
 ## Games excluded from the release build
 
-The parser accepts these 12 games, but each box score contradicts itself in a
+The parser accepts these 11 games, but each box score contradicts itself in a
 way the `baseball.computer` models cannot load. The release build excludes
 them. As with the unresolved records, the game's other records do not supply
 a single correct value, so the files stay as published.
@@ -119,14 +118,6 @@ A batter has fewer hits than extra-base hits:
 | MEM193704251 | `ngl_b/1937.EBR` | `stat,bline,davel102,0,1,1,6,2,3,1,2,1,...` | 3 hits; 1 double, 2 triples, 1 home run |
 | NW2193708140 | `ngl_b/1937.EBR` | `stat,bline,hayej104,1,8,1,3,2,1,1,1,0,...` | 1 hit; 1 double, 1 triple |
 | HOM193808283 | `ngl_b/1938.EBR` | `stat,bline,clarb101,0,8,1,3,1,1,1,0,1,...` | 1 hit; 1 double, 1 home run |
-
-A fielder has two first-position `dline`s, so the starting fielding lineup
-lists the player twice. The outs suggest a position change and the second row is
-misnumbered, but the record does not say so:
-
-| Game | File | Records |
-| --- | --- | --- |
-| PTC193509021 | `ngl_b/1935.EBR` | `stat,dline,browr103,0,1,8,...`; `stat,dline,browr103,0,1,1,...` |
 
 ## Home runs with no pitcher
 
