@@ -80,48 +80,26 @@ Other new parser warnings are left as published:
 
 ## Games rejected by the parser
 
-The parser rejects a game when one player on a side holds two batting slots
-in the game's `start` records or its `bline` records, or two starting
-fielding positions in its first-position `dline` records. It logs an `ERROR`
-and writes no output for the game. In the October 2026 corpus these games are
-rejected:
-
-Two batting slots:
+The parser rejects a game when one player appears twice in a side's starting
+lineup: in two `start` records, or as the first `bline` in two batting slots.
+It logs an `ERROR` and writes no output for the game. A player who moves to
+another batting slot or fielding position during the game is accepted. In the
+October 2026 corpus these games are rejected:
 
 | Game | File | Records | Slots |
 | --- | --- | --- | --- |
-| BSN189905310 | `boxes/1899.EBN` | `stat,bline,hillb102,0,1,2,...`; `stat,bline,hillb102,0,9,1,...` | 1 and 9 |
 | CB2193307290 | `ngl_b/1933.EBR` | `start,byrdb101,...,1,8,8`; `start,byrdb101,...,1,9,8` | 8 and 9 |
 | NSH193306042 | `ngl_b/1933.EBR` | `start,browr103,...` twice | 5 and 6 |
 | PTC193306010 | `ngl_b/1933.EBR` | `start,lacko101,...,1,7,6`; `start,lacko101,...,1,8,6` | 7 and 8 |
-| NW1193408192 | `ngl_b/1934.EBR` | `stat,bline,johnb111,1,1,...`; `stat,bline,johnb111,1,4,...` | 1 and 4 |
-| PH5193408270 | `ngl_b/1934.EBR` | `stat,bline,wrigb104,0,1,...`; `stat,bline,wrigb104,0,8,...` | 1 and 8 |
+| NW1193408192 | `ngl_b/1934.EBR` | `stat,bline,johnb111,1,1,1,...`; `stat,bline,johnb111,1,4,1,...` | 1 and 4 |
+| PH5193408270 | `ngl_b/1934.EBR` | `stat,bline,wrigb104,0,1,1,...`; `stat,bline,wrigb104,0,8,1,...` | 1 and 8 |
 | NY5193508042 | `ngl_b/1935.EBR` | `start,hubbj101,...` twice | 8 and 9 |
 | PTC193608040 | `ngl_b/1936.EBR` | `start,cartp102,...` twice | 8 and 9 |
 | WBS193805220 | `ngl_b/1938.EBR` | `start,speah101,...,1,3,5`; `start,speah101,...,1,4,5` | 3 and 4 |
 
-Two starting fielding positions:
-
-| Game | File | Player | Positions |
-| --- | --- | --- | --- |
-| BLS193407081 | `ngl_b/1934.EBR` | jonec108 | 4 and 9 |
-| NW1193408192 | `ngl_b/1934.EBR` | johnb111 | 7 and 9; also batting slots 1 and 4 |
-| PH5193407010 | `ngl_b/1934.EBR` | stroj103 | 1 and 9 |
-| PH5193407100 | `ngl_b/1934.EBR` | harrc104 | 3 and 9 |
-| PH5193408270 | `ngl_b/1934.EBR` | wrigb104 | 8 and 9; also batting slots 1 and 8 |
-| PTC193406091 | `ngl_b/1934.EBR` | gibsj101 | 3 and 5 |
-| PTC193407050 | `ngl_b/1934.EBR` | browr103 | 1 and 8 |
-| NW1193508251 | `ngl_b/1935.EBR` | byrdb101 | 1 and 8 |
-| PTC193505270 | `ngl_b/1935.EBR` | willc106 | 4 and 6 |
-| PTC193509021 | `ngl_b/1935.EBR` | browr103; benjj101 | 1 and 8; 2 and 9 |
-| JAX193803270 | `ngl_b/1938.EBR` | cornw101 | 1 and 2 |
-
-A `start` record that names a different slot from the player's `bline` is
-not rejected.
-
 ## Games excluded from the release build
 
-The parser accepts these 11 games, but each box score contradicts itself in a
+The parser accepts these 12 games, but each box score contradicts itself in a
 way the `baseball.computer` models cannot load. The release build excludes
 them. As with the unresolved records, the game's other records do not supply
 a single correct value, so the files stay as published.
@@ -141,6 +119,14 @@ A batter has fewer hits than extra-base hits:
 | MEM193704251 | `ngl_b/1937.EBR` | `stat,bline,davel102,0,1,1,6,2,3,1,2,1,...` | 3 hits; 1 double, 2 triples, 1 home run |
 | NW2193708140 | `ngl_b/1937.EBR` | `stat,bline,hayej104,1,8,1,3,2,1,1,1,0,...` | 1 hit; 1 double, 1 triple |
 | HOM193808283 | `ngl_b/1938.EBR` | `stat,bline,clarb101,0,8,1,3,1,1,1,0,1,...` | 1 hit; 1 double, 1 home run |
+
+A fielder has two first-position `dline`s, so the starting fielding lineup
+lists the player twice. The outs suggest a position change and the second row is
+misnumbered, but the record does not say so:
+
+| Game | File | Records |
+| --- | --- | --- |
+| PTC193509021 | `ngl_b/1935.EBR` | `stat,dline,browr103,0,1,8,...`; `stat,dline,browr103,0,1,1,...` |
 
 ## Home runs with no pitcher
 
