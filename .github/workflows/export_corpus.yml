@@ -1,0 +1,27 @@
+name: export_corpus
+on:
+  workflow_dispatch:
+    inputs:
+      retrosheet_key:
+        description: Date key (YYYY-MM-DD) of the cached Retrosheet corpus to export
+        required: true
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache/restore@v4
+        with:
+          path: retrosheet/
+          key: retrosheet-${{ inputs.retrosheet_key }}
+          fail-on-cache-miss: true
+
+      - run: tar --zstd -cf "retrosheet-${RETROSHEET_KEY}.tar.zst" retrosheet/
+        env:
+          RETROSHEET_KEY: ${{ inputs.retrosheet_key }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: retrosheet-${{ inputs.retrosheet_key }}
+          path: retrosheet-${{ inputs.retrosheet_key }}.tar.zst
+          compression-level: 0
+          retention-days: 90
