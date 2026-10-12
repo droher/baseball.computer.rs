@@ -45,7 +45,7 @@ stat,bline,snowf101,0,2,1,4,1,1,0,0,0,-1,1,-1,0,0,-1,-1,0,-1,0,-1
 stat,bline,parnr102,0,3,1,5,1,2,0,0,0,-1,0,-1,0,0,0,-1,1,-1,0,-1
 stat,bline,wrigz102,0,4,1,5,2,2,1,0,1,1,0,-1,0,0,0,-1,0,-1,0,-1
 stat,bline,wrigb104,0,5,1,3,1,1,0,0,1,1,0,-1,0,2,0,-1,1,-1,0,-1
-stat,bline,willn103,0,6,1,5,0,1,0,0,1,1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,willn103,0,6,1,5,0,1,1,0,0,1,0,-1,0,0,0,-1,0,-1,0,-1
 stat,bline,westj102,0,7,1,3,2,1,0,0,0,-1,0,-1,1,1,0,-1,0,-1,0,-1
 stat,bline,hardp102,0,8,1,2,1,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
 stat,bline,thoms105,0,9,1,0,1,0,0,0,0,-1,1,-1,1,0,0,-1,0,-1,0,-1
@@ -111,7 +111,6 @@ event,dpline,1,jenkf102,yancb101,burnt102
 event,dpline,1,willh105,yancb101
 event,hrline,0,wrigz102,?,-1,0,
 event,hrline,0,wrigb104,?,-1,0,
-event,hrline,0,willn103,?,-1,0,
 event,sbline,1,burnt102,?,hardp102,-1
 event,sbline,1,jenkf102,?,hardp102,-1
 event,sbline,0,parnr102,?,ruffl101,-1

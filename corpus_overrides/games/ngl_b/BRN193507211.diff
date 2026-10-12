@@ -1,13 +1,22 @@
-Nish Williams has 1 hit but 1 double and 1 home run. The team's 16 hits match
-the 16 hits allowed by Brooklyn's pitchers, and the event,hrline record and
-the pitchers' 3 home runs allowed confirm the home run, so the double is
-removed. The pitchers' doubles allowed are unknown (-1). Williams's line also
-shows 0 runs despite the home run; that is left as published.
+Nish Williams has 1 hit, 1 double, 1 home run, and 0 runs. A home run scores
+the batter, so the line cannot be right as published. Keeping the home run
+would require two errors in the source (the double and the runs); dropping it
+requires one. With the home run removed, his 1 hit is the double, 0 runs is
+consistent, and the team's 16 hits still match the 16 hits allowed by
+Brooklyn's pitchers. The home run is removed from his line, and his
+event,hrline record (pitcher and inning unknown) is removed. Team runs (13)
+are unchanged. Brooklyn's pitchers are still charged with 3 home runs (Day,
+Jackson, and Radcliffe, 1 each) against 2 on the batting lines, because no
+record says which pitcher's home run is wrong.
 
 --- a/ngl_b/1935.EBR
 +++ b/ngl_b/1935.EBR
 @@ -47,3 +47,3 @@
  stat,bline,wrigb104,0,5,1,3,1,1,0,0,1,1,0,-1,0,2,0,-1,1,-1,0,-1
 -stat,bline,willn103,0,6,1,5,0,1,1,0,1,1,0,-1,0,0,0,-1,0,-1,0,-1
-+stat,bline,willn103,0,6,1,5,0,1,0,0,1,1,0,-1,0,0,0,-1,0,-1,0,-1
++stat,bline,willn103,0,6,1,5,0,1,1,0,0,1,0,-1,0,0,0,-1,0,-1,0,-1
  stat,bline,westj102,0,7,1,3,2,1,0,0,0,-1,0,-1,1,1,0,-1,0,-1,0,-1
+@@ -113,3 +113,2 @@
+ event,hrline,0,wrigb104,?,-1,0,
+-event,hrline,0,willn103,?,-1,0,
+ event,sbline,1,burnt102,?,hardp102,-1

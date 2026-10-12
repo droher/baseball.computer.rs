@@ -85,7 +85,7 @@ Brown at catcher.
 | NW1193408192 | `ngl_b/1934.EBR` | Assign the leadoff left fielder to Buddy Burbage instead of a second Bert Johnson |
 | PH5193408270 | `ngl_b/1934.EBR` | Assign the slot 8 right fielder to Henry Wright instead of a second Bill Wright |
 | BRN193505261 | `ngl_b/1935.EBR` | Remove one of Dixon's two doubles |
-| BRN193507211 | `ngl_b/1935.EBR` | Remove N. Williams's double |
+| BRN193507211 | `ngl_b/1935.EBR` | Remove N. Williams's home run (0 runs; the double stands) |
 | BRN193507212 | `ngl_b/1935.EBR` | Remove Bill Wright's double; move the `hrline` from Zollie to Bill Wright |
 | CAG193506021 | `ngl_b/1935.EBR` | Remove Harris's double; give Marshall the hit for his home run |
 | CUS193507042 | `ngl_b/1935.EBR` | Slot 8 starter is Abreu at second base, not Noval |
