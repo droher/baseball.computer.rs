@@ -1,0 +1,17 @@
+The home side's start records put Tom Parker in slot 7 with no position and
+omit pitcher Edsall Walker. The bline records have Parker replacing Vic Harris
+in slot 6 (Parker's only dline is the second left fielder), Pepper Bassett first in
+slot 7, Jelly Jackson first in slot 8, and Walker first in slot 9 (27 outs at
+pitcher). The start records for slots 7-9 are rebuilt to match.
+
+--- a/ngl_b/1936.EBR
++++ b/ngl_b/1936.EBR
+@@ -37,5 +37,5 @@
+ start,harrv102,"Vic Harris",1,6,7
+-start,parkt101,"Tom Parker",1,7,
+-start,bassp101,"Pepper Bassett",1,8,2
+-start,jackj104,"Jelly Jackson",1,9,6
++start,bassp101,"Pepper Bassett",1,7,2
++start,jackj104,"Jelly Jackson",1,8,6
++start,walke103,"Edsall Walker",1,9,1
+ stat,bline,dixop101,0,1,1,5,1,1,0,0,0,-1,0,-1,0,0,-1,-1,0,-1,-1,-1

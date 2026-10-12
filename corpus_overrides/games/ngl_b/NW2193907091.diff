@@ -1,0 +1,17 @@
+Both event,hrline records have their fields shifted. Sam Bankhead (banks101,
+visiting side 0) has the visitors' only home run and Leon Day (day-l101) is
+the only home pitcher. Willie Wells (wellw101, home side 1) has the home
+side's only home run and Roy Partlow (partr102) is the only visiting pitcher.
+Each record is rewritten as batter off pitcher with inning, runners, and outs
+unknown (-1). Lennie Pearson (pearl102), who appears in the second record,
+has no home run, so Pearson is dropped from it.
+
+--- a/ngl_b/1939.EBR
++++ b/ngl_b/1939.EBR
+@@ -80,4 +80,4 @@
+ stat,dline,day-l101,1,1,1,27,-1,-1,0,0,0,0
+-event,hrline,banks101,day-l101,,0,0,
+-event,hrline,partr102,pearl102,,wellw101,1,
++event,hrline,0,banks101,day-l101,-1,-1,-1
++event,hrline,1,wellw101,partr102,-1,-1,-1
+ line,0,0,0,1,0,1,0,0,0,0

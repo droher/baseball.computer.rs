@@ -1,0 +1,13 @@
+event,hpline,NA,,willr106 names no pitching side or pitcher and puts Roy
+Williams (willr106) in the batter field. Williams has no hit-by-pitch as a
+batter, but Williams's pline shows the game's only hit batsman, and Anderson Pryor's
+bline shows the home side's only hit-by-pitch. The record is rewritten as
+pitching side 0, pitcher Williams, batter Pryor.
+
+--- a/ngl_b/1933.EBR
++++ b/ngl_b/1933.EBR
+@@ -97,3 +97,3 @@
+ event,dpline,1,taylj105,dandr101,gillg104
+-event,hpline,NA,,willr106
++event,hpline,0,willr106,pryoa101
+ event,hrline,0,andrj104,?,-1,0,

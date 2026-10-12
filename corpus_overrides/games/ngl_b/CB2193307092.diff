@@ -1,0 +1,16 @@
+The home side's start records disagree with its bline and dline records. They
+put Ameal Brooks in slot 8 with no position and Kermit Dial in slot 9, and
+omit Charlie Hughes. The bline records have Brooks replacing Clarence Griffin
+in slot 7 (Brooks's only dline is the second left fielder), Dial first in slot 8,
+and Hughes first in slot 9 at second base (27 outs). The start records are
+rebuilt from the first bline in each slot and that player's dline position.
+
+--- a/ngl_b/1933.EBR
++++ b/ngl_b/1933.EBR
+@@ -40,4 +40,4 @@
+ start,grifc102,"Clarence Griffin",1,7,7
+-start,brooa101,"Ameal Brooks",1,8,
+-start,dialk101,"Kermit Dial",1,9,1
++start,dialk101,"Kermit Dial",1,8,1
++start,hughc101,"Charlie Hughes",1,9,4
+ stat,bline,quinb101,0,1,1,4,0,0,0,0,0,0,0,-1,0,0,0,-1,0,-1,-1,-1

@@ -1,0 +1,31 @@
+Bill Wright (wrigb104) is listed in batting slots 1 and 8 and as the starter in
+both center field and right field. Nashville carried a second Wright, Henry
+Wright (wrigh102), who played for the team in 1934, including the left field
+appearance in game 2 the day before. Bill Wright led off in center field in
+both games the day before. The slot 8 start record, bline, and the right
+field dline are reassigned to Henry Wright; Bill keeps slot 1 in center field.
+This is the most likely reading of two different Wrights merged into one ID,
+not a confirmed identification.
+
+--- a/ngl_b/1934.EBR
++++ b/ngl_b/1934.EBR
+@@ -22,3 +22,3 @@
+ info,gwrbi,
+-start,wrigb104,"Wild Bill Wright",0,1,89
++start,wrigb104,"Wild Bill Wright",0,1,8
+ start,snowf101,"Felton Snow",0,2,6
+@@ -29,3 +29,3 @@
+ start,westj102,"Jim West",0,7,3
+-start,wrigb104,"Wild Bill Wright",0,8,89
++start,wrigh102,"Henry Wright",0,8,9
+ start,willj117,"Jim Willis",0,9,1
+@@ -41,3 +41,3 @@
+ stat,bline,wrigb104,0,1,1,4,0,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+-stat,bline,wrigb104,0,8,1,3,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
++stat,bline,wrigh102,0,8,1,3,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+ stat,bline,snowf101,0,2,1,4,1,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+@@ -61,3 +61,3 @@
+ stat,dline,wrigb104,0,1,8,24,4,1,0,-1,-1,0
+-stat,dline,wrigb104,0,1,9,24,1,0,1,-1,-1,0
++stat,dline,wrigh102,0,1,9,24,1,0,1,-1,-1,0
+ stat,dline,snowf101,0,1,6,24,2,2,0,-1,-1,0

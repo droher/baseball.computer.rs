@@ -1,0 +1,24 @@
+The visiting side's start records list George Scales (slot 2) and Tom Parker
+(slot 4) with no positions. Neither has a bline or dline in this game, and the
+other start records are out of order against the bline records. Every bline
+and dline for the side is consistent (nine players, one per slot, each with
+27 outs at one position), so the start records are rebuilt from them.
+
+--- a/ngl_b/1935.EBR
++++ b/ngl_b/1935.EBR
+@@ -25,9 +25,9 @@
+ start,harrv102,"Vic Harris",0,1,7
+-start,scalg101,"George Scales",0,2,
+-start,carlm101,"Matt Carlisle",0,3,4
+-start,parkt101,"Tom Parker",0,4,
+-start,leonb101,"Buck Leonard",0,5,3
++start,carlm101,"Matt Carlisle",0,2,4
++start,burbb102,"Buddy Burbage",0,3,9
++start,leonb101,"Buck Leonard",0,4,3
++start,benjj101,"Jerry Benjamin",0,5,8
+ start,browr103,"Ray Brown",0,6,1
+-start,bindj101,"Jimmy Binder",0,7,5
+-start,duket102,"Tommie Dukes",0,8,2
++start,duket102,"Tommie Dukes",0,7,2
++start,bindj101,"Jimmy Binder",0,8,5
+ start,jackj104,"Jelly Jackson",0,9,6

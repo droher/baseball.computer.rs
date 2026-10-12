@@ -1,0 +1,96 @@
+id,NY6193505262
+version,3
+info,visteam,HOM
+info,hometeam,NY6
+info,date,1935/05/26
+info,site,NYC23
+info,number,2
+info,starttime,0:00PM
+info,daynight,
+info,usedh,false
+info,umphome,cleap901
+info,ump1b,turnc101
+info,temp,0
+info,winddir,unknown
+info,windspeed,-1
+info,fieldcond,unknown
+info,precip,unknown
+info,sky,unknown
+info,timeofgame,120
+info,attendance,10000
+info,wp,browr103
+info,lp,taylj108
+info,save,
+info,gwrbi,
+start,harrv102,"Vic Harris",0,1,7
+start,carlm101,"Matt Carlisle",0,2,4
+start,burbb102,"Buddy Burbage",0,3,9
+start,leonb101,"Buck Leonard",0,4,3
+start,benjj101,"Jerry Benjamin",0,5,8
+start,browr103,"Ray Brown",0,6,1
+start,duket102,"Tommie Dukes",0,7,2
+start,bindj101,"Jimmy Binder",0,8,5
+start,jackj104,"Jelly Jackson",0,9,6
+start,lopec102,"Cando Lopez",1,1,7
+start,corrf102,"Francisco Correa",1,2,6
+start,dihim101,"Martin Dihigo",1,3,8
+start,salal101,"Lazaro Salazar",1,4,3
+start,oms-a101,"Alejandro Oms",1,5,9
+start,santa102,"Anastasio Santaella",1,6,4
+start,aranp101,"Pedro Arango",1,7,5
+start,lante101,"Enrique Lantigua",1,8,2
+start,duncf102,"Frank Duncan",1,9,1
+stat,bline,harrv102,0,1,1,4,1,3,0,0,0,-1,0,-1,0,1,-1,-1,0,-1,0,-1
+stat,bline,carlm101,0,2,1,5,1,1,0,0,1,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,burbb102,0,3,1,4,1,1,0,0,0,-1,0,-1,0,1,-1,-1,0,-1,0,-1
+stat,bline,leonb101,0,4,1,4,0,1,1,0,0,-1,0,-1,0,1,-1,-1,0,-1,0,-1
+stat,bline,benjj101,0,5,1,4,0,0,0,0,0,-1,0,-1,0,1,-1,-1,0,-1,0,-1
+stat,bline,browr103,0,6,1,3,2,2,2,0,0,-1,0,-1,0,2,-1,-1,0,-1,0,-1
+stat,bline,duket102,0,7,1,4,1,0,0,0,0,-1,1,-1,0,0,-1,-1,0,-1,0,-1
+stat,bline,bindj101,0,8,1,4,0,1,0,0,0,-1,0,-1,0,1,0,-1,0,-1,0,-1
+stat,bline,jackj104,0,9,1,5,0,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,lopec102,1,1,1,3,0,0,0,0,0,-1,0,-1,0,0,-1,-1,0,-1,-1,-1
+stat,bline,corrf102,1,2,1,4,0,0,0,0,0,-1,0,-1,0,0,0,-1,0,-1,-1,-1
+stat,bline,dihim101,1,3,1,4,1,1,0,0,1,-1,0,-1,0,0,0,-1,0,-1,-1,-1
+stat,bline,salal101,1,4,1,4,0,0,0,0,0,-1,0,-1,0,0,0,-1,0,-1,-1,-1
+stat,bline,oms-a101,1,5,1,3,1,2,0,0,0,-1,0,-1,0,0,-1,-1,0,-1,-1,-1
+stat,bline,santa102,1,6,1,3,1,1,0,0,0,-1,0,-1,0,1,0,-1,0,-1,-1,-1
+stat,bline,aranp101,1,7,1,4,0,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,-1,-1
+stat,bline,lante101,1,8,1,1,0,0,0,0,0,-1,1,-1,0,0,0,-1,0,-1,-1,-1
+stat,bline,duncf102,1,8,1,1,0,1,0,0,0,-1,0,-1,0,1,0,-1,0,-1,-1,-1
+stat,bline,taylj108,1,9,1,2,0,0,0,0,0,-1,2,-1,0,0,0,-1,0,-1,-1,-1
+stat,bline,garcc103,1,1,2,2,0,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,-1,-1
+stat,bline,martr105,1,5,2,1,0,0,0,0,0,-1,0,-1,0,0,0,-1,0,-1,-1,-1
+stat,pline,browr103,0,1,27,-1,37,7,0,0,1,3,3,2,-1,7,0,0,0,3,-1
+stat,pline,taylj108,1,1,21,-1,39,10,3,0,1,6,6,7,-1,8,0,0,0,-1,-1
+stat,pline,dihim101,1,2,6,-1,6,0,0,0,0,0,0,0,0,1,0,0,0,-1,-1
+stat,dline,harrv102,0,1,7,27,1,0,0,0,0,0
+stat,dline,carlm101,0,1,4,27,2,6,0,2,0,0
+stat,dline,burbb102,0,1,9,27,1,1,0,0,0,0
+stat,dline,leonb101,0,1,3,27,10,0,0,2,0,0
+stat,dline,benjj101,0,1,8,27,2,0,0,0,0,0
+stat,dline,browr103,0,1,1,27,1,1,0,0,0,0
+stat,dline,duket102,0,1,2,27,7,0,0,0,0,0
+stat,dline,bindj101,0,1,5,27,2,0,0,0,0,0
+stat,dline,jackj104,0,1,6,27,1,4,0,2,0,0
+stat,dline,lopec102,1,1,7,-1,0,0,0,0,0,0
+stat,dline,corrf102,1,1,6,27,1,3,0,0,0,0
+stat,dline,dihim101,1,1,8,21,1,1,0,0,0,0
+stat,dline,dihim101,1,2,1,6,0,0,0,0,0,0
+stat,dline,salal101,1,1,3,27,12,0,0,0,0,0
+stat,dline,oms-a101,1,1,9,-1,0,0,0,0,0,0
+stat,dline,santa102,1,1,4,27,2,4,0,0,0,0
+stat,dline,aranp101,1,1,5,27,0,4,0,0,0,0
+stat,dline,lante101,1,1,2,-1,9,0,0,0,0,0
+stat,dline,duncf102,1,2,2,-1,2,0,0,0,0,0
+stat,dline,taylj108,1,1,1,21,0,1,0,0,0,0
+stat,dline,garcc103,1,2,7,6,0,0,0,0,0,0
+stat,dline,martr105,1,2,9,-1,0,0,0,0,0,0
+event,dpline,0,jackj104,carlm101,leonb101
+event,dpline,0,carlm101,jackj104,leonb101
+event,hrline,0,carlm101,,-1,0,
+event,hrline,1,dihim101,browr103,-1,0,
+line,0,3,0,1,0,0,0,2,0,0
+line,1,0,0,0,0,0,2,1,0,0
+stat,tline,0,12,3,2,0
+stat,tline,1,7,6,0,0

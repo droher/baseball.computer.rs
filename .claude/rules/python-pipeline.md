@@ -9,7 +9,8 @@ uv run python bin/parquet.py                                # csv/*.csv -> parqu
 uv run python bin/simple_files.py                           # gamelog/schedule/park/roster/bio CSV concat + parquet
 uv run python bin/biodata.py                                # retrosheet/{teams,coaches,relatives,ejections,managers0,umpires0}.csv -> biodata/*.parquet
 uv run python bin/fetch_retrosheet.py -o retrosheet         # assembles a fresh corpus from retrosheet.org per-year + bundle URLs
-uv run python bin/patch_known_corpus_bugs.py <retrosheet> [--corrections-csv docs/ngl_box_corrections.csv]   # idempotent in-place fixes for game records the parser cannot resolve (single-game patches plus NLB box-score normalization; see docs/corpus_corrections.md)
+uv run python bin/patch_known_corpus_bugs.py <retrosheet> [--corrections-csv docs/ngl_box_corrections.csv]   # idempotent in-place fixes for game records the parser cannot resolve (single-game patches, NLB box-score normalization, then reviewed game overrides from corpus_overrides/games/; see docs/corpus_corrections.md)
+uv run python bin/refresh_game_override.py <corpus> <GAMEID.EBR>...   # rewrite a game override's diff from a corpus patched with --game-overrides set to an empty dir
 uv run python -m unittest discover -s bin -p 'test_*.py'   # Python helper tests
 ```
 

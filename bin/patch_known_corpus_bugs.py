@@ -43,6 +43,13 @@ Patches:
   anything ambiguous untouched with a warning. Pass `--corrections-csv` to
   list every change.
 
+* Reviewed game overrides (`corpus_overrides/games/`) — after the NLB
+  corrections, each `<GAMEID>.EBR` there replaces that game's record. Its
+  `<GAMEID>.diff` explains every change and holds the expected diff from the
+  corrected upstream record; the override is applied only while upstream
+  still produces that diff, and otherwise the script logs `SKIP
+  upstream-changed` and exits nonzero.
+
 * WS1191105040 (`events/1911WS1.EVA`) — bottom of 2nd, a 5-to-3 putout is
   encoded as `5-3.2-3` (dash-separated fielders), but Retrosheet's modern
   event grammar concatenates the fielders (`53`). The same batter-fielder
@@ -86,15 +93,23 @@ Patches:
 from __future__ import annotations
 
 import argparse
+import difflib
 import logging
-import os
+import re
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import ngl_box_corrections
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_GAME_OVERRIDES = (
+    Path(__file__).resolve().parent.parent / "corpus_overrides" / "games"
+)
+DIFF_FROM_PREFIX = "--- a/"
+HUNK_RE = re.compile(r"@@ -\d+(?:,\d+)? \+(?P<start>\d+)(?:,(?P<count>\d+))? @@")
 
 
 @dataclass(frozen=True)
@@ -371,14 +386,140 @@ def apply_patch(root: Path, patch: Patch) -> str:
     # `os.replace` over the target. This prevents a concurrent reader (e.g.
     # the Rust parser) from observing a half-written file, and ensures that
     # a re-run sees either the original or the fully-patched contents.
-    tmp_path = target.with_suffix(target.suffix + ".tmp")
-    new_bytes = "".join(lines).encode("ascii")
-    _ = tmp_path.write_bytes(new_bytes)
-    os.replace(tmp_path, target)
+    ngl_box_corrections.write_atomically(target, "".join(lines).encode("ascii"))
     return (
         f"PATCH {patch.game_id} in {patch.relative_path} "
         f"({len(matched_idx)} line(s); reason: {patch.rationale})"
     )
+
+
+@dataclass(frozen=True)
+class GameOverride:
+    game_id: str
+    relative_path: str
+    explanation: str
+    expected_diff: str
+    lines: list[str]
+
+
+def render_game_diff(
+    relative_path: str, before: Sequence[str], after: Sequence[str]
+) -> str:
+    return "\n".join(
+        difflib.unified_diff(
+            before,
+            after,
+            fromfile=f"a/{relative_path}",
+            tofile=f"b/{relative_path}",
+            lineterm="",
+            n=1,
+        )
+    )
+
+
+def write_game_diff(
+    path: Path,
+    relative_path: str,
+    explanation: str,
+    before: Sequence[str],
+    after: Sequence[str],
+) -> None:
+    _ = path.write_text(
+        f"{explanation.strip()}\n\n{render_game_diff(relative_path, before, after)}\n"
+    )
+
+
+def load_game_override(record_path: Path) -> GameOverride:
+    lines = record_path.read_text().splitlines()
+    if not lines or lines[0] != f"id,{record_path.stem}":
+        raise ValueError(f"{record_path} must start with id,{record_path.stem}")
+    diff_text = record_path.with_suffix(".diff").read_text()
+    explanation, marker, body = diff_text.partition(f"\n{DIFF_FROM_PREFIX}")
+    if not marker:
+        raise ValueError(
+            f"{record_path.with_suffix('.diff')} has no {DIFF_FROM_PREFIX} header"
+        )
+    expected_diff = (DIFF_FROM_PREFIX + body).rstrip("\n")
+    relative_path = expected_diff.splitlines()[0].removeprefix(DIFF_FROM_PREFIX)
+    return GameOverride(
+        record_path.stem, relative_path, explanation.strip(), expected_diff, lines
+    )
+
+
+def load_game_overrides(overrides_dir: Path) -> list[GameOverride]:
+    if not overrides_dir.is_dir():
+        return []
+    return [load_game_override(p) for p in sorted(overrides_dir.rglob("*.EB*"))]
+
+
+def upstream_lines(override: GameOverride) -> list[str]:
+    result: list[str] = []
+    position = 0
+    for line in override.expected_diff.splitlines()[2:]:
+        hunk = HUNK_RE.match(line)
+        if hunk is not None:
+            start = int(hunk["start"]) - (0 if hunk["count"] == "0" else 1)
+            result.extend(override.lines[position:start])
+            position = start
+            continue
+        tag, text = line[:1], line[1:]
+        if tag in (" ", "-"):
+            result.append(text)
+        if tag in (" ", "+"):
+            position += 1
+    result.extend(override.lines[position:])
+    return result
+
+
+def refresh_game_diff(record_path: Path, corpus_root: Path) -> str:
+    override = load_game_override(record_path)
+    target = corpus_root / override.relative_path
+    stripped = [line.rstrip("\r\n") for line in target.read_text().splitlines()]
+    block = find_game_block(stripped, override.game_id)
+    if block is None:
+        raise ValueError(f"{override.game_id} not found in {target}")
+    write_game_diff(
+        record_path.with_suffix(".diff"),
+        override.relative_path,
+        override.explanation,
+        stripped[block[0] : block[1]],
+        override.lines,
+    )
+    return f"REFRESH {override.game_id} from {target}"
+
+
+def apply_game_override(root: Path, override: GameOverride) -> str:
+    where = f"{override.game_id} in {override.relative_path}"
+    target = root / override.relative_path
+    if not target.resolve().is_relative_to(root.resolve()):
+        return f"SKIP outside-corpus {override.relative_path}"
+    if not target.exists():
+        return f"SKIP missing-file {override.relative_path}"
+    try:
+        lines = target.read_bytes().decode("ascii").splitlines(keepends=True)
+    except UnicodeDecodeError as e:
+        return f"SKIP non-ascii-bytes {override.relative_path}: {e}"
+    stripped = [line.rstrip("\r\n") for line in lines]
+    if stripped.count(f"id,{override.game_id}") > 1:
+        return f"SKIP duplicate-game {where}"
+    block = find_game_block(stripped, override.game_id)
+    if block is None:
+        return f"SKIP game-not-found {where}"
+    start, end = block
+    current = stripped[start:end]
+    if current == override.lines:
+        return f"NOOP already-overridden {where}"
+    if (
+        render_game_diff(override.relative_path, current, override.lines)
+        != override.expected_diff
+    ):
+        return (
+            f"SKIP upstream-changed {where}; review the override against the new record"
+        )
+    eol = lines[start][len(stripped[start]) :]
+    lines[start:end] = [line + eol for line in override.lines]
+    ngl_box_corrections.write_atomically(target, "".join(lines).encode("ascii"))
+    return f"OVERRIDE {where}"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -400,6 +541,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Write every rule-based NLB box-score correction to this CSV.",
     )
+    _ = parser.add_argument(
+        "--game-overrides",
+        type=Path,
+        default=DEFAULT_GAME_OVERRIDES,
+        help="Directory of reviewed whole-game replacements (<GAMEID>.EB* plus <GAMEID>.diff).",
+    )
     args = parser.parse_args(argv)
 
     verbose: bool = bool(getattr(args, "verbose", False))
@@ -415,6 +562,15 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("Retrosheet directory does not exist: %s", root)
         return 2
 
+    overrides_dir: Path = args.game_overrides
+    try:
+        overrides = load_game_overrides(overrides_dir)
+    except (OSError, ValueError):
+        logger.exception(
+            "Invalid game overrides in %s; corpus left unchanged", overrides_dir
+        )
+        return 1
+
     rc = 0
     for patch in PATCHES:
         try:
@@ -427,11 +583,9 @@ def main(argv: list[str] | None = None) -> int:
         if outcome.startswith("SKIP"):
             rc = max(rc, 1)
 
-    corrections, unresolved = ngl_box_corrections.correct_directory(root)
-    logger.info(
-        "NLB box-score normalization: %d correction(s), %d unresolved record(s)",
-        len(corrections),
-        len(unresolved),
+    override_ids = frozenset(o.game_id for o in overrides)
+    corrections, unresolved = ngl_box_corrections.correct_directory(
+        root, overridden_games=override_ids
     )
     corrections_csv: Path | None = getattr(args, "corrections_csv", None)
     if corrections_csv is not None and not corrections:
@@ -441,6 +595,37 @@ def main(argv: list[str] | None = None) -> int:
         )
     elif corrections_csv is not None:
         ngl_box_corrections.write_corrections_csv(corrections, corrections_csv)
+
+    overridden: set[str] = set()
+    for override in overrides:
+        try:
+            outcome = apply_game_override(root, override)
+        except Exception:
+            logger.exception("Failed applying override for %s", override.game_id)
+            rc = 1
+            continue
+        logger.info("%s", outcome)
+        if outcome.startswith("SKIP"):
+            rc = max(rc, 1)
+        else:
+            overridden.add(override.game_id)
+    logger.info(
+        "Game overrides: %d of %d reviewed game(s) in place from %s",
+        len(overridden),
+        len(overrides),
+        overrides_dir,
+    )
+
+    remaining = [u for u in unresolved if u.game_id not in overridden]
+    for u in (u for u in remaining if u.game_id in override_ids):
+        logger.warning(
+            "UNRESOLVED %s:%d %s %s: %s", u.file, u.line, u.game_id, u.reason, u.record
+        )
+    logger.info(
+        "NLB box-score normalization: %d correction(s), %d unresolved record(s)",
+        len(corrections),
+        len(remaining),
+    )
     return rc
 
 

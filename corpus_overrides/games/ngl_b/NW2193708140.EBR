@@ -1,0 +1,105 @@
+id,NW2193708140
+version,3
+info,visteam,HOM
+info,hometeam,NW2
+info,date,1937/08/14
+info,site,PAT01
+info,number,0
+info,starttime,0:00PM
+info,daynight,day
+info,usedh,false
+info,umphome,forbf901
+info,ump1b,craij901
+info,temp,0
+info,winddir,unknown
+info,windspeed,-1
+info,fieldcond,unknown
+info,precip,unknown
+info,sky,unknown
+info,timeofgame,0
+info,attendance,0
+info,wp,parkt101
+info,lp,gainj102
+info,save,browr103
+info,gwrbi,
+start,benjj101,"Jerry Benjamin",0,1,8
+start,perej103,"Javier Perez",0,2,5
+start,harrv102,"Vic Harris",0,3,7
+start,gibsj101,"Josh Gibson",0,4,2
+start,leonb101,"Buck Leonard",0,5,3
+start,willj110,"Jim Williams",0,6,9
+start,carlm101,"Matt Carlisle",0,7,4
+start,jackj104,"Jelly Jackson",0,8,6
+start,parkt101,"Tom Parker",0,9,1
+start,crutj101,"Jimmie Crutchfield",1,1,8
+start,seayd101,"Dick Seay",1,2,4
+start,wellw101,"Willie Wells",1,3,6
+start,stone101,"Ed Stone",1,4,9
+start,suttm101,"Mule Suttles",1,5,3
+start,dandr101,"Ray Dandridge",1,6,5
+start,pearl102,"Lennie Pearson",1,7,7
+start,hayej104,"Johnny Hayes",1,8,2
+start,gainj102,"Jonas Gaines",1,9,1
+stat,bline,benjj101,0,1,1,4,4,3,1,0,0,-1,1,-1,0,1,-1,-1,-1,-1,-1,-1
+stat,bline,perej103,0,2,1,5,2,1,0,0,0,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1
+stat,bline,harrv102,0,3,1,5,2,3,1,1,0,-1,1,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,gibsj101,0,4,1,5,4,4,0,0,2,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1
+stat,bline,leonb101,0,5,1,5,0,1,1,0,0,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1
+stat,bline,willj110,0,6,1,5,2,2,0,0,0,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1
+stat,bline,carlm101,0,7,1,5,2,1,0,0,0,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1
+stat,bline,jackj104,0,8,1,6,1,1,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,parkt101,0,9,1,5,3,4,0,0,1,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,dulal101,0,9,2,0,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,browr103,0,9,3,1,1,1,1,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,crutj101,1,1,1,6,2,2,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,seayd101,1,2,1,2,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,lundd103,1,2,2,4,2,3,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,wellw101,1,3,1,5,1,2,1,1,0,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1
+stat,bline,stone101,1,4,1,5,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,suttm101,1,5,1,4,2,2,0,0,1,1,0,-1,0,1,-1,-1,-1,-1,-1,-1
+stat,bline,dandr101,1,6,1,4,0,0,0,0,0,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1
+stat,bline,pearl102,1,7,1,5,2,3,1,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,hayej104,1,8,1,3,2,1,0,1,0,-1,0,-1,0,2,-1,-1,-1,-1,-1,-1
+stat,bline,gainj102,1,9,1,1,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,wrigj105,1,9,2,0,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,moorr104,1,9,3,1,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,bellw101,1,9,4,2,0,1,0,0,0,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1
+stat,pline,parkt101,0,1,18,-1,30,8,-1,-1,1,7,-1,4,-1,3,0,-1,-1,0,-1
+stat,pline,dulal101,0,2,3,-1,7,2,-1,-1,0,1,-1,2,-1,0,0,-1,-1,0,-1
+stat,pline,browr103,0,3,6,-1,11,4,-1,-1,0,3,-1,0,-1,1,0,-1,-1,0,-1
+stat,pline,gainj102,1,1,6,-1,14,5,-1,-1,1,6,-1,3,-1,1,0,-1,-1,-1,-1
+stat,pline,wrigj105,1,2,6,-1,13,7,-1,-1,1,5,-1,0,-1,3,0,-1,-1,-1,-1
+stat,pline,bellw101,1,3,15,-1,27,9,-1,-1,1,10,-1,3,-1,0,0,-1,-1,-1,-1
+stat,dline,benjj101,0,1,8,27,1,1,-1,-1,-1,0
+stat,dline,perej103,0,1,5,27,0,3,-1,-1,-1,0
+stat,dline,harrv102,0,1,7,27,0,0,-1,-1,-1,0
+stat,dline,gibsj101,0,1,2,27,6,2,-1,-1,-1,-1
+stat,dline,leonb101,0,1,3,27,13,0,-1,-1,-1,0
+stat,dline,willj110,0,1,9,27,2,0,-1,-1,-1,0
+stat,dline,carlm101,0,1,4,27,3,3,-1,-1,-1,0
+stat,dline,jackj104,0,1,6,27,2,5,-1,-1,-1,0
+stat,dline,parkt101,0,1,1,18,0,3,-1,-1,-1,0
+stat,dline,dulal101,0,1,1,3,0,0,-1,-1,-1,0
+stat,dline,browr103,0,1,1,6,0,1,-1,-1,-1,0
+stat,dline,crutj101,1,1,8,27,1,0,-1,-1,-1,0
+stat,dline,seayd101,1,1,4,12,1,0,-1,-1,-1,0
+stat,dline,bellw101,1,1,1,15,0,1,-1,-1,-1,0
+stat,dline,wellw101,1,1,6,12,2,3,-1,-1,-1,0
+stat,dline,wellw101,1,2,4,15,1,2,-1,-1,-1,0
+stat,dline,stone101,1,1,9,27,1,0,-1,-1,-1,0
+stat,dline,suttm101,1,1,3,27,14,2,-1,-1,-1,0
+stat,dline,dandr101,1,1,5,27,0,1,-1,-1,-1,0
+stat,dline,pearl102,1,1,7,27,0,0,-1,-1,-1,0
+stat,dline,hayej104,1,1,2,27,5,2,-1,-1,-1,-1
+stat,dline,gainj102,1,1,1,6,0,0,-1,-1,-1,0
+stat,dline,wrigj105,1,1,1,6,1,1,-1,-1,-1,0
+stat,dline,lundd103,1,1,6,15,1,5,-1,-1,-1,0
+stat,phline,moorr104,4,1,1,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+event,hrline,0,gibsj101,?,-1,0,
+event,hrline,0,gibsj101,?,-1,0,
+event,hrline,0,parkt101,?,-1,0,
+event,hrline,1,suttm101,parkt101,4,0,
+line,0,0,6,0,5,3,3,0,1,3
+line,1,3,0,0,1,0,3,0,3,1
+stat,tline,0,6,-1,-1,-1
+stat,tline,1,10,-1,-1,-1

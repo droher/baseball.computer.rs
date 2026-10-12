@@ -1,0 +1,13 @@
+Nish Williams has 1 hit but 1 double and 1 home run. The team's 16 hits match
+the 16 hits allowed by Brooklyn's pitchers, and the event,hrline record and
+the pitchers' 3 home runs allowed confirm the home run, so the double is
+removed. The pitchers' doubles allowed are unknown (-1). Williams's line also
+shows 0 runs despite the home run; that is left as published.
+
+--- a/ngl_b/1935.EBR
++++ b/ngl_b/1935.EBR
+@@ -47,3 +47,3 @@
+ stat,bline,wrigb104,0,5,1,3,1,1,0,0,1,1,0,-1,0,2,0,-1,1,-1,0,-1
+-stat,bline,willn103,0,6,1,5,0,1,1,0,1,1,0,-1,0,0,0,-1,0,-1,0,-1
++stat,bline,willn103,0,6,1,5,0,1,0,0,1,1,0,-1,0,0,0,-1,0,-1,0,-1
+ stat,bline,westj102,0,7,1,3,2,1,0,0,0,-1,0,-1,1,1,0,-1,0,-1,0,-1

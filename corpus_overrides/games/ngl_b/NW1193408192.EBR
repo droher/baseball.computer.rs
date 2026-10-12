@@ -1,0 +1,100 @@
+id,NW1193408192
+version,3
+info,visteam,BLS
+info,hometeam,NW1
+info,date,1934/08/19
+info,site,BLO02
+info,number,2
+info,starttime,0:00PM
+info,daynight,day
+info,usedh,false
+info,temp,0
+info,winddir,unknown
+info,windspeed,-1
+info,fieldcond,unknown
+info,precip,unknown
+info,sky,unknown
+info,timeofgame,0
+info,attendance,0
+info,wp,clarr105
+info,lp,day-l101
+info,save,
+info,gwrbi,
+start,hughc101,"Charlie Hughes",0,1,6
+start,harrr104,"Richard Harris",0,2,4
+start,dixor101,"Rap Dixon",0,3,8
+start,cunnv101,"Vernon Cunningham",0,4,7
+start,dixot102,"Tom Dixon",0,5,2
+start,jackl103,"Lincoln Jackson",0,6,3
+start,hayeb104,"Bun Hayes",0,7,3
+start,jonec108,"Casey Jones",0,8,9
+start,day-l101,"Leon Day",0,9,1
+start,burbb102,"Buddy Burbage",1,1,7
+start,arnop101,"Paul Arnold",1,2,8
+start,dandr101,"Ray Dandridge",1,3,5
+start,johnb111,"Bert Johnson",1,4,9
+start,starj102,"Jim Starks",1,5,3
+start,davie101,"Earl Davis",1,6,4
+start,hayej104,"Johnny Hayes",1,7,2
+start,byass101,"Subby Byas",1,8,6
+start,clarr105,"Ray Clark",1,9,1
+stat,bline,hughc101,0,1,1,4,1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,harrr104,0,2,1,4,0,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,dixor101,0,3,1,4,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,cunnv101,0,4,1,2,2,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,dixop101,0,4,2,2,1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,dixot102,0,5,1,4,0,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,jackl103,0,6,1,4,1,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,hayeb104,0,7,1,3,1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,johnj113,0,7,2,1,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,jonec108,0,8,1,4,1,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,day-l101,0,9,1,2,1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,mitcb103,0,9,2,1,1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,burbb102,1,1,1,5,2,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,johnb111,1,4,1,5,3,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,arnop101,1,2,1,5,3,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,dandr101,1,3,1,5,3,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,starj102,1,5,1,5,3,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,davie101,1,6,1,3,1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,merrs101,1,6,2,1,1,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,hayej104,1,7,1,2,0,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,mccof102,1,7,2,2,1,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,byass101,1,8,1,4,3,2,-1,-1,1,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,clarr105,1,9,1,3,0,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,vaugs101,1,9,2,1,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,craih101,1,9,3,0,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,pline,day-l101,0,1,10,-1,23,10,-1,-1,1,11,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,pline,mitcb103,0,2,8,-1,18,9,-1,-1,-1,9,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,pline,clarr105,1,1,15,-1,25,6,-1,-1,-1,7,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,pline,vaugs101,1,1,3,-1,5,2,-1,-1,-1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,pline,craih101,1,1,3,-1,5,2,-1,-1,-1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,dline,hughc101,0,1,6,18,-1,-1,0,-1,-1,0
+stat,dline,harrr104,0,1,4,18,-1,-1,1,-1,-1,0
+stat,dline,dixor101,0,1,8,18,-1,-1,0,-1,-1,0
+stat,dline,cunnv101,0,1,7,-1,-1,-1,0,-1,-1,0
+stat,dline,dixop101,0,1,7,-1,-1,-1,0,-1,-1,0
+stat,dline,dixot102,0,1,2,18,-1,-1,1,-1,-1,-1
+stat,dline,jackl103,0,1,3,18,-1,-1,0,-1,-1,0
+stat,dline,hayeb104,0,1,5,-1,-1,-1,0,-1,-1,0
+stat,dline,johnj113,0,1,5,-1,-1,-1,0,-1,-1,0
+stat,dline,jonec108,0,1,9,18,-1,-1,0,-1,-1,0
+stat,dline,day-l101,0,1,1,-1,-1,-1,0,-1,-1,0
+stat,dline,mitcb103,0,1,1,-1,-1,-1,0,-1,-1,0
+stat,dline,burbb102,1,1,7,21,-1,-1,0,-1,-1,0
+stat,dline,johnb111,1,1,9,21,-1,-1,0,-1,-1,0
+stat,dline,arnop101,1,1,8,21,-1,-1,0,-1,-1,0
+stat,dline,dandr101,1,1,5,21,-1,-1,0,-1,-1,0
+stat,dline,starj102,1,1,3,21,-1,-1,1,-1,-1,0
+stat,dline,davie101,1,1,4,21,-1,-1,0,-1,-1,0
+stat,dline,hayej104,1,1,2,-1,-1,-1,0,-1,-1,-1
+stat,dline,mccof102,1,1,2,-1,-1,-1,0,-1,-1,-1
+stat,dline,byass101,1,1,6,21,-1,-1,0,-1,-1,0
+stat,dline,clarr105,1,1,1,-1,-1,-1,0,-1,-1,0
+stat,dline,vaugs101,1,1,1,-1,-1,-1,0,-1,-1,0
+stat,dline,craih101,1,1,1,-1,-1,-1,0,-1,-1,0
+stat,phline,merrs101,-1,1,1,1,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+event,hrline,1,byass101,day-l101,4,0,
+line,0,2,1,0,1,3,1,1
+line,1,3,1,1,8,6,1
+stat,tline,0,5,-1,-1,-1
+stat,tline,1,3,-1,-1,-1

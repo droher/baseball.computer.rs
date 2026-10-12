@@ -15,6 +15,7 @@ UNKNOWN = frozenset({"NA", "?", ""})
 VALID_FIELD_POSITIONS = frozenset(str(p) for p in range(1, 13))
 STARTING_FIELD_POSITIONS = frozenset(str(p) for p in range(1, 11))
 SIDES = frozenset({"0", "1"})
+NO_GAMES: frozenset[str] = frozenset()
 
 DIAGNOSTIC_RE = re.compile(r"NUMBER OF .+ DISAGREE BETWEEN .+")
 MISTYPED_ID_RE = re.compile(r"Yid,([A-Z0-9]{12})")
@@ -328,8 +329,14 @@ def correct_text(text: str, file: str) -> FileResult:
     return FileResult(corrections, edits.unresolved, "".join(out))
 
 
+def write_atomically(path: Path, data: bytes) -> None:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    _ = tmp.write_bytes(data)
+    os.replace(tmp, path)
+
+
 def correct_directory(
-    root: Path, subdir: str = "ngl_b"
+    root: Path, subdir: str = "ngl_b", overridden_games: frozenset[str] = NO_GAMES
 ) -> tuple[list[Correction], list[Unresolved]]:
     corrections: list[Correction] = []
     unresolved: list[Unresolved] = []
@@ -350,7 +357,8 @@ def correct_directory(
                 c.after,
             )
         for u in result.unresolved:
-            logger.warning(
+            logger.log(
+                logging.DEBUG if u.game_id in overridden_games else logging.WARNING,
                 "UNRESOLVED %s:%d %s %s: %s",
                 u.file,
                 u.line,
@@ -359,9 +367,9 @@ def correct_directory(
                 u.record,
             )
         if result.corrections:
-            tmp = path.with_suffix(path.suffix + ".tmp")
-            _ = tmp.write_bytes(result.text.encode("utf-8", errors="surrogateescape"))
-            os.replace(tmp, path)
+            write_atomically(
+                path, result.text.encode("utf-8", errors="surrogateescape")
+            )
             logger.info("CORRECT %s: %d record(s)", relative, len(result.corrections))
     return corrections, unresolved
 

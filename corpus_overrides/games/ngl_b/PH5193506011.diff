@@ -1,0 +1,22 @@
+The home side's start records are shifted by one slot from slot 5 down. They
+omit catcher Mickey Casey, who is first in slot 5 with 27 outs at catcher, and
+list Lefty Holmes in slot 9 with no position, though Holmes's bline and dline
+make Holmes the second pitcher in slot 9. Webster McDonald, the starting pitcher, is
+listed in slot 8 at position 12. The start records for slots 5-9 are rebuilt
+from the first bline in each slot and that player's dline position.
+
+--- a/ngl_b/1935.EBR
++++ b/ngl_b/1935.EBR
+@@ -37,7 +37,7 @@
+ start,wilsj106,"Jud Wilson",1,4,9
+-start,dunnj104,"Jake Dunn",1,5,8
+-start,lyong102,"Granville Lyons",1,6,3
+-start,seayd101,"Dick Seay",1,7,4
+-start,mcdow101,"Webster McDonald",1,8,12
+-start,holml101,"Lefty Holmes",1,9,
++start,casem101,"Mickey Casey",1,5,2
++start,dunnj104,"Jake Dunn",1,6,8
++start,lyong102,"Granville Lyons",1,7,3
++start,seayd101,"Dick Seay",1,8,4
++start,mcdow101,"Webster McDonald",1,9,1
+ stat,bline,hughs101,0,1,1,6,2,3,1,1,0,-1,0,-1,0,0,0,-1,-1,-1,-1,-1

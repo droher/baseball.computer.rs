@@ -1,0 +1,34 @@
+Ray Brown has first-position dlines in center field and at pitcher, and Jerry
+Benjamin has first-position dlines at catcher and in right field, though
+Tommie Dukes caught all 27 outs. The pline records list Joe Strong, Willie
+Gisentaner, and Brown as the first, second, and third pitchers, but the dline
+pitcher sequence is Brown, Strong, Gisentaner. Tom Parker's dline is the
+second right fielder. So Brown started in center field and finished on the
+mound, Benjamin moved from right field to center field, and Parker took right
+field. Benjamin's catcher dline (2 putouts) becomes the second center fielder,
+Benjamin's start record gets position 9, and the pitcher dline sequence follows the
+pline order.
+
+--- a/ngl_b/1935.EBR
++++ b/ngl_b/1935.EBR
+@@ -26,3 +26,3 @@
+ info,gwrbi,
+-start,benjj101,"Jerry Benjamin",0,1,29
++start,benjj101,"Jerry Benjamin",0,1,9
+ start,scalg101,"George Scales",0,2,5
+@@ -75,3 +75,3 @@
+ stat,pline,kinch101,1,3,3,-1,4,0,0,0,0,0,0,1,-1,0,0,0,0,-1,-1
+-stat,dline,benjj101,0,1,2,-1,2,0,0,0,0,0
++stat,dline,benjj101,0,2,8,-1,2,0,0,0,0,0
+ stat,dline,benjj101,0,1,9,-1,0,0,0,0,0,0
+@@ -83,7 +83,7 @@
+ stat,dline,browr103,0,1,8,-1,2,0,0,0,0,0
+-stat,dline,browr103,0,1,1,-1,0,0,0,0,0,0
++stat,dline,browr103,0,3,1,-1,0,0,0,0,0,0
+ stat,dline,carlm101,0,1,4,27,2,3,0,1,0,0
+ stat,dline,jackj104,0,1,6,27,5,3,0,0,0,0
+-stat,dline,stroj103,0,2,1,-1,0,2,0,0,0,0
+-stat,dline,gisew101,0,3,1,-1,0,0,0,0,0,0
++stat,dline,stroj103,0,1,1,-1,0,2,0,0,0,0
++stat,dline,gisew101,0,2,1,-1,0,0,0,0,0,0
+ stat,dline,parkt101,0,2,9,-1,0,0,0,0,0,0

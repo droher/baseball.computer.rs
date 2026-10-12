@@ -1,0 +1,101 @@
+id,HOM193607122
+version,3
+info,visteam,NY6
+info,hometeam,HOM
+info,date,1936/07/12
+info,site,COL04
+info,number,2
+info,starttime,0:00PM
+info,daynight,day
+info,usedh,false
+info,temp,0
+info,winddir,unknown
+info,windspeed,-1
+info,fieldcond,unknown
+info,precip,unknown
+info,sky,unknown
+info,timeofgame,0
+info,attendance,2000
+info,wp,gisew101
+info,lp,stann101
+info,save,
+info,gwrbi,
+start,speac103,"Clyde Spearman",0,1,9
+start,corrf102,"Francisco Correa",0,2,4
+start,dihim101,"Martin Dihigo",0,3,5
+start,salal101,"Lazaro Salazar",0,4,7
+start,garcs101,"Silvio Garcia",0,5,6
+start,thomc103,"Clint Thomas",0,6,3
+start,duncf102,"Frank Duncan",0,7,2
+start,brewc102,"Chet Brewer",0,8,1
+start,santa102,"Anastasio Santaella",0,9,8
+start,benjj101,"Jerry Benjamin",1,1,8
+start,dixor101,"Rap Dixon",1,2,9
+start,harrv102,"Vic Harris",1,3,7
+start,leonb101,"Buck Leonard",1,4,3
+start,speah101,"Henry Spearman",1,5,5
+start,duket102,"Tommie Dukes",1,6,2
+start,terrt102,"Tarcat Terry",1,7,4
+start,carlm101,"Matt Carlisle",1,8,6
+start,parkt101,"Tom Parker",1,9,1
+stat,bline,speac103,0,1,1,5,2,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,corrf102,0,2,1,5,1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,dihim101,0,3,1,5,1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,salal101,0,4,1,4,2,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,garcs101,0,5,1,4,0,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,thomc103,0,6,1,4,1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,duncf102,0,7,1,4,0,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,brewc102,0,8,1,1,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,stann101,0,8,2,1,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,holml101,0,8,3,2,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,santa102,0,9,1,4,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,benjj101,1,1,1,5,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,dixor101,1,2,1,5,4,3,1,-1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,harrv102,1,3,1,5,2,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,leonb101,1,4,1,5,3,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,speah101,1,5,1,5,0,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,duket102,1,6,1,3,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,terrt102,1,7,1,4,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,carlm101,1,8,1,3,1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,parkt101,1,9,1,1,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,gisew101,1,9,2,3,1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,bassp101,1,6,3,0,0,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,jackj104,1,8,3,0,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,browr103,1,6,2,1,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,bline,dulal101,1,8,2,1,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,pline,brewc102,0,1,9,-1,17,7,-1,-1,1,5,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,pline,stann101,0,2,6,-1,13,6,-1,-1,1,5,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,pline,holml101,0,3,9,-1,11,2,-1,-1,0,1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,pline,parkt101,1,1,9,-1,18,7,-1,-1,-1,6,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,pline,gisew101,1,2,18,-1,21,2,-1,-1,-1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+stat,dline,speac103,0,1,9,24,3,1,-1,-1,0,0
+stat,dline,corrf102,0,1,4,24,2,2,-1,-1,0,0
+stat,dline,dihim101,0,1,5,24,0,2,-1,-1,0,0
+stat,dline,salal101,0,1,7,24,3,0,-1,-1,0,0
+stat,dline,garcs101,0,1,6,24,4,4,-1,-1,0,0
+stat,dline,thomc103,0,1,3,24,8,1,-1,-1,0,0
+stat,dline,duncf102,0,1,2,24,4,0,-1,-1,0,-1
+stat,dline,brewc102,0,1,1,-1,0,1,-1,-1,0,0
+stat,dline,stann101,0,2,1,-1,0,1,-1,-1,0,0
+stat,dline,holml101,0,3,1,-1,0,2,-1,-1,0,0
+stat,dline,santa102,0,1,8,24,0,0,-1,-1,0,0
+stat,dline,benjj101,1,1,8,27,2,0,-1,-1,-1,0
+stat,dline,dixor101,1,1,9,27,3,0,-1,-1,-1,0
+stat,dline,harrv102,1,1,7,27,5,0,-1,-1,-1,0
+stat,dline,leonb101,1,1,3,27,8,1,-1,-1,-1,0
+stat,dline,speah101,1,1,5,27,2,2,-1,-1,-1,0
+stat,dline,duket102,1,1,2,-1,2,0,-1,-1,-1,-1
+stat,dline,terrt102,1,1,4,27,1,2,-1,-1,-1,0
+stat,dline,carlm101,1,1,6,-1,1,1,-1,-1,-1,0
+stat,dline,parkt101,1,1,1,-1,0,1,-1,-1,-1,0
+stat,dline,gisew101,1,2,1,-1,0,1,-1,-1,-1,0
+stat,dline,bassp101,1,3,2,-1,0,0,-1,-1,-1,-1
+stat,dline,jackj104,1,2,6,-1,2,0,-1,-1,-1,0
+stat,dline,browr103,1,2,2,-1,1,2,-1,-1,-1,0
+event,tpline,0,
+event,hrline,1,dixor101,?,-1,0,
+event,hrline,1,dixor101,?,-1,0,
+line,0,2,0,4,0,0,1,0,0,0
+line,1,1,1,3,2,3,0,1,0
+stat,tline,0,5,-1,-1,0
+stat,tline,1,6,-1,-1,1

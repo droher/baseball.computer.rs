@@ -1,0 +1,16 @@
+Nish Williams has 1 hit but 3 doubles. The team's 12 hits match Burns's
+12 hits allowed, so the hit total stands. Two doubles are removed from
+Williams's line and from Burns's doubles allowed (3 -> 1).
+
+--- a/ngl_b/1935.EBR
++++ b/ngl_b/1935.EBR
+@@ -49,3 +49,3 @@
+ stat,bline,westj102,0,7,1,4,1,2,0,0,1,-1,-1,-1,0,1,-1,-1,-1,-1,-1,-1
+-stat,bline,willn103,0,8,1,4,1,1,3,0,0,-1,-1,-1,0,1,-1,-1,-1,-1,-1,-1
++stat,bline,willn103,0,8,1,4,1,1,1,0,0,-1,-1,-1,0,1,-1,-1,-1,-1,-1,-1
+ stat,bline,byrdb101,0,9,1,3,0,1,0,0,0,-1,-1,-1,0,0,-1,-1,-1,-1,-1,-1
+@@ -64,3 +64,3 @@
+ stat,pline,willn103,0,2,8,-1,12,2,-1,-1,0,2,-1,2,-1,4,1,0,0,-1,-1
+-stat,pline,burnw102,1,1,27,-1,45,12,3,1,1,5,5,5,-1,1,0,0,0,-1,-1
++stat,pline,burnw102,1,1,27,-1,45,12,1,1,1,5,5,5,-1,1,0,0,0,-1,-1
+ stat,dline,hughs101,0,1,4,24,-1,-1,2,-1,0,0

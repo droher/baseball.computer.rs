@@ -1,0 +1,15 @@
+The home side's start records put Martin Dihigo in slot 8 with no position and
+Rabbit Martinez in slot 9, and omit Cocaina Garcia. The bline records have
+Dihigo as a pinch hitter in slot 7 (Dihigo also has a phline and no dline),
+Martinez first in slot 8 at shortstop, and Garcia first in slot 9 as the
+pitcher (27 outs). The start records are rebuilt to match.
+
+--- a/ngl_b/1935.EBR
++++ b/ngl_b/1935.EBR
+@@ -40,4 +40,4 @@
+ start,diazh101,"Heliodoro Diaz",1,7,2
+-start,dihim101,"Martin Dihigo",1,8,
+-start,martr105,"Rabbit Martinez",1,9,6
++start,martr105,"Rabbit Martinez",1,8,6
++start,garcc103,"Cocaina Garcia",1,9,1
+ stat,bline,benjj101,0,1,1,5,0,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,-1,-1

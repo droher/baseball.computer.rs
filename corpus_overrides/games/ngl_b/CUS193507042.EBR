@@ -1,0 +1,95 @@
+id,CUS193507042
+version,3
+info,visteam,NY5
+info,hometeam,CUS
+info,date,1935/07/04
+info,site,NYC23
+info,number,2
+info,starttime,0:00PM
+info,daynight,day
+info,usedh,false
+info,umphome,clinu901
+info,ump1b,ferru901
+info,ump3b,browu901
+info,temp,0
+info,winddir,unknown
+info,windspeed,-1
+info,fieldcond,unknown
+info,precip,unknown
+info,sky,unknown
+info,timeofgame,0
+info,attendance,5000
+info,wp,mcdut101
+info,lp,miraj102
+info,save,
+info,gwrbi,
+start,speac103,"Clyde Spearman",0,1,9
+start,johnj109,"Josh Johnson",0,2,7
+start,cannw101,"Walter Cannady",0,3,4
+start,thomd104,"Dave Thomas",0,4,3
+start,brooa101,"Ameal Brooks",0,5,2
+start,adamp101,"Packinghouse Adams",0,6,6
+start,jeffh102,"Harry Jeffries",0,7,5
+start,washp101,"Pete Washington",0,8,8
+start,mcdut101,"Terris McDuffie",0,9,1
+start,vazqa102,"Andres Vazquez",1,1,7
+start,masss101,"Salvador Massip",1,2,3
+start,etchc101,"Carlos Etchegoyen",1,3,5
+start,roquj103,"Jacinto Roque",1,4,9
+start,corta101,"Aurelio Cortes",1,5,2
+start,vargj101,"Jose Vargas",1,6,8
+start,rodra102,"Antonio Rodriguez",1,7,6
+start,abrej103,"Jose Abreu",1,8,4
+start,miraj102,"Jesus Miralles",1,9,1
+stat,bline,speac103,0,1,1,5,2,2,0,0,1,1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,johnj109,0,2,1,5,1,2,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,speah101,0,2,2,0,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,cannw101,0,3,1,5,1,1,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,thomd104,0,4,1,5,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,brooa101,0,5,1,5,2,4,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,adamp101,0,6,1,5,2,3,0,1,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,jeffh102,0,7,1,4,2,2,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,washp101,0,8,1,3,1,0,0,0,0,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1
+stat,bline,chrit101,0,8,1,0,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,mcdut101,0,9,1,3,0,1,0,0,0,-1,0,-1,0,1,-1,-1,-1,-1,-1,-1
+stat,bline,vazqa102,1,1,1,5,0,2,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,masss101,1,2,1,2,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,fernj101,1,2,2,3,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,etchc101,1,3,1,4,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,roquj103,1,4,1,4,1,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,corta101,1,5,1,4,0,1,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,vargj101,1,6,1,3,0,1,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,rodra102,1,7,1,4,0,1,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,abrej103,1,8,1,4,1,1,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,miraj102,1,9,1,4,1,2,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,bline,sardj101,1,6,2,1,0,0,0,0,0,-1,0,-1,0,0,-1,-1,-1,-1,-1,-1
+stat,pline,mcdut101,0,1,27,-1,38,8,-1,-1,0,3,-1,0,-1,-1,0,-1,-1,0,-1
+stat,pline,miraj102,1,1,22,-1,34,14,-1,-1,1,10,-1,0,-1,-1,0,-1,-1,0,-1
+stat,pline,sardj101,1,2,5,-1,8,1,-1,-1,0,1,-1,2,-1,-1,0,-1,-1,0,-1
+stat,dline,speac103,0,1,9,27,2,0,0,-1,-1,0
+stat,dline,johnj109,0,1,7,21,0,0,0,-1,-1,0
+stat,dline,speah101,0,1,8,6,0,0,0,-1,-1,0
+stat,dline,cannw101,0,1,4,27,2,3,0,-1,-1,0
+stat,dline,thomd104,0,1,3,27,8,0,0,-1,-1,0
+stat,dline,brooa101,0,1,2,27,5,0,0,-1,-1,-1
+stat,dline,adamp101,0,1,6,27,3,5,1,-1,-1,0
+stat,dline,jeffh102,0,1,5,27,3,0,0,-1,-1,0
+stat,dline,washp101,0,1,8,21,3,0,1,-1,-1,0
+stat,dline,chrit101,0,1,7,6,1,0,0,-1,-1,0
+stat,dline,mcdut101,0,1,1,27,0,1,0,-1,-1,0
+stat,dline,vazqa102,1,1,7,27,2,0,0,-1,-1,0
+stat,dline,masss101,1,1,3,12,7,0,1,-1,-1,0
+stat,dline,fernj101,1,1,3,15,6,0,0,-1,-1,0
+stat,dline,etchc101,1,1,5,27,1,1,1,-1,-1,0
+stat,dline,roquj103,1,1,9,27,5,1,0,-1,-1,0
+stat,dline,corta101,1,1,2,27,2,1,0,-1,-1,-1
+stat,dline,vargj101,1,1,8,-1,1,0,1,-1,-1,0
+stat,dline,rodra102,1,1,6,27,2,3,0,-1,-1,0
+stat,dline,abrej103,1,1,4,27,1,4,1,-1,-1,0
+stat,dline,miraj102,1,1,1,-1,0,1,0,-1,-1,0
+stat,dline,miraj102,1,2,8,-1,0,0,0,-1,-1,0
+stat,dline,sardj101,1,1,1,-1,0,2,0,-1,-1,0
+line,0,0,0,0,3,1,3,0,4,0
+line,1,0,0,0,0,2,0,0,1,0
+stat,tline,0,4,-1,-1,-1
+stat,tline,1,8,-1,-1,-1

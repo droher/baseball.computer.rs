@@ -36,7 +36,6 @@ SCHEDULE_PARK_INSERT_AT = 10  # index of park_id, between day_night and postpone
 
 RETROSHEET_PATH = Path("retrosheet")
 OUTPUT_PATH = Path("retrosheet_simple")
-DATABANK_PATH = Path("baseballdatabank")
 
 RETROSHEET_SUBDIRS = "gamelogs", "schedules", "rosters"
 FILES = "gamelog", "schedule", "park", "roster", "bio"
@@ -52,16 +51,6 @@ def get_prebuilt_csvs() -> None:
      .read_csv("https://www.retrosheet.org/CurrentNames.csv", names=franchise_header, parse_dates=["date_start", "date_end"])
      .to_parquet("retrosheet_simple/franchise.parquet", index=False)
      )
-    databank_files = ["Appearances", "Batting", "Fielding", "FieldingOF", "Pitching", "People"]
-    DATABANK_PATH.mkdir(exist_ok=True)
-    # Remove this until repo yank gets resolved
-    # for f in databank_files:
-    #     github_url = f"https://raw.githubusercontent.com/chadwickbureau/baseballdatabank/master/core/{f}.csv"
-    #     df = pandas.read_csv(github_url)
-    #     if "yearID" in df.columns:
-    #         # Filter out all years after 1919
-    #         df = df[df["yearID"] < 1920]
-    #     df.to_parquet(f"baseballdatabank/{f.lower()}.parquet", index=False)
 
 
 def parse_simple_files() -> None:

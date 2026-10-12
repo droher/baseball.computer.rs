@@ -200,6 +200,22 @@ class CorrectDirectoryTests(unittest.TestCase):
             again, _ = nbc.correct_directory(root)
             self.assertEqual(again, [])
 
+    def test_overridden_games_are_returned_but_not_warned(self) -> None:
+        unresolved_game = ["id,AAA193701010", 'start,aaaa101,"A A",0,1,']
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "ngl_b").mkdir()
+            _ = (root / "ngl_b" / "1937.EBR").write_text(
+                "\n".join(unresolved_game) + "\n"
+            )
+            with self.assertLogs(nbc.logger, level="WARNING"):
+                _ = nbc.correct_directory(root)
+            with self.assertNoLogs(nbc.logger, level="WARNING"):
+                _, reported = nbc.correct_directory(
+                    root, overridden_games=frozenset({"AAA193701010"})
+                )
+            self.assertEqual([u.game_id for u in reported], ["AAA193701010"])
+
 
 if __name__ == "__main__":
     _ = unittest.main()

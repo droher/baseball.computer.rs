@@ -1,0 +1,99 @@
+id,BRN193505261
+version,3
+info,visteam,CAG
+info,hometeam,BRN
+info,date,1935/05/26
+info,site,NYC15
+info,number,1
+info,starttime,0:00PM
+info,daynight,
+info,usedh,false
+info,umphome,gholb901
+info,ump1b,dixou901
+info,temp,0
+info,winddir,unknown
+info,windspeed,-1
+info,fieldcond,unknown
+info,precip,unknown
+info,sky,unknown
+info,timeofgame,0
+info,attendance,5000
+info,wp,jackw101
+info,lp,trent101
+info,save,
+info,gwrbi,
+start,marsj104,"Jack Marshall",0,1,4
+start,radca101,"Alex Radcliff",0,2,5
+start,wellw101,"Willie Wells",0,3,6
+start,steat101,"Turkey Stearnes",0,4,8
+start,suttm101,"Mule Suttles",0,5,7
+start,davis103,"Steel Arm Davis",0,6,3
+start,reduw101,"Wilson Redus",0,7,9
+start,browl107,"Larry Brown",0,8,2
+start,trent101,"Ted Trent",0,9,1
+start,jenkf102,"Fats Jenkins",1,1,7
+start,gileg101,"George Giles",1,2,3
+start,willh105,"Harry Williams",1,3,4
+start,dixor101,"Rap Dixon",1,4,8
+start,stone101,"Ed Stone",1,5,9
+start,burnt102,"Tex Burnett",1,6,5
+start,palmc101,"Clarence Palm",1,7,2
+start,gilcd101,"Dennis Gilchrist",1,8,6
+start,wille104,"Elbert Williams",1,9,1
+stat,bline,marsj104,0,1,1,4,1,1,0,0,0,-1,0,-1,0,1,-1,-1,0,-1,0,-1
+stat,bline,radca101,0,2,1,5,1,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,wellw101,0,3,1,4,1,2,1,0,0,-1,0,-1,0,1,-1,-1,0,-1,0,-1
+stat,bline,steat101,0,4,1,4,1,2,1,1,0,-1,0,-1,0,1,-1,-1,1,-1,0,-1
+stat,bline,suttm101,0,5,1,4,0,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,davis103,0,6,1,3,0,0,0,0,0,-1,1,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,reduw101,0,7,1,3,1,0,0,0,0,-1,0,-1,1,0,0,-1,0,-1,0,-1
+stat,bline,browl107,0,8,1,4,0,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,trent101,0,9,1,3,0,1,0,0,0,-1,1,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,jenkf102,1,1,1,5,0,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,gileg101,1,2,1,4,0,1,0,0,0,-1,0,-1,0,1,-1,-1,1,-1,0,-1
+stat,bline,willh105,1,3,1,5,2,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,dixor101,1,4,1,5,0,1,1,0,0,-1,0,-1,0,0,0,-1,1,-1,0,-1
+stat,bline,stone101,1,5,1,3,0,1,0,0,0,-1,0,-1,0,2,-1,-1,0,-1,0,-1
+stat,bline,burnt102,1,6,1,4,0,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,palmc101,1,7,1,4,0,0,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,gilcd101,1,8,1,3,1,2,1,0,0,-1,0,-1,0,1,-1,-1,0,-1,0,-1
+stat,bline,yancb101,1,8,2,0,1,0,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,wille104,1,9,1,3,1,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,grifc102,1,9,2,1,0,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,willr105,1,7,2,0,1,0,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,jackw101,1,9,3,0,0,0,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,bline,ruffl101,1,7,3,0,0,0,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,pline,trent101,0,1,27,-1,41,10,2,0,0,6,-1,4,-1,4,0,0,0,0,-1
+stat,pline,wille104,1,1,27,-1,37,9,2,1,0,5,-1,2,-1,3,1,0,0,2,-1
+stat,pline,jackw101,1,2,3,-1,3,0,0,0,0,0,0,1,0,0,0,0,0,0,0
+stat,dline,marsj104,0,1,4,27,4,1,1,0,0,0
+stat,dline,radca101,0,1,5,27,0,2,0,0,0,0
+stat,dline,wellw101,0,1,6,27,1,4,1,0,0,0
+stat,dline,steat101,0,1,8,27,3,0,0,0,0,0
+stat,dline,suttm101,0,1,7,27,3,0,0,0,0,0
+stat,dline,davis103,0,1,3,27,10,3,0,0,0,0
+stat,dline,reduw101,0,1,9,27,1,0,0,0,0,0
+stat,dline,browl107,0,1,2,27,5,1,0,0,0,0
+stat,dline,trent101,0,1,1,27,0,4,0,0,0,0
+stat,dline,jenkf102,1,1,7,30,1,0,1,0,0,0
+stat,dline,gileg101,1,1,3,30,18,1,0,0,0,0
+stat,dline,willh105,1,1,4,30,1,8,0,0,0,0
+stat,dline,dixor101,1,1,8,30,2,0,0,0,0,0
+stat,dline,stone101,1,1,9,30,3,0,0,0,0,0
+stat,dline,burnt102,1,1,3,30,3,2,0,0,0,0
+stat,dline,palmc101,1,1,2,27,0,2,0,0,0,0
+stat,dline,gilcd101,1,1,6,27,1,2,0,0,0,0
+stat,dline,yancb101,1,1,6,3,1,0,0,0,0,0
+stat,dline,wille104,1,1,1,27,0,2,0,0,0,0
+stat,dline,jackw101,1,2,1,3,0,0,0,0,0,0
+stat,dline,ruffl101,1,2,2,3,0,0,0,0,0,0
+stat,phline,grifc102,9,1,1,0,1,0,0,0,-1,0,-1,0,0,0,-1,0,-1,0,-1
+stat,prline,yancb101,9,1,1,0,-1
+stat,prline,willr105,9,1,1,0,-1
+event,sbline,1,dixor101,trent101,browl107,-1
+event,sbline,1,gileg101,trent101,browl107,-1
+event,sbline,0,steat101,?,?,-1
+line,0,0,1,2,0,0,0,1,1,0,0
+line,1,0,0,3,0,0,0,0,0,2,1
+stat,tline,0,5,-1,0,0
+stat,tline,1,8,-1,0,0
