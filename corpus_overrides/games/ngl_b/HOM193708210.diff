@@ -1,0 +1,11 @@
+The hrline record for Josh Gibson names no pitcher. Of the visiting pitchers,
+Scottie Duncan's pline shows 1 home run allowed and Jim Lewis's shows none, so
+it is assigned to Duncan.
+
+--- a/ngl_b/1937.EBR
++++ b/ngl_b/1937.EBR
+@@ -103,3 +103,3 @@
+ event,hpline,1,parkt101,harvb101
+-event,hrline,1,gibsj101,,-1,0,
++event,hrline,1,gibsj101,duncs101,-1,0,
+ event,sbline,1,leonb101,?,bassp101,-1

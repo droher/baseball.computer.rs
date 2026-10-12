@@ -1,0 +1,13 @@
+The hrline records for Lazaro Salazar and Dave Thomas name no pitcher. Willie
+Burns was the only visiting pitcher (24 outs) and his pline shows 2 home runs
+allowed, so both are assigned to him.
+
+--- a/ngl_b/1935.EBR
++++ b/ngl_b/1935.EBR
+@@ -81,4 +81,4 @@
+ event,hpline,0,burnw102,speac103
+-event,hrline,1,salal101,,-1,0,
+-event,hrline,1,thomd104,,-1,0,
++event,hrline,1,salal101,burnw102,-1,0,
++event,hrline,1,thomd104,burnw102,-1,0,
+ line,0,0,0,2,0,0,0,0,0,0

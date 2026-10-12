@@ -4,6 +4,10 @@ other start records are out of order against the bline records. Every bline
 and dline for the side is consistent (nine players, one per slot, each with
 27 outs at one position), so the start records are rebuilt from them.
 
+The hrline record for Matt Carlisle names no pitcher. Of the home pitchers,
+Johnny Taylor's pline shows 1 home run allowed and Martin Dihigo's shows none,
+so it is assigned to Taylor.
+
 --- a/ngl_b/1935.EBR
 +++ b/ngl_b/1935.EBR
 @@ -25,9 +25,9 @@
@@ -22,3 +26,8 @@ and dline for the side is consistent (nine players, one per slot, each with
 +start,duket102,"Tommie Dukes",0,7,2
 +start,bindj101,"Jimmy Binder",0,8,5
  start,jackj104,"Jelly Jackson",0,9,6
+@@ -90,3 +90,3 @@
+ event,dpline,0,carlm101,jackj104,leonb101
+-event,hrline,0,carlm101,,-1,0,
++event,hrline,0,carlm101,taylj108,-1,0,
+ event,hrline,1,dihim101,browr103,-1,0,

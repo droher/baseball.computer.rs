@@ -1,0 +1,11 @@
+The hrline record for Buck Leonard's 5th-inning home run names no pitcher. Of
+the visiting pitchers, only Charlie King's pline shows a home run allowed
+(Roosevelt Davis and Jim Lewis show none), so it is assigned to King.
+
+--- a/ngl_b/1937.EBR
++++ b/ngl_b/1937.EBR
+@@ -89,3 +89,3 @@
+ stat,phline,bassp101,7,0,1,0,0,0,0,0,0,0,-1,0,0,0,-1,0,0,-1,0
+-event,hrline,1,leonb101,,5,0,
++event,hrline,1,leonb101,kingc103,5,0,
+ event,sbline,1,benjj101,?,ruffl101,-1

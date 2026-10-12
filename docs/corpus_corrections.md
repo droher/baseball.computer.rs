@@ -129,27 +129,28 @@ These are left as published:
 ## Home runs with no pitcher
 
 These games are not excluded. Each has an `hrline` with a batter but no
-pitcher, and the pitching lines do not say which pitcher allowed it. The
-records are not filled in from `pline` totals. The `baseball.computer` build
-loads them and its `not_null` audit on `box_score_home_runs.pitcher_id`
-warns.
+pitcher, and neither the pitching lines' home runs allowed nor the innings
+pitched single out the pitcher. The `baseball.computer` build loads them and
+its `not_null` audit on `box_score_home_runs.pitcher_id` warns.
+
+Seven other games had pitcherless home runs that the pitching lines do settle:
+only one opposing pitcher could have allowed each one. Their reviewed
+overrides fill in the pitcher: HOM193705220, HOM193706272, HOM193708210,
+HOM193808283, NY6193505262, NY6193508181, PH5193509222.
+
+In PH5193609051 the records conflict: Byrd recorded outs 1-21 and allowed 2
+home runs, but the two 9th-inning home runs came off Porter, who allowed 1.
+None of its three home runs is assigned.
 
 | Game | File | Records |
 | --- | --- | --- |
 | AKR193307270 | `ngl_b/1933.EBR` | `event,hrline,1,palmc101,,-1,0,`; `event,hrline,1,huntb106,,-1,0,` |
 | HOM193507280 | `ngl_b/1935.EBR` | `event,hrline,1,benjj101,,9,3,` |
 | HOM193508100 | `ngl_b/1935.EBR` | `event,hrline,0,grifc102,,-1,0,` |
-| NY6193505262 | `ngl_b/1935.EBR` | `event,hrline,0,carlm101,,-1,0,` |
-| NY6193508181 | `ngl_b/1935.EBR` | `event,hrline,1,salal101,,-1,0,`; `event,hrline,1,thomd104,,-1,0,` |
 | PH5193506222 | `ngl_b/1935.EBR` | `event,hrline,0,davis103,,-1,0,`; `event,hrline,0,browl107,,-1,0,`; `event,hrline,1,cread101,,-1,0,`; `event,hrline,1,seayd101,,-1,0,` |
-| PH5193509222 | `ngl_b/1935.EBR` | `event,hrline,0,perkb101,,-1,0,` |
 | PH5193609051 | `ngl_b/1936.EBR` | `event,hrline,1,parnr102,,5,0,`; `event,hrline,1,steat101,,9,0,`; `event,hrline,1,wilsj106,,9,0,` |
-| HOM193705220 | `ngl_b/1937.EBR` | `event,hrline,1,willj110,,-1,0,`; `event,hrline,1,harrv102,,-1,0,` |
-| HOM193706272 | `ngl_b/1937.EBR` | `event,hrline,1,leonb101,,5,0,` |
-| HOM193708210 | `ngl_b/1937.EBR` | `event,hrline,1,gibsj101,,-1,0,` |
 | PH5193709112 | `ngl_b/1937.EBR` | `event,hrline,1,paget101,,-1,0,` |
 | SSA193705301 | `ngl_b/1937.EBR` | `event,hrline,0,steat101,,-1,0,` (twice); `event,hrline,0,justc101,,-1,0,`; `event,hrline,0,millp101,,-1,0,` |
-| HOM193808283 | `ngl_b/1938.EBR` | `event,hrline,1,gibsj101,,5,0,`; `event,hrline,1,browr103,,8,0,` |
 | NW2194507041 | `ngl_b/1945.EBR` | `event,hrline,1,willc107,,5,0,` |
 
 
