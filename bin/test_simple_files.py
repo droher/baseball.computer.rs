@@ -120,3 +120,52 @@ def test_franchises_come_from_the_corpus_and_are_skipped_when_missing(tmp_path: 
     rows = pq.read_table(out / "franchise.parquet").to_pylist()
     assert rows[0]["current_franchise_id"] == "ANA"
     assert rows[0]["nickname"] == "Angels"
+
+
+DISCREPANCY_HEADER = "ID,Player,Year,Team,Type,Pos,Cat,Game,Retro,Official,Cross,Code,,Notes,Accepted\n"
+
+
+def test_discrepancies_take_their_league_from_the_file_and_tolerate_ragged_rows(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "retrosheet" / "discrepancies"
+    source.mkdir(parents=True)
+    (source / "1944nldiscs.csv").write_text(
+        DISCREPANCY_HEADER
+        + "1944N0069,schub102,1944,CHN,O,,GDP,CHN194404231,1,2,1944N0055,SWAP,,Officially, 0-2,\n"
+    )
+    (source / "1901aldiscs.csv").write_text(
+        DISCREPANCY_HEADER + "1901A0001,collj103,1901,BOS,O,,AB,WS1190105070,3,4,,,,SHs not shown\n"
+    )
+
+    written = simple_files.write_discrepancies(tmp_path / "retrosheet", tmp_path)
+
+    assert written is not None
+    rows = {row["discrepancy_id"]: row for row in pq.read_table(written).to_pylist()}
+    assert rows["1944N0069"]["notes"] == "Officially, 0-2"
+    assert rows["1944N0069"]["accepted"] is None
+    assert rows["1944N0069"]["league"] == "NL"
+    assert rows["1901A0001"]["notes"] == "SHs not shown"
+    assert rows["1901A0001"]["league"] == "AL"
+    assert rows["1901A0001"]["year"] == 1901
+
+
+def test_umpire_rosters_take_their_year_from_the_file_name(tmp_path: Path) -> None:
+    rosters = tmp_path / "retrosheet" / "rosters"
+    rosters.mkdir(parents=True)
+    (rosters / "UMPIRES1901.txt").write_text("ID,last,first\nallia101,Allison,Art\n")
+    (rosters / "UMPIRES1902.txt").write_text("alstd901,Alston,Dave\n")
+    (rosters / "NYA1901.ROS").write_text("x\n")
+
+    written = simple_files.write_umpire_rosters(tmp_path / "retrosheet", tmp_path)
+
+    assert written is not None
+    assert pq.read_table(written).to_pylist() == [
+        {"year": 1901, "umpire_id": "allia101", "last_name": "Allison", "first_name": "Art"},
+        {"year": 1902, "umpire_id": "alstd901", "last_name": "Alston", "first_name": "Dave"},
+    ]
+
+
+def test_missing_discrepancies_and_umpire_rosters_are_skipped(tmp_path: Path) -> None:
+    assert simple_files.write_discrepancies(tmp_path, tmp_path) is None
+    assert simple_files.write_umpire_rosters(tmp_path, tmp_path) is None

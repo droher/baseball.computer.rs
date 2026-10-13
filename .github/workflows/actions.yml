@@ -117,6 +117,7 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - run: uv sync --extra ci --frozen
+      - run: uv run python bin/corpus_coverage.py --corpus corpus
       - run: uv run python bin/simple_files.py --corpus corpus
       - run: uv run python bin/biodata.py --corpus corpus
 
@@ -130,6 +131,9 @@ jobs:
             --exclude '*' --include '*.parquet' --delete
           uv run aws s3 sync --endpoint-url="$R2_ENDPOINT" \
             baseballdatabank s3://timeball/baseballdatabank \
+            --exclude '*' --include '*.parquet' --delete
+          uv run aws s3 sync --endpoint-url="$R2_ENDPOINT" \
+            ngl_stats s3://timeball/ngl_stats \
             --exclude '*' --include '*.parquet' --delete
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY }}

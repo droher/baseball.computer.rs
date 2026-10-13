@@ -41,6 +41,15 @@ OUTPUT_PATH = Path("retrosheet_simple")
 LAHMAN_OUTPUT_PATH = Path("baseballdatabank")
 NGL_STATS_OUTPUT_PATH = Path("ngl_stats")
 FRANCHISE_FILE = "CurrentNames.csv"
+DISCREPANCY_FILE = re.compile(r"(\d{4})([afn])ldiscs\.csv")
+DISCREPANCY_LEAGUES = {"a": "AL", "f": "FL", "n": "NL"}
+DISCREPANCY_COLUMNS = (
+    "discrepancy_id", "player_id", "year", "team_id", "stat_group", "position", "category",
+    "game_id", "retrosheet_value", "official_value", "cross_reference", "code", "extra",
+    "notes", "accepted",
+)
+DISCREPANCY_NOTES_AT = DISCREPANCY_COLUMNS.index("notes")
+UMPIRE_ROSTER_FILE = re.compile(r"UMPIRES(\d{4})\.txt")
 TABLE_RENAMES = {"FieldingOFsplit": "fielding_of_split"}
 COLUMN_RENAMES = {
     "2B": "_2b", "3B": "_3b", "IPouts": "ip_outs", "Ghome": "g_home",
@@ -78,6 +87,76 @@ def get_prebuilt_csvs(retrosheet_base: Path, output_base: Path = OUTPUT_PATH) ->
      .to_parquet(output_base / "franchise.parquet", index=False)
      )
     return True
+
+
+def discrepancy_fields(row: list[str], source: str) -> list[str]:
+    width = len(DISCREPANCY_COLUMNS)
+    if len(row) > width:
+        LOG.warning("%s: joining %d unquoted commas into notes for %s", source, len(row) - width, row[0])
+        overflow = len(row) - width
+        notes = ",".join(row[DISCREPANCY_NOTES_AT:DISCREPANCY_NOTES_AT + overflow + 1])
+        row = [*row[:DISCREPANCY_NOTES_AT], notes, *row[DISCREPANCY_NOTES_AT + overflow + 1:]]
+    return [field.strip() for field in row] + [""] * (width - len(row))
+
+
+def write_discrepancies(retrosheet_base: Path, output_base: Path = OUTPUT_PATH) -> Path | None:
+    source = retrosheet_base / "discrepancies"
+    if not source.is_dir():
+        LOG.warning("%s is missing from the Corpus revision; skipping discrepancy.parquet", source)
+        return None
+    columns: dict[str, list[str]] = {name: [] for name in (*DISCREPANCY_COLUMNS, "league")}
+    short = 0
+    for path in sorted(source.glob("*.csv")):
+        match = DISCREPANCY_FILE.fullmatch(path.name)
+        if match is None:
+            raise ValueError(f"Unexpected discrepancy file name {path.name}")
+        league = DISCREPANCY_LEAGUES[match.group(2)]
+        with path.open(encoding="utf-8-sig", newline="") as stream:
+            rows = [row for row in stdcsv.reader(stream) if row][1:]
+        for row in rows:
+            short += len(row) < len(DISCREPANCY_COLUMNS)
+            for name, value in zip(DISCREPANCY_COLUMNS, discrepancy_fields(row, path.name)):
+                columns[name].append(value)
+            columns["league"].append(league)
+    if short:
+        LOG.info("Padded %d discrepancy rows that end before the accepted column", short)
+    table = pa.table({name: pa.array([v or None for v in values], pa.string()) for name, values in columns.items()})
+    table = table.set_column(
+        table.schema.get_field_index("year"), "year", table.column("year").cast(pa.int16())
+    )
+    target = output_base / "discrepancy.parquet"
+    pq.write_table(table, target, compression="zstd")
+    LOG.info("Wrote %d discrepancy rows -> %s", table.num_rows, target)
+    return target
+
+
+def write_umpire_rosters(retrosheet_base: Path, output_base: Path = OUTPUT_PATH) -> Path | None:
+    files = sorted((retrosheet_base / "rosters").glob("UMPIRES*.txt"))
+    if not files:
+        LOG.warning("No umpire rosters in the Corpus revision; skipping umpire_roster.parquet")
+        return None
+    columns: dict[str, list[object]] = {"year": [], "umpire_id": [], "last_name": [], "first_name": []}
+    for path in files:
+        match = UMPIRE_ROSTER_FILE.fullmatch(path.name)
+        if match is None:
+            raise ValueError(f"Unexpected umpire roster name {path.name}")
+        with path.open(encoding="utf-8-sig", newline="") as stream:
+            rows = [row for row in stdcsv.reader(stream) if row]
+        if rows and rows[0][0].upper() == "ID":
+            rows = rows[1:]
+        for row in rows:
+            if len(row) != 3:
+                raise ValueError(f"{path.name}: expected 3 fields, got {row!r}")
+            columns["year"].append(int(match.group(1)))
+            for name, value in zip(("umpire_id", "last_name", "first_name"), row):
+                columns[name].append(value.strip() or None)
+    schema = pa.schema([("year", pa.int16()), ("umpire_id", pa.string()),
+                        ("last_name", pa.string()), ("first_name", pa.string())])
+    table = pa.table(columns, schema=schema)
+    target = output_base / "umpire_roster.parquet"
+    pq.write_table(table, target, compression="zstd")
+    LOG.info("Wrote %d umpire roster rows from %d files -> %s", table.num_rows, len(files), target)
+    return target
 
 
 def snake_case(name: str) -> str:
@@ -252,6 +331,8 @@ def main() -> None:
     parse_simple_files(retrosheet_base)
     write_files()
     get_prebuilt_csvs(retrosheet_base)
+    write_discrepancies(retrosheet_base)
+    write_umpire_rosters(retrosheet_base)
     convert_csv_dir(args.corpus / "lahman", LAHMAN_OUTPUT_PATH, required=True)
     convert_csv_dir(retrosheet_base / "ngl_stats", NGL_STATS_OUTPUT_PATH, required=False)
 
