@@ -15,9 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 ci = [
-    # botocore >=1.36 added default integrity protections that R2 rejects
-    # with 401 Unauthorized. awscli 1.35.x pins botocore<1.36.
-    "awscli>=1.34,<1.36",
+    "awscli>=1.45.28",
     # awscli's lower bound on PyYAML resolves to 5.4.1 whose sdist no longer
     # builds on Cython 3+. Force a wheel-available release.
     "pyyaml>=6.0.1",
@@ -28,6 +26,7 @@ dev = ["pytest>=8"]
 
 [tool.uv]
 package = false
+constraint-dependencies = ["urllib3>=2.8.0", "pyasn1>=0.6.4"]
 
 [tool.basedpyright]
 executionEnvironments = [{ root = "bin" }]
