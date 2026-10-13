@@ -12,7 +12,7 @@ Locally, `<corpus>` is the mirror's `work/corrected` worktree (`uv run mirror wo
 
 CI builds with PGO via `.cargo/config.toml` (`-Cprofile-use=/tmp/pgo-data/merged.profdata`); local debug/release builds without that profdata work fine.
 
-CI (`.github/workflows/actions.yml`) checks out the mirror at the tag in `CORPUS_REVISION`, shallow, with the `MIRROR_DEPLOY_KEY` secret. Every push builds, tests, parses, and uploads `findings.csv` as an artifact; pushes never publish. Publishing to R2 and purging the Cloudflare cache happen only on a manual run on `master` for a promoted revision:
+CI (`.github/workflows/actions.yml`) builds the Corpus revision named in `CORPUS_REVISION` once per revision: its `corpus` job checks out the mirror at that tag and runs `mirror materialize --revision`, which downloads the mirror's GitHub Release assets with the `MIRROR_TOKEN` secret (a fine-grained token with read access to `droher/retrosheet-mirror` contents) and checks the tree against the revision's digest. The result is cached under `corpus-<revision>` for the parse jobs. Every push builds, tests, parses, and uploads `findings.csv` as an artifact; pushes never publish. Publishing to R2 and purging the Cloudflare cache happen only on a manual run on `master` for a promoted revision:
 
 ```bash
 gh workflow run build_parser -f revision=2026.08-c1 -f publish=true

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       revision:
-        description: Corpus revision tag on droher/retrosheet-mirror, such as 2026.08-c1 (defaults to CORPUS_REVISION)
+        description: Corpus revision tag on droher/retrosheet-mirror, such as 2026.08-c2 (defaults to CORPUS_REVISION)
         required: false
         default: ""
       publish:
@@ -70,20 +70,46 @@ jobs:
         env:
           INPUT_REVISION: ${{ inputs.revision }}
 
-  simple_files:
-    name: Parse simple files
-    needs: [python, revision]
+  corpus:
+    name: Build the Corpus revision
+    needs: revision
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - id: cache
+        uses: actions/cache@v4
+        with:
+          path: corpus
+          key: corpus-${{ needs.revision.outputs.revision }}
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: droher/retrosheet-mirror
           ref: refs/tags/${{ needs.revision.outputs.revision }}
-          ssh-key: ${{ secrets.MIRROR_DEPLOY_KEY }}
-          path: corpus
+          token: ${{ secrets.MIRROR_TOKEN }}
+          path: mirror
           fetch-depth: 1
           persist-credentials: false
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: >
+          uv run --project mirror --frozen mirror --root mirror
+          materialize --revision "$REVISION" --out corpus
+        env:
+          GH_TOKEN: ${{ secrets.MIRROR_TOKEN }}
+          REVISION: ${{ needs.revision.outputs.revision }}
+
+  simple_files:
+    name: Parse simple files
+    needs: [python, revision, corpus]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/cache/restore@v4
+        with:
+          path: corpus
+          key: corpus-${{ needs.revision.outputs.revision }}
+          fail-on-cache-miss: true
 
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
@@ -113,18 +139,15 @@ jobs:
 
   pbp:
     name: Create play-by-play
-    needs: [build, revision]
+    needs: [build, revision, corpus]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/cache/restore@v4
         with:
-          repository: droher/retrosheet-mirror
-          ref: refs/tags/${{ needs.revision.outputs.revision }}
-          ssh-key: ${{ secrets.MIRROR_DEPLOY_KEY }}
           path: corpus
-          fetch-depth: 1
-          persist-credentials: false
+          key: corpus-${{ needs.revision.outputs.revision }}
+          fail-on-cache-miss: true
 
       - uses: actions/cache@v4
         with:
