@@ -11,7 +11,7 @@ uv run python bin/biodata.py --corpus <corpus>              # retrosheet/{teams,
 uv run --group dev python -m pytest -q bin                  # Python helper tests
 ```
 
-`<corpus>` is a Corpus revision root from the mirror (it holds `retrosheet/` and `lahman/`). Nothing in `bin/` downloads anything: `CurrentNames.csv` comes from the corpus and a missing one is an error.
+`<corpus>` is a Corpus revision root from the mirror (it holds `retrosheet/` and `lahman/`). Nothing in `bin/` downloads anything: `CurrentNames.csv` comes from the corpus; when it is missing (as in `2026.08-c1`), `franchise.parquet` is skipped with a warning. The warehouse reads franchises from its own `seed_franchises` instead.
 
 The Lahman conversion keeps the names the warehouse reads (`SELECT * FROM read_parquet`): snake_case tables and columns as in boxball's schema (`FieldingOF.csv` -> `fielding_of`, `playerID` -> `player_id`, `IPouts` -> `ip_outs`, `2B` -> `_2b`), nullable integers, `debut`/`final_game` as timestamps, and `zr`/`height` as doubles. CSVs are read with `keep_default_na=False` so the National Association's `lgID` stays the string `NA`. Irregular headers live in `COLUMN_RENAMES`; a new Lahman header that the camelCase rule gets wrong needs an entry there.
 

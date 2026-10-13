@@ -104,18 +104,18 @@ def test_a_missing_optional_folder_is_skipped_and_a_required_one_fails(tmp_path:
         simple_files.convert_csv_dir(tmp_path / "absent", tmp_path / "out", required=True)
 
 
-def test_franchises_come_from_the_corpus_not_the_network(tmp_path: Path) -> None:
+def test_franchises_come_from_the_corpus_and_are_skipped_when_missing(tmp_path: Path) -> None:
     retrosheet = tmp_path / "retrosheet"
     retrosheet.mkdir()
     out = tmp_path / "simple"
     out.mkdir()
-    with pytest.raises(FileNotFoundError, match="CurrentNames.csv"):
-        simple_files.get_prebuilt_csvs(retrosheet, out)
+    assert simple_files.get_prebuilt_csvs(retrosheet, out) is False
+    assert not (out / "franchise.parquet").exists()
 
     (retrosheet / "CurrentNames.csv").write_text(
-        "ANA,LAA,AL,W,Los Angeles,Angels,,04/08/2005,,Anaheim,CA\n"
+        "ANA,ANA,AL,W,Los Angeles,Angels,,2005-04-05,,Anaheim,CA\n"
     )
-    simple_files.get_prebuilt_csvs(retrosheet, out)
+    assert simple_files.get_prebuilt_csvs(retrosheet, out) is True
 
     rows = pq.read_table(out / "franchise.parquet").to_pylist()
     assert rows[0]["current_franchise_id"] == "ANA"

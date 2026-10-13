@@ -66,16 +66,18 @@ FILES = "gamelog", "schedule", "park", "roster", "bio"
 DOS_EOF = chr(26)
 
 
-def get_prebuilt_csvs(retrosheet_base: Path, output_base: Path = OUTPUT_PATH) -> None:
+def get_prebuilt_csvs(retrosheet_base: Path, output_base: Path = OUTPUT_PATH) -> bool:
     franchise_header = ["current_franchise_id", "team_id", "league", "division", "location", "nickname",
                         "alternate_nicknames", "date_start", "date_end", "city", "state"]
     source = retrosheet_base / FRANCHISE_FILE
     if not source.is_file():
-        raise FileNotFoundError(f"{source} is missing from the Corpus revision")
+        LOG.warning("%s is missing from the Corpus revision; skipping franchise.parquet", source)
+        return False
     (pandas
      .read_csv(source, names=franchise_header, parse_dates=["date_start", "date_end"])
      .to_parquet(output_base / "franchise.parquet", index=False)
      )
+    return True
 
 
 def snake_case(name: str) -> str:
