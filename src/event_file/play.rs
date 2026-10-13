@@ -2251,7 +2251,7 @@ impl TryFrom<&str> for ParsedPlay {
     fn try_from(raw_play: &str) -> Result<Self> {
         // `#` (questionable play) and `!` (exceptional play) are dropped along
         // with stray spaces. Surfacing either as a flag would need a new schema
-        // column coordinated with the dbt project.
+        // column coordinated with the SQLMesh project.
         let value = &*STRIP_CHARS_REGEX.replace_all(raw_play, "");
         if value.is_empty() {
             return Ok(Self::default());

@@ -23,6 +23,9 @@ ci = [
     "pyyaml>=6.0.1",
 ]
 
+[dependency-groups]
+dev = ["pytest>=8"]
+
 [tool.uv]
 package = false
 

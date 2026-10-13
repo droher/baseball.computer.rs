@@ -343,6 +343,7 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
                 let trimmed = raw_value.trim();
                 if trimmed != raw_value {
                     warn!(
+                        kind = "info_whitespace_stripped",
                         "Stripped whitespace from {info_type}={raw_value:?} (would overflow team/site capacity)"
                     );
                 }

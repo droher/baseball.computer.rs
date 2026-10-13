@@ -3,18 +3,24 @@ on:
   push:
   workflow_dispatch:
     inputs:
-      retrosheet_key:
-        description: Date key (YYYY-MM-DD) of a cached Retrosheet corpus to reuse instead of fetching
+      revision:
+        description: Corpus revision tag on droher/retrosheet-mirror, such as 2026.08-c1 (defaults to CORPUS_REVISION)
         required: false
         default: ""
+      publish:
+        description: Publish the outputs to R2 and purge the Cloudflare cache
+        type: boolean
+        default: false
+permissions:
+  contents: read
 jobs:
   build:
     name: build
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/
@@ -23,7 +29,7 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: cargo-${{ hashFiles('**/Cargo.lock') }}
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: target/release/baseball-computer
           key: build-${{ github.run_id }}
@@ -35,74 +41,70 @@ jobs:
       # so any new error fails the build automatically.
       - run: cargo clippy --all-targets --release
 
-  retrosheet:
-    name: retrosheet
+  python:
+    name: Python tests
     runs-on: ubuntu-latest
-    outputs:
-      key: ${{ steps.key.outputs.key }}
     steps:
-      - uses: actions/checkout@v3
-
-      - id: key
-        run: echo "key=${RETROSHEET_KEY:-$(date -u +%Y-%m-%d)}" >> "$GITHUB_OUTPUT"
-        env:
-          RETROSHEET_KEY: ${{ inputs.retrosheet_key }}
-
-      - uses: actions/cache@v3
-        id: cache
-        with:
-          path: retrosheet/
-          key: retrosheet-${{ steps.key.outputs.key }}
-
-      - if: inputs.retrosheet_key != '' && steps.cache.outputs.cache-hit != 'true'
-        run: |
-          echo "No cached corpus retrosheet-${{ inputs.retrosheet_key }}; refusing to fetch"
-          exit 1
-
-      - uses: astral-sh/setup-uv@v3
-        if: steps.cache.outputs.cache-hit != 'true'
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
+      - run: uv run --frozen --group dev python -m pytest -q bin
 
-      - if: steps.cache.outputs.cache-hit != 'true'
-        run: uv sync --extra ci --frozen
-      - if: steps.cache.outputs.cache-hit != 'true'
-        run: uv run python bin/fetch_retrosheet.py -o retrosheet
+  revision:
+    name: Resolve the Corpus revision
+    runs-on: ubuntu-latest
+    outputs:
+      revision: ${{ steps.resolve.outputs.revision }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - id: resolve
+        run: |
+          revision="${INPUT_REVISION:-$(tr -d '[:space:]' < CORPUS_REVISION)}"
+          if ! [[ "$revision" =~ ^[0-9]{4}\.[0-9]{2}-c[0-9]+$ ]]; then
+            echo "::error::'$revision' is not a Corpus revision (YYYY.MM-cN)"
+            exit 1
+          fi
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+        env:
+          INPUT_REVISION: ${{ inputs.revision }}
 
   simple_files:
     name: Parse simple files
-    needs: [retrosheet]
+    needs: [python, revision]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/cache@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          path: retrosheet/
-          key: retrosheet-${{ needs.retrosheet.outputs.key }}
+          repository: droher/retrosheet-mirror
+          ref: refs/tags/${{ needs.revision.outputs.revision }}
+          ssh-key: ${{ secrets.MIRROR_DEPLOY_KEY }}
+          path: corpus
+          fetch-depth: 1
+          persist-credentials: false
 
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
       - run: uv sync --extra ci --frozen
-      - run: uv run python bin/simple_files.py
-      - run: uv run python bin/biodata.py
+      - run: uv run python bin/simple_files.py --corpus corpus
+      - run: uv run python bin/biodata.py --corpus corpus
 
-      - run: |
+      - if: inputs.publish && github.ref == 'refs/heads/master'
+        run: |
           uv run aws s3 sync --endpoint-url="$R2_ENDPOINT" \
             retrosheet_simple s3://timeball/misc \
             --exclude '*' --include '*.parquet' --delete
           uv run aws s3 sync --endpoint-url="$R2_ENDPOINT" \
             biodata s3://timeball/biodata \
             --exclude '*' --include '*.parquet' --delete
-
-      # TODO: Add back after databank is restored
-      # uv run aws s3 sync --endpoint-url="$R2_ENDPOINT" \
-      # baseballdatabank s3://timeball/baseballdatabank \
-      # --exclude '*' --include '*.parquet' --delete #}
+          uv run aws s3 sync --endpoint-url="$R2_ENDPOINT" \
+            baseballdatabank s3://timeball/baseballdatabank \
+            --exclude '*' --include '*.parquet' --delete
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET }}
@@ -111,42 +113,52 @@ jobs:
 
   pbp:
     name: Create play-by-play
-    needs: [build, retrosheet]
+    needs: [build, revision]
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/cache@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          path: retrosheet/
-          key: retrosheet-${{ needs.retrosheet.outputs.key }}
+          repository: droher/retrosheet-mirror
+          ref: refs/tags/${{ needs.revision.outputs.revision }}
+          ssh-key: ${{ secrets.MIRROR_DEPLOY_KEY }}
+          path: corpus
+          fetch-depth: 1
+          persist-credentials: false
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: target/release/baseball-computer
           key: build-${{ github.run_id }}
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
       - run: uv sync --extra ci --frozen
-      - run: uv run python bin/patch_known_corpus_bugs.py retrosheet
-      - run: mkdir csv parquet arrow
-      - run: ./target/release/baseball-computer -i retrosheet -o csv
+      - run: mkdir csv parquet
+      - run: ./target/release/baseball-computer -i corpus/retrosheet -o csv
       - run: uv run python bin/parquet.py
 
-      - run: |
-          uv run aws s3 sync --endpoint-url=${{ secrets.R2_ENDPOINT }} \
+      - uses: actions/upload-artifact@v4
+        with:
+          name: findings-${{ needs.revision.outputs.revision }}
+          path: csv/findings.csv
+
+      - if: inputs.publish && github.ref == 'refs/heads/master'
+        run: |
+          uv run aws s3 sync --endpoint-url="$R2_ENDPOINT" \
             parquet s3://timeball/event \
             --exclude '*' --include '*.parquet' --delete
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET }}
           AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
 
   purge_cache:
     name: Purge Cloudflare cache
+    if: inputs.publish && github.ref == 'refs/heads/master'
     needs: [pbp, simple_files]
     runs-on: ubuntu-22.04
     steps:

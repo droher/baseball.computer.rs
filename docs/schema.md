@@ -3,17 +3,17 @@
 The parser writes one CSV per variant of `EventFileSchema`
 (`src/main.rs`). `bin/parquet.py` and `bin/simple_files.py` then convert
 those CSVs into the Parquet files consumed by the
-[`baseball.computer`](https://github.com/droher/baseball.computer) dbt
+[`baseball.computer`](https://github.com/droher/baseball.computer) SQLMesh
 project.
 
-This document is the contract between the Rust parser and the dbt
+This document is the contract between the Rust parser and the SQLMesh
 sources. Each section names one variant; the row struct (or pair of
 structs, for the box-score variants) is the canonical column-level
 source of truth — clippy-deny enforces it stays consistent.
 
 **Filename pattern:** `{schema}.csv`, where `{schema}` is the strum
 `snake_case` rendering of the variant. Renaming a variant renames the
-downstream Parquet table and breaks the dbt sources, so coordinate
+downstream Parquet table and breaks the SQLMesh sources, so coordinate
 before doing it.
 
 **Event key namespacing:** Every play-by-play row carries an
@@ -224,10 +224,10 @@ Source: `BoxScoreComments` in `src/event_file/schemas.rs`.
    `write_play_by_play_files` for box-score rows.
 4. Add a section here, named for the snake-case `{schema}` token.
 5. Coordinate the column-level changes with the `baseball.computer`
-   dbt project before merging.
+   SQLMesh project before merging.
 
 ## Renaming columns
 
-Treat output column names as a public API. Coordinate with the dbt
+Treat output column names as a public API. Coordinate with the SQLMesh
 project before renaming. Type-narrowing changes (e.g. widening a `u8`
 to `u32`) generally do not break consumers; renames and removals do.

@@ -149,6 +149,7 @@ pub(super) fn reconcile_with_game_id(
     let bytes = id_str.as_bytes();
     if bytes.len() != 12 {
         warn!(
+            kind = "game_id_wrong_length",
             "game_id {} is {} chars long, expected 12; skipping the rest of the checks",
             id_str,
             bytes.len()
@@ -159,13 +160,16 @@ pub(super) fn reconcile_with_game_id(
     let home_from_id = &id_str[0..3];
     if !presence.home_team {
         warn!(
-            "game_id {} has no info,hometeam record; skipping the home team check",
-            id_str
+            kind = "missing_info_hometeam",
+            "game_id {} has no info,hometeam record; skipping the home team check", id_str
         );
     } else if teams.home.as_str() != home_from_id {
         warn!(
+            kind = "game_id_hometeam_mismatch",
             "game_id {} starts with home team {}, but info,hometeam is {}",
-            id_str, home_from_id, teams.home
+            id_str,
+            home_from_id,
+            teams.home
         );
     }
 
@@ -176,28 +180,35 @@ pub(super) fn reconcile_with_game_id(
         if let (Ok(y), Ok(m), Ok(d)) = (year_res, month_res, day_res) {
             if setting.date.year() != y || setting.date.month() != m || setting.date.day() != d {
                 warn!(
+                    kind = "game_id_date_mismatch",
                     "game_id {} encodes the date {:04}-{:02}-{:02}, but info,date is {}",
-                    id_str, y, m, d, setting.date
+                    id_str,
+                    y,
+                    m,
+                    d,
+                    setting.date
                 );
             }
         } else {
             warn!(
-                "game_id {} has a date that is not numeric; skipping the date check",
-                id_str
+                kind = "game_id_date_not_numeric",
+                "game_id {} has a date that is not numeric; skipping the date check", id_str
             );
         }
     } else {
         warn!(
-            "game_id {} has no info,date record; skipping the date check",
-            id_str
+            kind = "missing_info_date",
+            "game_id {} has no info,date record; skipping the date check", id_str
         );
     }
 
     let suffix = bytes[11];
     let Some(dh_from_id) = doubleheader_status_from_suffix(suffix) else {
         warn!(
+            kind = "game_id_unknown_suffix",
             "game_id {} ends in '{}', which is not a known doubleheader number",
-            id_str, suffix as char
+            id_str,
+            suffix as char
         );
         return;
     };
@@ -205,14 +216,19 @@ pub(super) fn reconcile_with_game_id(
     if presence.doubleheader {
         if setting.doubleheader_status != dh_from_id {
             warn!(
+                kind = "game_id_number_mismatch",
                 "game_id {} ends in {:?} but info,number says {:?}; keeping info,number",
-                id_str, dh_from_id, setting.doubleheader_status
+                id_str,
+                dh_from_id,
+                setting.doubleheader_status
             );
         }
     } else if dh_from_id != DoubleheaderStatus::SingleGame {
         warn!(
+            kind = "missing_info_number",
             "game_id {} has no info,number record; using {:?} from the game ID suffix",
-            id_str, dh_from_id
+            id_str,
+            dh_from_id
         );
         setting.doubleheader_status = dh_from_id;
     }

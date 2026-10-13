@@ -1,5 +1,6 @@
 import glob
 import os
+import sys
 from pathlib import Path
 
 import pyarrow as pa
@@ -11,7 +12,7 @@ from pyarrow import csv, parquet
 # Retrosheet `btline`/`dtline` records that the corpus does not currently
 # contain — only `tline` (-> miscellaneous) is emitted.
 #
-# dbt sources expect the parquet files regardless. Provide an empty-schema
+# SQLMesh sources expect the parquet files regardless. Provide an empty-schema
 # fallback for these tables so an empty source still parses. Keep this in
 # sync with the row structs in src/event_file/box_score.rs:
 #   - TeamBattingLine = (side, BattingLineStats)
@@ -146,11 +147,19 @@ def write_empty_parquet(stem: str, parquet_file: str) -> bool:
     return True
 
 
-if __name__ == "__main__":
-    for f in glob.glob("csv/*.csv"):
+NOT_TABLES = frozenset({"findings"})
+
+
+def convert_directory(csv_dir: Path, parquet_dir: Path) -> tuple[list[str], list[str]]:
+    converted = []
+    failed = []
+    for f in sorted(glob.glob(f"{csv_dir}/*.csv")):
         print(f)
-        fname = f.split("/")[-1].split(".")[0]
-        parquet_path = f"parquet/{fname}.parquet"
+        fname = Path(f).stem
+        if fname in NOT_TABLES:
+            print(f"  -> skipped {fname}: not a warehouse table")
+            continue
+        parquet_path = f"{parquet_dir}/{fname}.parquet"
         if os.path.getsize(f) == 0:
             if not write_empty_parquet(fname, parquet_path):
                 print(f"  -> skipped empty CSV (no fallback schema): {fname}")
@@ -158,4 +167,14 @@ if __name__ == "__main__":
         try:
             file_to_data_frame_to_parquet(f, parquet_path)
         except (OSError, ValueError, pa.ArrowException) as e:
-            print(e)
+            print(f"  -> failed {fname}: {e}")
+            failed.append(fname)
+            continue
+        converted.append(fname)
+    return converted, failed
+
+
+if __name__ == "__main__":
+    _, failures = convert_directory(Path("csv"), Path("parquet"))
+    if failures:
+        sys.exit(f"Failed to convert {len(failures)} tables: {', '.join(failures)}")

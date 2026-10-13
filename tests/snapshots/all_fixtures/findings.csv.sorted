@@ -1,0 +1,3 @@
+source,kind,game_id,file,line,message
+retrosheet,info_whitespace_stripped,,fixtures/events/1948_BIR.EBR,,"Stripped whitespace from hometeam=""BIR "" (would overflow team/site capacity)"
+retrosheet,pitcher_responsibility_missing_runner,BSN191409102,fixtures/events/1914_BSN.EVN,,"Skipping pitcher responsibility adjustment for non-existent runner: PitcherResponsibilityAdjustment { pitcher_id: ""oescj101"", baserunner: First }"

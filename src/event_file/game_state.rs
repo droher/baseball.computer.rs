@@ -1267,6 +1267,7 @@ impl GameState {
         self.bases = next;
         if let Some(w) = warning {
             warn!(
+                kind = "pitcher_responsibility_missing_runner",
                 "Skipping pitcher responsibility adjustment for non-existent runner: {:?}",
                 w.adjustment
             );

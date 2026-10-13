@@ -3,7 +3,7 @@
 Inputs live at the root of the fetched retrosheet/ directory and don't go
 through the Rust event parser. Outputs are written to biodata/ alongside
 retrosheet_simple/, then synced to s3://timeball/biodata for the
-baseball.computer dbt project.
+baseball.computer SQLMesh project.
 
 Tables (with renames where the upstream header is uppercase / inconsistent):
   - teams.csv        -> biodata/teams.parquet
@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import csv
 import datetime as dt
+import argparse
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -226,28 +227,32 @@ def _coerce(spec: TableSpec, rows: list[dict[str, str]]) -> dict[str, list[objec
     return cols
 
 
-def write_biodata() -> None:
-    OUTPUT_PATH.mkdir(exist_ok=True)
+def write_biodata(retrosheet: Path = RETROSHEET_PATH, output: Path = OUTPUT_PATH) -> None:
+    output.mkdir(exist_ok=True)
     for spec in SPECS:
-        src = RETROSHEET_PATH / spec.source
+        src = retrosheet / spec.source
         if not src.exists():
             raise FileNotFoundError(
                 f"Required biodata source missing: {src}. "
-                "Run bin/fetch_retrosheet.py first."
+                "Point --corpus at a Corpus revision from retrosheet-mirror."
             )
         rows = list(_read_rows(src, spec))
         cols = _coerce(spec, rows)
         table = pa.table(cols, schema=spec.schema)
-        out = OUTPUT_PATH / f"{spec.name}.parquet"
+        out = output / f"{spec.name}.parquet"
         pq.write_table(table, out, compression="zstd")
         logger.info("Wrote %s rows=%d -> %s", spec.name, len(rows), out)
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--corpus", type=Path, required=True, help="Corpus revision root")
+    parser.add_argument("--output", type=Path, default=OUTPUT_PATH)
+    args = parser.parse_args()
     logging.basicConfig(
         level=logging.INFO, format="%(levelname)s %(name)s: %(message)s"
     )
-    write_biodata()
+    write_biodata(args.corpus / "retrosheet", args.output)
 
 
 if __name__ == "__main__":

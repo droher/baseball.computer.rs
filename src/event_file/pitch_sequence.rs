@@ -17,6 +17,7 @@ fn warn_unrecognized_pitch_char_once(c: char) {
         let seen = guard.get_or_insert_with(HashSet::new);
         if seen.insert(c) {
             warn!(
+                kind = "unrecognized_pitch_char",
                 "Unrecognized pitch char {c:?}, mapping to {:?}",
                 PitchType::Unrecognized
             );

@@ -17,3 +17,9 @@ See the website or the main repo for more info:
 https://baseball.computer/
 
 https://github.com/droher/baseball.computer
+
+The input is a Corpus revision from
+[retrosheet-mirror](https://github.com/droher/retrosheet-mirror), which owns
+every Retrosheet and Lahman download and every correction to that data.
+`CORPUS_REVISION` pins the revision CI builds; see
+[build and run](.claude/rules/build.md).

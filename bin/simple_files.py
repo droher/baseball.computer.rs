@@ -1,5 +1,8 @@
+import argparse
 import csv as stdcsv
 import fileinput
+import logging
+import re
 from pathlib import Path
 from typing import Dict, Type, Iterator, List, Tuple
 
@@ -34,8 +37,27 @@ SCHEDULE_COLUMNS_13 = [
 ]
 SCHEDULE_PARK_INSERT_AT = 10  # index of park_id, between day_night and postponement_indicator
 
-RETROSHEET_PATH = Path("retrosheet")
 OUTPUT_PATH = Path("retrosheet_simple")
+LAHMAN_OUTPUT_PATH = Path("baseballdatabank")
+NGL_STATS_OUTPUT_PATH = Path("ngl_stats")
+FRANCHISE_FILE = "CurrentNames.csv"
+TABLE_RENAMES = {"FieldingOFsplit": "fielding_of_split"}
+COLUMN_RENAMES = {
+    "2B": "_2b", "3B": "_3b", "IPouts": "ip_outs", "Ghome": "g_home",
+    "HA": "h_a", "HRA": "hr_a", "BBA": "bb_a", "SOA": "so_a",
+    "Glf": "g_lf", "Gcf": "g_cf", "Grf": "g_rf",
+    "teamIDBR": "team_id_br", "teamIDlahman45": "team_id_lahman45", "teamIDretro": "team_id_retro",
+    "teamIDwinner": "team_id_winner", "lgIDwinner": "lg_id_winner",
+    "teamIDloser": "team_id_loser", "lgIDloser": "lg_id_loser",
+    "NAassoc": "na_assoc", "yearid": "year_id",
+    "yearkey": "year_id", "leaguekey": "lg_id", "teamkey": "team_id", "parkkey": "park_id",
+    "spanfirst": "first_game", "spanlast": "last_game", "parkalias": "park_alias", "parkname": "park_name",
+}
+DATE_COLUMNS = "debut", "final_game"
+FLOAT_COLUMNS = "zr", "height"
+CAMEL_BOUNDARY = re.compile(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+
+LOG = logging.getLogger(__name__)
 
 RETROSHEET_SUBDIRS = "gamelogs", "schedules", "rosters"
 FILES = "gamelog", "schedule", "park", "roster", "bio"
@@ -44,16 +66,59 @@ FILES = "gamelog", "schedule", "park", "roster", "bio"
 DOS_EOF = chr(26)
 
 
-def get_prebuilt_csvs() -> None:
+def get_prebuilt_csvs(retrosheet_base: Path, output_base: Path = OUTPUT_PATH) -> None:
     franchise_header = ["current_franchise_id", "team_id", "league", "division", "location", "nickname",
                         "alternate_nicknames", "date_start", "date_end", "city", "state"]
+    source = retrosheet_base / FRANCHISE_FILE
+    if not source.is_file():
+        raise FileNotFoundError(f"{source} is missing from the Corpus revision")
     (pandas
-     .read_csv("https://www.retrosheet.org/CurrentNames.csv", names=franchise_header, parse_dates=["date_start", "date_end"])
-     .to_parquet("retrosheet_simple/franchise.parquet", index=False)
+     .read_csv(source, names=franchise_header, parse_dates=["date_start", "date_end"])
+     .to_parquet(output_base / "franchise.parquet", index=False)
      )
 
 
-def parse_simple_files() -> None:
+def snake_case(name: str) -> str:
+    if name in COLUMN_RENAMES:
+        return COLUMN_RENAMES[name]
+    return CAMEL_BOUNDARY.sub("_", name).lower()
+
+
+def table_name(stem: str) -> str:
+    return TABLE_RENAMES.get(stem, snake_case(stem))
+
+
+def read_verbatim_csv(path: Path) -> pandas.DataFrame:
+    frame = pandas.read_csv(path, encoding="utf-8-sig", keep_default_na=False, na_values=[""],
+                            low_memory=False, dtype_backend="numpy_nullable")
+    frame = frame.rename(columns=snake_case)
+    for column in DATE_COLUMNS:
+        if column in frame.columns:
+            frame[column] = pandas.to_datetime(frame[column], format="%Y-%m-%d")
+    for column in FLOAT_COLUMNS:
+        if column in frame.columns:
+            frame[column] = frame[column].astype("Float64")
+    return frame
+
+
+def convert_csv_dir(source: Path, output: Path, *, required: bool) -> list[Path]:
+    if not source.is_dir():
+        if required:
+            raise FileNotFoundError(f"{source} is missing from the Corpus revision")
+        LOG.warning("%s is missing from the Corpus revision; skipping it", source)
+        return []
+    output.mkdir(parents=True, exist_ok=True)
+    written = []
+    for csv_path in sorted(source.glob("*.csv")):
+        target = output / f"{table_name(csv_path.stem)}.parquet"
+        frame = read_verbatim_csv(csv_path)
+        frame.to_parquet(target, index=False, compression="zstd")
+        LOG.info("Wrote %s rows=%d -> %s", csv_path.name, len(frame), target)
+        written.append(target)
+    return written
+
+
+def parse_simple_files(retrosheet_base: Path, output_base: Path = OUTPUT_PATH) -> None:
     def concat_files(input_path: Path, output_file: Path, glob: str = "*",
                      prepend_filename: bool = False,
                      strip_header: bool = False,
@@ -91,8 +156,6 @@ def parse_simple_files() -> None:
                     lines.add(new_line)
                 fout.write(new_line.strip() + "\n")
 
-    retrosheet_base = Path(RETROSHEET_PATH)
-    output_base = Path(OUTPUT_PATH)
     output_base.mkdir(exist_ok=True)
     subdirs = {subdir: retrosheet_base / subdir for subdir in RETROSHEET_SUBDIRS}
 
@@ -150,7 +213,7 @@ def fields_for(name: str, table: AlchemyTable) -> List[Tuple[str, str]]:
     return get_fields(table)
 
 
-def write_files() -> None:
+def write_files(output_base: Path = OUTPUT_PATH) -> None:
     """
     Creates a Parquet file for each table in the schema.
     """
@@ -160,8 +223,8 @@ def write_files() -> None:
         name = table.name
         print(name)
 
-        extract_file = OUTPUT_PATH / f"{name}.csv"
-        parquet_file = OUTPUT_PATH / f"{name}.parquet"
+        extract_file = output_base / f"{name}.csv"
+        parquet_file = output_base / f"{name}.parquet"
 
         fields = fields_for(name, table)
         arrow_schema = pa.schema(fields)
@@ -178,7 +241,18 @@ def write_files() -> None:
         pq.write_table(table, parquet_file, compression="zstd")
 
 
-if __name__ == "__main__":
-    parse_simple_files()
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--corpus", type=Path, required=True, help="Corpus revision root")
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    retrosheet_base = args.corpus / "retrosheet"
+    parse_simple_files(retrosheet_base)
     write_files()
-    get_prebuilt_csvs()
+    get_prebuilt_csvs(retrosheet_base)
+    convert_csv_dir(args.corpus / "lahman", LAHMAN_OUTPUT_PATH, required=True)
+    convert_csv_dir(retrosheet_base / "ngl_stats", NGL_STATS_OUTPUT_PATH, required=False)
+
+
+if __name__ == "__main__":
+    main()

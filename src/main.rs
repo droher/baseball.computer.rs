@@ -40,8 +40,10 @@ use fixed_map::{Key, Map};
 use rayon::prelude::*;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-use tracing::{Level, debug, error, info, warn};
-use tracing_subscriber::FmtSubscriber;
+use tracing::{debug, error, info, info_span, warn};
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::{Layer, fmt};
 
 use event_file::game_state::GameContext;
 use event_file::parser::RetrosheetReader;
@@ -55,8 +57,10 @@ use crate::event_file::schemas::{
     Events, GameEarnedRuns, Games,
 };
 use crate::event_file::traits::{EVENT_KEY_BUFFER, GameType};
+use crate::findings::{FINDINGS_FILE, FindingsLayer};
 
 mod event_file;
+mod findings;
 mod pitch_review;
 
 const ABOUT: &str = "Creates structured datasets from raw Retrosheet files.";
@@ -424,6 +428,7 @@ struct WorkerCtx<'a> {
     writer_map: &'a WriterMap,
     json_writer: Option<&'a ThreadSafeJsonWriter>,
     errors: &'a Mutex<Vec<anyhow::Error>>,
+    relative_paths: &'a [String],
     base_index: usize,
     audit_pitch_conflicts: bool,
 }
@@ -469,6 +474,8 @@ fn pump_file(
     game_rx: &crossbeam_channel::Receiver<GameTask>,
     ctx: &WorkerCtx<'_>,
 ) {
+    let file = ctx.relative_paths.get(file_idx).map_or("", AsRef::as_ref);
+    let _span = info_span!("file", file).entered();
     let file_index = (ctx.base_index + file_idx) * EVENT_KEY_BUFFER;
     let reader = match RetrosheetReader::new(path, file_index) {
         Ok(r) => r,
@@ -574,6 +581,15 @@ impl EventFileSchema {
     }
 
     fn run_task(task: &GameTask, ctx: &WorkerCtx<'_>) {
+        let game_id = match task.record_vec.record_vec.first() {
+            Some(MappedRecord::GameId(game_id)) => game_id.id.as_str(),
+            _ => "",
+        };
+        let file = ctx
+            .relative_paths
+            .get(task.source_rank.0)
+            .map_or("", AsRef::as_ref);
+        let _span = info_span!("game", file, game_id).entered();
         if let Err(e) = Self::process_game(task, ctx) {
             ctx.errors.lock().map(|mut g| g.push(e)).ok();
         }
@@ -593,8 +609,10 @@ impl EventFileSchema {
                 .is_some_and(|games| games.contains(&game_id))
         {
             warn!(
+                kind = "already_processed_game",
                 "File {} contains already-processed game {}, ignoring",
-                file_info.filename, &game_id.id
+                file_info.filename,
+                &game_id.id
             );
             return Ok(Some(game_id));
         }
@@ -609,8 +627,12 @@ impl EventFileSchema {
                 .context("duplicate source inventory was empty")?;
             if task.source_rank != selected {
                 warn!(
+                    kind = "duplicate_game",
                     "File {} contains duplicate game {}, ignoring source rank {:?}; selected {:?}",
-                    file_info.filename, &game_id.id, task.source_rank, selected
+                    file_info.filename,
+                    &game_id.id,
+                    task.source_rank,
+                    selected
                 );
                 return Ok(Some(game_id));
             }
@@ -642,15 +664,19 @@ impl EventFileSchema {
         let game_id = game_context.game_id;
         if ctx.parsed_games.is_some_and(|pg| pg.contains(&game_id)) {
             warn!(
+                kind = "already_processed_game",
                 "File {} contains already-processed game {}, ignoring",
-                file_info.filename, &game_id.id
+                file_info.filename,
+                &game_id.id
             );
             return Ok(Some(game_id));
         }
         if !ctx.claimed_games.pin().insert(game_id) {
             warn!(
+                kind = "duplicate_game",
                 "File {} contains duplicate game {}, ignoring later occurrence",
-                file_info.filename, &game_id.id
+                file_info.filename,
+                &game_id.id
             );
             return Ok(Some(game_id));
         }
@@ -890,6 +916,7 @@ impl FileProcessor {
         // then reorder so the largest files run first. Largest-first reduces
         // tail latency: by the time we get to small files, work-stealing has
         // many cheap items to balance the few cores still finishing big ones.
+        let relative_paths = corpus_relative_paths(&self.opt.input, &files);
         let mut indexed: Vec<(usize, PathBuf)> = files.into_iter().enumerate().collect();
         indexed.par_sort_by_key(|(_, p)| {
             std::cmp::Reverse(std::fs::metadata(p).map(|m| m.len()).unwrap_or(0))
@@ -918,6 +945,7 @@ impl FileProcessor {
             writer_map: &self.writer_map,
             json_writer: self.json_writer.as_ref(),
             errors: &errors,
+            relative_paths: &relative_paths,
             base_index: self.index,
             audit_pitch_conflicts: self.opt.audit_pitch_conflicts,
         };
@@ -976,17 +1004,38 @@ impl FileProcessor {
     }
 }
 
+fn corpus_relative_paths(input: &Path, files: &[PathBuf]) -> Vec<String> {
+    files
+        .iter()
+        .map(|path| corpus_relative(input, path))
+        .collect()
+}
+
+fn corpus_relative(input: &Path, path: &Path) -> String {
+    let root = input.parent().unwrap_or(input);
+    let relative = path.strip_prefix(root).unwrap_or(path);
+    let parts: Vec<String> = relative
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    parts.join("/")
+}
+
 fn main() -> Result<()> {
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
-        .finish();
+    let findings = FindingsLayer::default();
+    let subscriber = tracing_subscriber::registry()
+        .with(fmt::layer().with_filter(LevelFilter::INFO))
+        .with(findings.clone());
     tracing::subscriber::set_global_default(subscriber)
         .context("Failed to initialize tracing subscriber")?;
 
     let opt = Opt::parse();
     let start = Instant::now();
+    let findings_path = get_output_root(&opt)?.join(FINDINGS_FILE);
 
     FileProcessor::new(opt)?.process_files()?;
+    let count = findings.write_csv(&findings_path)?;
+    info!("Wrote {count} findings to {}", findings_path.display());
 
     let end = start.elapsed();
     info!("Elapsed: {:?}", end);

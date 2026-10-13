@@ -22,6 +22,10 @@ class ParquetConverter(Protocol):
 
     def write_empty_parquet(self, stem: str, parquet_file: str) -> bool: ...
 
+    def convert_directory(
+        self, csv_dir: Path, parquet_dir: Path
+    ) -> tuple[list[str], list[str]]: ...
+
 
 def load_converter() -> ParquetConverter:
     path = Path(__file__).with_name("parquet.py")
@@ -192,3 +196,31 @@ def test_old_game_csv_does_not_gain_provenance_columns(tmp_path: Path) -> None:
     assert "source_scorer" not in table.column_names
     assert table.column("scorer").to_pylist() == ["scogc701"]
     assert table.column("legacy_text").to_pylist() == [None]
+
+
+def test_the_findings_report_is_not_converted_to_a_table(tmp_path: Path) -> None:
+    csv_dir = tmp_path / "csv"
+    parquet_dir = tmp_path / "parquet"
+    csv_dir.mkdir()
+    parquet_dir.mkdir()
+    (csv_dir / "games.csv").write_text("game_id,event_key\nBOS202604010,1\n")
+    (csv_dir / "findings.csv").write_text("source,kind,game_id,file,line,message\n")
+
+    converted, failed = parquet_converter.convert_directory(csv_dir, parquet_dir)
+
+    assert converted == ["games"]
+    assert failed == []
+    assert sorted(p.name for p in parquet_dir.iterdir()) == ["games.parquet"]
+
+
+def test_a_table_that_fails_to_convert_is_reported(tmp_path: Path) -> None:
+    csv_dir = tmp_path / "csv"
+    parquet_dir = tmp_path / "parquet"
+    csv_dir.mkdir()
+    parquet_dir.mkdir()
+    (csv_dir / "events.csv").write_text("game_id,event_key\nBOS202604010,not-a-number\n")
+
+    converted, failed = parquet_converter.convert_directory(csv_dir, parquet_dir)
+
+    assert converted == []
+    assert failed == ["events"]
