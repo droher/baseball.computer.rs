@@ -386,7 +386,7 @@ impl TryFrom<&RetrosheetEventRecord> for InfoRecord {
             "gametype" => Self::GameType(GameType::from_str(value)?),
             "howentered" => Self::HowEntered,
 
-            "windspeed" => Self::WindSpeed(parse_positive_int::<u8>(value)),
+            "windspeed" => Self::WindSpeed(parse_non_negative_int::<u8>(value)),
             "timeofgame" => Self::TimeOfGameMinutes(parse_positive_int::<u16>(value)),
             "attendance" => Self::Attendance(parse_non_negative_int::<u32>(value)),
             "temp" => Self::Temp(parse_positive_int::<u8>(value)),
@@ -531,8 +531,13 @@ mod tests {
     }
 
     #[test]
-    fn windspeed_filters_zero_and_negative() {
+    fn windspeed_keeps_zero_and_filters_negative() {
         let r = rec(&["info", "windspeed", "0"]);
+        assert_eq!(
+            InfoRecord::try_from(&r).unwrap(),
+            InfoRecord::WindSpeed(Some(0))
+        );
+        let r = rec(&["info", "windspeed", "-1"]);
         assert_eq!(
             InfoRecord::try_from(&r).unwrap(),
             InfoRecord::WindSpeed(None)
